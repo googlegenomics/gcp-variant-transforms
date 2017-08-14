@@ -1,0 +1,4 @@
+Tool for processing VCF files in a scalable manner.
+
+The current implementation supports exporting VCF files (stored in local or on
+Google Cloud Storage) to BigQuery.
