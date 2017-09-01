@@ -20,4 +20,5 @@ setuptools.setup(
     install_requires=REQUIRED_PACKAGES,
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
+    package_data={'variant_processing': ['testing/testdata/*']},
 )

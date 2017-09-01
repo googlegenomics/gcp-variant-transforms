@@ -1,25 +1,31 @@
 """Tests for vcfio module."""
 
-import bz2
-import gzip
 import logging
 import os
 import shutil
 import tempfile
 import unittest
 
-from apache_beam import coders
-from apache_beam.io.filebasedsource_test import write_data
-from apache_beam.io.filebasedsource_test import write_pattern
-from apache_beam.io.filesystem import CompressionTypes
 import apache_beam.io.source_test_utils as source_test_utils
-
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
-from apache_beam.testing.util import equal_to
+from apache_beam.testing.util import BeamAssertException
 
-from beam_io.vcfio import _TextSource as TextSource
-from beam_io.vcfio import ReadFromText
+from beam_io.vcfio import _VcfSource as VcfSource
+from beam_io.vcfio import ReadFromVcf
+from beam_io.vcfio import Variant
+
+from testing import testdata_util
+
+# Note: mixing \n and \r\n to verify both behaviors.
+_SAMPLE_HEADER_LINES = [
+    '##fileformat=VCFv4.2\n',
+    '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+    '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+    '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
+    '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
+    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\r\n',
+]
 
 
 class _TestCaseWithTempDirCleanUp(unittest.TestCase):
@@ -43,198 +49,205 @@ class _TestCaseWithTempDirCleanUp(unittest.TestCase):
     self._tempdirs.append(result)
     return result
 
-  def _create_temp_file(self, name='', suffix=''):
+  def _create_temp_file(self, name='', suffix='', tmpdir=None):
     if not name:
       name = tempfile.template
-    file_name = tempfile.NamedTemporaryFile(
+    return tempfile.NamedTemporaryFile(
         delete=False, prefix=name,
-        dir=self._new_tempdir(), suffix=suffix).name
-    return file_name
+        dir=tmpdir or self._new_tempdir(), suffix=suffix)
 
 
-class TextSourceTest(_TestCaseWithTempDirCleanUp):
+# Helper method for comparing variants.
+def _variant_comparator(v1, v2):
+  if v1.reference_name == v2.reference_name:
+    if v1.start == v2.start:
+      return cmp(v1.end, v2.end)
+    return cmp(v1.start, v2.start)
+  return cmp(v1.reference_name, v2.reference_name)
 
-  # Number of records that will be written by most tests.
-  DEFAULT_NUM_RECORDS = 100
 
-  def _run_read_test(self, file_or_pattern, expected_data,
-                     buffer_size=DEFAULT_NUM_RECORDS,
-                     compression=CompressionTypes.UNCOMPRESSED):
-    # Since each record usually takes more than 1 byte, default buffer size is
-    # smaller than the total size of the file. This is done to
-    # increase test coverage for cases that hit the buffer boundary.
-    source = TextSource(file_or_pattern, 0, compression,
-                        True, coders.StrUtf8Coder(), buffer_size)
+# Helper method for verifying equal count on PCollection.
+def _count_equals_to(expected_count):
+  def _count_equal(actual_list):
+    actual_count = len(actual_list)
+    if expected_count != actual_count:
+      raise BeamAssertException(
+          'Expected %d not equal actual %d' % (expected_count, actual_count))
+  return _count_equal
+
+
+class VcfSourceTest(_TestCaseWithTempDirCleanUp):
+
+  def _read_records(self, file_or_pattern):
+    source = VcfSource(file_or_pattern)
     range_tracker = source.get_range_tracker(None, None)
     read_data = [record for record in source.read(range_tracker)]
-    self.assertItemsEqual(expected_data, read_data)
+    return read_data
+
+  def _create_temp_vcf_file(self, lines, tmpdir=None):
+    with self._create_temp_file(suffix='.vcf', tmpdir=tmpdir) as f:
+      for line in lines:
+        f.write(line)
+    return f.name
+
+  def _create_temp_file_and_read_records(self, lines):
+    return self._read_records(self._create_temp_vcf_file(lines))
+
+  def _assert_variants_equal(self, actual, expected):
+    self.assertEqual(
+        sorted(expected, cmp=_variant_comparator),
+        sorted(actual, cmp=_variant_comparator))
+
+  def _get_sample_variant_1(self):
+    vcf_line = '20	1234	rs12345	C	A,T	50	PASS	AF=0.5;NS=1	GT:GQ	0/0:48\n'
+    variant = Variant(
+        reference_name='20', start=1233, end=1234, reference_bases='C',
+        alternate_bases=['A', 'T'])
+    return variant, vcf_line
+
+  def _get_sample_variant_2(self):
+    vcf_line = '19	123	rs12345	GTC	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n'
+    variant = Variant(
+        reference_name='19', start=122, end=125, reference_bases='GTC',
+        alternate_bases=['C'])
+    return variant, vcf_line
+
+  def _get_sample_variant_3(self):
+    vcf_line = '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5;NS=2	GT:GQ	1|1:45\n'
+    variant = Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['<SYMBOLIC>'])
+    return variant, vcf_line
 
   def test_read_single_file(self):
-    file_name, expected_data = write_data(TextSourceTest.DEFAULT_NUM_RECORDS)
-    assert len(expected_data) == TextSourceTest.DEFAULT_NUM_RECORDS
-    self._run_read_test(file_name, expected_data)
+    test_data_conifgs = [
+        {'file': 'valid-4.0.vcf', 'num_records': 5},
+        {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
+        {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
+        {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
+        {'file': 'valid-4.2.vcf', 'num_records': 13},
+    ]
+    for config in test_data_conifgs:
+      read_data = self._read_records(
+          testdata_util.get_full_file_path(config['file']))
+      self.assertEqual(config['num_records'], len(read_data))
 
   def test_read_file_pattern(self):
-    pattern, expected_data = write_pattern(
-        [TextSourceTest.DEFAULT_NUM_RECORDS * 5,
-         TextSourceTest.DEFAULT_NUM_RECORDS * 3,
-         TextSourceTest.DEFAULT_NUM_RECORDS * 12,
-         TextSourceTest.DEFAULT_NUM_RECORDS * 8,
-         TextSourceTest.DEFAULT_NUM_RECORDS * 8,
-         TextSourceTest.DEFAULT_NUM_RECORDS * 4])
-    assert len(expected_data) == TextSourceTest.DEFAULT_NUM_RECORDS * 40
-    self._run_read_test(pattern, expected_data)
+    read_data = self._read_records(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
+    self.assertEqual(9900, len(read_data))
 
-  def test_read_from_text_file_pattern(self):
-    pattern, expected_data = write_pattern([5, 3, 12, 8, 8, 4])
-    assert len(expected_data) == 40
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromText(pattern)
-    assert_that(pcoll, equal_to(expected_data))
-    pipeline.run()
+    read_data_gz = self._read_records(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf.gz'))
+    self.assertEqual(9900, len(read_data_gz))
 
-  def test_read_auto_bzip2(self):
-    _, lines = write_data(15)
-    file_name = self._create_temp_file(suffix='.bz2')
-    with bz2.BZ2File(file_name, 'wb') as f:
-      f.write('\n'.join(lines))
+  def test_single_file_no_records(self):
+    self.assertEqual(
+        [], self._create_temp_file_and_read_records(['']))
+    self.assertEqual(
+        [], self._create_temp_file_and_read_records(['\n', '\r\n', '\n']))
+    self.assertEqual(
+        [], self._create_temp_file_and_read_records(_SAMPLE_HEADER_LINES))
 
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromText(file_name)
-    assert_that(pcoll, equal_to(lines))
-    pipeline.run()
+  def test_single_file_verify_details(self):
+    variant_1, vcf_line_1 = self._get_sample_variant_1()
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [vcf_line_1])
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant_1, read_data[0])
 
-  def test_read_auto_gzip(self):
-    _, lines = write_data(15)
-    file_name = self._create_temp_file(suffix='.gz')
+    variant_2, vcf_line_2 = self._get_sample_variant_2()
+    variant_3, vcf_line_3 = self._get_sample_variant_3()
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3])
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
-    with gzip.GzipFile(file_name, 'wb') as f:
-      f.write('\n'.join(lines))
+  def test_file_pattern_verify_details(self):
+    variant_1, vcf_line_1 = self._get_sample_variant_1()
+    variant_2, vcf_line_2 = self._get_sample_variant_2()
+    variant_3, vcf_line_3 = self._get_sample_variant_3()
+    tmpdir = self._new_tempdir()
+    self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [vcf_line_1],
+                               tmpdir=tmpdir)
+    self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [vcf_line_2, vcf_line_3],
+                               tmpdir=tmpdir)
+    read_data = self._read_records(os.path.join(tmpdir, '*.vcf'))
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromText(file_name)
-    assert_that(pcoll, equal_to(lines))
-    pipeline.run()
-
-  def test_read_bzip2(self):
-    _, lines = write_data(15)
-    file_name = self._create_temp_file()
-    with bz2.BZ2File(file_name, 'wb') as f:
-      f.write('\n'.join(lines))
-
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromText(
-        file_name,
-        compression_type=CompressionTypes.BZIP2)
-    assert_that(pcoll, equal_to(lines))
-    pipeline.run()
-
-  def _remove_lines(self, lines, sublist_lengths, num_to_remove):
-    """Utility function to remove num_to_remove lines from each sublist.
-
-    Args:
-      lines: list of items.
-      sublist_lengths: list of integers representing length of sublist
-        corresponding to each source file.
-      num_to_remove: number of lines to remove from each sublist.
-    Returns:
-      remaining lines.
-    """
-    curr = 0
-    result = []
-    for offset in sublist_lengths:
-      end = curr + offset
-      start = min(curr + num_to_remove, end)
-      result += lines[start:end]
-      curr += offset
-    return result
-
-  def _read_skip_header_lines(self, file_or_pattern, skip_header_lines):
-    """Simple wrapper function for instantiating TextSource."""
-    source = TextSource(
-        file_or_pattern,
-        0,
-        CompressionTypes.UNCOMPRESSED,
-        True,
-        coders.StrUtf8Coder(),
-        skip_header_lines=skip_header_lines)
-
-    range_tracker = source.get_range_tracker(None, None)
-    return [record for record in source.read(range_tracker)]
-
-  def test_read_skip_header_single(self):
-    file_name, expected_data = write_data(TextSourceTest.DEFAULT_NUM_RECORDS)
-    assert len(expected_data) == TextSourceTest.DEFAULT_NUM_RECORDS
-    skip_header_lines = 1
-    expected_data = self._remove_lines(expected_data,
-                                       [TextSourceTest.DEFAULT_NUM_RECORDS],
-                                       skip_header_lines)
-    read_data = self._read_skip_header_lines(file_name, skip_header_lines)
-    self.assertEqual(len(expected_data), len(read_data))
-    self.assertItemsEqual(expected_data, read_data)
-
-  def test_read_skip_header_pattern(self):
-    line_counts = [
-        TextSourceTest.DEFAULT_NUM_RECORDS * 5,
-        TextSourceTest.DEFAULT_NUM_RECORDS * 3,
-        TextSourceTest.DEFAULT_NUM_RECORDS * 12,
-        TextSourceTest.DEFAULT_NUM_RECORDS * 8,
-        TextSourceTest.DEFAULT_NUM_RECORDS * 8,
-        TextSourceTest.DEFAULT_NUM_RECORDS * 4
-    ]
-    skip_header_lines = 2
-    pattern, data = write_pattern(line_counts)
-
-    expected_data = self._remove_lines(data, line_counts, skip_header_lines)
-    read_data = self._read_skip_header_lines(pattern, skip_header_lines)
-    self.assertEqual(len(expected_data), len(read_data))
-    self.assertItemsEqual(expected_data, read_data)
-
-  def test_read_skip_header_pattern_insufficient_lines(self):
-    line_counts = [
-        5, 3,  # Fewer lines in file than we want to skip
-        12, 8, 8, 4
-    ]
-    skip_header_lines = 4
-    pattern, data = write_pattern(line_counts)
-
-    data = self._remove_lines(data, line_counts, skip_header_lines)
-    read_data = self._read_skip_header_lines(pattern, skip_header_lines)
-    self.assertEqual(len(data), len(read_data))
-    self.assertItemsEqual(data, read_data)
-
-  def test_read_gzip_with_skip_lines(self):
-    _, lines = write_data(15)
-    file_name = self._create_temp_file()
-    with gzip.GzipFile(file_name, 'wb') as f:
-      f.write('\n'.join(lines))
-
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromText(
-        file_name, 0, CompressionTypes.GZIP,
-        True, coders.StrUtf8Coder(), skip_header_lines=2)
-    assert_that(pcoll, equal_to(lines[2:]))
-    pipeline.run()
-
-  def test_read_after_splitting_skip_header(self):
-    file_name, expected_data = write_data(100)
-    assert len(expected_data) == 100
-    source = TextSource(file_name, 0, CompressionTypes.UNCOMPRESSED, True,
-                        coders.StrUtf8Coder(), skip_header_lines=2)
-    splits = [split for split in source.split(desired_bundle_size=33)]
-
-    reference_source_info = (source, None, None)
+  def test_read_after_splitting(self):
+    file_name = testdata_util.get_full_file_path('valid-4.1-large.vcf')
+    source = VcfSource(file_name)
+    splits = [split for split in source.split(desired_bundle_size=500)]
+    self.assertGreater(len(splits), 1)
     sources_info = ([
         (split.source, split.start_position, split.stop_position) for
         split in splits])
     self.assertGreater(len(sources_info), 1)
-    reference_lines = source_test_utils.read_from_source(*reference_source_info)
-    split_lines = []
+    split_records = []
     for source_info in sources_info:
-      split_lines.extend(source_test_utils.read_from_source(*source_info))
+      split_records.extend(source_test_utils.read_from_source(*source_info))
+    self.assertEqual(9882, len(split_records))
 
-    self.assertEqual(expected_data[2:], reference_lines)
-    self.assertEqual(reference_lines, split_lines)
+  def test_invalid_file(self):
+    invalid_file_contents = [
+        # Malfromed record.
+        [
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '1    1  '
+        ],
+        # Missing "GT:GQ" format, but GQ is provided.
+        [
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT	1|0:48'
+        ],
+        # Malformed FILTER.
+        [
+            '##FILTER=<ID=PASS,Description="All filters passed">\n',
+            '##FILTER=<ID=LowQual,Descri\n',
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48',
+        ],
+        # POS should be an integer.
+        [
+            '##FILTER=<ID=PASS,Description="All filters passed">\n',
+            '##FILTER=<ID=LowQual,Descri\n',
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '19	abc	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n',
+        ],
+    ]
+    for content in invalid_file_contents:
+      try:
+        self._read_records(self._create_temp_vcf_file(content))
+        self.fail('Invalid VCF file must throw an exception')
+      except ValueError:
+        pass
+
+    # Try with multiple files (any one of them will throw an exception).
+    tmpdir = self._new_tempdir()
+    for content in invalid_file_contents:
+      self._create_temp_vcf_file(content, tmpdir=tmpdir)
+    try:
+      self._read_records(os.path.join(tmpdir, '*.vcf'))
+      self.fail('Invalid VCF file must throw an exception.')
+    except ValueError:
+      pass
+
+  def test_pipeline_read_single_file(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | 'Read' >> ReadFromVcf(
+        testdata_util.get_full_file_path('valid-4.0.vcf'))
+    assert_that(pcoll, _count_equals_to(5))
+    pipeline.run()
+
+  def test_pipeline_read_file_pattern(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | 'Read' >> ReadFromVcf(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
+    assert_that(pcoll, _count_equals_to(9900))
+    pipeline.run()
+
 
 
 if __name__ == '__main__':

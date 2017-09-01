@@ -24,6 +24,7 @@ import logging
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
 
+# TODO(arostami): Replace with the version from Beam SDK once that is released.
 from beam_io import vcfio
 
 
@@ -43,7 +44,7 @@ def run(argv=None):
   known_args, pipeline_args = parser.parse_known_args(argv)
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
-    _ = p | 'ReadFromVcf' >> vcfio.ReadFromText(known_args.input_pattern)
+    _ = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
 
 
 if __name__ == '__main__':

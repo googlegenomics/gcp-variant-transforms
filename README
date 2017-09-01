@@ -1,4 +1,19 @@
+# TODO(arostami): Format this as an .md file and add more details.
+
 Tool for processing VCF files in a scalable manner.
 
 The current implementation supports exporting VCF files (stored in local or on
 Google Cloud Storage) to BigQuery.
+
+To build:
+$ python setup.py build
+For example run commands, please see vcf_to_bq.py.
+
+To run tests:
+$ python setup.py test
+
+To run a specific test:
+$ python setup.py test -s <module>.<test class>.<test method>
+Example:
+$ python setup.py test -s beam_io.vcfio_test.VcfSourceTest.test_pipeline_read_single_file
+

@@ -12,9 +12,58 @@ from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 from apache_beam.transforms.display import DisplayDataItem
 
-__all__ = ['ReadFromVcf']
+import vcf
+
+__all__ = ['ReadFromVcf', 'Variant']
 
 
+class Variant(object):
+  """A class to store info about a genomic variant.
+
+  Each object corresponds to a single record in a VCF file.
+  """
+
+  def __init__(self,
+               reference_name=None,
+               start=None,
+               end=None,
+               reference_bases=None,
+               alternate_bases=None):
+    """Initialize the :class:`Variant` object.
+
+    Args:
+      reference_name (str): The reference on which this variant occurs
+        (such as `chr20` or `X`). .
+      start (int): The position at which this variant occurs (0-based).
+      end (int): The end position (0-based) of this variant.
+      reference_bases (str): The reference bases for this variant.
+      alternate_bases (list of str): The bases that appear instead of the
+        reference bases.
+    """
+    # TODO(arostami): Add more fields.
+    self.reference_name = reference_name
+    self.start = start
+    self.end = end
+    self.reference_bases = reference_bases
+    self.alternate_bases = alternate_bases or []
+
+  def __eq__(self, other):
+    return (self.reference_name == other.reference_name and
+            self.start == other.start and
+            self.end == other.end and
+            self.reference_bases == other.reference_bases and
+            self.alternate_bases == other.alternate_bases)
+
+  def __repr__(self):
+    return ', '.join(
+        [str(s) for s in [self.reference_name,
+                          self.start,
+                          self.end,
+                          self.reference_bases,
+                          self.alternate_bases]])
+
+# TODO(arostami): Remove once header processing changes are released in the
+# Beam SDK.
 class _TextSource(filebasedsource.FileBasedSource):
   r"""A source for reading text files.
 
@@ -55,6 +104,10 @@ class _TextSource(filebasedsource.FileBasedSource):
                          'size of data %d.', value, len(self._data))
       self._position = value
 
+    def reset(self):
+      self.data = ''
+      self.position = 0
+
   def __init__(self,
                file_pattern,
                min_bundle_size,
@@ -63,7 +116,8 @@ class _TextSource(filebasedsource.FileBasedSource):
                coder,
                buffer_size=DEFAULT_READ_BUFFER_SIZE,
                validate=True,
-               skip_header_lines=0):
+               skip_header_lines=0,
+               header_matcher_predicate=None):
     super(_TextSource, self).__init__(file_pattern, min_bundle_size,
                                       compression_type=compression_type,
                                       validate=validate)
@@ -80,6 +134,7 @@ class _TextSource(filebasedsource.FileBasedSource):
           'Skipping %d header lines. Skipping large number of header '
           'lines might significantly slow down processing.')
     self._skip_header_lines = skip_header_lines
+    self._header_matcher_predicate = header_matcher_predicate
 
   def display_data(self):
     parent_dd = super(_TextSource, self).display_data()
@@ -107,18 +162,18 @@ class _TextSource(filebasedsource.FileBasedSource):
     range_tracker.set_split_points_unclaimed_callback(split_points_unclaimed)
 
     with self.open_file(file_name) as file_to_read:
-      position_after_skipping_header_lines = self._skip_lines(
-          file_to_read, read_buffer,
-          self._skip_header_lines) if self._skip_header_lines else 0
-      start_offset = max(start_offset, position_after_skipping_header_lines)
-      if start_offset > position_after_skipping_header_lines:
+      position_after_processing_header_lines, header_lines = (
+          self._process_header(file_to_read, read_buffer))
+      self.process_header_lines_matching_predicate(file_name, header_lines)
+      start_offset = max(start_offset, position_after_processing_header_lines)
+      if start_offset > position_after_processing_header_lines:
         # Seeking to one position before the start index and ignoring the
         # current line. If start_position is at beginning if the line, that line
         # belongs to the current bundle, hence ignoring that is incorrect.
         # Seeking to one byte before prevents that.
 
         file_to_read.seek(start_offset - 1)
-        read_buffer = _TextSource.ReadBuffer('', 0)
+        read_buffer.reset()
         sep_bounds = self._find_separator_bounds(file_to_read, read_buffer)
         if not sep_bounds:
           # Could not find a separator after (start_offset - 1). This means that
@@ -129,7 +184,7 @@ class _TextSource(filebasedsource.FileBasedSource):
         read_buffer.data = read_buffer.data[sep_end:]
         next_record_start_position = start_offset - 1 + sep_end
       else:
-        next_record_start_position = position_after_skipping_header_lines
+        next_record_start_position = position_after_processing_header_lines
 
       while range_tracker.try_claim(next_record_start_position):
         record, num_bytes_to_next_record = self._read_record(file_to_read,
@@ -151,6 +206,36 @@ class _TextSource(filebasedsource.FileBasedSource):
         yield self._coder.decode(record)
         if num_bytes_to_next_record < 0:
           break
+
+  def process_header_lines_matching_predicate(self, file_name, header_lines):
+    # Performs any special processing based on header lines that match the
+    # 'header_matcher_predicate'. Implementation is currently intended for
+    # subclasses that handle special header-processing logic.
+    # TODO(BEAM-2776): Implement generic header processing functionality here.
+    pass
+
+  def _process_header(self, file_to_read, read_buffer):
+    # Returns a tuple containing the position in file after processing header
+    # records and a list of decoded header lines that match
+    # 'header_matcher_predicate'.
+    header_lines_to_return = []
+    position = self._skip_lines(
+        file_to_read, read_buffer,
+        self._skip_header_lines) if self._skip_header_lines else 0
+    while self._header_matcher_predicate:
+      record, num_bytes_to_next_record = self._read_record(file_to_read,
+                                                           read_buffer)
+      decoded_line = self._coder.decode(record)
+      if not self._header_matcher_predicate(decoded_line):
+        # We've read past the header section at this point, so go back a line.
+        file_to_read.seek(position)
+        read_buffer.reset()
+        break
+      header_lines_to_return.append(decoded_line)
+      if num_bytes_to_next_record < 0:
+        break
+      position += num_bytes_to_next_record
+    return position, header_lines_to_return
 
   def _find_separator_bounds(self, file_to_read, read_buffer):
     # Determines the start and end positions within 'read_buffer.data' of the
@@ -242,26 +327,97 @@ class _TextSource(filebasedsource.FileBasedSource):
               sep_bounds[1] - record_start_position_in_buffer)
 
 
-class ReadFromText(PTransform):
-  r"""A :class:`~apache_beam.transforms.ptransform.PTransform` for reading text
-  files.
-  Parses a text file as newline-delimited elements, by default assuming
-  ``UTF-8`` encoding. Supports newline delimiters ``\n`` and ``\r\n``.
-  This implementation only supports reading text encoded using ``UTF-8`` or
-  ``ASCII``.
-  This does not support other encodings such as ``UTF-16`` or ``UTF-32``.
+class _VcfSource(_TextSource):
+  r"""A source for reading VCF files.
+
+  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  multiple files, then the header from each file is used separately to parse
+  the content. However, the output will be a uniform PCollection of
+  :class:`Variant` objects.
   """
+
+  DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
+
+  def __init__(self,
+               file_pattern,
+               min_bundle_size=0,
+               compression_type=CompressionTypes.AUTO,
+               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,
+               validate=True):
+    super(_VcfSource, self).__init__(
+        file_pattern,
+        min_bundle_size,
+        compression_type,
+        strip_trailing_newlines=True,
+        coder=coders.StrUtf8Coder(),  # VCF files are UTF-8 per schema.
+        buffer_size=buffer_size,
+        validate=validate,
+        skip_header_lines=0,
+        header_matcher_predicate=lambda x: x.startswith('#'))
+    self._header_lines_per_file = {}
+
+  def process_header_lines_matching_predicate(self, file_name, header_lines):
+    self._header_lines_per_file[file_name] = header_lines
+
+  def read_records(self, file_name, range_tracker):
+    def line_generator():
+      header_processed = False
+      for line in super(_VcfSource, self).read_records(file_name,
+                                                       range_tracker):
+        if not header_processed and file_name in self._header_lines_per_file:
+          for header in self._header_lines_per_file[file_name]:
+            yield header
+          header_processed = True
+        yield line
+
+    try:
+      vcf_reader = vcf.Reader(fsock=line_generator())
+    except SyntaxError as e:
+      raise ValueError('Invalid VCF header: %s' % str(e))
+    while True:
+      try:
+        record = next(vcf_reader)
+        yield self.convert_to_variant_record(record)
+      except StopIteration:
+        break
+      except (LookupError, ValueError) as e:
+        # TODO(arostami): Add 'strict' and 'loose' modes to not throw an
+        # exception in case of such failures.
+        raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
+
+  def convert_to_variant_record(self, record):
+    variant = Variant()
+    variant.reference_name = record.CHROM
+    variant.start = record.start
+    variant.end = record.end
+    variant.reference_bases = record.REF
+    # ALT fields are classes in PyVCF (e.g. Substitution), so need convert them
+    # to their string representations.
+    variant.alternate_bases.extend(
+        [str(r) for r in record.ALT] if record.ALT else [])
+    # TODO(arostami): Add the rest of the fields from record.
+    return variant
+
+
+class ReadFromVcf(PTransform):
+  r"""A :class:`~apache_beam.transforms.ptransform.PTransform` for reading VCF
+  files.
+
+  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  multiple files, then the header from each file is used separately to parse
+  the content. However, the output will be a uniform PCollection of
+  :class:`Variant` objects.
+  """
+
   def __init__(
       self,
       file_pattern=None,
       min_bundle_size=0,
       compression_type=CompressionTypes.AUTO,
-      strip_trailing_newlines=True,
-      coder=coders.StrUtf8Coder(),
       validate=True,
-      skip_header_lines=0,
       **kwargs):
-    """Initialize the :class:`ReadFromText` transform.
+    """Initialize the :class:`ReadFromVcf` transform.
+
     Args:
       file_pattern (str): The file path to read from as a local file path or a
         GCS ``gs://`` path. The path can contain glob characters
@@ -274,21 +430,12 @@ class ReadFromText(PTransform):
         Typical value is :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
-      strip_trailing_newlines (bool): Indicates whether this source should
-        remove the newline char in each line it reads before decoding that line.
       validate (bool): flag to verify that the files exist during the pipeline
         creation time.
-      skip_header_lines (int): Number of header lines to skip. Same number is
-        skipped from each source file. Must be 0 or higher. Large number of
-        skipped lines might impact performance.
-      coder (~apache_beam.coders.coders.Coder): Coder used to decode each line.
     """
-
-    super(ReadFromText, self).__init__(**kwargs)
-    self._source = _TextSource(
-        file_pattern, min_bundle_size, compression_type,
-        strip_trailing_newlines, coder, validate=validate,
-        skip_header_lines=skip_header_lines)
+    super(ReadFromVcf, self).__init__(**kwargs)
+    self._source = _VcfSource(
+        file_pattern, min_bundle_size, compression_type, validate=validate)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
