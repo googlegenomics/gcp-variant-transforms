@@ -394,7 +394,7 @@ class _VcfSource(_TextSource):
     # ALT fields are classes in PyVCF (e.g. Substitution), so need convert them
     # to their string representations.
     variant.alternate_bases.extend(
-        [str(r) for r in record.ALT] if record.ALT else [])
+        [str(r) for r in record.ALT if r] if record.ALT else [])
     # TODO(arostami): Add the rest of the fields from record.
     return variant
 

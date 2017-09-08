@@ -106,10 +106,10 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
     return variant, vcf_line
 
   def _get_sample_variant_2(self):
-    vcf_line = '19	123	rs12345	GTC	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n'
+    vcf_line = '19	123	rs12345	GTC	.	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n'
     variant = Variant(
         reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=['C'])
+        alternate_bases=[])
     return variant, vcf_line
 
   def _get_sample_variant_3(self):
@@ -247,7 +247,6 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
         os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
     assert_that(pcoll, _count_equals_to(9900))
     pipeline.run()
-
 
 
 if __name__ == '__main__':
