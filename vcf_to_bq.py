@@ -13,7 +13,8 @@ python vcf_to_bq.py \
   --staging_location gs://YOUR-BUCKET/staging \
   --temp_location gs://YOUR-BUCKET/temp \
   --job_name vcf-to-bq-export \
-  --setup_file ./setup.py
+  --setup_file ./setup.py \
+  --runner DataflowRunner
 """
 
 from __future__ import absolute_import
@@ -26,6 +27,7 @@ from apache_beam.options.pipeline_options import PipelineOptions
 
 # TODO(arostami): Replace with the version from Beam SDK once that is released.
 from beam_io import vcfio
+from transforms.variant_to_bigquery import VariantToBigQuery
 
 
 def run(argv=None):
@@ -44,7 +46,9 @@ def run(argv=None):
   known_args, pipeline_args = parser.parse_known_args(argv)
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
-    _ = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
+    _ = (p
+         | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
+         | 'VariantToBigQuery' >> VariantToBigQuery(known_args.output_table))
 
 
 if __name__ == '__main__':
