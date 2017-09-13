@@ -1,7 +1,11 @@
-"""A source for reading from VCF files."""
+"""A source for reading from VCF files (version 4.x).
+
+The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
+"""
 
 
 from __future__ import absolute_import
+import collections
 import logging
 
 from apache_beam.coders import coders
@@ -14,7 +18,27 @@ from apache_beam.transforms.display import DisplayDataItem
 
 import vcf
 
-__all__ = ['ReadFromVcf', 'Variant']
+__all__ = ['ReadFromVcf', 'Variant', 'VariantCall', 'VariantInfo']
+
+
+# Stores data about variant INFO fields. The type of `data` is specified in the
+# VCF headers. `field_count` is a string that specifies the number of fields
+# that the data type contains. Its value can either be a number representing a
+# constant number of fields, `None` indicating that the value is not set
+# (equivalent to `.` in the VCF file) or one of:
+#   - `A`: one value per alternate allele.
+#   - `G`: one value for each possible genotype.
+#   - `R`: one value for each possible allele (including the reference).
+VariantInfo = collections.namedtuple('VariantInfo', ['data', 'field_count'])
+
+
+MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
+PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
+GENOTYPE_FORMAT_KEY = 'GT'  # Specifies the genotype format key in a call.
+PHASESET_INFO_KEY = 'PS'  # Specifies the phaseset info key.
+DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
+                              # no 'PS' is present.
+MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 
 
 class Variant(object):
@@ -28,7 +52,12 @@ class Variant(object):
                start=None,
                end=None,
                reference_bases=None,
-               alternate_bases=None):
+               alternate_bases=None,
+               names=None,
+               quality=None,
+               filters=None,
+               info=None,
+               calls=None):
     """Initialize the :class:`Variant` object.
 
     Args:
@@ -39,20 +68,40 @@ class Variant(object):
       reference_bases (str): The reference bases for this variant.
       alternate_bases (list of str): The bases that appear instead of the
         reference bases.
+      names (list of str): Names for the variant, for example a RefSNP ID.
+      quality (float): A measure of how likely this variant is to be real.
+        Higher values imply better quality.
+      filters (list of str): A list of filters (normally quality filters) this
+        variant has failed. `PASS` indicates this variant has passed all
+        filters.
+      info (dict): A map of additional variant information. The key is specified
+        in the VCF record and the value is of type ``VariantInfo``.
+      calls (list of :class:`VariantCall`): The variant calls for this variant.
+        Each one represents the determination of genotype with respect to this
+        variant.
     """
-    # TODO(arostami): Add more fields.
     self.reference_name = reference_name
     self.start = start
     self.end = end
     self.reference_bases = reference_bases
     self.alternate_bases = alternate_bases or []
+    self.names = names or []
+    self.quality = quality
+    self.filters = filters or []
+    self.info = info or {}
+    self.calls = calls or []
 
   def __eq__(self, other):
     return (self.reference_name == other.reference_name and
             self.start == other.start and
             self.end == other.end and
             self.reference_bases == other.reference_bases and
-            self.alternate_bases == other.alternate_bases)
+            self.alternate_bases == other.alternate_bases and
+            self.names == other.names and
+            self.quality == other.quality and
+            self.filters == other.filters and
+            self.info == other.info and
+            self.calls == other.calls)
 
   def __repr__(self):
     return ', '.join(
@@ -60,7 +109,55 @@ class Variant(object):
                           self.start,
                           self.end,
                           self.reference_bases,
-                          self.alternate_bases]])
+                          self.alternate_bases,
+                          self.names,
+                          self.quality,
+                          self.filters,
+                          self.info,
+                          self.calls]])
+
+
+class VariantCall(object):
+  """A class to store info about a variant call.
+
+  A call represents the determination of genotype with respect to a particular
+  variant. It may include associated information such as quality and phasing.
+  """
+
+  def __init__(self, name=None, genotype=None, phaseset=None, info=None):
+    """Initialize the :class:`VariantCall` object.
+
+    Args:
+      name (str): The name of the call.
+      genotype (list of int): The genotype of this variant call as specified by
+        the VCF schema. The values are either `0` representing the reference,
+        or a 1-based index into alternate bases. Ordering is only important if
+        `phaseset` is present. If a genotype is not called (that is, a `.` is
+        present in the GT string), -1 is used
+      phaseset (str): If this field is present, this variant call's genotype
+        ordering implies the phase of the bases and is consistent with any other
+        variant calls in the same reference sequence which have the same
+        phaseset value. If the genotype data was phased but no phase set was
+        specified, this field will be set to `*`.
+      info (dict): A map of additional variant call information. The key is
+        specified in the VCF record and the type of the value is specified by
+        the VCF header FORMAT.
+    """
+    self.name = name
+    self.genotype = genotype or []
+    self.phaseset = phaseset
+    self.info = info or {}
+
+  def __eq__(self, other):
+    return (self.name == other.name and
+            self.genotype == other.genotype and
+            self.phaseset == other.phaseset and
+            self.info == other.info)
+
+  def __repr__(self):
+    return ', '.join(
+        [str(s) for s in [self.name, self.genotype, self.phaseset]])
+
 
 # TODO(arostami): Remove once header processing changes are released in the
 # Beam SDK.
@@ -377,7 +474,7 @@ class _VcfSource(_TextSource):
     while True:
       try:
         record = next(vcf_reader)
-        yield self.convert_to_variant_record(record)
+        yield self._convert_to_variant_record(record, vcf_reader.infos)
       except StopIteration:
         break
       except (LookupError, ValueError) as e:
@@ -385,18 +482,80 @@ class _VcfSource(_TextSource):
         # exception in case of such failures.
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
-  def convert_to_variant_record(self, record):
+  def _convert_to_variant_record(self, record, infos):
+    """Converts the PyVCF record to a :class:`Variant` object.
+
+    Args:
+      record (:class:`~vcf.model._Record`): An object containing info about a
+        variant.
+      infos (dict): The PyVCF dict storing info extracted from the VCF header.
+        The key is the info key and the value is :class:`~vcf.parser._Info`.
+    Returns:
+      A :class:`Variant` object from the given record.
+    """
     variant = Variant()
     variant.reference_name = record.CHROM
     variant.start = record.start
     variant.end = record.end
-    variant.reference_bases = record.REF
+    variant.reference_bases = (
+        record.REF if record.REF != MISSING_FIELD_VALUE else None)
     # ALT fields are classes in PyVCF (e.g. Substitution), so need convert them
     # to their string representations.
     variant.alternate_bases.extend(
         [str(r) for r in record.ALT if r] if record.ALT else [])
-    # TODO(arostami): Add the rest of the fields from record.
+    variant.names.extend(record.ID.split(';') if record.ID else [])
+    variant.quality = record.QUAL
+    variant.filters.extend(record.FILTER if record.FILTER else [PASS_FILTER])
+    for k, v in record.INFO.iteritems():
+      field_count = None
+      if k in infos:
+        field_count = self._get_field_count_as_string(infos[k].num)
+      variant.info[k] = VariantInfo(data=v, field_count=field_count)
+
+    for sample in record.samples:
+      call = VariantCall()
+      call.name = sample.sample
+      for allele in sample.gt_alleles or [MISSING_GENOTYPE_VALUE]:
+        if allele is None:
+          allele = MISSING_GENOTYPE_VALUE
+        call.genotype.append(int(allele))
+      if sample.phased:
+        call.phaseset = DEFAULT_PHASESET_VALUE
+        if (PHASESET_INFO_KEY in variant.info and
+            variant.info[PHASESET_INFO_KEY]):
+          call.phaseset = variant.info[PHASESET_INFO_KEY].data
+      for field in sample.data._fields:
+        if field == GENOTYPE_FORMAT_KEY:  # Genotype is already included.
+          continue
+        call.info[field] = getattr(sample.data, field)
+      variant.calls.append(call)
     return variant
+
+  def _get_field_count_as_string(self, field_count):
+    """Returns the string representation of field_count from PyVCF.
+
+    PyVCF converts field counts to an integer with some predefined constants
+    as specified in the vcf.parser.field_counts dict (e.g. 'A' is -1). This
+    method converts them back to their string representation to avoid having
+    direct dependency on the arbitrary PyVCF constants.
+
+    Args:
+      field_count (int): An integer representing the number of fields in INFO
+        as specified by PyVCF.
+    Returns:
+      A string representation of field_count (e.g. '-1' becomes 'A').
+    Raises:
+      ValueError: if the field_count is not valid.
+    """
+    if field_count is None:
+      return None
+    elif field_count >= 0:
+      return str(field_count)
+    field_count_to_string = {v: k for k, v in vcf.parser.field_counts.items()}
+    if field_count in field_count_to_string:
+      return field_count_to_string[field_count]
+    else:
+      raise ValueError('Invalid value for field_count: %d' % field_count)
 
 
 class ReadFromVcf(PTransform):

@@ -12,8 +12,12 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import BeamAssertException
 
 from beam_io.vcfio import _VcfSource as VcfSource
+from beam_io.vcfio import DEFAULT_PHASESET_VALUE
+from beam_io.vcfio import MISSING_GENOTYPE_VALUE
 from beam_io.vcfio import ReadFromVcf
 from beam_io.vcfio import Variant
+from beam_io.vcfio import VariantCall
+from beam_io.vcfio import VariantInfo
 
 from testing import testdata_util
 
@@ -24,7 +28,7 @@ _SAMPLE_HEADER_LINES = [
     '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
     '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
     '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
-    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\r\n',
+    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
 ]
 
 
@@ -99,24 +103,50 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
         sorted(actual, cmp=_variant_comparator))
 
   def _get_sample_variant_1(self):
-    vcf_line = '20	1234	rs12345	C	A,T	50	PASS	AF=0.5;NS=1	GT:GQ	0/0:48\n'
+    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	' +
+                'GT:GQ	0/0:48	1/0:20\n')
     variant = Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
-        alternate_bases=['A', 'T'])
+        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+        filters=['PASS'],
+        info={'AF': VariantInfo(data=[0.5, 0.1], field_count='A'),
+              'NS': VariantInfo(data=1, field_count='1')})
+    variant.calls.append(
+        VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+    variant.calls.append(
+        VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
     return variant, vcf_line
 
   def _get_sample_variant_2(self):
-    vcf_line = '19	123	rs12345	GTC	.	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n'
+    vcf_line = (
+        '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n')
     variant = Variant(
         reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=[])
+        alternate_bases=[], names=['rs1234'], quality=40,
+        filters=['q10', 's50'],
+        info={'NS': VariantInfo(data=2, field_count='1')})
+    variant.calls.append(
+        VariantCall(name='Sample1', genotype=[1, 0],
+                    phaseset=DEFAULT_PHASESET_VALUE,
+                    info={'GQ': 48}))
+    variant.calls.append(
+        VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
     return variant, vcf_line
 
   def _get_sample_variant_3(self):
-    vcf_line = '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5;NS=2	GT:GQ	1|1:45\n'
+    vcf_line = (
+        '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:GQ	0|1:45 .:.\n')
     variant = Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
-        alternate_bases=['<SYMBOLIC>'])
+        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
+        info={'AF': VariantInfo(data=[0.5], field_count='A')})
+    variant.calls.append(
+        VariantCall(name='Sample1', genotype=[0, 1],
+                    phaseset=DEFAULT_PHASESET_VALUE,
+                    info={'GQ': 45}))
+    variant.calls.append(
+        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE],
+                    info={'GQ': None}))
     return variant, vcf_line
 
   def test_read_single_file(self):
@@ -202,12 +232,23 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
             '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
             '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT	1|0:48'
         ],
+        # GT is not an integer.
+        [
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT	A|0'
+        ],
         # Malformed FILTER.
         [
             '##FILTER=<ID=PASS,Description="All filters passed">\n',
             '##FILTER=<ID=LowQual,Descri\n',
             '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
             '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48',
+        ],
+        # Invalid Number value for INFO.
+        [
+            '##INFO=<ID=G,Number=U,Type=String,Description="InvalidNumber">\n',
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SampleName\n',
+            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n',
         ],
         # POS should be an integer.
         [
@@ -233,6 +274,81 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
       self.fail('Invalid VCF file must throw an exception.')
     except ValueError:
       pass
+
+  def test_no_samples(self):
+    header_line = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO\n'
+    record_line = '19	123	.	G	A	.	PASS	AF=0.2'
+    expected_variant = Variant(
+        reference_name='19', start=122, end=123, reference_bases='G',
+        alternate_bases=['A'], filters=['PASS'],
+        info={'AF': VariantInfo(data=[0.2], field_count='A')})
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES[:-1] + [header_line, record_line])
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(expected_variant, read_data[0])
+
+  def test_no_info(self):
+    record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
+    expected_variant = Variant(
+        reference_name='chr19', start=122, end=123, filters=['PASS'])
+    expected_variant.calls.append(
+        VariantCall(name='Sample1', genotype=[MISSING_GENOTYPE_VALUE]))
+    expected_variant.calls.append(
+        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE]))
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [record_line])
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(expected_variant, read_data[0])
+
+  def test_info_numbers_and_types(self):
+    info_headers = [
+        '##INFO=<ID=HA,Number=A,Type=String,Description="StringInfo_A">\n',
+        '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
+        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##INFO=<ID=HF,Number=0,Type=Flag,Description="FlagInfo">\n',
+        '##INFO=<ID=HU,Number=.,Type=Float,Description="FloatInfo_variable">\n']
+    record_lines = [
+        '19	2	.	A	T,C	.	.	HA=a1,a2;HG=1,2,3;HR=a,b,c;HF;HU=0.1	GT	1/0	0/1\n',
+        '19	124	.	A	T	.	.	HG=3,4,5;HR=d,e;HU=1.1,1.2	GT	0/0	0/1']
+    variant_1 = Variant(
+        reference_name='19', start=1, end=2, reference_bases='A',
+        alternate_bases=['T', 'C'], filters=['PASS'],
+        info={'HA': VariantInfo(data=['a1', 'a2'], field_count='A'),
+              'HG': VariantInfo(data=[1, 2, 3], field_count='G'),
+              'HR': VariantInfo(data=['a', 'b', 'c'], field_count='R'),
+              'HF': VariantInfo(data=True, field_count='0'),
+              'HU': VariantInfo(data=[0.1], field_count=None)})
+    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = Variant(
+        reference_name='19', start=123, end=124, reference_bases='A',
+        alternate_bases=['T'], filters=['PASS'],
+        info={'HG': VariantInfo(data=[3, 4, 5], field_count='G'),
+              'HR': VariantInfo(data=['d', 'e'], field_count='R'),
+              'HU': VariantInfo(data=[1.1, 1.2], field_count=None)})
+    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
+    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+
+    read_data = self._create_temp_file_and_read_records(
+        info_headers + _SAMPLE_HEADER_LINES[1:] + record_lines)
+    self.assertEqual(2, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2], read_data)
+
+  def test_custom_phaseset(self):
+    phaseset_header_line = (
+        '##INFO=<ID=PS,Number=1,Type=String,Description="Phaseset">\n')
+    record_line = '19	123	.	A	T	.	.	PS=ps1	GT	1|0	0/1'
+    expected_variant = Variant(
+        reference_name='19', start=122, end=123, reference_bases='A',
+        alternate_bases=['T'], filters=['PASS'],
+        info={'PS': VariantInfo(data='ps1', field_count='1')})
+    expected_variant.calls.append(
+        VariantCall(name='Sample1', genotype=[1, 0], phaseset='ps1'))
+    expected_variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    read_data = self._create_temp_file_and_read_records(
+        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + [record_line])
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(expected_variant, read_data[0])
 
   def test_pipeline_read_single_file(self):
     pipeline = TestPipeline()
