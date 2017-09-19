@@ -350,6 +350,30 @@ class VcfSourceTest(_TestCaseWithTempDirCleanUp):
     self.assertEqual(1, len(read_data))
     self.assertEqual(expected_variant, read_data[0])
 
+  def test_format_numbers(self):
+    format_headers = [
+        '##FORMAT=<ID=FU,Number=.,Type=String,Description="Format_variable">\n',
+        '##FORMAT=<ID=F1,Number=1,Type=Integer,Description="Format_one">\n',
+        '##FORMAT=<ID=F2,Number=2,Type=Character,Description="Format_two">\n']
+    record_lines = [
+        '19	2	.	A	T,C	.	.	.	GT:FU:F1:F2	1/0:a1:3:a,b	0/1:a2,a3:4:b,c\n']
+    expected_variant = Variant(
+        reference_name='19', start=1, end=2, reference_bases='A',
+        alternate_bases=['T', 'C'], filters=['PASS'])
+    expected_variant.calls.append(VariantCall(
+        name='Sample1',
+        genotype=[1, 0],
+        info={'FU': ['a1'], 'F1': 3, 'F2': ['a', 'b']}))
+    expected_variant.calls.append(VariantCall(
+        name='Sample2',
+        genotype=[0, 1],
+        info={'FU': ['a2', 'a3'], 'F1': 4, 'F2': ['b', 'c']}))
+
+    read_data = self._create_temp_file_and_read_records(
+        format_headers + _SAMPLE_HEADER_LINES[1:] + record_lines)
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(expected_variant, read_data[0])
+
   def test_pipeline_read_single_file(self):
     pipeline = TestPipeline()
     pcoll = pipeline | 'Read' >> ReadFromVcf(

@@ -156,7 +156,7 @@ class VariantCall(object):
 
   def __repr__(self):
     return ', '.join(
-        [str(s) for s in [self.name, self.genotype, self.phaseset]])
+        [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
 
 
 # TODO(arostami): Remove once header processing changes are released in the
@@ -474,7 +474,7 @@ class _VcfSource(_TextSource):
     while True:
       try:
         record = next(vcf_reader)
-        yield self._convert_to_variant_record(record, vcf_reader.infos)
+        yield self._convert_to_variant_record(record, vcf_reader.infos, vcf_reader.formats)
       except StopIteration:
         break
       except (LookupError, ValueError) as e:
@@ -482,14 +482,17 @@ class _VcfSource(_TextSource):
         # exception in case of such failures.
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
-  def _convert_to_variant_record(self, record, infos):
+  def _convert_to_variant_record(self, record, infos, formats):
     """Converts the PyVCF record to a :class:`Variant` object.
 
     Args:
       record (:class:`~vcf.model._Record`): An object containing info about a
         variant.
-      infos (dict): The PyVCF dict storing info extracted from the VCF header.
+      infos (dict): The PyVCF dict storing INFO extracted from the VCF header.
         The key is the info key and the value is :class:`~vcf.parser._Info`.
+      fromats (dict): The PyVCF dict storing FORMAT extracted from the VCF
+        header. The key is the FORMAT key and the value is
+        :class:`~vcf.parser._Format`.
     Returns:
       A :class:`Variant` object from the given record.
     """
@@ -527,7 +530,14 @@ class _VcfSource(_TextSource):
       for field in sample.data._fields:
         if field == GENOTYPE_FORMAT_KEY:  # Genotype is already included.
           continue
-        call.info[field] = getattr(sample.data, field)
+        data = getattr(sample.data, field)
+        # Convert single values to a list for cases where the number of fields
+        # is unknown. This is to ensure consistent types across all records.
+        # Note: this is already done for INFO fields in PyVCF.
+        if (field in formats and formats[field].num is None and
+            isinstance(data, (int, float, long, basestring, bool))):
+          data = [data]
+        call.info[field] = data
       variant.calls.append(call)
     return variant
 
