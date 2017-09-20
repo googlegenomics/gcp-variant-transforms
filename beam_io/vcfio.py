@@ -64,12 +64,14 @@ class Variant(object):
       reference_name (str): The reference on which this variant occurs
         (such as `chr20` or `X`). .
       start (int): The position at which this variant occurs (0-based).
-      end (int): The end position (0-based) of this variant.
+        Corresponds to the first base of the string of reference bases.
+      end (int): The end position (0-based) of this variant. Corresponds to the
+        first base after the last base in the reference allele.
       reference_bases (str): The reference bases for this variant.
       alternate_bases (list of str): The bases that appear instead of the
         reference bases.
       names (list of str): Names for the variant, for example a RefSNP ID.
-      quality (float): A measure of how likely this variant is to be real.
+      quality (float): Phred-scaled quality score (−10log10 prob(call is wrong))
         Higher values imply better quality.
       filters (list of str): A list of filters (normally quality filters) this
         variant has failed. `PASS` indicates this variant has passed all

@@ -2,8 +2,6 @@
 
 import logging
 import os
-import shutil
-import tempfile
 import unittest
 
 import apache_beam.io.source_test_utils as source_test_utils
@@ -20,6 +18,7 @@ from beam_io.vcfio import VariantCall
 from beam_io.vcfio import VariantInfo
 
 from testing import testdata_util
+from testing.base_test_case_with_temp_dir import BaseTestCaseWithTempDir
 
 # Note: mixing \n and \r\n to verify both behaviors.
 _SAMPLE_HEADER_LINES = [
@@ -31,34 +30,6 @@ _SAMPLE_HEADER_LINES = [
     '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
 ]
 
-
-class _TestCaseWithTempDirCleanUp(unittest.TestCase):
-  """Base class for TestCases that deals with TempDir clean-up.
-
-  Inherited test cases will call self._new_tempdir() to start a temporary dir
-  which will be deleted at the end of the tests (when tearDown() is called).
-  """
-
-  def setUp(self):
-    self._tempdirs = []
-
-  def tearDown(self):
-    for path in self._tempdirs:
-      if os.path.exists(path):
-        shutil.rmtree(path)
-    self._tempdirs = []
-
-  def _new_tempdir(self):
-    result = tempfile.mkdtemp()
-    self._tempdirs.append(result)
-    return result
-
-  def _create_temp_file(self, name='', suffix='', tmpdir=None):
-    if not name:
-      name = tempfile.template
-    return tempfile.NamedTemporaryFile(
-        delete=False, prefix=name,
-        dir=tmpdir or self._new_tempdir(), suffix=suffix)
 
 
 # Helper method for comparing variants.
@@ -80,19 +51,13 @@ def _count_equals_to(expected_count):
   return _count_equal
 
 
-class VcfSourceTest(_TestCaseWithTempDirCleanUp):
+class VcfSourceTest(BaseTestCaseWithTempDir):
 
   def _read_records(self, file_or_pattern):
     source = VcfSource(file_or_pattern)
     range_tracker = source.get_range_tracker(None, None)
     read_data = [record for record in source.read(range_tracker)]
     return read_data
-
-  def _create_temp_vcf_file(self, lines, tmpdir=None):
-    with self._create_temp_file(suffix='.vcf', tmpdir=tmpdir) as f:
-      for line in lines:
-        f.write(line)
-    return f.name
 
   def _create_temp_file_and_read_records(self, lines):
     return self._read_records(self._create_temp_vcf_file(lines))
