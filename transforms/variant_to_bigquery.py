@@ -45,7 +45,8 @@ class VariantToBigQuery(beam.PTransform):
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertToBigQueryTableRow' >> beam.ParDo(
-                _ConvertToBigQueryTableRow())
+                _ConvertToBigQueryTableRow(
+                    self._split_alternate_allele_info_fields))
             | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,
                 schema=bigquery_vcf_schema.generate_schema_from_header_fields(
