@@ -74,7 +74,9 @@ class GemerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         ('IU', Info('IU', field_counts['.'], 'Character', 'desc', 'src', 'v')),
         ('IG', Info('IG', field_counts['G'], 'String', 'desc', 'src', 'v')),
         ('I0', Info('I0', 0, 'Flag', 'desc', 'src', 'v')),
-        ('IA2', Info('IA2', field_counts['A'], 'Float', 'desc', 'src', 'v'))])
+        ('IA2', Info('IA2', field_counts['A'], 'Float', 'desc', 'src', 'v')),
+        ('END',  # END should not be included in the generated schema.
+         Info('END', 1, 'Integer', 'Special END key', 'src', 'v'))])
     header_fields = HeaderFields(infos, {})
 
     self._assert_fields_equal(
@@ -116,10 +118,14 @@ class GemerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     infos = OrderedDict([
         ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
         ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+    # GT and PS should not be set as they're already included in special
+    # 'genotype' and 'phaseset' fields.
     formats = OrderedDict([
         ('F1', Format('F1', 1, 'String', 'desc')),
         ('F2', Format('F2', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc'))])
+        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
+        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
     header_fields = HeaderFields(infos, formats)
     self._assert_fields_equal(
         self._generate_expected_fields(
