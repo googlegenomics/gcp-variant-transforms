@@ -71,7 +71,7 @@ class Variant(object):
       alternate_bases (list of str): The bases that appear instead of the
         reference bases.
       names (list of str): Names for the variant, for example a RefSNP ID.
-      quality (float): Phred-scaled quality score (−10log10 prob(call is wrong))
+      quality (float): Phred-scaled quality score (-10log10 prob(call is wrong))
         Higher values imply better quality.
       filters (list of str): A list of filters (normally quality filters) this
         variant has failed. `PASS` indicates this variant has passed all

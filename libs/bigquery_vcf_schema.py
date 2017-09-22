@@ -72,13 +72,13 @@ def generate_schema_from_header_fields(
       type=_TableFieldConstants.TYPE_INTEGER,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('Start position (0-based). Corresponds to the first base '
-                   'of the string of reference bases.'))
+                   'of the string of reference bases.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=_ColumnKeyConstants.END_POSITION,
       type=_TableFieldConstants.TYPE_INTEGER,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('End position (0-based). Corresponds to the first base '
-                   'after the last base in the reference allele.'))
+                   'after the last base in the reference allele.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=_ColumnKeyConstants.REFERENCE_BASES,
       type=_TableFieldConstants.TYPE_STRING,
@@ -115,7 +115,7 @@ def generate_schema_from_header_fields(
       name=_ColumnKeyConstants.QUALITY,
       type=_TableFieldConstants.TYPE_FLOAT,
       mode=_TableFieldConstants.MODE_NULLABLE,
-      description=('Phred-scaled quality score (−10log10 prob(call is wrong)). '
+      description=('Phred-scaled quality score (-10log10 prob(call is wrong)). '
                    'Higher values imply better quality.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=_ColumnKeyConstants.FILTER,
