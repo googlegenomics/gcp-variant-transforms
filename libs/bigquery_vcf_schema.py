@@ -2,8 +2,10 @@
 
 import sys
 from apache_beam.io.gcp.internal.clients import bigquery
+from beam_io.vcfio import END_INFO_KEY
 from beam_io.vcfio import GENOTYPE_FORMAT_KEY
 from beam_io.vcfio import MISSING_FIELD_VALUE
+from beam_io.vcfio import PHASESET_FORMAT_KEY
 from vcf.parser import field_counts
 
 __all__ = ['generate_schema_from_header_fields', 'get_row_from_variant']
@@ -20,7 +22,7 @@ class _ColumnKeyConstants(object):
   NAMES = 'names'
   QUALITY = 'quality'
   FILTER = 'filter'
-  CALLS = 'calls'
+  CALLS = 'call'  # Column name is singular for consistency with Variants API.
   CALLS_NAME = 'name'
   CALLS_GENOTYPE = 'genotype'
   CALLS_PHASESET = 'phaseset'
@@ -149,7 +151,8 @@ def generate_schema_from_header_fields(
                    'the genotype is phased, but no phase set ("PS" in INFO) '
                    'was specified.')))
   for key, field in header_fields.formats.iteritems():
-    if key == GENOTYPE_FORMAT_KEY:  # GT is already included.
+    # GT and PS are already included in 'genotype' and 'phaseset' fields.
+    if key in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
       continue
     calls_record.fields.append(bigquery.TableFieldSchema(
         name=key,
@@ -160,8 +163,10 @@ def generate_schema_from_header_fields(
 
   # Add info fields.
   for key, field in header_fields.infos.iteritems():
-    if (split_alternate_allele_info_fields and
-        field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
+    # END info is already included by modifying the end_position.
+    if (key == END_INFO_KEY or
+        (split_alternate_allele_info_fields and
+         field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=key,

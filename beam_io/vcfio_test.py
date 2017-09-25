@@ -31,7 +31,6 @@ _SAMPLE_HEADER_LINES = [
 ]
 
 
-
 # Helper method for comparing variants.
 def _variant_comparator(v1, v2):
   if v1.reference_name == v2.reference_name:
@@ -68,7 +67,7 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         sorted(actual, cmp=_variant_comparator))
 
   def _get_sample_variant_1(self):
-    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	' +
+    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	'
                 'GT:GQ	0/0:48	1/0:20\n')
     variant = Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
@@ -254,8 +253,7 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
 
   def test_no_info(self):
     record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
-    expected_variant = Variant(
-        reference_name='chr19', start=122, end=123, filters=['PASS'])
+    expected_variant = Variant(reference_name='chr19', start=122, end=123)
     expected_variant.calls.append(
         VariantCall(name='Sample1', genotype=[MISSING_GENOTYPE_VALUE]))
     expected_variant.calls.append(
@@ -277,7 +275,7 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         '19	124	.	A	T	.	.	HG=3,4,5;HR=d,e;HU=1.1,1.2	GT	0/0	0/1']
     variant_1 = Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T', 'C'], filters=['PASS'],
+        alternate_bases=['T', 'C'],
         info={'HA': VariantInfo(data=['a1', 'a2'], field_count='A'),
               'HG': VariantInfo(data=[1, 2, 3], field_count='G'),
               'HR': VariantInfo(data=['a', 'b', 'c'], field_count='R'),
@@ -287,7 +285,7 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
     variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
     variant_2 = Variant(
         reference_name='19', start=123, end=124, reference_bases='A',
-        alternate_bases=['T'], filters=['PASS'],
+        alternate_bases=['T'],
         info={'HG': VariantInfo(data=[3, 4, 5], field_count='G'),
               'HR': VariantInfo(data=['d', 'e'], field_count='R'),
               'HU': VariantInfo(data=[1.1, 1.2], field_count=None)})
@@ -299,21 +297,46 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
     self.assertEqual(2, len(read_data))
     self._assert_variants_equal([variant_1, variant_2], read_data)
 
+  def test_end_info_key(self):
+    phaseset_header_line = (
+        '##INFO=<ID=END,Number=1,Type=Integer,Description="End of record.">\n')
+    record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n',
+                    '19	123	.	A	.	.	.	.	GT	0/1	1/1\n']
+    variant_1 = Variant(
+        reference_name='19', start=122, end=1111, reference_bases='A')
+    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = Variant(
+        reference_name='19', start=122, end=123, reference_bases='A')
+    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
+    variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
+    read_data = self._create_temp_file_and_read_records(
+        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
+    self.assertEqual(2, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2], read_data)
+
   def test_custom_phaseset(self):
     phaseset_header_line = (
-        '##INFO=<ID=PS,Number=1,Type=String,Description="Phaseset">\n')
-    record_line = '19	123	.	A	T	.	.	PS=ps1	GT	1|0	0/1'
-    expected_variant = Variant(
+        '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phaseset">\n')
+    record_lines = ['19	123	.	A	T	.	.	.	GT:PS	1|0:1111	0/1:.\n',
+                    '19	121	.	A	T	.	.	.	GT:PS	1|0:2222	0/1:2222\n']
+    variant_1 = Variant(
         reference_name='19', start=122, end=123, reference_bases='A',
-        alternate_bases=['T'], filters=['PASS'],
-        info={'PS': VariantInfo(data='ps1', field_count='1')})
-    expected_variant.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='ps1'))
-    expected_variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+        alternate_bases=['T'])
+    variant_1.calls.append(
+        VariantCall(name='Sample1', genotype=[1, 0], phaseset='1111'))
+    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = Variant(
+        reference_name='19', start=120, end=121, reference_bases='A',
+        alternate_bases=['T'])
+    variant_2.calls.append(
+        VariantCall(name='Sample1', genotype=[1, 0], phaseset='2222'))
+    variant_2.calls.append(
+        VariantCall(name='Sample2', genotype=[0, 1], phaseset='2222'))
     read_data = self._create_temp_file_and_read_records(
-        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + [record_line])
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(expected_variant, read_data[0])
+        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
+    self.assertEqual(2, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2], read_data)
 
   def test_format_numbers(self):
     format_headers = [
@@ -324,7 +347,7 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         '19	2	.	A	T,C	.	.	.	GT:FU:F1:F2	1/0:a1:3:a,b	0/1:a2,a3:4:b,c\n']
     expected_variant = Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T', 'C'], filters=['PASS'])
+        alternate_bases=['T', 'C'])
     expected_variant.calls.append(VariantCall(
         name='Sample1',
         genotype=[1, 0],

@@ -34,8 +34,9 @@ VariantInfo = collections.namedtuple('VariantInfo', ['data', 'field_count'])
 
 MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
 PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
-GENOTYPE_FORMAT_KEY = 'GT'  # Specifies the genotype format key in a call.
-PHASESET_INFO_KEY = 'PS'  # Specifies the phaseset info key.
+END_INFO_KEY = 'END'  # The info key that explicitly specifies end of a record.
+GENOTYPE_FORMAT_KEY = 'GT'  # The genotype format key in a call.
+PHASESET_FORMAT_KEY = 'PS'  # The phaseset format key.
 DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
                               # no 'PS' is present.
 MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
@@ -476,7 +477,8 @@ class _VcfSource(_TextSource):
     while True:
       try:
         record = next(vcf_reader)
-        yield self._convert_to_variant_record(record, vcf_reader.infos, vcf_reader.formats)
+        yield self._convert_to_variant_record(
+            record, vcf_reader.infos, vcf_reader.formats)
       except StopIteration:
         break
       except (LookupError, ValueError) as e:
@@ -510,8 +512,15 @@ class _VcfSource(_TextSource):
         [str(r) for r in record.ALT if r] if record.ALT else [])
     variant.names.extend(record.ID.split(';') if record.ID else [])
     variant.quality = record.QUAL
-    variant.filters.extend(record.FILTER if record.FILTER else [PASS_FILTER])
+    # PyVCF uses None for '.' and an empty list for 'PASS'.
+    if record.FILTER is not None:
+      variant.filters.extend(record.FILTER if record.FILTER else [PASS_FILTER])
     for k, v in record.INFO.iteritems():
+      # Special case: END info value specifies end of the record, so adjust
+      # variant.end and do not include it as part of variant.info.
+      if k == END_INFO_KEY:
+        variant.end = v
+        continue
       field_count = None
       if k in infos:
         field_count = self._get_field_count_as_string(infos[k].num)
@@ -524,13 +533,17 @@ class _VcfSource(_TextSource):
         if allele is None:
           allele = MISSING_GENOTYPE_VALUE
         call.genotype.append(int(allele))
-      if sample.phased:
-        call.phaseset = DEFAULT_PHASESET_VALUE
-        if (PHASESET_INFO_KEY in variant.info and
-            variant.info[PHASESET_INFO_KEY]):
-          call.phaseset = variant.info[PHASESET_INFO_KEY].data
+      phaseset_from_format = (getattr(sample.data, PHASESET_FORMAT_KEY)
+                              if PHASESET_FORMAT_KEY in sample.data._fields
+                              else None)
+      # Note: Call is considered phased if it contains the 'PS' key regardless
+      # of whether it uses '|'.
+      if phaseset_from_format or sample.phased:
+        call.phaseset = (str(phaseset_from_format) if phaseset_from_format
+                         else DEFAULT_PHASESET_VALUE)
       for field in sample.data._fields:
-        if field == GENOTYPE_FORMAT_KEY:  # Genotype is already included.
+        # Genotype and phaseset (if present) are already included.
+        if field in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
           continue
         data = getattr(sample.data, field)
         # Convert single values to a list for cases where the number of fields
