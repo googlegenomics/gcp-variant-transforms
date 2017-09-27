@@ -146,7 +146,7 @@ def generate_schema_from_header_fields(
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('Phaseset of the call (if any). "*" is used in cases where '
-                   'the genotype is phased, but no phase set ("PS" in INFO) '
+                   'the genotype is phased, but no phase set ("PS" in FORMAT) '
                    'was specified.')))
   for key, field in header_fields.formats.iteritems():
     if key == GENOTYPE_FORMAT_KEY:  # GT is already included.

@@ -65,7 +65,7 @@ def run(argv=None):
       type='bool',
       nargs='?',
       const=True,
-      help=('If true, all INFO fields with `Number=A (i.e. one value for each '
+      help=('If true, all INFO fields with Number=A (i.e. one value for each '
             'alternate allele) will be stored under the alternate_bases '
             'record. If false, they will be stored with the rest of the INFO '
             'fields. Setting this option to true makes querying the data '
