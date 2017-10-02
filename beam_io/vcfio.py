@@ -468,7 +468,9 @@ class _VcfSource(_TextSource):
           for header in self._header_lines_per_file[file_name]:
             yield header
           header_processed = True
-        yield line
+        # PyVCF has explicit str() calls when parsing INFO fields, which fails
+        # with UTF-8 decoded strings. Encode the line back to UTF-8.
+        yield self._coder.encode(line)
 
     try:
       vcf_reader = vcf.Reader(fsock=line_generator())
