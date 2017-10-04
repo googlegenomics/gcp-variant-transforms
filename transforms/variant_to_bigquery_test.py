@@ -11,7 +11,7 @@ from apache_beam.transforms import Create
 from beam_io.vcfio import Variant
 from beam_io.vcfio import VariantCall
 from beam_io.vcfio import VariantInfo
-from libs.bigquery_vcf_schema import _ColumnKeyConstants as ColumnKeyConstants
+from libs.bigquery_vcf_schema import ColumnKeyConstants
 from transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
 
@@ -76,8 +76,6 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.END_POSITION: 125,
            ColumnKeyConstants.REFERENCE_BASES: 'CT',
            ColumnKeyConstants.ALTERNATE_BASES: [],
-           ColumnKeyConstants.NAMES: [],
-           ColumnKeyConstants.QUALITY: None,
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
            'INTINFO': 1234}
@@ -91,9 +89,6 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.END_POSITION: None,
            ColumnKeyConstants.REFERENCE_BASES: None,
            ColumnKeyConstants.ALTERNATE_BASES: [],
-           ColumnKeyConstants.NAMES: [],
-           ColumnKeyConstants.QUALITY: None,
-           ColumnKeyConstants.FILTER: [],
            ColumnKeyConstants.CALLS: []}
     return variant, row
 

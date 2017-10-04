@@ -7,7 +7,6 @@ import unittest
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
-from apache_beam.testing.util import BeamAssertException
 
 from beam_io.vcfio import _VcfSource as VcfSource
 from beam_io.vcfio import DEFAULT_PHASESET_VALUE
@@ -17,6 +16,7 @@ from beam_io.vcfio import Variant
 from beam_io.vcfio import VariantCall
 from beam_io.vcfio import VariantInfo
 
+from testing import asserts
 from testing import testdata_util
 from testing.base_test_case_with_temp_dir import BaseTestCaseWithTempDir
 
@@ -38,16 +38,6 @@ def _variant_comparator(v1, v2):
       return cmp(v1.end, v2.end)
     return cmp(v1.start, v2.start)
   return cmp(v1.reference_name, v2.reference_name)
-
-
-# Helper method for verifying equal count on PCollection.
-def _count_equals_to(expected_count):
-  def _count_equal(actual_list):
-    actual_count = len(actual_list)
-    if expected_count != actual_count:
-      raise BeamAssertException(
-          'Expected %d not equal actual %d' % (expected_count, actual_count))
-  return _count_equal
 
 
 class VcfSourceTest(BaseTestCaseWithTempDir):
@@ -366,14 +356,14 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
     pipeline = TestPipeline()
     pcoll = pipeline | 'Read' >> ReadFromVcf(
         testdata_util.get_full_file_path('valid-4.0.vcf'))
-    assert_that(pcoll, _count_equals_to(5))
+    assert_that(pcoll, asserts.count_equals_to(5))
     pipeline.run()
 
   def test_pipeline_read_file_pattern(self):
     pipeline = TestPipeline()
     pcoll = pipeline | 'Read' >> ReadFromVcf(
         os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
-    assert_that(pcoll, _count_equals_to(9900))
+    assert_that(pcoll, asserts.count_equals_to(9900))
     pipeline.run()
 
 
