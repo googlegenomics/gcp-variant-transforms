@@ -11,11 +11,26 @@ REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
     ]
 
-# TODO(arostami): Add more details (e.g. package keywords).
 setuptools.setup(
     name='variant_processing',
     version='0.0.0',
-    description='Variant processing tools.',
+    description='Variant processing tools based on Apache Beam.',
+    author='Google',
+    license='Apache 2.0',
+
+    # See https://pypi.python.org/pypi?%3Aaction=list_classifiers for the list
+    # of values.
+    classifiers=[
+        'Development Status :: 2 - Pre-Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
+        'Topic :: Scientific/Engineering :: Information Analysis',
+        'Topic :: System :: Distributed Computing',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+    ],
+
     setup_requires=REQUIRED_SETUP_PACKAGES,
     install_requires=REQUIRED_PACKAGES,
     test_suite='nose.collector',
