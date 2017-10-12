@@ -23,7 +23,7 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
 class VariantToBigQuery(beam.PTransform):
   """Writes PCollection of ``Variant`` records to BigQuery."""
 
-  def __init__(self, output_table, header_fields,
+  def __init__(self, output_table, header_fields, variant_merger=None,
                split_alternate_allele_info_fields=True):
     """Initializes the transform.
 
@@ -32,6 +32,9 @@ class VariantToBigQuery(beam.PTransform):
       header_fields (``libs.vcf_header_parser.HeaderFields``): A ``namedtuple``
         containing representative header fields for all ``Variant`` records.
         This is needed for dynamically generating the schema.
+      variant_merger (``VariantMergeStrategy``): The strategy used for merging
+        variants (if any). Some strategies may change the schema, which is why
+        this may be needed here.
       split_alternate_allele_info_fields (bool): If true, all INFO fields with
         `Number=A` (i.e. one value for each alternate allele) will be stored
         under the `alternate_bases` record. If false, they will be stored with
@@ -39,6 +42,7 @@ class VariantToBigQuery(beam.PTransform):
     """
     self._output_table = output_table
     self._header_fields = header_fields
+    self._variant_merger = variant_merger
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
 
@@ -51,6 +55,7 @@ class VariantToBigQuery(beam.PTransform):
                 self._output_table,
                 schema=bigquery_vcf_schema.generate_schema_from_header_fields(
                     self._header_fields,
+                    self._variant_merger,
                     self._split_alternate_allele_info_fields),
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),

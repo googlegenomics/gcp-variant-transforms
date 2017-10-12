@@ -8,10 +8,11 @@ from beam_io.vcfio import MISSING_FIELD_VALUE
 from beam_io.vcfio import PHASESET_FORMAT_KEY
 from vcf.parser import field_counts
 
-__all__ = ['generate_schema_from_header_fields', 'get_row_from_variant']
+__all__ = ['generate_schema_from_header_fields', 'get_row_from_variant',
+           'ColumnKeyConstants']
 
 
-class _ColumnKeyConstants(object):
+class ColumnKeyConstants(object):
   """Constants for column names in the BigQuery schema."""
   REFERENCE_NAME = 'reference_name'
   START_POSITION = 'start_position'
@@ -50,14 +51,17 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
 
-def generate_schema_from_header_fields(
-    header_fields, split_alternate_allele_info_fields=True):
+def generate_schema_from_header_fields(header_fields, variant_merger=None,
+                                       split_alternate_allele_info_fields=True):
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
 
   Args:
     header_fields (``libs.vcf_header_parser.HeaderFields``): A ``namedtuple``
       containing representative header fields for all ``Variant`` records. This
       specifies custom INFO and FORMAT fields in the VCF file(s).
+    variant_merger (``VariantMergeStrategy``): The strategy used for merging
+      variants (if any). Some strategies may change the schema, which is why
+      this may be needed here.
     split_alternate_allele_info_fields (bool): If true, all INFO fields with
       `Number=A` (i.e. one value for each alternate allele) will be stored under
       the `alternate_bases` record. If false, they will be stored with the rest
@@ -65,36 +69,36 @@ def generate_schema_from_header_fields(
   """
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.REFERENCE_NAME,
+      name=ColumnKeyConstants.REFERENCE_NAME,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description='Reference name.'))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.START_POSITION,
+      name=ColumnKeyConstants.START_POSITION,
       type=_TableFieldConstants.TYPE_INTEGER,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('Start position (0-based). Corresponds to the first base '
                    'of the string of reference bases.')))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.END_POSITION,
+      name=ColumnKeyConstants.END_POSITION,
       type=_TableFieldConstants.TYPE_INTEGER,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('End position (0-based). Corresponds to the first base '
                    'after the last base in the reference allele.')))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.REFERENCE_BASES,
+      name=ColumnKeyConstants.REFERENCE_BASES,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description='Reference bases.'))
 
   # Add alternate bases.
   alternate_bases_record = bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.ALTERNATE_BASES,
+      name=ColumnKeyConstants.ALTERNATE_BASES,
       type=_TableFieldConstants.TYPE_RECORD,
       mode=_TableFieldConstants.MODE_REPEATED,
       description='One record for each alternate base (if any).')
   alternate_bases_record.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.ALTERNATE_BASES_ALT,
+      name=ColumnKeyConstants.ALTERNATE_BASES_ALT,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description='Alternate base.'))
@@ -109,18 +113,18 @@ def generate_schema_from_header_fields(
   schema.fields.append(alternate_bases_record)
 
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.NAMES,
+      name=ColumnKeyConstants.NAMES,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_REPEATED,
       description='Variant names (e.g. RefSNP ID).'))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.QUALITY,
+      name=ColumnKeyConstants.QUALITY,
       type=_TableFieldConstants.TYPE_FLOAT,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('Phred-scaled quality score (-10log10 prob(call is wrong)). '
                    'Higher values imply better quality.')))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.FILTER,
+      name=ColumnKeyConstants.FILTER,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_REPEATED,
       description=('List of failed filters (if any) or "PASS" indicating the '
@@ -128,23 +132,23 @@ def generate_schema_from_header_fields(
 
   # Add calls.
   calls_record = bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.CALLS,
+      name=ColumnKeyConstants.CALLS,
       type=_TableFieldConstants.TYPE_RECORD,
       mode=_TableFieldConstants.MODE_REPEATED,
       description='One record for each call.')
   calls_record.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.CALLS_NAME,
+      name=ColumnKeyConstants.CALLS_NAME,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description='Name of the call.'))
   calls_record.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.CALLS_GENOTYPE,
+      name=ColumnKeyConstants.CALLS_GENOTYPE,
       type=_TableFieldConstants.TYPE_INTEGER,
       mode=_TableFieldConstants.MODE_REPEATED,
       description=('Genotype of the call. "-1" is used in cases where the '
                    'genotype is not called.')))
   calls_record.fields.append(bigquery.TableFieldSchema(
-      name=_ColumnKeyConstants.CALLS_PHASESET,
+      name=ColumnKeyConstants.CALLS_PHASESET,
       type=_TableFieldConstants.TYPE_STRING,
       mode=_TableFieldConstants.MODE_NULLABLE,
       description=('Phaseset of the call (if any). "*" is used in cases where '
@@ -162,6 +166,7 @@ def generate_schema_from_header_fields(
   schema.fields.append(calls_record)
 
   # Add info fields.
+  info_keys = set()
   for key, field in header_fields.infos.iteritems():
     # END info is already included by modifying the end_position.
     if (key == END_INFO_KEY or
@@ -173,7 +178,9 @@ def generate_schema_from_header_fields(
         type=_get_bigquery_type_from_vcf_type(field.type),
         mode=_get_bigquery_mode_from_vcf_num(field.num),
         description=field.desc))
-
+    info_keys.add(key)
+  if variant_merger:
+    variant_merger.modify_bigquery_schema(schema, info_keys)
   return schema
 
 
@@ -194,19 +201,22 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
   # TODO(arostami): Add error checking here for cases where the schema defined
   # by the headers does not match actual records.
   row = {
-      _ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
-      _ColumnKeyConstants.START_POSITION: variant.start,
-      _ColumnKeyConstants.END_POSITION: variant.end,
-      _ColumnKeyConstants.REFERENCE_BASES: variant.reference_bases,
-      _ColumnKeyConstants.NAMES: variant.names,
-      _ColumnKeyConstants.QUALITY: variant.quality,
-      _ColumnKeyConstants.FILTER: variant.filters,
+      ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
+      ColumnKeyConstants.START_POSITION: variant.start,
+      ColumnKeyConstants.END_POSITION: variant.end,
+      ColumnKeyConstants.REFERENCE_BASES: variant.reference_bases
   }
+  if variant.names:
+    row[ColumnKeyConstants.NAMES] = variant.names
+  if variant.quality is not None:
+    row[ColumnKeyConstants.QUALITY] = variant.quality
+  if variant.filters:
+    row[ColumnKeyConstants.FILTER] = variant.filters
 
   # Add alternate bases
-  row[_ColumnKeyConstants.ALTERNATE_BASES] = []
+  row[ColumnKeyConstants.ALTERNATE_BASES] = []
   for alt_index, alt in enumerate(variant.alternate_bases):
-    alt_record = {_ColumnKeyConstants.ALTERNATE_BASES_ALT: alt}
+    alt_record = {ColumnKeyConstants.ALTERNATE_BASES_ALT: alt}
     if split_alternate_allele_info_fields:
       for info_key, info in variant.info.iteritems():
         if info.field_count == _FIELD_COUNT_ALTERNATE_ALLELE:
@@ -215,21 +225,21 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
                 'Invalid number of "A" fields for key %s in variant %s ' % (
                     info_key, variant))
           alt_record[info_key] = info.data[alt_index]
-    row[_ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
+    row[ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
 
   # Add calls.
-  row[_ColumnKeyConstants.CALLS] = []
+  row[ColumnKeyConstants.CALLS] = []
   for call in variant.calls:
     call_record = {
-        _ColumnKeyConstants.CALLS_NAME: call.name,
-        _ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
-        _ColumnKeyConstants.CALLS_GENOTYPE: [g for g in call.genotype or []]
+        ColumnKeyConstants.CALLS_NAME: call.name,
+        ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
+        ColumnKeyConstants.CALLS_GENOTYPE: [g for g in call.genotype or []]
     }
     for key, field in call.info.iteritems():
       if field is None:
         continue
       call_record[key] = _get_bigquery_sanitized_field(field)
-    row[_ColumnKeyConstants.CALLS].append(call_record)
+    row[ColumnKeyConstants.CALLS].append(call_record)
 
   # Add info.
   for key, info in variant.info.iteritems():
