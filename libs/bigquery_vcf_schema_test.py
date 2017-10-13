@@ -295,3 +295,23 @@ class GetRowFromVariantTest(unittest.TestCase):
         'AF': [0.1, 0.2, -sys.maxint, 0.4],
         'AS': ['.', 'data1', 'data2']}
     self.assertEqual(expected_row, get_row_from_variant(variant))
+
+  def test_unicode_fields(self):
+    sample_unicode_str = u'\xc3\xb6'
+    sample_utf8_str = sample_unicode_str.encode('utf-8')
+    variant = Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[sample_unicode_str, sample_utf8_str],
+        info={'AS1': VariantInfo(sample_utf8_str, '1'),
+              'AS2': VariantInfo([sample_unicode_str, sample_utf8_str], '2')})
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.FILTER: [sample_unicode_str, sample_unicode_str],
+        ColumnKeyConstants.CALLS: [],
+        'AS1': sample_unicode_str,
+        'AS2': [sample_unicode_str, sample_unicode_str]}
+    self.assertEqual(expected_row, get_row_from_variant(variant))

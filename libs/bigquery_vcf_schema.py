@@ -123,7 +123,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
             name=key,
             type=_get_bigquery_type_from_vcf_type(field.type),
             mode=_TableFieldConstants.MODE_NULLABLE,
-            description=field.desc))
+            description=_get_bigquery_sanitized_field(field.desc)))
   schema.fields.append(alternate_bases_record)
 
   schema.fields.append(bigquery.TableFieldSchema(
@@ -176,7 +176,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
         name=key,
         type=_get_bigquery_type_from_vcf_type(field.type),
         mode=_get_bigquery_mode_from_vcf_num(field.num),
-        description=field.desc))
+        description=_get_bigquery_sanitized_field(field.desc)))
   schema.fields.append(calls_record)
 
   # Add info fields.
@@ -191,7 +191,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
         name=key,
         type=_get_bigquery_type_from_vcf_type(field.type),
         mode=_get_bigquery_mode_from_vcf_num(field.num),
-        description=field.desc))
+        description=_get_bigquery_sanitized_field(field.desc)))
     info_keys.add(key)
   if variant_merger:
     variant_merger.modify_bigquery_schema(schema, info_keys)
@@ -221,11 +221,12 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
       ColumnKeyConstants.REFERENCE_BASES: variant.reference_bases
   }
   if variant.names:
-    row[ColumnKeyConstants.NAMES] = variant.names
+    row[ColumnKeyConstants.NAMES] = _get_bigquery_sanitized_field(variant.names)
   if variant.quality is not None:
     row[ColumnKeyConstants.QUALITY] = variant.quality
   if variant.filters:
-    row[ColumnKeyConstants.FILTER] = variant.filters
+    row[ColumnKeyConstants.FILTER] = _get_bigquery_sanitized_field(
+        variant.filters)
 
   # Add alternate bases
   row[ColumnKeyConstants.ALTERNATE_BASES] = []
@@ -238,14 +239,15 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
             raise ValueError(
                 'Invalid number of "A" fields for key %s in variant %s ' % (
                     info_key, variant))
-          alt_record[info_key] = info.data[alt_index]
+          alt_record[info_key] = _get_bigquery_sanitized_field(
+              info.data[alt_index])
     row[ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
 
   # Add calls.
   row[ColumnKeyConstants.CALLS] = []
   for call in variant.calls:
     call_record = {
-        ColumnKeyConstants.CALLS_NAME: call.name,
+        ColumnKeyConstants.CALLS_NAME: _get_bigquery_sanitized_field(call.name),
         ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
         ColumnKeyConstants.CALLS_GENOTYPE: [g for g in call.genotype or []]
     }
@@ -270,8 +272,8 @@ def _get_bigquery_sanitized_field(
     field, null_numeric_value_replacement=-sys.maxint):
   """Returns sanitized field according to BigQuery restrictions.
 
-  This method only sanitizes lists. It returns the same ``field`` for all other
-  types (including None).
+  This method only sanitizes lists and strings. It returns the same
+  ``field`` for all other types (including None).
 
   For lists, null values are replaced with reasonable defaults since the
   BgiQuery API does not allow null values in lists (note that the entire
@@ -284,18 +286,52 @@ def _get_bigquery_sanitized_field(
     - ``null_numeric_value_replacement`` for float/int/long.
   TODO(arostami): Expose ``null_numeric_value_replacement`` as a flag.
 
+  For strings, it returns its unicode representation. The BigQuery API does not
+  support strings that are UTF-8 encoded.
+
   Args:
     field: Field to sanitize. It can be of any type.
+    null_numeric_value_replacement (int): Value to use instead of null for
+      numeric (float/int/long) lists.
+  Raises:
+    ValueError: If the field could not be sanitized (e.g. unsupported types in
+      lists).
+  """
+  if not field:
+    return field
+  if isinstance(field, basestring):
+    return _get_bigquery_sanitized_string(field)
+  elif isinstance(field, list):
+    return _get_bigquery_sanitized_list(field, null_numeric_value_replacement)
+  else:
+    return field
+
+
+def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
+  """Returns sanitized list according to BigQuery restrictions.
+
+  Null values are replaced with reasonable defaults since the
+  BgiQuery API does not allow null values in lists (note that the entire
+  list is allowed to be null). For instance, [0, None, 1] becomes
+  [0, ``null_numeric_value_replacement``, 1].
+  Null value replacements are:
+    - `False` for bool.
+    - `.` for string (null string values should not exist in Variants parsed
+      using PyVCF though).
+    - ``null_numeric_value_replacement`` for float/int/long.
+  Lists that contain strings are also sanitized according to the
+  ``_get_bigquery_sanitized_string`` method.
+
+  Args:
+    input_list: List to sanitize.
     null_numeric_value_replacement (int): Value to use instead of null for
       numeric (float/int/long) lists.
   Raises:
     ValueError: If a list contains unsupported values. Supported types are
       basestring, bool, int, long, and float.
   """
-  if not field or not isinstance(field, list):
-    return field
   null_replacement_value = None
-  for i in field:
+  for i in input_list:
     if i is None:
       continue
     if isinstance(i, basestring):
@@ -309,7 +345,23 @@ def _get_bigquery_sanitized_field(
     break  # Assumption is that all fields have the same type.
   if null_replacement_value is None:  # Implies everything was None.
     return []
-  return [(null_replacement_value if i is None else i) for i in field]
+  sanitized_list = []
+  for i in input_list:
+    if i is None:
+      i = null_replacement_value
+    elif isinstance(i, basestring):
+      i = _get_bigquery_sanitized_string(i)
+    sanitized_list.append(i)
+  return sanitized_list
+
+
+def _get_bigquery_sanitized_string(input_str):
+  """Returns a unicode string as BigQuery API does not support UTF-8 strings."""
+  try:
+    return (input_str if isinstance(input_str, unicode)
+            else input_str.decode('utf-8'))
+  except UnicodeDecodeError:
+    raise ValueError('input_str is not UTF-8: %s ' % (input_str))
 
 
 def _get_bigquery_type_from_vcf_type(vcf_type):
