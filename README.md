@@ -32,8 +32,9 @@ if you don't have one already.
 
 ### VCF to BigQuery
 
-Use `vcf_to_bq.py` to load [VCF](samtools.github.io/hts-specs/VCFv4.3.pdf) files
-directly to [BigQuery](bigquery.cloud.google.com).
+Use `vcf_to_bq.py` to load
+[VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) files
+directly to [BigQuery](https://cloud.google.com/bigquery/).
 
 You may use the
 [DirectRunner](https://beam.apache.org/documentation/runners/direct/)
