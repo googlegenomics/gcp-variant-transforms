@@ -489,7 +489,8 @@ class _VcfSource(_TextSource):
     try:
       vcf_reader = vcf.Reader(fsock=line_generator())
     except SyntaxError as e:
-      raise ValueError('Invalid VCF header: %s' % str(e))
+      raise ValueError(
+          'Invalid VCF header in file %s: %s' % (file_name,  str(e)))
     while True:
       try:
         record = next(vcf_reader)
@@ -500,7 +501,8 @@ class _VcfSource(_TextSource):
       except (LookupError, ValueError) as e:
         # TODO(arostami): Add 'strict' and 'loose' modes to not throw an
         # exception in case of such failures.
-        raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
+        raise ValueError(
+            'Invalid record in VCF file %s. Error: %s' % (file_name, str(e)))
 
   def _convert_to_variant_record(self, record, infos, formats):
     """Converts the PyVCF record to a :class:`Variant` object.
