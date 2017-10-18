@@ -335,3 +335,20 @@ class GetRowFromVariantTest(unittest.TestCase):
         'AS1': sample_unicode_str,
         'AS2': [sample_unicode_str, sample_unicode_str]}
     self.assertEqual(expected_row, get_row_from_variant(variant))
+
+  def test_nonstandard_fields_names(self):
+    variant = Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[],
+        info={'A-1': VariantInfo('data1', '1'),
+              '_A': VariantInfo('data2', '2')})
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        'A_1': 'data1',
+        'field__A': 'data2'}
+    self.assertEqual(expected_row, get_row_from_variant(variant))

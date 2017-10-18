@@ -243,8 +243,8 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
             raise ValueError(
                 'Invalid number of "A" fields for key %s in variant %s ' % (
                     info_key, variant))
-          alt_record[info_key] = _get_bigquery_sanitized_field(
-              info.data[alt_index])
+          alt_record[_get_bigquery_sanitized_field_name(info_key)] = (
+              _get_bigquery_sanitized_field(info.data[alt_index]))
     row[ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
 
   # Add calls.
@@ -258,7 +258,8 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
     for key, field in call.info.iteritems():
       if field is None:
         continue
-      call_record[key] = _get_bigquery_sanitized_field(field)
+      call_record[_get_bigquery_sanitized_field_name(key)] = (
+          _get_bigquery_sanitized_field(field))
     row[ColumnKeyConstants.CALLS].append(call_record)
 
   # Add info.
@@ -267,7 +268,8 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
         (split_alternate_allele_info_fields and
          info.field_count == _FIELD_COUNT_ALTERNATE_ALLELE)):
       continue
-    row[key] = _get_bigquery_sanitized_field(info.data)
+    row[_get_bigquery_sanitized_field_name(key)] = (
+        _get_bigquery_sanitized_field(info.data))
 
   return row
 
@@ -275,16 +277,16 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
 def _get_bigquery_sanitized_field_name(field_name):
   """Returns the sanitized field name according to BigQuery restrictions.
 
-  BigQuery field names must follow [a-zA-Z][a-zA-Z0-9_]*. This method converts
+  BigQuery field names must follow `[a-zA-Z][a-zA-Z0-9_]*`. This method converts
   any unsupported characters to an underscore. Also, if the first character does
-  not match [a-zA-Z], it prepends ``_FALLBACK_FIELD_NAME_PREFIX`` to the name.
+  not match `[a-zA-Z]`, it prepends ``_FALLBACK_FIELD_NAME_PREFIX`` to the name.
 
   Args:
     field_name (str): Name of the field to sanitize.
   Returns:
     Sanitized field name with unsupported characters replaced with an
     underscore. It also prepends the name with ``_FALLBACK_FIELD_NAME_PREFIX``
-    if the first character does not match [a-zA-Z].
+    if the first character does not match `[a-zA-Z]`.
   """
   assert field_name  # field_name must not be empty by this stage.
   if not re.match('[a-zA-Z]', field_name[0]):
