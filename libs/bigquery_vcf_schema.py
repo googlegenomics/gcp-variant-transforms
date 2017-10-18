@@ -14,6 +14,7 @@
 
 """Handles generation and processing of BigQuery schema for variants."""
 
+import re
 import sys
 from apache_beam.io.gcp.internal.clients import bigquery
 from beam_io.vcfio import END_INFO_KEY
@@ -63,6 +64,9 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
     'flag': _TableFieldConstants.TYPE_BOOLEAN,
 }
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+# Prefix to use when the first character of the field name is not [a-zA-Z]
+# as required by BigQuery.
+_FALLBACK_FIELD_NAME_PREFIX = 'field_'
 
 
 def generate_schema_from_header_fields(header_fields, variant_merger=None,
@@ -120,7 +124,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
     for key, field in header_fields.infos.iteritems():
       if field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]:
         alternate_bases_record.fields.append(bigquery.TableFieldSchema(
-            name=key,
+            name=_get_bigquery_sanitized_field_name(key),
             type=_get_bigquery_type_from_vcf_type(field.type),
             mode=_TableFieldConstants.MODE_NULLABLE,
             description=_get_bigquery_sanitized_field(field.desc)))
@@ -173,7 +177,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
     if key in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
       continue
     calls_record.fields.append(bigquery.TableFieldSchema(
-        name=key,
+        name=_get_bigquery_sanitized_field_name(key),
         type=_get_bigquery_type_from_vcf_type(field.type),
         mode=_get_bigquery_mode_from_vcf_num(field.num),
         description=_get_bigquery_sanitized_field(field.desc)))
@@ -188,7 +192,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
          field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
-        name=key,
+        name=_get_bigquery_sanitized_field_name(key),
         type=_get_bigquery_type_from_vcf_type(field.type),
         mode=_get_bigquery_mode_from_vcf_num(field.num),
         description=_get_bigquery_sanitized_field(field.desc)))
@@ -266,6 +270,26 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
     row[key] = _get_bigquery_sanitized_field(info.data)
 
   return row
+
+
+def _get_bigquery_sanitized_field_name(field_name):
+  """Returns the sanitized field name according to BigQuery restrictions.
+
+  BigQuery field names must follow [a-zA-Z][a-zA-Z0-9_]*. This method converts
+  any unsupported characters to an underscore. Also, if the first character does
+  not match [a-zA-Z], it prepends ``_FALLBACK_FIELD_NAME_PREFIX`` to the name.
+
+  Args:
+    field_name (str): Name of the field to sanitize.
+  Returns:
+    Sanitized field name with unsupported characters replaced with an
+    underscore. It also prepends the name with ``_FALLBACK_FIELD_NAME_PREFIX``
+    if the first character does not match [a-zA-Z].
+  """
+  assert field_name  # field_name must not be empty by this stage.
+  if not re.match('[a-zA-Z]', field_name[0]):
+    field_name = _FALLBACK_FIELD_NAME_PREFIX + field_name
+  return re.sub('[^a-zA-Z0-9_]', '_', field_name)
 
 
 def _get_bigquery_sanitized_field(

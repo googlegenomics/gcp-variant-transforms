@@ -161,6 +161,26 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             info_fields=['I1']),
         generate_schema_from_header_fields(header_fields))
 
+  def test_bigquery_field_name_sanitize(self):
+    infos = OrderedDict([
+        ('_', Info('_', 1, 'String', 'desc', 'src', 'v')),
+        ('_A', Info('_A', 1, 'String', 'desc', 'src', 'v')),
+        ('0a', Info('0a', 1, 'String', 'desc', 'src', 'v')),
+        ('A-B*C', Info('A-B*C', 1, 'String', 'desc', 'src', 'v')),
+        ('I-A', Info('I-A', field_counts['A'], 'Float', 'desc', 'src', 'v')),
+        ('OK_info_09', Format('OK_info_09', 1, 'String', 'desc'))])
+    formats = OrderedDict([
+        ('a^b', Format('a^b', 1, 'String', 'desc')),
+        ('OK_format_09', Format('OK_format_09', 1, 'String', 'desc'))])
+    header_fields = HeaderFields(infos, formats)
+    self._assert_fields_equal(
+        self._generate_expected_fields(
+            alt_fields=['I_A'],
+            call_fields=['a_b', 'OK_format_09'],
+            info_fields=['field__', 'field__A', 'field_0a', 'A_B_C',
+                         'OK_info_09']),
+        generate_schema_from_header_fields(header_fields))
+
   def test_variant_merger_modify_schema(self):
     infos = OrderedDict([
         ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
