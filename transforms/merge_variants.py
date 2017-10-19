@@ -35,14 +35,15 @@ class MergeVariants(beam.PTransform):
                       variant_merge_strategy.VariantMergeStrategy)
     self._variant_merger = variant_merger
 
-  def _map_by_variant_key(self, variant):
-    return (self._variant_merger.get_merge_key(variant), variant)
+  def _map_by_variant_keys(self, variant):
+    for key in self._variant_merger.get_merge_keys(variant):
+      yield (key, variant)
 
   def _merge_variants_by_key(self, (key, variants)):
     return self._variant_merger.get_merged_variants(variants)
 
   def expand(self, pcoll):
     return (pcoll
-            | 'MapVariantsByKey' >> beam.Map(self._map_by_variant_key)
+            | 'MapVariantsByKey' >> beam.FlatMap(self._map_by_variant_keys)
             | 'GroupVariantsByKey' >> beam.GroupByKey()
             | 'MergeVariantsByKey' >> beam.FlatMap(self._merge_variants_by_key))

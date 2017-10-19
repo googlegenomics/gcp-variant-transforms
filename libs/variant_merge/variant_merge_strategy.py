@@ -33,8 +33,8 @@ class VariantMergeStrategy(object):
     """
     raise NotImplementedError
 
-  def get_merge_key(self, variant):
-    """Returns a key (str) used for merging variants."""
+  def get_merge_keys(self, variant):
+    """Returns a generator of keys (str) used for merging variants."""
     raise NotImplementedError
 
   def modify_bigquery_schema(self, schema, info_keys):

@@ -93,8 +93,8 @@ class MoveToCallsStrategy(VariantMergeStrategy):
     merged_variant.filters = sorted(set(merged_variant.filters))
     return [merged_variant]
 
-  def get_merge_key(self, variant):
-    return ':'.join(
+  def get_merge_keys(self, variant):
+    yield ':'.join(
         [str(x) for x in [
             variant.reference_name or '',
             variant.start or '',

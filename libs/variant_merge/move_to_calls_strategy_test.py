@@ -217,22 +217,23 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         merged_variant.calls)
     self.assertEqual([], merged_variant.info.keys())
 
-  def test_get_merge_key(self):
+  def test_get_merge_keys(self):
     strategy = MoveToCallsStrategy(None, None, None)
 
     variant = Variant()
-    self.assertEqual('::::', strategy.get_merge_key(variant))
+    self.assertEqual('::::', next(strategy.get_merge_keys(variant)))
 
     variant.reference_name = '19'
-    self.assertEqual('19::::', strategy.get_merge_key(variant))
+    self.assertEqual('19::::', next(strategy.get_merge_keys(variant)))
 
     variant.start = 123
     variant.end = 125
     variant.reference_bases = 'AT'
-    self.assertEqual('19:123:125:AT:', strategy.get_merge_key(variant))
+    self.assertEqual('19:123:125:AT:', next(strategy.get_merge_keys(variant)))
 
     variant.alternate_bases = ['A', 'C']
-    self.assertEqual('19:123:125:AT:A,C', strategy.get_merge_key(variant))
+    self.assertEqual('19:123:125:AT:A,C',
+        next(strategy.get_merge_keys(variant)))
 
   def _get_base_schema(self, info_keys):
     schema = bigquery.TableSchema()
