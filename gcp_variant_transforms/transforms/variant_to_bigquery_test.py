@@ -14,6 +14,8 @@
 
 """Tests for variant_to_bigquery module."""
 
+from __future__ import absolute_import
+
 import unittest
 
 from apache_beam import ParDo
@@ -22,30 +24,28 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
-from beam_io.vcfio import Variant
-from beam_io.vcfio import VariantCall
-from beam_io.vcfio import VariantInfo
-from libs.bigquery_vcf_schema import ColumnKeyConstants
-from transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
+from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
 
 class ConvertToBigQueryTableRowTest(unittest.TestCase):
   """Test cases for the ``ConvertToBigQueryTableRow`` DoFn."""
 
   def _get_sample_variant_1(self, split_alternate_allele_info_fields=True):
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'AF': VariantInfo([0.1, 0.2], 'A'),
-              'AF2': VariantInfo([0.2, 0.3], 'A'),
-              'A1': VariantInfo('some data', '1'),
-              'A2': VariantInfo(['data1', 'data2'], '2')},
+        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
+              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
+              'A1': vcfio.VariantInfo('some data', '1'),
+              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')},
         calls=[
-            VariantCall(
+            vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'HQ': [10, 20]}),
-            VariantCall(
+            vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
                 info={'GQ': 10, 'FLAG1': True}),
         ]
@@ -81,10 +81,10 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     return variant, row
 
   def _get_sample_variant_2(self):
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'INTINFO': VariantInfo(1234, '1')})
+        info={'INTINFO': vcfio.VariantInfo(1234, '1')})
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -96,7 +96,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     return variant, row
 
   def _get_sample_variant_3(self):
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='20', start=None, end=None, reference_bases=None)
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: None,

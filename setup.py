@@ -18,7 +18,7 @@ import setuptools
 
 REQUIRED_PACKAGES = [
     'apache-beam[gcp]>=2.0',
-    'pyvcf',
+    'pyvcf<0.7.0',
     ]
 
 REQUIRED_SETUP_PACKAGES = [
@@ -26,9 +26,10 @@ REQUIRED_SETUP_PACKAGES = [
     ]
 
 setuptools.setup(
-    name='variant_processing',
+    name='gcp_variant_transforms',
     version='0.0.0',
-    description='Variant processing tools based on Apache Beam.',
+    description=('Tool for transforming and processing VCF files in a '
+                 'scalable manner based on Apache Beam'),
     author='Google',
     license='Apache 2.0',
 
@@ -49,5 +50,7 @@ setuptools.setup(
     install_requires=REQUIRED_PACKAGES,
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
-    package_data={'variant_processing': ['testing/testdata/*']},
+    package_data={
+        'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
+    },
 )

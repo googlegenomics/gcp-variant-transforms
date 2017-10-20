@@ -17,11 +17,11 @@
 
 FROM google/cloud-sdk
 
-# TODO(arostami): Figure out why 'setup.py install' does't work.
+# TODO: Figure out why 'setup.py install' does't work.
 RUN pip install apache_beam[gcp] pyvcf
 
-RUN mkdir -p /opt/variant_processing/bin && mkdir -p /opt/variant_processing/src
-ADD / /opt/variant_processing/src/
-RUN echo 'python /opt/variant_processing/src/vcf_to_bq.py "$@"' > \
-      /opt/variant_processing/bin/vcf_to_bq && \
-    chmod +x /opt/variant_processing/bin/vcf_to_bq
+RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
+ADD / /opt/gcp_variant_transforms/src/
+RUN printf '#!/bin/bash\ncd /opt/gcp_variant_transforms/src\npython -m gcp_variant_transforms.vcf_to_bq "$@"\n' > \
+      /opt/gcp_variant_transforms/bin/vcf_to_bq && \
+    chmod +x /opt/gcp_variant_transforms/bin/vcf_to_bq

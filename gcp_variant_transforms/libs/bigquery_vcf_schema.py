@@ -14,14 +14,15 @@
 
 """Handles generation and processing of BigQuery schema for variants."""
 
+from __future__ import absolute_import
+
 import re
 import sys
+
 from apache_beam.io.gcp.internal.clients import bigquery
-from beam_io.vcfio import END_INFO_KEY
-from beam_io.vcfio import GENOTYPE_FORMAT_KEY
-from beam_io.vcfio import MISSING_FIELD_VALUE
-from beam_io.vcfio import PHASESET_FORMAT_KEY
-from vcf.parser import field_counts
+from gcp_variant_transforms.beam_io import vcfio
+
+import vcf
 
 __all__ = ['generate_schema_from_header_fields', 'get_row_from_variant',
            'ColumnKeyConstants']
@@ -122,7 +123,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
       description='Alternate base.'))
   if split_alternate_allele_info_fields:
     for key, field in header_fields.infos.iteritems():
-      if field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]:
+      if field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]:
         alternate_bases_record.fields.append(bigquery.TableFieldSchema(
             name=_get_bigquery_sanitized_field_name(key),
             type=_get_bigquery_type_from_vcf_type(field.type),
@@ -174,7 +175,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
                    'was specified.')))
   for key, field in header_fields.formats.iteritems():
     # GT and PS are already included in 'genotype' and 'phaseset' fields.
-    if key in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
+    if key in (vcfio.GENOTYPE_FORMAT_KEY, vcfio.PHASESET_FORMAT_KEY):
       continue
     calls_record.fields.append(bigquery.TableFieldSchema(
         name=_get_bigquery_sanitized_field_name(key),
@@ -187,9 +188,9 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
   info_keys = set()
   for key, field in header_fields.infos.iteritems():
     # END info is already included by modifying the end_position.
-    if (key == END_INFO_KEY or
+    if (key == vcfio.END_INFO_KEY or
         (split_alternate_allele_info_fields and
-         field.num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
+         field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=_get_bigquery_sanitized_field_name(key),
@@ -216,7 +217,7 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
   Raises:
     ValueError: If variant data is inconsistent or invalid.
   """
-  # TODO(arostami): Add error checking here for cases where the schema defined
+  # TODO: Add error checking here for cases where the schema defined
   # by the headers does not match actual records.
   row = {
       ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
@@ -310,7 +311,7 @@ def _get_bigquery_sanitized_field(
     - `.` for string (null string values should not exist in Variants parsed
       using PyVCF though).
     - ``null_numeric_value_replacement`` for float/int/long.
-  TODO(arostami): Expose ``null_numeric_value_replacement`` as a flag.
+  TODO: Expose ``null_numeric_value_replacement`` as a flag.
 
   For strings, it returns its unicode representation. The BigQuery API does not
   support strings that are UTF-8 encoded.
@@ -361,7 +362,7 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
     if i is None:
       continue
     if isinstance(i, basestring):
-      null_replacement_value = MISSING_FIELD_VALUE
+      null_replacement_value = vcfio.MISSING_FIELD_VALUE
     elif isinstance(i, bool):
       null_replacement_value = False
     elif isinstance(i, (int, long, float)):

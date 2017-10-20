@@ -176,8 +176,7 @@ class VariantCall(object):
         [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
 
 
-# TODO(arostami): Remove once header processing changes are released in the
-# Beam SDK.
+# TODO: Remove once header processing changes are released in the Beam SDK.
 class _TextSource(filebasedsource.FileBasedSource):
   r"""A source for reading text files.
 
@@ -490,7 +489,7 @@ class _VcfSource(_TextSource):
       vcf_reader = vcf.Reader(fsock=line_generator())
     except SyntaxError as e:
       raise ValueError(
-          'Invalid VCF header in file %s: %s' % (file_name,  str(e)))
+          'Invalid VCF header in file %s: %s' % (file_name, str(e)))
     while True:
       try:
         record = next(vcf_reader)
@@ -499,8 +498,8 @@ class _VcfSource(_TextSource):
       except StopIteration:
         break
       except (LookupError, ValueError) as e:
-        # TODO(arostami): Add 'strict' and 'loose' modes to not throw an
-        # exception in case of such failures.
+        # TODO: Add 'strict' and 'loose' modes to not throw an exception in case
+        # of such failures.
         raise ValueError(
             'Invalid record in VCF file %s. Error: %s' % (file_name, str(e)))
 

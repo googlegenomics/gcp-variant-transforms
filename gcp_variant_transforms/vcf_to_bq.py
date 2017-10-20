@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Pipeline from exporting VCF files to BigQuery.
+r"""Pipeline from loading VCF files to BigQuery.
 
 Run locally:
-python vcf_to_bq.py \
+python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern <path to VCF files> \
   --output_table PROJECT_ID:BIGQUERY_DATASET.TABLE_NAME
 
 Run on Dataflow:
-python vcf_to_bq.py \
-  --input_pattern <path to VCF files on GCS> \
-  --output_table PROJECT_ID:BIGQUERY_DATASET.TABLE_NAME \
-  --project PROJECT_ID \
-  --staging_location gs://YOUR-BUCKET/staging \
-  --temp_location gs://YOUR-BUCKET/temp \
-  --job_name vcf-to-bq-export \
+python -m gcp_variant_transforms.vcf_to_bq \
+  --input_pattern gs://bucket/vcfs/vcffile.vcf \
+  --output_table projectname:bigquerydataset.tablename \
+  --project projectname \
+  --staging_location gs://bucket/staging \
+  --temp_location gs://bucket/temp \
+  --job_name vcf-to-bq \
   --setup_file ./setup.py \
   --runner DataflowRunner
 """
@@ -39,12 +39,12 @@ import logging
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
 
-# TODO(arostami): Replace with the version from Beam SDK once that is released.
-from beam_io import vcfio
-from libs.variant_merge import move_to_calls_strategy
-from libs.vcf_header_parser import get_merged_vcf_headers
-from transforms.merge_variants import MergeVariants
-from transforms.variant_to_bigquery import VariantToBigQuery
+# TODO: Replace with the version from Beam SDK once that is released.
+from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.transforms import merge_variants
+from gcp_variant_transforms.transforms import variant_to_bigquery
 
 
 # List of supported merge strategies for variants.
@@ -84,7 +84,7 @@ def _validate_args(known_args):
 
 
 def run(argv=None):
-  """Runs VCF to BigQuery export pipeline."""
+  """Runs VCF to BigQuery pipeline."""
 
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
@@ -163,16 +163,17 @@ def run(argv=None):
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQUery shcmea cannot yet be dynamically created based on input.
   # See https://issues.apache.org/jira/browse/BEAM-2801.
-  header_fields = get_merged_vcf_headers(
+  header_fields = vcf_header_parser.get_merged_vcf_headers(
       known_args.representative_header_file or known_args.input_pattern)
 
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
     variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
     if variant_merger:
-      variants |= 'MergeVariants' >> MergeVariants(variant_merger)
+      variants |= (
+          'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
     _ = (variants |
-         'VariantToBigQuery' >> VariantToBigQuery(
+         'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
              known_args.output_table,
              header_fields,
              variant_merger,

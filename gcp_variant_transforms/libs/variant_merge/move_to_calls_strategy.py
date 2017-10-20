@@ -14,15 +14,18 @@
 
 """Implements a variant merge stategy that moves fields to calls."""
 
+from __future__ import absolute_import
+
 import re
-from beam_io.vcfio import Variant
-from libs.bigquery_vcf_schema import ColumnKeyConstants
-from libs.variant_merge.variant_merge_strategy import VariantMergeStrategy
+
+from gcp_variant_transforms.beam_io.vcfio import Variant
+from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 
 __all__ = ['MoveToCallsStrategy']
 
 
-class MoveToCallsStrategy(VariantMergeStrategy):
+class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
   """A merging strategy that moves fields to the corresponding calls records.
 
   Variants will be merged across files using

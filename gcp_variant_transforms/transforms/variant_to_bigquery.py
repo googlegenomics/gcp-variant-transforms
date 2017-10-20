@@ -14,9 +14,11 @@
 
 """A PTransform to output a PCollection of ``Variant`` records to BigQuery."""
 
+from __future__ import absolute_import
+
 import apache_beam as beam
 
-from libs import bigquery_vcf_schema
+from gcp_variant_transforms.libs import bigquery_vcf_schema
 
 __all__ = ['VariantToBigQuery']
 

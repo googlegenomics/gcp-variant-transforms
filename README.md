@@ -53,20 +53,21 @@ it runs slower for compressed files as they cannot be sharded.
 Example command for DirectRunner:
 
 ```bash
-python vcf_to_bq.py --input_pattern testing/testdata/valid-4.0.vcf \
+python -m gcp_variant_transforms.vcf_to_bq \
+  --input_pattern gcp_variant_transforms/testing/testdata/valid-4.0.vcf \
   --output_table projectname:bigquerydataset.tablename
 ```
 
 Example command for DataflowRunner:
 
 ```bash
-python vcf_to_bq.py \
+python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gs://bucket/vcfs/vcffile.vcf \
   --output_table projectname:bigquerydataset.tablename  \
   --project projectname \
   --staging_location gs://bucket/staging \
   --temp_location gs://bucket/temp \
-  --job_name vcf-to-bq-export \
+  --job_name vcf-to-bq \
   --setup_file ./setup.py \
   --runner DataflowRunner
 ```

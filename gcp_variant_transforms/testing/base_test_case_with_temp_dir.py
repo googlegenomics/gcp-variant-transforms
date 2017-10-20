@@ -14,6 +14,8 @@
 
 """Base class for unittests requiring temporary directories/files."""
 
+from __future__ import absolute_import
+
 import os
 import shutil
 import tempfile

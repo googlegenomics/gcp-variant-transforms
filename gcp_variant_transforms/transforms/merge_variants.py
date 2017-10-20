@@ -14,9 +14,11 @@
 
 """A PTransform for merging variants based on a strategy."""
 
+from __future__ import absolute_import
+
 import apache_beam as beam
 
-from libs.variant_merge import variant_merge_strategy
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 
 __all__ = ['MergeVariants']
 

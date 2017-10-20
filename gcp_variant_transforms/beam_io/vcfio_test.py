@@ -14,6 +14,8 @@
 
 """Tests for vcfio module."""
 
+from __future__ import absolute_import
+
 import logging
 import os
 import unittest
@@ -22,17 +24,11 @@ import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 
-from beam_io.vcfio import _VcfSource as VcfSource
-from beam_io.vcfio import DEFAULT_PHASESET_VALUE
-from beam_io.vcfio import MISSING_GENOTYPE_VALUE
-from beam_io.vcfio import ReadFromVcf
-from beam_io.vcfio import Variant
-from beam_io.vcfio import VariantCall
-from beam_io.vcfio import VariantInfo
-
-from testing import asserts
-from testing import testdata_util
-from testing.base_test_case_with_temp_dir import BaseTestCaseWithTempDir
+from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io.vcfio import _VcfSource as VcfSource
+from gcp_variant_transforms.testing import asserts
+from gcp_variant_transforms.testing import base_test_case_with_temp_dir
+from gcp_variant_transforms.testing import testdata_util
 
 # Note: mixing \n and \r\n to verify both behaviors.
 _SAMPLE_HEADER_LINES = [
@@ -54,7 +50,7 @@ def _variant_comparator(v1, v2):
   return cmp(v1.reference_name, v2.reference_name)
 
 
-class VcfSourceTest(BaseTestCaseWithTempDir):
+class VcfSourceTest(base_test_case_with_temp_dir.BaseTestCaseWithTempDir):
 
   def _read_records(self, file_or_pattern):
     source = VcfSource(file_or_pattern)
@@ -73,48 +69,49 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
   def _get_sample_variant_1(self):
     vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	'
                 'GT:GQ	0/0:48	1/0:20\n')
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
         alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
         filters=['PASS'],
-        info={'AF': VariantInfo(data=[0.5, 0.1], field_count='A'),
-              'NS': VariantInfo(data=1, field_count='1')})
+        info={'AF': vcfio.VariantInfo(data=[0.5, 0.1], field_count='A'),
+              'NS': vcfio.VariantInfo(data=1, field_count='1')})
     variant.calls.append(
-        VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+        vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
     variant.calls.append(
-        VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+        vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
     return variant, vcf_line
 
   def _get_sample_variant_2(self):
     vcf_line = (
         '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n')
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='19', start=122, end=125, reference_bases='GTC',
         alternate_bases=[], names=['rs1234'], quality=40,
         filters=['q10', 's50'],
-        info={'NS': VariantInfo(data=2, field_count='1')})
+        info={'NS': vcfio.VariantInfo(data=2, field_count='1')})
     variant.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0],
-                    phaseset=DEFAULT_PHASESET_VALUE,
-                    info={'GQ': 48}))
+        vcfio.VariantCall(name='Sample1', genotype=[1, 0],
+                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                          info={'GQ': 48}))
     variant.calls.append(
-        VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
+        vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
     return variant, vcf_line
 
   def _get_sample_variant_3(self):
     vcf_line = (
         '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:GQ	0|1:45 .:.\n')
-    variant = Variant(
+    variant = vcfio.Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-        info={'AF': VariantInfo(data=[0.5], field_count='A')})
+        info={'AF': vcfio.VariantInfo(data=[0.5], field_count='A')})
     variant.calls.append(
-        VariantCall(name='Sample1', genotype=[0, 1],
-                    phaseset=DEFAULT_PHASESET_VALUE,
-                    info={'GQ': 45}))
+        vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                          info={'GQ': 45}))
     variant.calls.append(
-        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE],
-                    info={'GQ': None}))
+        vcfio.VariantCall(name='Sample2',
+                          genotype=[vcfio.MISSING_GENOTYPE_VALUE],
+                          info={'GQ': None}))
     return variant, vcf_line
 
   def test_read_single_file(self):
@@ -246,10 +243,10 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
   def test_no_samples(self):
     header_line = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO\n'
     record_line = '19	123	.	G	A	.	PASS	AF=0.2'
-    expected_variant = Variant(
+    expected_variant = vcfio.Variant(
         reference_name='19', start=122, end=123, reference_bases='G',
         alternate_bases=['A'], filters=['PASS'],
-        info={'AF': VariantInfo(data=[0.2], field_count='A')})
+        info={'AF': vcfio.VariantInfo(data=[0.2], field_count='A')})
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES[:-1] + [header_line, record_line])
     self.assertEqual(1, len(read_data))
@@ -257,11 +254,13 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
 
   def test_no_info(self):
     record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
-    expected_variant = Variant(reference_name='chr19', start=122, end=123)
+    expected_variant = vcfio.Variant(reference_name='chr19', start=122, end=123)
     expected_variant.calls.append(
-        VariantCall(name='Sample1', genotype=[MISSING_GENOTYPE_VALUE]))
+        vcfio.VariantCall(name='Sample1',
+                          genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     expected_variant.calls.append(
-        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE]))
+        vcfio.VariantCall(name='Sample2',
+                          genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES + [record_line])
     self.assertEqual(1, len(read_data))
@@ -277,24 +276,24 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
     record_lines = [
         '19	2	.	A	T,C	.	.	HA=a1,a2;HG=1,2,3;HR=a,b,c;HF;HU=0.1	GT	1/0	0/1\n',
         '19	124	.	A	T	.	.	HG=3,4,5;HR=d,e;HU=1.1,1.2	GT	0/0	0/1']
-    variant_1 = Variant(
+    variant_1 = vcfio.Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T', 'C'],
-        info={'HA': VariantInfo(data=['a1', 'a2'], field_count='A'),
-              'HG': VariantInfo(data=[1, 2, 3], field_count='G'),
-              'HR': VariantInfo(data=['a', 'b', 'c'], field_count='R'),
-              'HF': VariantInfo(data=True, field_count='0'),
-              'HU': VariantInfo(data=[0.1], field_count=None)})
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
+        info={'HA': vcfio.VariantInfo(data=['a1', 'a2'], field_count='A'),
+              'HG': vcfio.VariantInfo(data=[1, 2, 3], field_count='G'),
+              'HR': vcfio.VariantInfo(data=['a', 'b', 'c'], field_count='R'),
+              'HF': vcfio.VariantInfo(data=True, field_count='0'),
+              'HU': vcfio.VariantInfo(data=[0.1], field_count=None)})
+    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_1.calls.append(vcfio.VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = vcfio.Variant(
         reference_name='19', start=123, end=124, reference_bases='A',
         alternate_bases=['T'],
-        info={'HG': VariantInfo(data=[3, 4, 5], field_count='G'),
-              'HR': VariantInfo(data=['d', 'e'], field_count='R'),
-              'HU': VariantInfo(data=[1.1, 1.2], field_count=None)})
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+        info={'HG': vcfio.VariantInfo(data=[3, 4, 5], field_count='G'),
+              'HR': vcfio.VariantInfo(data=['d', 'e'], field_count='R'),
+              'HU': vcfio.VariantInfo(data=[1.1, 1.2], field_count=None)})
+    variant_2.calls.append(vcfio.VariantCall(name='Sample1', genotype=[0, 0]))
+    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[0, 1]))
 
     read_data = self._create_temp_file_and_read_records(
         info_headers + _SAMPLE_HEADER_LINES[1:] + record_lines)
@@ -306,14 +305,14 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         '##INFO=<ID=END,Number=1,Type=Integer,Description="End of record.">\n')
     record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n',
                     '19	123	.	A	.	.	.	.	GT	0/1	1/1\n']
-    variant_1 = Variant(
+    variant_1 = vcfio.Variant(
         reference_name='19', start=122, end=1111, reference_bases='A')
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
+    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_1.calls.append(vcfio.VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = vcfio.Variant(
         reference_name='19', start=122, end=123, reference_bases='A')
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
+    variant_2.calls.append(vcfio.VariantCall(name='Sample1', genotype=[0, 1]))
+    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 1]))
     read_data = self._create_temp_file_and_read_records(
         [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
@@ -324,19 +323,19 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phaseset">\n')
     record_lines = ['19	123	.	A	T	.	.	.	GT:PS	1|0:1111	0/1:.\n',
                     '19	121	.	A	T	.	.	.	GT:PS	1|0:2222	0/1:2222\n']
-    variant_1 = Variant(
+    variant_1 = vcfio.Variant(
         reference_name='19', start=122, end=123, reference_bases='A',
         alternate_bases=['T'])
     variant_1.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='1111'))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
+        vcfio.VariantCall(name='Sample1', genotype=[1, 0], phaseset='1111'))
+    variant_1.calls.append(vcfio.VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2 = vcfio.Variant(
         reference_name='19', start=120, end=121, reference_bases='A',
         alternate_bases=['T'])
     variant_2.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='2222'))
+        vcfio.VariantCall(name='Sample1', genotype=[1, 0], phaseset='2222'))
     variant_2.calls.append(
-        VariantCall(name='Sample2', genotype=[0, 1], phaseset='2222'))
+        vcfio.VariantCall(name='Sample2', genotype=[0, 1], phaseset='2222'))
     read_data = self._create_temp_file_and_read_records(
         [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
@@ -349,14 +348,14 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
         '##FORMAT=<ID=F2,Number=2,Type=Character,Description="Format_two">\n']
     record_lines = [
         '19	2	.	A	T,C	.	.	.	GT:FU:F1:F2	1/0:a1:3:a,b	0/1:a2,a3:4:b,c\n']
-    expected_variant = Variant(
+    expected_variant = vcfio.Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T', 'C'])
-    expected_variant.calls.append(VariantCall(
+    expected_variant.calls.append(vcfio.VariantCall(
         name='Sample1',
         genotype=[1, 0],
         info={'FU': ['a1'], 'F1': 3, 'F2': ['a', 'b']}))
-    expected_variant.calls.append(VariantCall(
+    expected_variant.calls.append(vcfio.VariantCall(
         name='Sample2',
         genotype=[0, 1],
         info={'FU': ['a2', 'a3'], 'F1': 4, 'F2': ['b', 'c']}))
@@ -368,14 +367,14 @@ class VcfSourceTest(BaseTestCaseWithTempDir):
 
   def test_pipeline_read_single_file(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromVcf(
+    pcoll = pipeline | 'Read' >> vcfio.ReadFromVcf(
         testdata_util.get_full_file_path('valid-4.0.vcf'))
     assert_that(pcoll, asserts.count_equals_to(5))
     pipeline.run()
 
   def test_pipeline_read_file_pattern(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromVcf(
+    pcoll = pipeline | 'Read' >> vcfio.ReadFromVcf(
         os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
     assert_that(pcoll, asserts.count_equals_to(9900))
     pipeline.run()
