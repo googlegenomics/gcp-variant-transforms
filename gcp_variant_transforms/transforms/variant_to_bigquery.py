@@ -45,8 +45,8 @@ class VariantToBigQuery(beam.PTransform):
 
     Args:
       output_table (str): Full path of the output BigQuery table.
-      header_fields (``libs.vcf_header_parser.HeaderFields``): A ``namedtuple``
-        containing representative header fields for all ``Variant`` records.
+      header_fields (``HeaderFields``): A ``namedtuple`` containing
+        representative header fields for all ``Variant`` records.
         This is needed for dynamically generating the schema.
       variant_merger (``VariantMergeStrategy``): The strategy used for merging
         variants (if any). Some strategies may change the schema, which is why

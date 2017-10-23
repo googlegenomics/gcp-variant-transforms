@@ -75,9 +75,9 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
 
   Args:
-    header_fields (``libs.vcf_header_parser.HeaderFields``): A ``namedtuple``
-      containing representative header fields for all ``Variant`` records. This
-      specifies custom INFO and FORMAT fields in the VCF file(s).
+    header_fields (``HeaderFields``): A ``namedtuple`` containing representative
+      header fields for all ``Variant`` records. This specifies custom INFO and
+      FORMAT fields in the VCF file(s).
     variant_merger (``VariantMergeStrategy``): The strategy used for merging
       variants (if any). Some strategies may change the schema, which is why
       this may be needed here.

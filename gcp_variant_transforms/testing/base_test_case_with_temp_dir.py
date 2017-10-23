@@ -27,8 +27,8 @@ __all__ = ['BaseTestCaseWithTempDir']
 class BaseTestCaseWithTempDir(unittest.TestCase):
   """Base class for TestCases that deals with TempDir clean-up.
 
-  Inherited test cases will call self._new_tempdir() to start a temporary dir
-  which will be deleted at the end of the tests (when tearDown() is called).
+  Inherited test cases will call `self._new_tempdir()` to start a temporary dir
+  which will be deleted at the end of the tests (when `tearDown()` is called).
   """
 
   def setUp(self):
