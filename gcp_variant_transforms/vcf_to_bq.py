@@ -16,8 +16,8 @@ r"""Pipeline from loading VCF files to BigQuery.
 
 Run locally:
 python -m gcp_variant_transforms.vcf_to_bq \
-  --input_pattern <path to VCF files> \
-  --output_table PROJECT_ID:BIGQUERY_DATASET.TABLE_NAME
+  --input_pattern <path to VCF file(s)> \
+  --output_table projectname:bigquerydataset.tablename
 
 Run on Dataflow:
 python -m gcp_variant_transforms.vcf_to_bq \
