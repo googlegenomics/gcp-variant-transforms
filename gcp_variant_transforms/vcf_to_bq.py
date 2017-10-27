@@ -43,6 +43,7 @@ from apache_beam.options.pipeline_options import PipelineOptions
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
 
@@ -156,6 +157,13 @@ def run(argv=None):
             'the associated calls in each VCF file. '
             'Requires variant_merge_strategy=MOVE_TO_CALLS.'))
 
+  parser.add_argument(
+      '--reference_names',
+      dest='reference_names', default=None, nargs='+',
+      help=('A list of reference names (separated by a space) to load '
+            'to BigQuery. If this parameter is not specified, all '
+            'references will be kept.'))
+
   known_args, pipeline_args = parser.parse_known_args(argv)
   _validate_args(known_args)
 
@@ -168,7 +176,10 @@ def run(argv=None):
 
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
-    variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
+    variants = (p
+                | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
+                | 'FilterVariants' >> filter_variants.FilterVariants(
+                    reference_names=known_args.reference_names))
     if variant_merger:
       variants |= (
           'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
