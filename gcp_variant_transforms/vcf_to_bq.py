@@ -35,9 +35,13 @@ from __future__ import absolute_import
 
 import argparse
 import logging
+import re
 
 import apache_beam as beam
+from apache_beam.io.gcp.internal.clients import bigquery
 from apache_beam.options.pipeline_options import PipelineOptions
+from apitools.base.py import exceptions
+from oauth2client.client import GoogleCredentials
 
 # TODO: Replace with the version from Beam SDK once that is released.
 from gcp_variant_transforms.beam_io import vcfio
@@ -45,7 +49,6 @@ from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
-
 
 # List of supported merge strategies for variants.
 # - NONE: Variants will not be merged across files.
@@ -67,7 +70,35 @@ def _get_variant_merge_strategy(known_args):
     raise ValueError('Merge strategy is not supported.')
 
 
+def _validate_bq_path(output_table, client=None):
+  output_table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
+      output_table)
+  if not output_table_re_match:
+    raise ValueError(
+        'Expected a table reference (PROJECT:DATASET.TABLE) instead of %s.' % (
+            output_table))
+  try:
+    if not client:
+      credentials = GoogleCredentials.get_application_default().create_scoped(
+          ['https://www.googleapis.com/auth/bigquery'])
+      client = bigquery.BigqueryV2(credentials=credentials)
+    client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
+        projectId=output_table_re_match.group('project'),
+        datasetId=output_table_re_match.group('dataset')))
+  except exceptions.HttpError as e:
+    if e.status_code == 404:
+      raise ValueError('Dataset %s:%s does not exist.' %
+                       (output_table_re_match.group('project'),
+                        output_table_re_match.group('dataset')))
+    else:
+      # For the rest of the errors, use BigQuery error message.
+      raise
+
+
 def _validate_args(known_args):
+  _validate_bq_path(known_args.output_table)
+
   if known_args.variant_merge_strategy != 'MOVE_TO_CALLS':
     if known_args.info_keys_to_move_to_calls_regex:
       raise ValueError(
@@ -161,7 +192,7 @@ def run(argv=None):
 
   variant_merger = _get_variant_merge_strategy(known_args)
   # Retrieve merged headers prior to launching the pipeline. This is needed
-  # since the BigQUery shcmea cannot yet be dynamically created based on input.
+  # since the BigQuery schema cannot yet be dynamically created based on input.
   # See https://issues.apache.org/jira/browse/BEAM-2801.
   header_fields = vcf_header_parser.get_merged_vcf_headers(
       known_args.representative_header_file or known_args.input_pattern)
