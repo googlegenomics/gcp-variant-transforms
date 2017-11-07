@@ -36,5 +36,18 @@ def count_equals_to(expected_count):
     actual_count = len(actual_list)
     if expected_count != actual_count:
       raise BeamAssertException(
-          'Expected %d not equal actual %d' % (expected_count, actual_count))
+          'Failed assert: %d == %d' % (expected_count, actual_count))
   return _count_equal
+
+
+def has_calls(call_names):
+  """Returns a function for checking presence of calls_names in variants."""
+  def _equal(variants):
+    for variant in variants:
+      variant_call_names = [call.name for call in variant.calls]
+      sorted_expected = sorted(call_names)
+      sorted_actual = sorted(variant_call_names)
+      if sorted_expected != sorted_actual:
+        raise BeamAssertException(
+            'Failed assert: %r == %r' % (sorted_expected, sorted_actual))
+  return _equal
