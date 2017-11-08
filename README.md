@@ -92,7 +92,7 @@ gcloud beta compute instances create gcp-variant-transforms \
   --zone us-east1-d
 ```
 
-Next, SSH into the VM and run the following command to grant credentials
+Then, SSH into the VM and run the following command to grant credentials
 to the docker image:
 
 ```bash
