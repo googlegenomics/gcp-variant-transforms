@@ -72,6 +72,49 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 ```
 
+## Docker
+
+A docker image is also available at
+`gcr.io/gcp-variant-transforms/gcp-variant-transforms` with pre-built binaries
+and dependencies.
+
+The easiest way to use the docker image in Google Compute Engine is to
+create an instance based on
+[Container-Optimized OS](https://cloud.google.com/container-optimized-os/docs/):
+
+```bash
+gcloud beta compute instances create gcp-variant-transforms \
+  --project $PROJECT_NAME \
+  --scopes bigquery,storage-full,compute-rw,cloud-platform,userinfo-email \
+  --machine-type n1-standard-1 \
+  --image cos-stable-61-9765-66-0 \
+  --image-project cos-cloud \
+  --zone us-east1-d
+```
+
+Next, SSH into the VM and run the following command to grant credentials
+to the docker image:
+
+```bash
+docker-credential-gcr configure-docker
+```
+
+You can now run the pipeline using the `docker run` command. For instance,
+to run the VCF to BigQuery pipeline using Dataflow, run:
+
+```bash
+docker run gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest \
+  ./opt/gcp_variant_transforms/bin/vcf_to_bq \
+  --input_pattern gs://bucket/vcfs/vcffile.vcf \
+  --output_table projectname:bigquerydataset.tablename  \
+  --project projectname \
+  --staging_location gs://bucket/staging \
+  --temp_location gs://bucket/temp \
+  --job_name vcf-to-bq \
+  --setup_file /opt/gcp_variant_transforms/src/setup.py \
+  --runner DataflowRunner
+```
+
 ## Development
 
 ### Testing
@@ -87,3 +130,4 @@ To run a specific test:
 ```bash
 python setup.py test -s <module>.<test class>.<test method>
 ```
+
