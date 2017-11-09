@@ -14,16 +14,26 @@
 
 """Tests for vcfio module."""
 
+from __future__ import absolute_import
+
+import bz2
+import glob
+import gzip
 import logging
 import os
+import tempfile
 import unittest
 from itertools import permutations
 
+import apache_beam as beam
+from apache_beam.io.filesystem import CompressionTypes
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import BeamAssertException
 from apache_beam.testing.util import assert_that
 
+from gcp_variant_transforms.testing import asserts
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcfio import _VcfSource as VcfSource
 from gcp_variant_transforms.beam_io.vcfio import DEFAULT_PHASESET_VALUE
 from gcp_variant_transforms.beam_io.vcfio import MISSING_GENOTYPE_VALUE
@@ -31,6 +41,7 @@ from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
 from gcp_variant_transforms.beam_io.vcfio import VariantInfo
+from gcp_variant_transforms.testing import testdata_util
 from gcp_variant_transforms.testing.temp_dir import TempDir
 
 # Note: mixing \n and \r\n to verify both behaviors.
@@ -55,40 +66,96 @@ _SAMPLE_TEXT_LINES = [
 ]
 
 
-def get_full_file_path(file_name):
-  """Returns the full path of the specified ``file_name`` from ``data``."""
-  return os.path.join(
-      os.path.dirname(__file__), '..', 'testing', 'data', 'vcf', file_name)
+def _get_sample_variant_1():
+  """Get first sample variant.
+
+  Features:
+    multiple alternates
+    not phased
+    multiple names
+  """
+  vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	'
+              'GT:GQ	0/0:48	1/0:20\n')
+  variant = vcfio.Variant(
+      reference_name='20', start=1233, end=1234, reference_bases='C',
+      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+      filters=['PASS'],
+      info={'AF': vcfio.VariantInfo(data=[0.5, 0.1], field_count='A'),
+            'NS': vcfio.VariantInfo(data=1, field_count='1')})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+  return variant, vcf_line
 
 
-def get_full_dir():
-  """Returns the full path of the  ``data`` directory."""
-  return os.path.join(os.path.dirname(__file__), '..', 'testing', 'data', 'vcf')
+def _get_sample_variant_2():
+  """Get second sample variant.
+
+  Features:
+    multiple references
+    no alternate
+    phased
+    multiple filters
+    missing format field
+  """
+  vcf_line = (
+      '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n')
+  variant = vcfio.Variant(
+      reference_name='19', start=122, end=125, reference_bases='GTC',
+      alternate_bases=[], names=['rs1234'], quality=40,
+      filters=['q10', 's50'],
+      info={'NS': vcfio.VariantInfo(data=2, field_count='1')})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[1, 0],
+                        phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                        info={'GQ': 48}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
+  return variant, vcf_line
 
 
-# Helper method for comparing variants.
-def _variant_comparator(v1, v2):
-  if v1.reference_name == v2.reference_name:
-    if v1.start == v2.start:
-      return cmp(v1.end, v2.end)
-    return cmp(v1.start, v2.start)
-  return cmp(v1.reference_name, v2.reference_name)
+def _get_sample_variant_3():
+  """Get third sample variant.
+
+  Features:
+    symbolic alternate
+    no calls for sample 2
+    alternate phaseset
+  """
+  vcf_line = (
+      '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:PS:GQ	0|1:1:45	'
+      '.:.:.\n')
+  variant = vcfio.Variant(
+      reference_name='19', start=11, end=12, reference_bases='C',
+      alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
+      info={'AF': vcfio.VariantInfo(data=[0.5], field_count='A')})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+                        phaseset='1',
+                        info={'GQ': 45}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2',
+                        genotype=[vcfio.MISSING_GENOTYPE_VALUE],
+                        info={'GQ': None}))
+  return variant, vcf_line
 
 
-# Helper method for verifying equal count on PCollection.
-def _count_equals_to(expected_count):
-  def _count_equal(actual_list):
-    actual_count = len(actual_list)
-    if expected_count != actual_count:
-      raise BeamAssertException(
-          'Expected %d not equal actual %d' % (expected_count, actual_count))
-  return _count_equal
+def _get_sample_non_variant():
+  """Get sample non variant."""
+  gvcf_line = (
+      '19	1234	.	C	<NON_REF>	50	.	END=1236	GT:GQ	0/0:99\n')
+  non_variant = vcfio.Variant(
+      reference_name='19', start=1233, end=1236, reference_bases='C',
+      alternate_bases=['<NON_REF>'], quality=50)
+  non_variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 99}))
 
+  return non_variant, gvcf_line
 
 class VcfSourceTest(unittest.TestCase):
 
-  # Distribution should skip tests that need VCF files due to large size
-  VCF_FILE_DIR_MISSING = not os.path.exists(get_full_dir())
+  VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
 
   def _create_temp_vcf_file(self, lines, tempdir):
     return tempdir.create_temp_file(suffix='.vcf', lines=lines)
@@ -105,72 +172,6 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(
         sorted(expected),
         sorted(actual))
-
-  def _get_sample_variant_1(self):
-    """Get first sample variant.
-    Features:
-      multiple alternates
-      not phased
-      multiple names
-    """
-    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	'
-                'GT:GQ	0/0:48	1/0:20\n')
-    variant = Variant(
-        reference_name='20', start=1233, end=1234, reference_bases='C',
-        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'],
-        info={'AF': VariantInfo(data=[0.5, 0.1], field_count='A'),
-              'NS': VariantInfo(data=1, field_count='1')})
-    variant.calls.append(
-        VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
-    variant.calls.append(
-        VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
-    return variant, vcf_line
-
-  def _get_sample_variant_2(self):
-    """Get second sample variant.
-    Features:
-      multiple references
-      no alternate
-      phased
-      multiple filters
-      missing format field
-    """
-    vcf_line = (
-        '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n')
-    variant = Variant(
-        reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=[], names=['rs1234'], quality=40,
-        filters=['q10', 's50'],
-        info={'NS': VariantInfo(data=2, field_count='1')})
-    variant.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0],
-                    phaseset=DEFAULT_PHASESET_VALUE,
-                    info={'GQ': 48}))
-    variant.calls.append(
-        VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
-    return variant, vcf_line
-
-  def _get_sample_variant_3(self):
-    """Get third sample variant.
-    Features:
-      symbolic alternate
-      no calls for sample 2
-    """
-    vcf_line = (
-        '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:GQ	0|1:45 .:.\n')
-    variant = Variant(
-        reference_name='19', start=11, end=12, reference_bases='C',
-        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-        info={'AF': VariantInfo(data=[0.5], field_count='A')})
-    variant.calls.append(
-        VariantCall(name='Sample1', genotype=[0, 1],
-                    phaseset=DEFAULT_PHASESET_VALUE,
-                    info={'GQ': 45}))
-    variant.calls.append(
-        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE],
-                    info={'GQ': None}))
-    return variant, vcf_line
 
   def test_sort_variants(self):
     sorted_variants = [
@@ -219,16 +220,16 @@ class VcfSourceTest(unittest.TestCase):
     ]
     for config in test_data_conifgs:
       read_data = self._read_records(
-          get_full_file_path(config['file']))
+          testdata_util.get_full_file_path(config['file']))
       self.assertEqual(config['num_records'], len(read_data))
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_file_pattern_large(self):
     read_data = self._read_records(
-        os.path.join(get_full_dir(), 'valid-*.vcf'))
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
     self.assertEqual(9900, len(read_data))
     read_data_gz = self._read_records(
-        os.path.join(get_full_dir(), 'valid-*.vcf.gz'))
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf.gz'))
     self.assertEqual(9900, len(read_data_gz))
 
   def test_single_file_no_records(self):
@@ -240,22 +241,23 @@ class VcfSourceTest(unittest.TestCase):
         [], self._create_temp_file_and_read_records(_SAMPLE_HEADER_LINES))
 
   def test_single_file_verify_details(self):
-    variant_1, vcf_line_1 = self._get_sample_variant_1()
+    variant_1, vcf_line_1 = _get_sample_variant_1()
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES + [vcf_line_1])
     self.assertEqual(1, len(read_data))
     self.assertEqual(variant_1, read_data[0])
-    variant_2, vcf_line_2 = self._get_sample_variant_2()
-    variant_3, vcf_line_3 = self._get_sample_variant_3()
+
+    variant_2, vcf_line_2 = _get_sample_variant_2()
+    variant_3, vcf_line_3 = _get_sample_variant_3()
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3])
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
   def test_file_pattern_verify_details(self):
-    variant_1, vcf_line_1 = self._get_sample_variant_1()
-    variant_2, vcf_line_2 = self._get_sample_variant_2()
-    variant_3, vcf_line_3 = self._get_sample_variant_3()
+    variant_1, vcf_line_1 = _get_sample_variant_1()
+    variant_2, vcf_line_2 = _get_sample_variant_2()
+    variant_3, vcf_line_3 = _get_sample_variant_3()
     with TempDir() as tempdir:
       self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [vcf_line_1], tempdir)
       self._create_temp_vcf_file((_SAMPLE_HEADER_LINES +
@@ -267,7 +269,7 @@ class VcfSourceTest(unittest.TestCase):
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_after_splitting(self):
-    file_name = get_full_file_path('valid-4.1-large.vcf')
+    file_name = testdata_util.get_full_file_path('valid-4.1-large.vcf')
     source = VcfSource(file_name)
     splits = [p for p in source.split(desired_bundle_size=500)]
     self.assertGreater(len(splits), 1)
@@ -462,23 +464,23 @@ class VcfSourceTest(unittest.TestCase):
                                              _SAMPLE_TEXT_LINES, tempdir)
       pipeline = TestPipeline()
       pcoll = pipeline | 'Read' >> ReadFromVcf(file_name)
-      assert_that(pcoll, _count_equals_to(len(_SAMPLE_TEXT_LINES)))
+      assert_that(pcoll, asserts.count_equals_to(len(_SAMPLE_TEXT_LINES)))
       pipeline.run()
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_single_file_large(self):
     pipeline = TestPipeline()
     pcoll = pipeline | 'Read' >> ReadFromVcf(
-        get_full_file_path('valid-4.0.vcf'))
-    assert_that(pcoll, _count_equals_to(5))
+        testdata_util.get_full_file_path('valid-4.0.vcf'))
+    assert_that(pcoll, asserts.count_equals_to(5))
     pipeline.run()
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_file_pattern_large(self):
     pipeline = TestPipeline()
     pcoll = pipeline | 'Read' >> ReadFromVcf(
-        os.path.join(get_full_dir(), 'valid-*.vcf'))
-    assert_that(pcoll, _count_equals_to(9900))
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
+    assert_that(pcoll, asserts.count_equals_to(9900))
     pipeline.run()
 
   def test_read_reentrant_without_splitting(self):
@@ -507,6 +509,157 @@ class VcfSourceTest(unittest.TestCase):
       assert len(splits) == 1
       source_test_utils.assert_split_at_fraction_exhaustive(
           splits[0].source, splits[0].start_position, splits[0].stop_position)
+
+
+class VcfSinkTest(unittest.TestCase):
+
+  def setUp(self):
+    super(VcfSinkTest, self).setUp()
+    self.path = tempfile.NamedTemporaryFile(suffix='.vcf').name
+    self.variants, self.variant_lines = zip(_get_sample_variant_1(),
+                                            _get_sample_variant_2(),
+                                            _get_sample_variant_3(),
+                                            _get_sample_non_variant())
+
+  def _assert_variant_lines_equal(self, actual, expected):
+    actual_fields = actual.strip().split('\t')
+    expected_fields = expected.strip().split('\t')
+
+    self.assertEqual(len(actual_fields), len(expected_fields))
+    self.assertEqual(actual_fields[0], expected_fields[0])
+    self.assertEqual(actual_fields[1], expected_fields[1])
+    self.assertItemsEqual(actual_fields[2].split(';'),
+                          expected_fields[2].split(';'))
+    self.assertEqual(actual_fields[3], expected_fields[3])
+    self.assertItemsEqual(actual_fields[4].split(','),
+                          expected_fields[4].split(','))
+    self.assertEqual(actual_fields[5], actual_fields[5])
+    self.assertItemsEqual(actual_fields[6].split(';'),
+                          expected_fields[6].split(';'))
+    self.assertItemsEqual(actual_fields[7].split(';'),
+                          expected_fields[7].split(';'))
+    self.assertItemsEqual(actual_fields[8].split(':'),
+                          expected_fields[8].split(':'))
+
+    # Assert calls are the same
+    for call, expected_call in zip(actual_fields[9:], expected_fields[9:]):
+      actual_split = call.split(':')
+      expected_split = expected_call.split(':')
+      # Compare the first and third values of the GT field
+      self.assertEqual(actual_split[0], expected_split[0])
+      # Compare the rest of the items ignoring order
+      self.assertItemsEqual(actual_split[1:], expected_split[1:])
+
+  def _get_coder(self):
+    return vcfio._ToVcfRecordCoder()
+
+  def test_to_vcf_line(self):
+    coder = self._get_coder()
+    for variant, line in zip(self.variants, self.variant_lines):
+      self._assert_variant_lines_equal(
+          coder.encode(variant), line)
+    empty_variant = vcfio.Variant()
+    empty_line = '\t'.join(['.' for _ in range(9)])
+    self._assert_variant_lines_equal(
+        coder.encode(empty_variant), empty_line)
+
+  def test_missing_info_key(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.calls.append(VariantCall(
+        name='Sample1', genotype=[0, 1], info={'GQ': 10, 'AF': 20}))
+    variant.calls.append(VariantCall(
+        name='Sample2', genotype=[0, 1], info={'AF': 20}))
+    expected = ('.	.	.	.	.	.	.	.	GT:AF:GQ	0/1:20:10	'
+                '0/1:20:.\n')
+
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_info_list(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.calls.append(VariantCall(
+        name='Sample', genotype=[0, 1], info={'LI': [1, None, 3]}))
+    expected = '.	.	.	.	.	.	.	.	GT:LI	0/1:1,.,3\n'
+
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_info_field_count(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.info['NS'] = VariantInfo(data=3, field_count='1')
+    variant.info['AF'] = VariantInfo(data=[0.333, 0.667], field_count='A')
+    variant.info['DB'] = VariantInfo(data=True, field_count='0')
+    expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
+
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_missing_genotype(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.calls.append(VariantCall(
+        name='Sample', genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
+    expected = '.	.	.	.	.	.	.	.	GT	1/.\n'
+
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_triploid_genotype(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.calls.append(VariantCall(
+        name='Sample', genotype=[1, 0, 1]))
+    expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
+
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_write_dataflow(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | beam.core.Create(self.variants)
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with open(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    for actual, expected in zip(read_result, self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
+
+  def test_write_dataflow_auto_compression(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | beam.core.Create(self.variants)
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
+        self.path + '.gz',
+        compression_type=CompressionTypes.AUTO)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with gzip.GzipFile(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    for actual, expected in zip(read_result, self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
+
+  def test_write_dataflow_header(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | 'Create' >> beam.core.Create(self.variants)
+    headers = ['foo\n']
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
+        self.path + '.gz',
+        compression_type=CompressionTypes.AUTO,
+        headers=headers)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with gzip.GzipFile(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    self.assertEqual(read_result[0], 'foo')
+    for actual, expected in zip(read_result[1:], self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
 
 
 if __name__ == '__main__':
