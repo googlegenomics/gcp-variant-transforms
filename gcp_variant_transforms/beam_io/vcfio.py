@@ -210,6 +210,28 @@ class VariantCall(object):
     return ((self.name, self.genotype, self.phaseset, self.info) ==
             (other.name, other.genotype, other.phaseset, other.info))
 
+  def __lt__(self, other):
+    if self.name != other.name:
+      return self.name < other.name
+    elif self.genotype != other.genotype:
+      return self.genotype < other.genotype
+    elif self.phaseset != other.phaseset:
+      return self.phaset < other.phaseset
+    else:
+      return self.info < other.info
+
+  def __le__(self, other):
+    return self < other or self == other
+
+  def __gt__(self, other):
+    return other < self
+
+  def __ge__(self, other):
+    return other <= self
+
+  def __ne__(self, other):
+    return not self == other
+
   def __repr__(self):
     return ', '.join(
         [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])

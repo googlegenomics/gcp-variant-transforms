@@ -60,6 +60,38 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     self._copy_quality_to_calls = copy_quality_to_calls
     self._copy_filter_to_calls = copy_filter_to_calls
 
+  def move_data_to_calls(self, variant):
+    """Moves filters, calls, and info items to the variant's calls based on the
+    strategy's initialization parameters.
+
+    Args:
+      variant (Variant): The variant whose filters, quality,
+        and info items will be moved to its calls if specified.
+    """
+    additional_call_info = {}
+    if self._should_copy_filter_to_calls():
+      additional_call_info[ColumnKeyConstants.FILTER] = variant.filters
+    if self._should_copy_quality_to_calls():
+      additional_call_info[ColumnKeyConstants.QUALITY] = variant.quality
+    for info_key, info_value in variant.info.iteritems():
+      if self._should_move_info_key_to_calls(info_key):
+        additional_call_info[info_key] = info_value.data
+    for call in variant.calls:
+      call.info.update(additional_call_info)
+
+  def move_data_to_merged(self, variant, merged_variant):
+    """Moves items from the variant's info to merged_variant.
+
+    Args:
+      variant (Variant): The variant whose info items will be
+        moved to `merged_variant` if specified.
+      merged_variant (Variant): The variant who will receive
+        the info items of `variant` if specified.
+    """
+    for info_key, info_value in variant.info.iteritems():
+      if not self._should_move_info_key_to_calls(info_key):
+        merged_variant.info[info_key] = info_value
+
   def get_merged_variants(self, variants):
     if not variants:
       return []
@@ -73,23 +105,12 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
                                  alternate_bases=variant.alternate_bases)
       merged_variant.names.extend(variant.names)
       merged_variant.filters.extend(variant.filters)
-      if (variant.quality is not None and
-          (merged_variant.quality is None or
-           merged_variant.quality < variant.quality)):
-        merged_variant.quality = variant.quality
-      additional_call_info = {}
-      if self._should_copy_filter_to_calls():
-        additional_call_info[ColumnKeyConstants.FILTER] = variant.filters
-      if self._should_copy_quality_to_calls():
-        additional_call_info[ColumnKeyConstants.QUALITY] = variant.quality
-      for info_key, info_value in variant.info.iteritems():
-        if self._should_move_info_key_to_calls(info_key):
-          additional_call_info[info_key] = info_value.data
-        else:
-          merged_variant.info[info_key] = info_value
-      for call in variant.calls:
-        call.info.update(additional_call_info)
-        merged_variant.calls.append(call)
+      merged_variant.quality = max(merged_variant.quality, variant.quality)
+
+      self.move_data_to_calls(variant)
+      self.move_data_to_merged(variant, merged_variant)
+
+      merged_variant.calls.extend(variant.calls)
 
     # Deduplicate names and filters.
     merged_variant.names = sorted(set(merged_variant.names))
