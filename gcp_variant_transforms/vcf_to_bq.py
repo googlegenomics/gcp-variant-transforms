@@ -47,23 +47,39 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
 
+_NONE_STRING = 'NONE'
+_MOVE_TO_CALLS_STRING = 'MOVE_TO_CALLS'
+_MERGE_WITH_NON_VARIANTS_STRING = 'MERGE_WITH_NON_VARIANTS'
 # List of supported merge strategies for variants.
 # - NONE: Variants will not be merged across files.
 # - MOVE_TO_CALLS: uses libs.variant_merge.move_to_calls_strategy
 #   for merging. Please see the documentation in that file for details.
-_VARIANT_MERGE_STRATEGIES = ['NONE', 'MOVE_TO_CALLS']
+# - MERGE_WITH_NON_VARIANTS: uses
+#   libs.variant_merge.merge_with_non_variants_strategy for merging. Please see
+#   documentation in that file for details.
+_VARIANT_MERGE_STRATEGIES = [
+    _NONE_STRING,
+    _MOVE_TO_CALLS_STRING,
+    _MERGE_WITH_NON_VARIANTS_STRING,
+]
 
 
 def _get_variant_merge_strategy(known_args):
   if (not known_args.variant_merge_strategy or
-      known_args.variant_merge_strategy == 'NONE'):
+      known_args.variant_merge_strategy == _NONE_STRING):
     return None
-  elif known_args.variant_merge_strategy == 'MOVE_TO_CALLS':
+  elif known_args.variant_merge_strategy == _MOVE_TO_CALLS_STRING:
     return move_to_calls_strategy.MoveToCallsStrategy(
+        known_args.info_keys_to_move_to_calls_regex,
+        known_args.copy_quality_to_calls,
+        known_args.copy_filter_to_calls)
+  elif known_args.variant_merge_strategy == _MERGE_WITH_NON_VARIANTS_STRING:
+    return merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         known_args.info_keys_to_move_to_calls_regex,
         known_args.copy_quality_to_calls,
         known_args.copy_filter_to_calls)
@@ -100,19 +116,23 @@ def _validate_bq_path(output_table, client=None):
 def _validate_args(known_args):
   _validate_bq_path(known_args.output_table)
 
-  if known_args.variant_merge_strategy != 'MOVE_TO_CALLS':
+  if (known_args.variant_merge_strategy != _MOVE_TO_CALLS_STRING
+      and known_args.variant_merge_strategy != _MERGE_WITH_NON_VARIANTS_STRING):
     if known_args.info_keys_to_move_to_calls_regex:
       raise ValueError(
           '--info_keys_to_move_to_calls_regex requires '
-          '--variant_merge_strategy MOVE_TO_CALLS.')
+          '--variant_merge_strategy {}|{}'.format(
+              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
     if known_args.copy_quality_to_calls:
       raise ValueError(
           '--copy_quality_to_calls requires '
-          '--variant_merge_strategy MOVE_TO_CALLS.')
+          '--variant_merge_strategy {}|{}'.format(
+              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
     if known_args.copy_filter_to_calls:
       raise ValueError(
           '--copy_filter_to_calls requires '
-          '--variant_merge_strategy MOVE_TO_CALLS.')
+          '--variant_merge_strategy {}|{}'.format(
+              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
 
 
 def run(argv=None):
@@ -172,21 +192,25 @@ def run(argv=None):
       default='',
       help=('Regular expression specifying the INFO keys to move to the '
             'associated calls in each VCF file. '
-            'Requires variant_merge_strategy=MOVE_TO_CALLS.'))
+            'Requires variant_merge_strategy={}|{}.'.format(
+                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
   parser.add_argument(
       '--copy_quality_to_calls',
       dest='copy_quality_to_calls',
       type='bool', default=False, nargs='?', const=True,
       help=('If true, the QUAL field for each record will be copied to '
             'the associated calls in each VCF file. '
-            'Requires variant_merge_strategy=MOVE_TO_CALLS.'))
+            'Requires variant_merge_strategy={}|{}.'.format(
+                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
   parser.add_argument(
       '--copy_filter_to_calls',
       dest='copy_filter_to_calls',
       type='bool', default=False, nargs='?', const=True,
       help=('If true, the FILTER field for each record will be copied to '
             'the associated calls in each VCF file. '
-            'Requires variant_merge_strategy=MOVE_TO_CALLS.'))
+            'Requires variant_merge_strategy={}|{}.'.format(
+                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
+
   parser.add_argument(
       '--reference_names',
       dest='reference_names', default=None, nargs='+',
