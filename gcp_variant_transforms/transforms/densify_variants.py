@@ -63,6 +63,6 @@ class DensifyVariants(beam.PTransform):
     return (pcoll
             | 'DensifyVariants' >> beam.Map(
                 self._densify_variants,
-                call_names=beam.pvalue.AsSingleton(call_names)))
+                all_call_names=beam.pvalue.AsSingleton(call_names)))
 
 
