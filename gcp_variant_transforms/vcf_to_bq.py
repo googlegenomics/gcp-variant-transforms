@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Pipeline for loading VCF files to BigQuery.
+"""Pipeline for loading VCF files to BigQuery.
 
 Run locally:
 python -m gcp_variant_transforms.vcf_to_bq \
