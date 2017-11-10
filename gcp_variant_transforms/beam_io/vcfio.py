@@ -507,7 +507,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
                                      compression_type=compression_type,
                                      validate=validate)
 
-    self._header_lines_per_file = {}
     self._compression_type = compression_type
     self._buffer_size = buffer_size
 
