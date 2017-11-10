@@ -31,7 +31,7 @@ from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
 from gcp_variant_transforms.beam_io.vcfio import VariantInfo
-from gcp_variant_transforms.testing.test_utils import TempDir
+from gcp_variant_transforms.testing.temp_dir import TempDir
 
 # Note: mixing \n and \r\n to verify both behaviors.
 _SAMPLE_HEADER_LINES = [

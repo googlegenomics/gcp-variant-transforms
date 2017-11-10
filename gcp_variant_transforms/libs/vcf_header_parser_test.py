@@ -17,15 +17,18 @@
 from __future__ import absolute_import
 
 import os
+import unittest
 
 from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.testing import base_test_case_with_temp_dir
+from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 
 
-class GetMergedVcfHeadersTest(
-    base_test_case_with_temp_dir.BaseTestCaseWithTempDir):
+class GetMergedVcfHeadersTest(unittest.TestCase):
   """Test cases for the ``get_merged_vcf_headers`` function."""
+
+  def _create_temp_vcf_file(self, lines, tempdir):
+    return tempdir.create_temp_file(suffix='.vcf', lines=lines)
 
   def test_one_file(self):
     lines = [
@@ -35,10 +38,11 @@ class GetMergedVcfHeadersTest(
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
         '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\n']
-    file_path = self._create_temp_vcf_file(lines)
-    header_fields = vcf_header_parser.get_merged_vcf_headers(file_path)
-    self.assertItemsEqual(['NS', 'AF'], header_fields.infos.keys())
-    self.assertItemsEqual(['GT', 'GQ'], header_fields.formats.keys())
+    with temp_dir.TempDir() as tempdir:
+      file_path = self._create_temp_vcf_file(lines, tempdir)
+      header_fields = vcf_header_parser.get_merged_vcf_headers(file_path)
+      self.assertItemsEqual(['NS', 'AF'], header_fields.infos.keys())
+      self.assertItemsEqual(['GT', 'GQ'], header_fields.formats.keys())
 
   def test_multiple_files(self):
     file_1_lines = [
@@ -56,13 +60,13 @@ class GetMergedVcfHeadersTest(
         '##FORMAT=<ID=GQ2,Number=1,Type=Integer,Description="GQ">\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample3\n']
 
-    tmpdir = self._new_tempdir()
-    self._create_temp_vcf_file(file_1_lines, tmpdir=tmpdir)
-    self._create_temp_vcf_file(file_2_lines, tmpdir=tmpdir)
-    header_fields = vcf_header_parser.get_merged_vcf_headers(
-        os.path.join(tmpdir, '*.vcf'))
-    self.assertItemsEqual(['NS', 'AF', 'NS2'], header_fields.infos.keys())
-    self.assertItemsEqual(['GT', 'GQ', 'GQ2'], header_fields.formats.keys())
+    with temp_dir.TempDir() as tempdir:
+      self._create_temp_vcf_file(file_1_lines, tempdir)
+      self._create_temp_vcf_file(file_2_lines, tempdir)
+      header_fields = vcf_header_parser.get_merged_vcf_headers(
+          os.path.join(tempdir.get_path(), '*.vcf'))
+      self.assertItemsEqual(['NS', 'AF', 'NS2'], header_fields.infos.keys())
+      self.assertItemsEqual(['GT', 'GQ', 'GQ2'], header_fields.formats.keys())
 
   def test_invalid_file(self):
     lines = [
@@ -71,12 +75,13 @@ class GetMergedVcfHeadersTest(
         '##INFO=<ID=AF,Number=A,Type=Float,Desc\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\n']
-    file_path = self._create_temp_vcf_file(lines)
-    try:
-      vcf_header_parser.get_merged_vcf_headers(file_path)
-      self.fail('Invalid VCF file must throw an exception.')
-    except ValueError:
-      pass
+    with temp_dir.TempDir() as tempdir:
+      file_path = self._create_temp_vcf_file(lines, tempdir)
+      try:
+        vcf_header_parser.get_merged_vcf_headers(file_path)
+        self.fail('Invalid VCF file must throw an exception.')
+      except ValueError:
+        pass
 
   def test_incompatible_files(self):
     # NS has Number=1 in file1, but Number=2 in file2.
@@ -90,14 +95,15 @@ class GetMergedVcfHeadersTest(
         '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample3\n']
 
-    tmpdir = self._new_tempdir()
-    self._create_temp_vcf_file(file_1_lines, tmpdir=tmpdir)
-    self._create_temp_vcf_file(file_2_lines, tmpdir=tmpdir)
-    try:
-      vcf_header_parser.get_merged_vcf_headers(os.path.join(tmpdir, '*.vcf'))
-      self.fail('Incompatible VCF files must throw an exception.')
-    except ValueError:
-      pass
+    with temp_dir.TempDir() as tempdir:
+      self._create_temp_vcf_file(file_1_lines, tempdir)
+      self._create_temp_vcf_file(file_2_lines, tempdir)
+      try:
+        vcf_header_parser.get_merged_vcf_headers(
+            os.path.join(tempdir.get_path(), '*.vcf'))
+        self.fail('Incompatible VCF files must throw an exception.')
+      except ValueError:
+        pass
 
   def test_gz(self):
     """Tests successfully parsing gz files."""
