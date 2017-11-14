@@ -1,10 +1,11 @@
-# GCP Variant Transforms based on Apache Beam
+# GCP Variant Transforms
 
 ## Overview
 
 This is a tool for transforming and processing VCF files in a scalable manner
-based on Apache Beam. The Python implementation supports running pipelines
-using [Dataflow](https://cloud.google.com/dataflow/) on Google Cloud Platform.
+based on [Apache Beam](https://beam.apache.org/). The Python implementation
+supports running pipelines using
+[Dataflow](https://cloud.google.com/dataflow/) on Google Cloud Platform.
 
 ### Pre-requisites
 
@@ -50,6 +51,9 @@ the documentation in `vcf_to_bq.py` for additional details on merging.
 The pipeline supports gzip, bzip, and uncompressed VCF formats. However,
 it runs slower for compressed files as they cannot be sharded.
 
+Note that the pipeline requires valid and complete headers for all VCF files
+being processed.
+
 Example command for DirectRunner:
 
 ```bash
@@ -71,6 +75,21 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --setup_file ./setup.py \
   --runner DataflowRunner
 ```
+
+#### Running with large inputs
+
+You may adjust the number of workers that Dataflow uses in the pipeline by
+adding the `--max_num_workers` argument. To request a specific number of
+workers, use the `--num_workers` argument. You may need to request additional
+quota for using a large number of workers. Please see
+https://cloud.google.com/compute/quotas for details.
+
+If you want to load a large number of files (e.g. more than 50), then you
+should specify `--representative_header_file` to point to a file
+that has representative INFO and FORMAT header fields among the files
+being imported (i.e. a merged view of all INFO and FORMAT fields).
+In cases where all files have the same header fields, then this can point
+to any individual VCF file in the batch being loaded.
 
 ## Docker
 
