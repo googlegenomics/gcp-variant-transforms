@@ -37,3 +37,10 @@ class MergeHeadersFn(beam.CombineFn):
 
   def extract_output(self, merged_headers):
     return merged_headers
+
+
+class MergeHeaders(beam.PTransform):
+  """A PTransform to merge VCF file headers."""
+
+  def expand(self, pcoll):
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(MergeHeadersFn())

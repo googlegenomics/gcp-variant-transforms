@@ -18,13 +18,14 @@ from __future__ import absolute_import
 
 import vcf
 
+import apache_beam as beam
 from apache_beam.io import filebasedsource
 from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
-__all__ = ['VcfHeader', 'ReadVcfHeaders']
+__all__ = ['VcfHeader', 'ReadVcfHeaders', 'WriteVcfHeaders']
 
 
 class VcfHeader(object):
@@ -193,3 +194,86 @@ class ReadVcfHeaders(PTransform):
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
+
+
+class _WriteVcfHeaderFn(beam.DoFn):
+  """A DoFn for writing VCF headers to a file."""
+
+  HEADER_TEMPLATE = '##{}=<{}>\n'
+  FINAL_HEADER_LINE = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
+  INFO_KEY = 'INFO'
+  FILTER_KEY = 'FILTER'
+  ALT_KEY = 'ALT'
+  FORMAT_KEY = 'FORMAT'
+  CONTIG_KEY = 'contig'
+  ID_KEY = 'ID'
+  NUMBER_KEY = 'Number'
+  TYPE_KEY = 'Type'
+  DESCRIPTION_KEY = 'Description'
+
+  def __init__(self, file_path):
+    self._file_path = file_path
+
+  def process(self, header):
+    with FileSystems.create(self._file_path) as file_to_write:
+      self._write_headers_by_key(file_to_write, self.INFO_KEY, header.infos)
+      self._write_headers_by_key(file_to_write, self.FILTER_KEY, header.filters)
+      self._write_headers_by_key(file_to_write, self.ALT_KEY, header.alts)
+      self._write_headers_by_key(file_to_write, self.FORMAT_KEY, header.formats)
+      self._write_headers_by_key(file_to_write, self.CONTIG_KEY, header.contigs)
+      file_to_write.write(self.FINAL_HEADER_LINE)
+
+  def _write_headers_by_key(self, file_to_write, header_key, header):
+    if header_key == self.INFO_KEY:
+      self._remove_source_and_version(header)
+
+    for header_value in header.values():
+      file_to_write.write(self._to_vcf_header_line(header_key, header_value))
+
+  def _to_vcf_header_line(self, header_key, header):
+    headers = ['{}={}'.format(*self._map_header(header, key)) for key in header]
+    return self.HEADER_TEMPLATE.format(header_key, ','.join(headers))
+
+  def _map_header(self, header, key):
+    value = header[key]
+    key = self._map_key(key)
+    if key == self.NUMBER_KEY:
+      value = self._map_num(value)
+    elif key == self.DESCRIPTION_KEY:
+      value = '"{}"'.format(value)
+    return (key, value)
+
+  def _map_key(self, key):
+    if key == 'id':
+      return self.ID_KEY
+    elif key == 'num':
+      return self.NUMBER_KEY
+    elif key == 'desc':
+      return self.DESCRIPTION_KEY
+    elif key == 'type':
+      return self.TYPE_KEY
+    else:
+      raise ValueError('Unknown VCF header key {}.'.format(key))
+
+  def _map_num(self, num):
+    if num == -1:
+      return 'A'
+    elif num >= 0:
+      return str(num)
+    else:
+      raise ValueError('Invalid VCF header Number {}.'.format(num))
+
+  def _remove_source_and_version(self, infos):
+    for info_value in infos.values():
+      del info_value['source']
+      del info_value['version']
+
+
+class WriteVcfHeaders(PTransform):
+  """A PTransform for writing VCF header lines."""
+
+  def __init__(self, file_path):
+    self._file_path = file_path
+
+  def expand(self, pcoll):
+    return pcoll | beam.ParDo(_WriteVcfHeaderFn(self._file_path))

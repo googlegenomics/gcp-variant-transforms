@@ -14,11 +14,13 @@
 
 """Tests for vcfio_header_io module."""
 
+import collections
 import os
 import unittest
 
 import vcf
 
+import apache_beam as beam
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 import apache_beam.io.source_test_utils as source_test_utils
@@ -26,6 +28,8 @@ from apache_beam.testing.test_pipeline import TestPipeline
 from gcp_variant_transforms.beam_io.vcf_header_io import _VcfHeaderSource
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
+from gcp_variant_transforms.beam_io.vcf_header_io import _WriteVcfHeaderFn
+from gcp_variant_transforms.beam_io.vcf_header_io import WriteVcfHeaders
 from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 
@@ -35,7 +39,7 @@ _SAMPLE_HEADER_LINES = [
     '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
     '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
     '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
-    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
+    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\r\n',
 ]
 
 _SAMPLE_TEXT_LINES = [
@@ -44,24 +48,27 @@ _SAMPLE_TEXT_LINES = [
 ]
 
 
+def _get_header_from_reader(vcf_reader):
+  return VcfHeader(infos=vcf_reader.infos,
+                   filters=vcf_reader.filters,
+                   alts=vcf_reader.alts,
+                   formats=vcf_reader.formats,
+                   contigs=vcf_reader.contigs)
+
+
 class VcfHeaderSourceTest(unittest.TestCase):
 
   # TODO(msaul): Replace get_full_dir() with function from utils.
   # Distribution should skip tests that need VCF files due to large size
   VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
 
-  def _get_header_from_reader(self, vcf_reader):
-    return VcfHeader(infos=vcf_reader.infos,
-                     filters=vcf_reader.filters,
-                     alts=vcf_reader.alts,
-                     formats=vcf_reader.formats,
-                     contigs=vcf_reader.contigs)
+
 
   def test_vcf_header_eq(self):
     vcf_reader_1 = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
     vcf_reader_2 = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
-    header_1 = self._get_header_from_reader(vcf_reader_1)
-    header_2 = self._get_header_from_reader(vcf_reader_2)
+    header_1 = _get_header_from_reader(vcf_reader_1)
+    header_2 = _get_header_from_reader(vcf_reader_2)
     self.assertEqual(header_1, header_2)
 
   def test_read_file_headers(self):
@@ -71,7 +78,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
 
       headers = source_test_utils.read_from_source(_VcfHeaderSource(filename))
       vcf_reader = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
-      self.assertEqual(headers[0], self._get_header_from_reader(vcf_reader))
+      self.assertEqual(headers[0], _get_header_from_reader(vcf_reader))
 
   def test_all_fields(self):
     lines = [
@@ -122,7 +129,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
 
       expected = []
       for reader in [vcf_reader_1, vcf_reader_2, vcf_reader_3]:
-        expected.append(self._get_header_from_reader(reader))
+        expected.append(_get_header_from_reader(reader))
 
       actual_vars = [vars(header) for header in headers]
       expected_vars = [vars(header) for header in expected]
@@ -151,7 +158,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
       pipeline = TestPipeline()
       pcoll = pipeline | 'ReadHeaders' >> ReadVcfHeaders(filename)
       vcf_reader = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
-      assert_that(pcoll, equal_to([self._get_header_from_reader(vcf_reader)]))
+      assert_that(pcoll, equal_to([_get_header_from_reader(vcf_reader)]))
 
   def test_pipeline_read_file_pattern(self):
     with temp_dir.TempDir() as tempdir:
@@ -173,5 +180,63 @@ class VcfHeaderSourceTest(unittest.TestCase):
       vcf_reader_3 = vcf.Reader(fsock=iter(headers_3))
       expected = []
       for reader in [vcf_reader_1, vcf_reader_2, vcf_reader_3]:
-        expected.append(self._get_header_from_reader(reader))
+        expected.append(_get_header_from_reader(reader))
       assert_that(pcoll, equal_to(expected))
+
+
+class WriteVcfHeadersTest(unittest.TestCase):
+
+  def test_to_vcf_header_line(self):
+    header_fn = _WriteVcfHeaderFn('')
+    header = collections.OrderedDict([
+        ('id', 'NS'),
+        ('num', 1),
+        ('type', 'Integer'),
+        ('desc', 'Number samples'),
+    ])
+
+    expected = ('##INFO=<ID=NS,Number=1,Type=Integer,'
+                'Description="Number samples">\n')
+    self.assertEqual(header_fn._to_vcf_header_line('INFO', header),
+                     expected)
+
+  def test_raises_error_for_invalid_key(self):
+    header_fn = _WriteVcfHeaderFn('')
+    header = collections.OrderedDict([('number', 1)])
+
+    with self.assertRaises(ValueError):
+      header_fn._to_vcf_header_line('INFO', header)
+
+  def test_raises_error_for_invalid_num(self):
+    header_fn = _WriteVcfHeaderFn('')
+    header = collections.OrderedDict([('num', -2)])
+
+    with self.assertRaises(ValueError):
+      header_fn._to_vcf_header_line('INFO', header)
+
+  def test_write_headers(self):
+    reader = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
+    header = _get_header_from_reader(reader)
+    with temp_dir.TempDir() as tempdir:
+      tempfile = tempdir.create_temp_file(suffix='.vcf')
+      header_fn = _WriteVcfHeaderFn(tempfile)
+      header_fn.process(header)
+      with open(tempfile, 'rb') as f:
+        actual = f.read().splitlines()
+        expected = [s.strip() for s in _SAMPLE_HEADER_LINES[1:]]
+        self.assertEqual(actual, expected)
+
+  def test_write_dataflow(self):
+    reader = vcf.Reader(fsock=iter(_SAMPLE_HEADER_LINES))
+    header = _get_header_from_reader(reader)
+    with temp_dir.TempDir() as tempdir:
+      tempfile = tempdir.create_temp_file(suffix='.vcf')
+      pipeline = TestPipeline()
+      pcoll = pipeline | beam.core.Create([header])
+      _ = pcoll | 'Write' >> WriteVcfHeaders(tempfile)
+      pipeline.run()
+
+      with open(tempfile, 'rb') as f:
+        actual = f.read().splitlines()
+        expected = [s.strip() for s in _SAMPLE_HEADER_LINES[1:]]
+        self.assertEqual(actual, expected)
