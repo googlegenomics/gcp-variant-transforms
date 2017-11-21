@@ -27,7 +27,7 @@ from apache_beam.transforms import PTransform
 
 from gcp_variant_transforms.beam_io import vcfio
 
-__all__ = ['VcfHeader', 'ReadVcfHeaders', 'WriteVcfHeaders']
+__all__ = ['VcfHeader', 'VcfHeaderSource', 'ReadVcfHeaders', 'WriteVcfHeaders']
 
 
 class VcfHeader(object):
@@ -123,11 +123,11 @@ class VcfHeader(object):
                 and (source_value['num'] != to_merge_value['num']
                      or source_value['type'] != to_merge_value['type']))):
           raise ValueError(
-              'Incompatible number or types in header fields: %s, %s' % (
+              'Incompatible number or types in header fields: {}, {}'.format(
                   source_value, to_merge_value))
 
 
-class _VcfHeaderSource(filebasedsource.FileBasedSource):
+class VcfHeaderSource(filebasedsource.FileBasedSource):
   """A source for reading VCF file headers.
 
   Parses VCF files (version 4) using PyVCF library.
@@ -137,17 +137,17 @@ class _VcfHeaderSource(filebasedsource.FileBasedSource):
                file_pattern,
                compression_type=CompressionTypes.AUTO,
                validate=True):
-    super(_VcfHeaderSource, self).__init__(file_pattern,
-                                           compression_type=compression_type,
-                                           validate=validate,
-                                           splittable=False)
+    super(VcfHeaderSource, self).__init__(file_pattern,
+                                          compression_type=compression_type,
+                                          validate=validate,
+                                          splittable=False)
     self._compression_type = compression_type
 
   def read_records(self, file_name, range_tracker):
     try:
       vcf_reader = vcf.Reader(fsock=self._read_headers(file_name))
     except StopIteration:
-      raise ValueError('%s has no header.', file_name)
+      raise ValueError('{} has no header.'.format(file_name))
 
     yield VcfHeader(infos=vcf_reader.infos,
                     filters=vcf_reader.filters,
@@ -174,7 +174,7 @@ class ReadVcfHeaders(PTransform):
 
   def __init__(
       self,
-      file_pattern=None,
+      file_pattern,
       compression_type=CompressionTypes.AUTO,
       validate=True,
       **kwargs):
@@ -191,7 +191,7 @@ class ReadVcfHeaders(PTransform):
         creation time.
     """
     super(ReadVcfHeaders, self).__init__(**kwargs)
-    self._source = _VcfHeaderSource(
+    self._source = VcfHeaderSource(
         file_pattern, compression_type, validate=validate)
 
   def expand(self, pvalue):
@@ -346,7 +346,7 @@ class _WriteVcfHeaderFn(beam.DoFn):
     if number in number_to_string:
       return number_to_string[number]
     else:
-      raise ValueError('Invalid value for number: %d' % number)
+      raise ValueError('Invalid value for number: {}'.format(number))
 
   def _format_string_value(self, value):
     return '"{}"'.format(value)

@@ -47,7 +47,6 @@ def get_sample_vcf_header_lines():
       '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
       '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
       '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
-      '##contig=<ID=M,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
       '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1	SAMPLE2\n',
   ]
 
