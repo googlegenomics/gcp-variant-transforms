@@ -25,7 +25,7 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
-from gcp_variant_transforms.beam_io.vcf_header_io import _VcfHeaderSource
+from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeaderSource
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.beam_io.vcf_header_io import _WriteVcfHeaderFn
@@ -59,7 +59,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
   def _create_file_and_read_headers(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(suffix='.vcf', lines=self.lines)
-      headers = source_test_utils.read_from_source(_VcfHeaderSource(filename))
+      headers = source_test_utils.read_from_source(VcfHeaderSource(filename))
       return headers[0]
 
   def test_vcf_header_eq(self):
@@ -105,7 +105,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
       tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
       tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
 
-      actual = source_test_utils.read_from_source(_VcfHeaderSource(
+      actual = source_test_utils.read_from_source(VcfHeaderSource(
           os.path.join(tempdir.get_path(), '*.vcf')))
 
       expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
@@ -124,7 +124,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
         {'file': 'valid-4.2.vcf', 'num_infos': 8, 'num_formats': 5},
     ]
     for config in test_data_conifgs:
-      read_data = source_test_utils.read_from_source(_VcfHeaderSource(
+      read_data = source_test_utils.read_from_source(VcfHeaderSource(
           testdata_util.get_full_file_path(config['file'])))
       self.assertEqual(config['num_infos'], len(read_data[0].infos))
       self.assertEqual(config['num_formats'], len(read_data[0].formats))
@@ -236,8 +236,6 @@ class WriteVcfHeadersTest(unittest.TestCase):
     self.assertItemsEqual(actual, expected)
 
   def test_write_headers(self):
-    # PyVCF removes some fields from contigs.
-    self.lines = [line for line in self.lines if 'contig' not in line]
     header = _get_vcf_header_from_lines(self.lines)
     with temp_dir.TempDir() as tempdir:
       tempfile = tempdir.create_temp_file(suffix='.vcf')
@@ -257,8 +255,6 @@ class WriteVcfHeadersTest(unittest.TestCase):
       self.assertItemsEqual(actual, expected)
 
   def test_write_dataflow(self):
-    # PyVCF removes some fields from contigs.
-    self.lines = [line for line in self.lines if 'contig' not in line]
     header = _get_vcf_header_from_lines(self.lines)
     with temp_dir.TempDir() as tempdir:
       tempfile = tempdir.create_temp_file(suffix='.vcf')

@@ -36,21 +36,26 @@ from __future__ import absolute_import
 import argparse
 import logging
 import re
+import tempfile
 
 import apache_beam as beam
+from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.gcp.internal.clients import bigquery
 from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import GoogleCloudOptions
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 # TODO: Replace with the version from Beam SDK once that is released.
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
+from gcp_variant_transforms.transforms import merge_headers
 
 _NONE_STRING = 'NONE'
 _MOVE_TO_CALLS_STRING = 'MOVE_TO_CALLS'
@@ -63,6 +68,11 @@ _VARIANT_MERGE_STRATEGIES = [
     _NONE_STRING,
     _MOVE_TO_CALLS_STRING,
 ]
+# If the # of files matching the input file_pattern exceeds this value, then
+# headers will be merged in beam.
+_USE_HEADER_MERGER_THRESHOLD = 100
+_MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
+_MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 
 
 def _get_variant_merge_strategy(known_args):
@@ -145,6 +155,13 @@ def _read_variants(pipeline, known_args):
         known_args.input_pattern,
         allow_malformed_records=known_args.allow_malformed_records)
   return variants
+
+
+def _use_beam_header_merger(known_args):
+  if known_args.representative_header_file:
+    return False
+  match_results = FileSystems.match([known_args.input_pattern])
+  return len(match_results) > _USE_HEADER_MERGER_THRESHOLD
 
 
 def run(argv=None):
@@ -243,6 +260,24 @@ def run(argv=None):
   _validate_args(known_args)
 
   variant_merger = _get_variant_merge_strategy(known_args)
+
+  if _use_beam_header_merger(known_args):
+    pipeline_options = GoogleCloudOptions(pipeline_args)
+    if pipeline_args.job_name:
+      pipeline_args.job_name += '-' + _MERGE_HEADERS_JOB_NAME
+    else:
+      pipeline_args.job_name = _MERGE_HEADERS_FILE_NAME
+    temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
+    known_args.representative_header_file = FileSystems.join(
+        temp_directory, _MERGE_HEADERS_FILE_NAME)
+    with beam.Pipeline(options=pipeline_options) as p:
+      _ = (p
+           | 'ReadHeaders' >> vcf_header_io.ReadVcfHeaders(
+               known_args.input_pattern)
+           | 'MergeHeaders' >> merge_headers.MergeHeaders()
+           | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
+               known_args.representative_header_file))
+
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQuery schema cannot yet be dynamically created based on input.
   # See https://issues.apache.org/jira/browse/BEAM-2801.
