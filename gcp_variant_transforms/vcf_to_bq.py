@@ -187,13 +187,19 @@ def run(argv=None):
       help=('If true, the FILTER field for each record will be copied to '
             'the associated calls in each VCF file. '
             'Requires variant_merge_strategy=MOVE_TO_CALLS.'))
-
   parser.add_argument(
       '--reference_names',
       dest='reference_names', default=None, nargs='+',
       help=('A list of reference names (separated by a space) to load '
             'to BigQuery. If this parameter is not specified, all '
             'references will be kept.'))
+  parser.add_argument(
+      '--allow_malformed_records',
+      dest='allow_malformed_records',
+      type='bool', default=False, nargs='?', const=True,
+      help=('If true, failed VCF record reads will not raise errors. '
+            'Failed reads will be logged to as warnings and returned as '
+            'MalformedVcfRecord objects'))
 
   known_args, pipeline_args = parser.parse_known_args(argv)
   _validate_args(known_args)
@@ -208,7 +214,9 @@ def run(argv=None):
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
     variants = (p
-                | 'ReadFromVcf' >> vcfio.ReadFromVcf(known_args.input_pattern)
+                | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+                    known_args.input_pattern,
+                    allow_malformed_records=known_args.allow_malformed_records)
                 | 'FilterVariants' >> filter_variants.FilterVariants(
                     reference_names=known_args.reference_names))
     if variant_merger:
