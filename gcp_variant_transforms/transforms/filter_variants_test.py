@@ -27,8 +27,16 @@ from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.transforms import filter_variants
 
 
+# A sample MalformedVcfRecord.
+MALFORMED_RECORD = vcfio.MalformedVcfRecord('FILE', 'LINE')
+
+
 class FilterVariantsTest(unittest.TestCase):
   """Test cases for ``FilterVariants`` transform."""
+
+  def setUp(self):
+    self.variants = self._get_sample_variants()
+    self.pipeline = TestPipeline()
 
   def _get_sample_variants(self):
     variant_1 = vcfio.Variant(
@@ -61,60 +69,36 @@ class FilterVariantsTest(unittest.TestCase):
     )
     return [variant_1, variant_2]
 
-  def test_filter_all_valid(self):
-    pipeline = TestPipeline()
-    variants = self._get_sample_variants()
+  def _run_filter_pipeline(self, variants, expected, reference_names=None):
     filtered_variants = (
-        pipeline
+        self.pipeline
         | Create(variants)
-        | 'FilterVariants' >> filter_variants.FilterVariants())
+        | 'FilterVariants' >> filter_variants.FilterVariants(
+            reference_names=reference_names))
     assert_that(filtered_variants,
-                asserts.variants_equal_to_ignore_order(variants))
-    pipeline.run()
+                asserts.variants_equal_to_ignore_order(expected))
+    self.pipeline.run()
+
+  def test_filter_all_valid(self):
+    self._run_filter_pipeline(self.variants, self.variants)
 
   def test_filter_all_invalid(self):
-    pipeline = TestPipeline()
-    filtered_variants = (
-        pipeline
-        | Create([None, None])
-        | 'FilterVariants' >> filter_variants.FilterVariants())
-    assert_that(filtered_variants,
-                asserts.variants_equal_to_ignore_order([]))
-    pipeline.run()
+    self._run_filter_pipeline([MALFORMED_RECORD, MALFORMED_RECORD], [])
 
   def test_filter_some_invalid(self):
-    variants = self._get_sample_variants()
-    pipeline = TestPipeline()
-    filtered_variants = (
-        pipeline
-        | Create([None, variants[0], None, None, variants[1], None])
-        | 'FilterVariants' >> filter_variants.FilterVariants())
-    assert_that(filtered_variants,
-                asserts.variants_equal_to_ignore_order(variants))
-    pipeline.run()
+    self._run_filter_pipeline(
+        [MALFORMED_RECORD,
+         self.variants[0],
+         MALFORMED_RECORD,
+         self.variants[1]],
+        self.variants)
 
   def test_keep_reference_names(self):
-    variants = self._get_sample_variants()
-    whitelist = ['19']
-    pipeline = TestPipeline()
-    filtered_variants = (
-        pipeline
-        | Create([None, variants[0], None, None, variants[1], None])
-        | 'FilterVariants' >> filter_variants.FilterVariants(
-            reference_names=whitelist))
-    assert_that(filtered_variants,
-                asserts.variants_equal_to_ignore_order([variants[0]]))
-    pipeline.run()
+    self._run_filter_pipeline(self.variants, [self.variants[0]], ['19'])
 
   def test_keep_all_if_empty_reference_names(self):
-    variants = self._get_sample_variants()
-    whitelist = []
-    pipeline = TestPipeline()
-    filtered_variants = (
-        pipeline
-        | Create([None, variants[0], None, None, variants[1], None])
-        | 'FilterVariants' >> filter_variants.FilterVariants(
-            reference_names=whitelist))
-    assert_that(filtered_variants,
-                asserts.variants_equal_to_ignore_order(variants))
-    pipeline.run()
+    self._run_filter_pipeline(self.variants, self.variants, [])
+
+  def test_raises_error_for_unknown_type(self):
+    with self.assertRaises(ValueError):
+      self._run_filter_pipeline([None], [])

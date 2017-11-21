@@ -41,10 +41,14 @@ class FilterVariants(beam.PTransform):
   def _is_valid_record(self, variant):
     if isinstance(variant, vcfio.Variant):
       return True
-    else:
-      # TODO: Add more descriptive invalid record message
-      logging.warn('variant read failed for record.')
+    elif isinstance(variant, vcfio.MalformedVcfRecord):
+      logging.warning('VCF record read failed in %s for line %s.',
+                      variant.file_name, variant.line)
       return False
+    else:
+      raise ValueError(
+          'Unexpected {} encountered while filtering variants.'.format(
+              type(variant)))
 
   def _should_keep_reference_name(self, variant):
     return (not self._reference_names or
