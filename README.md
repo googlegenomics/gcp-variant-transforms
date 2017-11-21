@@ -135,18 +135,4 @@ docker run gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest \
 ```
 
 ## Development
-
-### Testing
-
-To run all tests:
-
-```bash
-python setup.py test
-```
-
-To run a specific test:
-
-```bash
-python setup.py test -s <module>.<test class>.<test method>
-```
-
+[Development Guide](docs/development_guide.md)
