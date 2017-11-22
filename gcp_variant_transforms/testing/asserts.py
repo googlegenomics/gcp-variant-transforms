@@ -19,14 +19,21 @@ from __future__ import absolute_import
 from apache_beam.testing.util import BeamAssertException
 
 
+def items_equal(expected):
+  """Returns a function for checking expected and actual have the same items."""
+  def _items_equal(actual):
+    sorted_expected = sorted(expected)
+    sorted_actual = sorted(actual)
+    if sorted_expected != sorted_actual:
+      raise BeamAssertException(
+          'Failed assert: %r != %r' % (sorted_expected, sorted_actual))
+  return _items_equal
+
+
 def variants_equal_to_ignore_order(expected):
   """Returns a function for comparing Variant output from the pipeline."""
   def _equal(actual):
-    sorted_expected = sorted(expected, key=repr)
-    sorted_actual = sorted(actual, key=repr)
-    if sorted_expected != sorted_actual:
-      raise BeamAssertException(
-          'Failed assert: %r == %r' % (sorted_expected, sorted_actual))
+    items_equal(expected)(actual)
   return _equal
 
 
@@ -42,12 +49,17 @@ def count_equals_to(expected_count):
 
 def has_calls(call_names):
   """Returns a function for checking presence of calls_names in variants."""
-  def _equal(variants):
+  def _has_calls(variants):
+    assert_fn = items_equal(call_names)
     for variant in variants:
       variant_call_names = [call.name for call in variant.calls]
-      sorted_expected = sorted(call_names)
-      sorted_actual = sorted(variant_call_names)
-      if sorted_expected != sorted_actual:
-        raise BeamAssertException(
-            'Failed assert: %r == %r' % (sorted_expected, sorted_actual))
-  return _equal
+      assert_fn(variant_call_names)
+  return _has_calls
+
+
+def header_vars_equal(expected):
+  def _vars_equal(actual):
+    expected_vars = [vars(header) for header in expected]
+    actual_vars = [vars(header) for header in actual]
+    items_equal(expected_vars)(actual_vars)
+  return _vars_equal
