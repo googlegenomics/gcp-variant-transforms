@@ -17,10 +17,10 @@
 import apache_beam as beam
 from gcp_variant_transforms.beam_io import vcf_header_io
 
-__all__ = ['MergeHeadersFn']
+__all__ = ['MergeHeaders']
 
 
-class MergeHeadersFn(beam.CombineFn):
+class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""
 
   def create_accumulator(self):
@@ -43,4 +43,4 @@ class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
   def expand(self, pcoll):
-    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(MergeHeadersFn())
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn())

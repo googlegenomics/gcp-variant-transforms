@@ -25,6 +25,8 @@ from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
+from gcp_variant_transforms.beam_io import vcfio
+
 __all__ = ['VcfHeader', 'ReadVcfHeaders', 'WriteVcfHeaders']
 
 
@@ -196,77 +198,158 @@ class ReadVcfHeaders(PTransform):
     return pvalue.pipeline | Read(self._source)
 
 
+class _HeaderTypeConstants(object):
+  INFO = 'INFO'
+  FILTER = 'FILTER'
+  ALT = 'ALT'
+  FORMAT = 'FORMAT'
+  CONTIG = 'contig'
+
+
+class _HeaderFieldKeyConstants(object):
+  ID = 'ID'
+  NUMBER = 'Number'
+  TYPE = 'Type'
+  DESCRIPTION = 'Description'
+  SOURCE = 'Source'
+  VERSION = 'Version'
+  LENGTH = 'length'
+
+
 class _WriteVcfHeaderFn(beam.DoFn):
   """A DoFn for writing VCF headers to a file."""
 
   HEADER_TEMPLATE = '##{}=<{}>\n'
   FINAL_HEADER_LINE = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
-  INFO_KEY = 'INFO'
-  FILTER_KEY = 'FILTER'
-  ALT_KEY = 'ALT'
-  FORMAT_KEY = 'FORMAT'
-  CONTIG_KEY = 'contig'
-  ID_KEY = 'ID'
-  NUMBER_KEY = 'Number'
-  TYPE_KEY = 'Type'
-  DESCRIPTION_KEY = 'Description'
 
   def __init__(self, file_path):
     self._file_path = file_path
+    self._file_to_write = None
 
   def process(self, header):
-    with FileSystems.create(self._file_path) as file_to_write:
-      self._write_headers_by_key(file_to_write, self.INFO_KEY, header.infos)
-      self._write_headers_by_key(file_to_write, self.FILTER_KEY, header.filters)
-      self._write_headers_by_key(file_to_write, self.ALT_KEY, header.alts)
-      self._write_headers_by_key(file_to_write, self.FORMAT_KEY, header.formats)
-      self._write_headers_by_key(file_to_write, self.CONTIG_KEY, header.contigs)
-      file_to_write.write(self.FINAL_HEADER_LINE)
+    with FileSystems.create(self._file_path) as self._file_to_write:
+      self._write_headers_by_type(_HeaderTypeConstants.INFO, header.infos)
+      self._write_headers_by_type(_HeaderTypeConstants.FILTER, header.filters)
+      self._write_headers_by_type(_HeaderTypeConstants.ALT, header.alts)
+      self._write_headers_by_type(_HeaderTypeConstants.FORMAT, header.formats)
+      self._write_headers_by_type(_HeaderTypeConstants.CONTIG, header.contigs)
+      self._file_to_write.write(self.FINAL_HEADER_LINE)
 
-  def _write_headers_by_key(self, file_to_write, header_key, header):
-    if header_key == self.INFO_KEY:
-      self._remove_source_and_version(header)
+  def _write_headers_by_type(self, header_type, headers):
+    """Writes all VCF headers of a specific type.
 
-    for header_value in header.values():
-      file_to_write.write(self._to_vcf_header_line(header_key, header_value))
+    Args:
+      header_type (str): The type of `headers` (e.g. INFO, FORMAT, etc.).
+      headers (dict): Each value of headers is a dictionary that describes a
+        single VCF header line.
+    """
+    for header in headers.values():
+      self._file_to_write.write(
+          self._to_vcf_header_line(header_type, header))
 
-  def _to_vcf_header_line(self, header_key, header):
-    headers = ['{}={}'.format(*self._map_header(header, key)) for key in header]
-    return self.HEADER_TEMPLATE.format(header_key, ','.join(headers))
+  def _to_vcf_header_line(self, header_type, header):
+    """Formats a single VCF header line.
 
-  def _map_header(self, header, key):
-    value = header[key]
-    key = self._map_key(key)
-    if key == self.NUMBER_KEY:
-      value = self._map_num(value)
-    elif key == self.DESCRIPTION_KEY:
-      value = '"{}"'.format(value)
-    return (key, value)
+    Args:
+      header_type (str): The VCF type of `header` (e.g. INFO, FORMAT, etc.).
+      header (dict): A dictionary mapping header field keys (e.g. id, desc,
+        etc.) to their corresponding values for the header line.
 
-  def _map_key(self, key):
+    Returns:
+      A formatted VCF header line.
+    """
+    formatted_header_values = self._format_header(header)
+    return self.HEADER_TEMPLATE.format(header_type, formatted_header_values)
+
+  def _format_header(self, header):
+    """Formats all key, value pairs that describe the header line.
+
+    Args:
+      header (dict): A dictionary mapping header field keys (e.g. id, desc,
+        etc.) to their corresponding values for the header line.
+
+    Returns:
+      A formatted string composed of header keys and values.
+    """
+    formatted_values = []
+    for key, value in header.iteritems():
+      if self._should_include_key_value(key, value):
+        formatted_values.append(self._format_header_key_value(key, value))
+    return ','.join(formatted_values)
+
+  def _should_include_key_value(self, key, value):
+    return value is not None or (key != 'source' and key != 'version')
+
+  def _format_header_key_value(self, key, value):
+    """Formats a single key, value pair in a header line.
+
+    Args:
+      key (str): The key of the header field (e.g. num, desc, etc.).
+      value: The header value corresponding to the key in a specific
+        header line.
+
+    Returns:
+      A formatted key, value pair for a VCF header line.
+    """
+    key = self._format_header_key(key)
+    if value is None:
+      value = vcfio.MISSING_FIELD_VALUE
+    elif key == _HeaderFieldKeyConstants.NUMBER:
+      value = self._format_number(value)
+    elif (key == _HeaderFieldKeyConstants.DESCRIPTION
+          or key == _HeaderFieldKeyConstants.SOURCE
+          or key == _HeaderFieldKeyConstants.VERSION):
+      value = self._format_string_value(value)
+    return '{}={}'.format(key, value)
+
+  def _format_header_key(self, key):
     if key == 'id':
-      return self.ID_KEY
+      return _HeaderFieldKeyConstants.ID
     elif key == 'num':
-      return self.NUMBER_KEY
+      return _HeaderFieldKeyConstants.NUMBER
     elif key == 'desc':
-      return self.DESCRIPTION_KEY
+      return _HeaderFieldKeyConstants.DESCRIPTION
     elif key == 'type':
-      return self.TYPE_KEY
+      return _HeaderFieldKeyConstants.TYPE
+    elif key == 'source':
+      return _HeaderFieldKeyConstants.SOURCE
+    elif key == 'version':
+      return _HeaderFieldKeyConstants.VERSION
+    elif key == 'length':
+      return _HeaderFieldKeyConstants.LENGTH
     else:
-      raise ValueError('Unknown VCF header key {}.'.format(key))
+      raise ValueError('Invalid VCF header key {}.'.format(key))
 
-  def _map_num(self, num):
-    if num == -1:
-      return 'A'
-    elif num >= 0:
-      return str(num)
+  def _format_number(self, number):
+    """Returns the string representation of field_count from PyVCF.
+
+    PyVCF converts field counts to an integer with some predefined constants
+    as specified in the vcf.parser.field_counts dict (e.g. 'A' is -1). This
+    method converts them back to their string representation to avoid having
+    direct dependency on the arbitrary PyVCF constants.
+
+    Args:
+      number (int): An integer representing the number of fields in INFO
+        as specified by PyVCF.
+
+    Returns:
+      A string representation of field_count (e.g. '-1' becomes 'A').
+
+    Raises:
+      ValueError: if the number is not valid.
+    """
+    if number is None:
+      return None
+    elif number >= 0:
+      return str(number)
+    number_to_string = {v: k for k, v in vcf.parser.field_counts.items()}
+    if number in number_to_string:
+      return number_to_string[number]
     else:
-      raise ValueError('Invalid VCF header Number {}.'.format(num))
+      raise ValueError('Invalid value for number: %d' % number)
 
-  def _remove_source_and_version(self, infos):
-    for info_value in infos.values():
-      del info_value['source']
-      del info_value['version']
+  def _format_string_value(self, value):
+    return '"{}"'.format(value)
 
 
 class WriteVcfHeaders(PTransform):

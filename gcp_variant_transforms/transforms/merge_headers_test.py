@@ -16,8 +16,6 @@
 
 import unittest
 
-import vcf
-
 import apache_beam as beam
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
@@ -26,6 +24,8 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
+
+import vcf
 
 FILE_1_LINES = [
     '##fileformat=VCFv4.2\n',
@@ -58,7 +58,7 @@ class MergeHeadersTest(unittest.TestCase):
   def test_combine_single_header(self):
     vcf_reader = vcf.Reader(fsock=iter(FILE_1_LINES))
     headers = self._get_header_from_reader(vcf_reader)
-    combiner_fn = merge_headers.MergeHeadersFn()
+    combiner_fn = merge_headers._MergeHeadersFn()
 
     merged_headers = combiner_fn.create_accumulator()
     merged_headers = combiner_fn.add_input(merged_headers, headers)
@@ -73,7 +73,7 @@ class MergeHeadersTest(unittest.TestCase):
     headers_1 = self._get_header_from_reader(vcf_reader_1)
     headers_2 = self._get_header_from_reader(vcf_reader_2)
 
-    combiner_fn = merge_headers.MergeHeadersFn()
+    combiner_fn = merge_headers._MergeHeadersFn()
 
     merged_headers = combiner_fn.create_accumulator()
     merged_headers = combiner_fn.add_input(merged_headers, headers_1)
@@ -89,7 +89,7 @@ class MergeHeadersTest(unittest.TestCase):
     headers_1 = self._get_header_from_reader(vcf_reader_1)
     headers_2 = self._get_header_from_reader(vcf_reader_2)
 
-    combiner_fn = merge_headers.MergeHeadersFn()
+    combiner_fn = merge_headers._MergeHeadersFn()
 
     merged_headers_1 = combiner_fn.create_accumulator()
     merged_headers_1 = combiner_fn.add_input(merged_headers_1, headers_1)
@@ -115,7 +115,6 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = (
         pipeline
         | Create([headers_1, headers_2])
-        | 'MergeHeaders' >> beam.CombineGlobally(
-            merge_headers.MergeHeadersFn()))
+        | 'MergeHeaders' >> merge_headers.MergeHeaders())
 
     assert_that(merged_headers, equal_to([expected]))
