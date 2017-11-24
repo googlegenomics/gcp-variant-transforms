@@ -17,6 +17,7 @@
 from __future__ import absolute_import
 
 from collections import OrderedDict
+import json
 import sys
 import unittest
 
@@ -196,8 +197,13 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             header_fields, variant_merger=_DummyVariantMergeStrategy()))
 
 
-class GetRowFromVariantTest(unittest.TestCase):
-  """Test cases for the ``get_row_from_variant`` library function."""
+class GetRowsFromVariantTest(unittest.TestCase):
+  """Test cases for the ``get_rows_from_variant`` library function."""
+
+  def _get_row_list_from_variant(
+      self, variant, split_alternate_allele_info_fields=True):
+    return list(bigquery_vcf_schema.get_rows_from_variant(
+        variant, split_alternate_allele_info_fields))
 
   def test_all_fields(self):
     variant = vcfio.Variant(
@@ -239,8 +245,7 @@ class GetRowFromVariantTest(unittest.TestCase):
              'GQ': 10, 'FLAG1': True}],
         'I1': 'some data',
         'I2': ['data1', 'data2']}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
     # Test with split_alternate_allele_info_fields=False.
     expected_row[ColumnKeyConstants.ALTERNATE_BASES] = [
@@ -249,8 +254,8 @@ class GetRowFromVariantTest(unittest.TestCase):
     expected_row['AF'] = [0.1, 0.2]
     expected_row['AF2'] = [0.2, 0.3]
     self.assertEqual(
-        expected_row,
-        bigquery_vcf_schema.get_row_from_variant(
+        [expected_row],
+        self._get_row_list_from_variant(
             variant, split_alternate_allele_info_fields=False))
 
   def test_no_alternate_bases(self):
@@ -269,8 +274,7 @@ class GetRowFromVariantTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'A1': 'some data',
         'A2': ['data1', 'data2']}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_some_fields_set(self):
     variant = vcfio.Variant(
@@ -284,8 +288,7 @@ class GetRowFromVariantTest(unittest.TestCase):
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.QUALITY: 20,
         ColumnKeyConstants.CALLS: []}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_no_field_set(self):
     variant = vcfio.Variant()
@@ -296,8 +299,7 @@ class GetRowFromVariantTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: None,
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: []}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_null_repeated_fields(self):
     variant = vcfio.Variant(
@@ -319,8 +321,7 @@ class GetRowFromVariantTest(unittest.TestCase):
         'AB': [True, False, False],
         'AF': [0.1, 0.2, -sys.maxint, 0.4],
         'AS': ['.', 'data1', 'data2']}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_unicode_fields(self):
     sample_unicode_str = u'\xc3\xb6'
@@ -341,8 +342,7 @@ class GetRowFromVariantTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'AS1': sample_unicode_str,
         'AS2': [sample_unicode_str, sample_unicode_str]}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_nonstandard_fields_names(self):
     variant = vcfio.Variant(
@@ -359,5 +359,77 @@ class GetRowFromVariantTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'A_1': 'data1',
         'field__A': 'data2'}
-    self.assertEqual(expected_row,
-                     bigquery_vcf_schema.get_row_from_variant(variant))
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+
+  def test_sharded_rows(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='C',
+        alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
+        filters=['PASS'],
+        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
+              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
+              'I1': vcfio.VariantInfo('some data', '1'),},
+        calls=[
+            vcfio.VariantCall(
+                name='Sample1', genotype=[0, 1], phaseset='*',
+                info={'GQ': 20, 'HQ': [10, 20]}),
+            vcfio.VariantCall(
+                name='Sample2', genotype=[1, 0],
+                info={'GQ': 10, 'FLAG1': True}),
+            vcfio.VariantCall(
+                name='Sample3', genotype=[1, 0],
+                info={'GQ': 30, 'FLAG1': True})])
+    expected_rows = [
+        {
+            ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+            ColumnKeyConstants.START_POSITION: 11,
+            ColumnKeyConstants.END_POSITION: 12,
+            ColumnKeyConstants.REFERENCE_BASES: 'C',
+            ColumnKeyConstants.ALTERNATE_BASES: [
+                {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A',
+                 'AF': 0.1, 'AF2': 0.2},
+                {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT',
+                 'AF': 0.2, 'AF2': 0.3}],
+            ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+            ColumnKeyConstants.QUALITY: 2,
+            ColumnKeyConstants.FILTER: ['PASS'],
+            ColumnKeyConstants.CALLS: [
+                {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+                 ColumnKeyConstants.CALLS_PHASESET: '*',
+                 'GQ': 20, 'HQ': [10, 20]},
+                {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+                 ColumnKeyConstants.CALLS_PHASESET: None,
+                 'GQ': 10, 'FLAG1': True}],
+            'I1': 'some data'
+        },
+        {
+            ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+            ColumnKeyConstants.START_POSITION: 11,
+            ColumnKeyConstants.END_POSITION: 12,
+            ColumnKeyConstants.REFERENCE_BASES: 'C',
+            ColumnKeyConstants.ALTERNATE_BASES: [
+                {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A',
+                 'AF': 0.1, 'AF2': 0.2},
+                {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT',
+                 'AF': 0.2, 'AF2': 0.3}],
+            ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+            ColumnKeyConstants.QUALITY: 2,
+            ColumnKeyConstants.FILTER: ['PASS'],
+            ColumnKeyConstants.CALLS: [
+                {ColumnKeyConstants.CALLS_NAME: 'Sample3',
+                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+                 ColumnKeyConstants.CALLS_PHASESET: None,
+                 'GQ': 30, 'FLAG1': True}],
+            'I1': 'some data'
+        },
+    ]
+
+    try:
+      original_max_row_size = bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES
+      bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES = (
+          len(json.dumps(expected_rows[0])) + 10)
+      self.assertEqual(expected_rows, self._get_row_list_from_variant(variant))
+    finally:
+      bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES = original_max_row_size

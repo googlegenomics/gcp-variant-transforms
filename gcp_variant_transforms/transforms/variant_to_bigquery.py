@@ -32,7 +32,7 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
         split_alternate_allele_info_fields)
 
   def process(self, record):
-    yield bigquery_vcf_schema.get_row_from_variant(
+    return bigquery_vcf_schema.get_rows_from_variant(
         record, self._split_alternate_allele_info_fields)
 
 
