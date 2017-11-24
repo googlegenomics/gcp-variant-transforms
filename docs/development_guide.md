@@ -79,7 +79,7 @@ This will allow you to browse through changes since your last commit and filter
 the exact changes that you want to commit. You can then run:
 ```bash
 git commit -m "<commit message>"
-git push origin <branch name>
+git push -u origin <branch name>
 ```
 To commit and push those changes to your branch.
 
