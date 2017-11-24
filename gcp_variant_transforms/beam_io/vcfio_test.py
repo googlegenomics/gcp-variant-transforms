@@ -38,6 +38,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcfio import _VcfSource as VcfSource
 from gcp_variant_transforms.beam_io.vcfio import DEFAULT_PHASESET_VALUE
 from gcp_variant_transforms.beam_io.vcfio import MISSING_GENOTYPE_VALUE
+from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
@@ -154,12 +155,22 @@ def _get_sample_non_variant():
 
   return non_variant, gvcf_line
 
+
 class VcfSourceTest(unittest.TestCase):
 
   VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
 
-  def _create_temp_vcf_file(self, lines, tempdir):
-    return tempdir.create_temp_file(suffix='.vcf', lines=lines)
+  def _create_temp_vcf_file(
+      self, lines, tempdir, compression_type=CompressionTypes.UNCOMPRESSED):
+    if compression_type in (CompressionTypes.UNCOMPRESSED,
+                            CompressionTypes.AUTO):
+      suffix = '.vcf'
+    elif compression_type == CompressionTypes.GZIP:
+      suffix = '.vcf.gz'
+    elif compression_type == CompressionTypes.BZIP:
+      suffix = '.vcf.bz2'
+    return tempdir.create_temp_file(
+        suffix=suffix, lines=lines, compression_type=compression_type)
 
   def _read_records(self, file_or_pattern, **kwargs):
     return source_test_utils.read_from_source(
@@ -483,42 +494,119 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(1, len(read_data))
     self.assertEqual(expected_variant, read_data[0])
 
+  def _assert_pipeline_read_files_record_count_equal(
+      self, input_pattern, expected_count, use_read_all=False):
+    """Helper method for verifying total records read.
+
+    Args:
+      input_pattern (str): Input file pattern to read.
+      expected_count (int): Expected number of reacords that was read.
+      use_read_all (bool): Whether to use the scalable ReadAllFromVcf transform
+        instead of ReadFromVcf.
+    """
+    pipeline = TestPipeline()
+    if use_read_all:
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([input_pattern])
+               | 'Read' >> ReadAllFromVcf())
+    else:
+      pcoll = pipeline | 'Read' >> ReadFromVcf(input_pattern)
+    assert_that(pcoll, asserts.count_equals_to(expected_count))
+    pipeline.run()
+
   def test_pipeline_read_single_file(self):
     with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(_SAMPLE_HEADER_LINES +
-                                             _SAMPLE_TEXT_LINES, tempdir)
-      pipeline = TestPipeline()
-      pcoll = pipeline | 'Read' >> ReadFromVcf(file_name)
-      assert_that(pcoll, asserts.count_equals_to(len(_SAMPLE_TEXT_LINES)))
-      pipeline.run()
+      file_name = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
+      self._assert_pipeline_read_files_record_count_equal(
+          file_name, len(_SAMPLE_TEXT_LINES))
+
+  def test_pipeline_read_all_single_file(self):
+    with TempDir() as tempdir:
+      file_name = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
+      self._assert_pipeline_read_files_record_count_equal(
+          file_name, len(_SAMPLE_TEXT_LINES), use_read_all=True)
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_single_file_large(self):
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromVcf(
-        testdata_util.get_full_file_path('valid-4.0.vcf'))
-    assert_that(pcoll, asserts.count_equals_to(5))
-    pipeline.run()
+    self._assert_pipeline_read_files_record_count_equal(
+        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882)
+
+  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
+  def test_pipeline_read_all_single_file_large(self):
+    self._assert_pipeline_read_files_record_count_equal(
+        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882,
+        use_read_all=True)
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_file_pattern_large(self):
+    self._assert_pipeline_read_files_record_count_equal(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900)
+
+  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
+  def test_pipeline_read_all_file_pattern_large(self):
+    self._assert_pipeline_read_files_record_count_equal(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900,
+        use_read_all=True)
+
+  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
+  def test_pipeline_read_all_gzip_large(self):
+    self._assert_pipeline_read_files_record_count_equal(
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf.gz'), 9900,
+        use_read_all=True)
+
+  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
+  def test_pipeline_read_all_multiple_files_large(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | 'Read' >> ReadFromVcf(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'))
+    pcoll = (pipeline
+             | 'Create' >> beam.Create(
+                 [testdata_util.get_full_file_path('valid-4.0.vcf'),
+                  testdata_util.get_full_file_path('valid-4.1-large.vcf'),
+                  testdata_util.get_full_file_path('valid-4.2.vcf')])
+             | 'Read' >> ReadAllFromVcf())
     assert_that(pcoll, asserts.count_equals_to(9900))
     pipeline.run()
 
+  def test_pipeline_read_all_gzip(self):
+    with TempDir() as tempdir:
+      file_name_1 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
+          compression_type=CompressionTypes.GZIP)
+      file_name_2 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
+          compression_type=CompressionTypes.GZIP)
+      pipeline = TestPipeline()
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([file_name_1, file_name_2])
+               | 'Read' >> ReadAllFromVcf())
+      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
+      pipeline.run()
+
+  def test_pipeline_read_all_multiple_files(self):
+    with TempDir() as tempdir:
+      file_name_1 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
+      file_name_2 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
+      pipeline = TestPipeline()
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([file_name_1, file_name_2])
+               | 'Read' >> ReadAllFromVcf())
+      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
+      pipeline.run()
+
   def test_read_reentrant_without_splitting(self):
     with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(_SAMPLE_HEADER_LINES +
-                                             _SAMPLE_TEXT_LINES, tempdir)
+      file_name = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
       source_test_utils.assert_reentrant_reads_succeed((source, None, None))
 
   def test_read_reentrant_after_splitting(self):
     with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(_SAMPLE_HEADER_LINES +
-                                             _SAMPLE_TEXT_LINES, tempdir)
+      file_name = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
       splits = [split for split in source.split(desired_bundle_size=100000)]
       assert len(splits) == 1
@@ -527,8 +615,8 @@ class VcfSourceTest(unittest.TestCase):
 
   def test_dynamic_work_rebalancing(self):
     with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(_SAMPLE_HEADER_LINES +
-                                             _SAMPLE_TEXT_LINES, tempdir)
+      file_name = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
       splits = [split for split in source.split(desired_bundle_size=100000)]
       assert len(splits) == 1
