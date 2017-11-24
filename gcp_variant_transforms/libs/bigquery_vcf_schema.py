@@ -16,6 +16,8 @@
 
 from __future__ import absolute_import
 
+import copy
+import json
 import re
 import sys
 
@@ -68,6 +70,14 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 # Prefix to use when the first character of the field name is not [a-zA-Z]
 # as required by BigQuery.
 _FALLBACK_FIELD_NAME_PREFIX = 'field_'
+# Maximum size of a BigQuery row is 10MB. See
+# https://cloud.google.com/bigquery/quotas#import for details.
+# We set it to 10MB - 10KB to leave a bit of room for error in case jsonifying
+# the object is not exactly the same in different libraries.
+_MAX_BIGQUERY_ROW_SIZE_BYTES = 10 * 1024 * 1024 - 10 * 1024
+# Number of bytes to add to the object size when concatenating calls (i.e.
+# to account for ", "). We use 5 bytes to be conservative.
+_JSON_CONCATENATION_OVERHEAD_BYTES = 5
 
 
 def generate_schema_from_header_fields(header_fields, variant_merger=None,
@@ -203,8 +213,13 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
   return schema
 
 
-def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
-  """Returns a BigQuery row according to the schema from the given variant.
+# TODO: refactor this to use a class instead.
+def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
+  """Yields BigQuery rows according to the schema from the given variant.
+
+  There is a 10MB limit for each BigQuqery row, which can exceed by having
+  a large number of calls. This method may split up a row into multiple rows if
+  it exceeds 10MB.
 
   Args:
     variant (``Variant``): Variant to process.
@@ -212,13 +227,50 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
       `Number=A` (i.e. one value for each alternate allele) will be stored under
       the `alternate_bases` record. If false, they will be stored with the rest
       of the INFO fields.
-  Returns:
-    A dict representing BigQuery row from the given variant.
+  Yields:
+    A dict representing a BigQuery row from the given variant. The row may have
+    a subset of the calls if it exceeds the maximum allowed BigQuery row size.
   Raises:
     ValueError: If variant data is inconsistent or invalid.
   """
   # TODO: Add error checking here for cases where the schema defined
   # by the headers does not match actual records.
+  base_row = _get_base_row_from_variant(
+      variant, split_alternate_allele_info_fields)
+  base_row_size_in_bytes = _get_json_object_size(base_row)
+  row_size_in_bytes = base_row_size_in_bytes
+  row = copy.deepcopy(base_row)  # Keep base_row intact.
+  for call in variant.calls:
+    call_record = _get_call_record(call)
+    # Add a few bytes to account for surrounding characters when concatenating.
+    call_record_size_in_bytes = (
+        _get_json_object_size(call_record) + _JSON_CONCATENATION_OVERHEAD_BYTES)
+    if (row_size_in_bytes + call_record_size_in_bytes >=
+        _MAX_BIGQUERY_ROW_SIZE_BYTES):
+      yield row
+      row = copy.deepcopy(base_row)
+      row_size_in_bytes = base_row_size_in_bytes
+    row[ColumnKeyConstants.CALLS].append(call_record)
+    row_size_in_bytes += call_record_size_in_bytes
+  yield row
+
+
+def _get_call_record(call):
+  """A helper method for ``get_row_from_variant`` to get a call as JSON."""
+  call_record = {
+      ColumnKeyConstants.CALLS_NAME: _get_bigquery_sanitized_field(call.name),
+      ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
+      ColumnKeyConstants.CALLS_GENOTYPE: call.genotype or []
+  }
+  for key, field in call.info.iteritems():
+    if field is not None:
+      call_record[_get_bigquery_sanitized_field_name(key)] = (
+          _get_bigquery_sanitized_field(field))
+  return call_record
+
+
+def _get_base_row_from_variant(variant, split_alternate_allele_info_fields):
+  """A helper method for ``get_row_from_variant`` to get row without calls."""
   row = {
       ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
       ColumnKeyConstants.START_POSITION: variant.start,
@@ -232,8 +284,7 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
   if variant.filters:
     row[ColumnKeyConstants.FILTER] = _get_bigquery_sanitized_field(
         variant.filters)
-
-  # Add alternate bases
+  # Add alternate bases.
   row[ColumnKeyConstants.ALTERNATE_BASES] = []
   for alt_index, alt in enumerate(variant.alternate_bases):
     alt_record = {ColumnKeyConstants.ALTERNATE_BASES_ALT: alt}
@@ -247,31 +298,15 @@ def get_row_from_variant(variant, split_alternate_allele_info_fields=True):
           alt_record[_get_bigquery_sanitized_field_name(info_key)] = (
               _get_bigquery_sanitized_field(info.data[alt_index]))
     row[ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
-
-  # Add calls.
-  row[ColumnKeyConstants.CALLS] = []
-  for call in variant.calls:
-    call_record = {
-        ColumnKeyConstants.CALLS_NAME: _get_bigquery_sanitized_field(call.name),
-        ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
-        ColumnKeyConstants.CALLS_GENOTYPE: [g for g in call.genotype or []]
-    }
-    for key, field in call.info.iteritems():
-      if field is None:
-        continue
-      call_record[_get_bigquery_sanitized_field_name(key)] = (
-          _get_bigquery_sanitized_field(field))
-    row[ColumnKeyConstants.CALLS].append(call_record)
-
   # Add info.
   for key, info in variant.info.iteritems():
-    if (info.data is None or
-        (split_alternate_allele_info_fields and
-         info.field_count == _FIELD_COUNT_ALTERNATE_ALLELE)):
-      continue
-    row[_get_bigquery_sanitized_field_name(key)] = (
-        _get_bigquery_sanitized_field(info.data))
-
+    if (info.data is not None and
+        (not split_alternate_allele_info_fields or
+         info.field_count != _FIELD_COUNT_ALTERNATE_ALLELE)):
+      row[_get_bigquery_sanitized_field_name(key)] = (
+          _get_bigquery_sanitized_field(info.data))
+  # Set calls to empty for now (will be filled later).
+  row[ColumnKeyConstants.CALLS] = []
   return row
 
 
@@ -407,3 +442,6 @@ def _get_bigquery_mode_from_vcf_num(vcf_num):
 
 def _is_alternate_allele_count(info_field):
   return info_field.field_count == _FIELD_COUNT_ALTERNATE_ALLELE
+
+def _get_json_object_size(object):
+  return len(json.dumps(object))
