@@ -135,6 +135,22 @@ def _validate_args(known_args):
               _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
 
 
+def _read_variants(pipeline, known_args):
+  """Helper method for returning a ``PCollection`` of Variants from VCFs."""
+  if known_args.optimize_for_large_inputs:
+    variants = (pipeline
+                | 'InputFilePattern' >> beam.Create(
+                    [known_args.input_pattern])
+                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    allow_malformed_records=(
+                        known_args.allow_malformed_records)))
+  else:
+    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+        known_args.input_pattern,
+        allow_malformed_records=known_args.allow_malformed_records)
+  return variants
+
+
 def run(argv=None):
   """Runs VCF to BigQuery pipeline."""
 
@@ -143,16 +159,13 @@ def run(argv=None):
 
   # I/O options.
   parser.add_argument('--input_pattern',
-                      dest='input_pattern',
                       required=True,
                       help='Input pattern for VCF files to process.')
   parser.add_argument('--output_table',
-                      dest='output_table',
                       required=True,
                       help='BigQuery table to store the results.')
   parser.add_argument(
       '--representative_header_file',
-      dest='representative_header_file',
       default='',
       help=('If provided, header values from the provided file will be used as '
             'representative for all files matching input_pattern. '
@@ -164,11 +177,22 @@ def run(argv=None):
             'large number of files are specified by input_pattern. '
             'Note that each VCF file must still contain valid header files '
             'even if this is provided.'))
+  parser.add_argument(
+      '--allow_malformed_records',
+      type='bool', default=False, nargs='?', const=True,
+      help=('If true, failed VCF record reads will not raise errors. '
+            'Failed reads will be logged as warnings and returned as '
+            'MalformedVcfRecord objects.'))
+  parser.add_argument(
+      '--optimize_for_large_inputs',
+      type='bool', default=False, nargs='?', const=True,
+      help=('If true, the pipeline runs in optimized way for handling large '
+            'inputs. Set this to true if you are loading more than 50,000 '
+            'files.'))
 
   # Output schema options.
   parser.add_argument(
       '--split_alternate_allele_info_fields',
-      dest='split_alternate_allele_info_fields',
       type='bool', default=True, nargs='?', const=True,
       help=('If true, all INFO fields with Number=A (i.e. one value for each '
             'alternate allele) will be stored under the alternate_bases '
@@ -180,7 +204,6 @@ def run(argv=None):
   # Merging logic.
   parser.add_argument(
       '--variant_merge_strategy',
-      dest='variant_merge_strategy',
       default='NONE',
       choices=_VARIANT_MERGE_STRATEGIES,
       help=('Variant merge strategy to use. Set to NONE if variants should '
@@ -188,7 +211,6 @@ def run(argv=None):
   # Configs for MOVE_TO_CALLS strategy.
   parser.add_argument(
       '--info_keys_to_move_to_calls_regex',
-      dest='info_keys_to_move_to_calls_regex',
       default='',
       help=('Regular expression specifying the INFO keys to move to the '
             'associated calls in each VCF file. '
@@ -196,7 +218,6 @@ def run(argv=None):
                 _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
   parser.add_argument(
       '--copy_quality_to_calls',
-      dest='copy_quality_to_calls',
       type='bool', default=False, nargs='?', const=True,
       help=('If true, the QUAL field for each record will be copied to '
             'the associated calls in each VCF file. '
@@ -204,7 +225,6 @@ def run(argv=None):
                 _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
   parser.add_argument(
       '--copy_filter_to_calls',
-      dest='copy_filter_to_calls',
       type='bool', default=False, nargs='?', const=True,
       help=('If true, the FILTER field for each record will be copied to '
             'the associated calls in each VCF file. '
@@ -213,17 +233,10 @@ def run(argv=None):
 
   parser.add_argument(
       '--reference_names',
-      dest='reference_names', default=None, nargs='+',
+      default=None, nargs='+',
       help=('A list of reference names (separated by a space) to load '
             'to BigQuery. If this parameter is not specified, all '
             'references will be kept.'))
-  parser.add_argument(
-      '--allow_malformed_records',
-      dest='allow_malformed_records',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, failed VCF record reads will not raise errors. '
-            'Failed reads will be logged to as warnings and returned as '
-            'MalformedVcfRecord objects'))
 
   known_args, pipeline_args = parser.parse_known_args(argv)
   _validate_args(known_args)
@@ -237,12 +250,9 @@ def run(argv=None):
 
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
-    variants = (p
-                | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-                    known_args.input_pattern,
-                    allow_malformed_records=known_args.allow_malformed_records)
-                | 'FilterVariants' >> filter_variants.FilterVariants(
-                    reference_names=known_args.reference_names))
+    variants = _read_variants(p, known_args)
+    variants |= 'FilterVariants' >> filter_variants.FilterVariants(
+        reference_names=known_args.reference_names)
     if variant_merger:
       variants |= (
           'MergeVariants' >> merge_variants.MergeVariants(variant_merger))

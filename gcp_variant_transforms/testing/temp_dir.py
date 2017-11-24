@@ -16,9 +16,13 @@
 
 from __future__ import absolute_import
 
+import bz2
+import gzip
 import os
 import shutil
 import tempfile
+
+from apache_beam.io import filesystem
 
 __all__ = ['TempDir']
 
@@ -40,20 +44,37 @@ class TempDir(object):
     """Returns the path to the temporary directory."""
     return self._tempdir
 
-  def create_temp_file(self, suffix='', lines=None):
+  def create_temp_file(
+      self, suffix='', lines=None,
+      compression_type=filesystem.CompressionTypes.UNCOMPRESSED):
     """Creates a temporary file in the temporary directory.
+
     Args:
       suffix (str): The filename suffix of the temporary file (e.g. '.txt')
       lines (List[str]): A list of lines that will be written to the temporary
         file.
+      compression_type (str): Specifies compression type of the file. Value
+        should be one of ``CompressionTypes``.
     Returns:
       The name of the temporary file created.
+    Raises:
+      ValueError: If ``compression_type`` is unsupported.
     """
     f = tempfile.NamedTemporaryFile(delete=False,
                                     dir=self._tempdir,
                                     suffix=suffix)
-    if lines:
-      for line in lines:
-        f.write(line)
+    if not lines:
+      return f.name
+    if compression_type in (filesystem.CompressionTypes.UNCOMPRESSED,
+                            filesystem.CompressionTypes.AUTO):
+      f.write(''.join(lines))
+    elif compression_type == filesystem.CompressionTypes.GZIP:
+      with gzip.GzipFile(f.name, 'w') as gzip_file:
+        gzip_file.write(''.join(lines))
+    elif compression_type == filesystem.CompressionType.BZIP:
+      with bz2.BZ2File(f.name, 'w') as bzip_file:
+        bzip_file.write(''.join(lines))
+    else:
+      raise ValueError('Unsupported CompressionType.')
 
     return f.name

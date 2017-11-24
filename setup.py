@@ -17,7 +17,7 @@
 import setuptools
 
 REQUIRED_PACKAGES = [
-    'apache-beam[gcp]>=2.0',
+    'apache-beam[gcp]>=2.2',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
     ]

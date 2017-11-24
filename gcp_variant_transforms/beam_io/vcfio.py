@@ -21,6 +21,7 @@ from __future__ import absolute_import
 
 import logging
 from collections import namedtuple
+from functools import partial
 
 import vcf
 
@@ -35,8 +36,8 @@ from apache_beam.io.iobase import Write
 from apache_beam.transforms import PTransform
 from apache_beam.transforms.display import DisplayDataItem
 
-__all__ = ['ReadFromVcf', 'Variant', 'VariantCall', 'VariantInfo',
-           'MalformedVcfRecord']
+__all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
+           'VariantInfo', 'MalformedVcfRecord']
 
 
 # Stores data about variant INFO fields. The type of 'data' is specified in the
@@ -881,6 +882,62 @@ class ReadFromVcf(PTransform):
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
+
+
+def _create_vcf_source(
+    file_pattern=None, compression_type=None, allow_malformed_records=None):
+  return _VcfSource(file_pattern=file_pattern,
+                    compression_type=compression_type,
+                    allow_malformed_records=allow_malformed_records)
+
+
+class ReadAllFromVcf(PTransform):
+  """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading a
+  :class:`~apache_beam.pvalue.PCollection` of VCF files.
+
+  Reads a :class:`~apache_beam.pvalue.PCollection` of VCF files or file patterns
+  and produces a PCollection :class:`Variant` (or
+  :class:`MalformedVcfRecord for failed reads) objects.
+
+  This transform should be used when reading from massive (>70,000) number of
+  files.
+  """
+
+  DEFAULT_DESIRED_BUNDLE_SIZE = 64 * 1024 * 1024  # 64MB
+
+  def __init__(
+      self,
+      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
+      compression_type=CompressionTypes.AUTO,
+      allow_malformed_records=False,
+      **kwargs):
+    """Initialize the :class:`ReadAllFromVcf` transform.
+
+    Args:
+      desired_bundle_size (int): Desired size of bundles that should be
+        generated when splitting this source into bundles. See
+        :class:`~apache_beam.io.filebasedsource.FileBasedSource` for more
+        details.
+      compression_type (str): Used to handle compressed input files.
+        Typical value is :attr:`CompressionTypes.AUTO
+        <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
+        underlying file_path's extension will be used to detect the compression.
+      allow_malformed_records (bool): If true, malformed records from VCF files
+        will be returned as :class:`MalformedVcfRecord` instead of failing
+        the pipeline.
+    """
+    super(ReadAllFromVcf, self).__init__(**kwargs)
+    source_from_file = partial(
+        _create_vcf_source, compression_type=compression_type,
+        allow_malformed_records=allow_malformed_records)
+    self._read_all_files = filebasedsource.ReadAllFiles(
+        True,  # splittable
+        CompressionTypes.AUTO, desired_bundle_size,
+        0,  #min_bundle_size
+        source_from_file)
+
+  def expand(self, pvalue):
+    return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
 class WriteToVcf(PTransform):
