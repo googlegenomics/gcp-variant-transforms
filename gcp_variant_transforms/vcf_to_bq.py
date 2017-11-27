@@ -59,13 +59,9 @@ _MERGE_WITH_NON_VARIANTS_STRING = 'MERGE_WITH_NON_VARIANTS'
 # - NONE: Variants will not be merged across files.
 # - MOVE_TO_CALLS: uses libs.variant_merge.move_to_calls_strategy
 #   for merging. Please see the documentation in that file for details.
-# - MERGE_WITH_NON_VARIANTS: uses
-#   libs.variant_merge.merge_with_non_variants_strategy for merging. Please see
-#   documentation in that file for details.
 _VARIANT_MERGE_STRATEGIES = [
     _NONE_STRING,
     _MOVE_TO_CALLS_STRING,
-    _MERGE_WITH_NON_VARIANTS_STRING,
 ]
 
 

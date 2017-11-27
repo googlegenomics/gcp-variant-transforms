@@ -238,3 +238,69 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     self.assertEqual(next(keys), '2:6')
     self.assertEqual(next(keys), '2:8')
     self.assertEqual(next(keys), '2:10')
+
+  def test_merge_many_different_alternates(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None, 2)
+
+    variant_1 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['C'])
+    variant_2 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['G'])
+    variant_3 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['T'])
+    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 0]))
+    variant_3.calls.append(vcfio.VariantCall(name='Sample3', genotype=[1, 0]))
+    variants = [variant_1, variant_2, variant_3]
+    merged_variants = strategy.get_merged_variants(variants)
+    self.assertEqual(sorted(merged_variants), sorted(variants))
+
+  def test_merge_one_overlap(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None, 2)
+
+    variant_1 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['C'])
+    variant_2 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['G'])
+    variant_3 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['T'])
+    variant_4 = vcfio.Variant(reference_name='1',
+                              start=1,
+                              end=2,
+                              reference_bases='A',
+                              alternate_bases=['C'])
+    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 0]))
+    variant_3.calls.append(vcfio.VariantCall(name='Sample3', genotype=[1, 0]))
+    variant_4.calls.append(vcfio.VariantCall(name='Sample4', genotype=[1, 0]))
+    variants = [variant_1, variant_2, variant_3, variant_4]
+    merged = vcfio.Variant(reference_name='1',
+                           start=1,
+                           end=2,
+                           reference_bases='A',
+                           alternate_bases=['C'])
+    merged.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
+    merged.calls.append(vcfio.VariantCall(name='Sample4', genotype=[1, 0]))
+    merged_variants = strategy.get_merged_variants(variants)
+    self.assertEqual(
+        sorted(merged_variants), sorted([merged, variant_2, variant_3]))
