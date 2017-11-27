@@ -90,19 +90,25 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
       yield v1
       yield v2
 
+  def _can_merge(self, v1, v2):
+    return (v1.start == v2.start
+            and v1.end == v2.end
+            and v1.alternate_bases == v2.alternate_bases)
+
   def get_merged_variants(self, variants):
     tree = IntervalTree()
     for v in variants:
       self._move_to_calls_strategy.move_data_to_calls(v)
       overlapping_variants = [ov.data for ov in tree[v.start:v.end]]
-      if overlapping_variants:
-        for ov in overlapping_variants:
+      tree[v.start:v.end] = v
+      for ov in overlapping_variants:
+        if self._can_merge(ov, v):
           tree.removei(ov.start, ov.end, ov)
+          tree.removei(v.start, v.end, v)
           new_variants = self._merge(ov, v)
           for nv in new_variants:
             tree[nv.start:nv.end] = nv
-      else:
-        tree[v.start:v.end] = v
+          break
     return [v.data for v in sorted(tree)]
 
   def get_merge_keys(self, variant):
