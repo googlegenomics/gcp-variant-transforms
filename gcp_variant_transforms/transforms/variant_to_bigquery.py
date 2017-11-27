@@ -40,7 +40,7 @@ class VariantToBigQuery(beam.PTransform):
   """Writes PCollection of ``Variant`` records to BigQuery."""
 
   def __init__(self, output_table, header_fields, variant_merger=None,
-               split_alternate_allele_info_fields=True):
+               split_alternate_allele_info_fields=True, append=False):
     """Initializes the transform.
 
     Args:
@@ -55,12 +55,15 @@ class VariantToBigQuery(beam.PTransform):
         `Number=A` (i.e. one value for each alternate allele) will be stored
         under the `alternate_bases` record. If false, they will be stored with
         the rest of the INFO fields.
+      append (bool): If true, existing records in output_table will not be
+        overwritten. New records will be appended to those that already exist.
     """
     self._output_table = output_table
     self._header_fields = header_fields
     self._variant_merger = variant_merger
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
+    self._append = append
 
   def expand(self, pcoll):
     return (pcoll
@@ -76,4 +79,6 @@ class VariantToBigQuery(beam.PTransform):
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
                 write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+                    beam.io.BigQueryDisposition.WRITE_APPEND
+                    if self._append
+                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))

@@ -196,7 +196,12 @@ def run(argv=None):
             'fields. Setting this option to true makes querying the data '
             'easier, because it avoids having to map each field with the '
             'corresponding alternate record while querying.'))
-
+  parser.add_argument(
+      '--append',
+      type='bool', default=False, nargs='?', const=True,
+      help=('If true, existing records in output_table will not be '
+            'overwritten. New records will be appended to those that already '
+            'exist.'))
   # Merging logic.
   parser.add_argument(
       '--variant_merge_strategy',
@@ -257,7 +262,8 @@ def run(argv=None):
              known_args.output_table,
              header_fields,
              variant_merger,
-             known_args.split_alternate_allele_info_fields))
+             known_args.split_alternate_allele_info_fields,
+             append=known_args.append))
 
 
 if __name__ == '__main__':
