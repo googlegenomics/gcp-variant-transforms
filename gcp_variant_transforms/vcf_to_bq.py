@@ -161,7 +161,9 @@ def _use_beam_header_merger(known_args):
   if known_args.representative_header_file:
     return False
   match_results = FileSystems.match([known_args.input_pattern])
-  return len(match_results) > _USE_HEADER_MERGER_THRESHOLD
+  if not match_results:
+    return False
+  return len(match_results[0].metadata_list) > _USE_HEADER_MERGER_THRESHOLD
 
 
 def run(argv=None):
@@ -263,10 +265,10 @@ def run(argv=None):
 
   if _use_beam_header_merger(known_args):
     pipeline_options = GoogleCloudOptions(pipeline_args)
-    if pipeline_args.job_name:
-      pipeline_args.job_name += '-' + _MERGE_HEADERS_JOB_NAME
+    if pipeline_options.job_name:
+      pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
     else:
-      pipeline_args.job_name = _MERGE_HEADERS_FILE_NAME
+      pipeline_options.job_name = _MERGE_HEADERS_FILE_NAME
     temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
     known_args.representative_header_file = FileSystems.join(
         temp_directory, _MERGE_HEADERS_FILE_NAME)
