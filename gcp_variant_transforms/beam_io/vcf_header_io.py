@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 
+from functools import partial
 import vcf
 
 import apache_beam as beam
@@ -27,7 +28,8 @@ from apache_beam.transforms import PTransform
 
 from gcp_variant_transforms.beam_io import vcfio
 
-__all__ = ['VcfHeader', 'VcfHeaderSource', 'ReadVcfHeaders', 'WriteVcfHeaders']
+__all__ = ['VcfHeader', 'VcfHeaderSource', 'ReadAllVcfHeaders',
+           'ReadVcfHeaders', 'WriteVcfHeaders']
 
 
 class VcfHeader(object):
@@ -196,6 +198,54 @@ class ReadVcfHeaders(PTransform):
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
+
+
+def _create_vcf_header_source(file_pattern=None, compression_type=None):
+  return VcfHeaderSource(file_pattern=file_pattern,
+                         compression_type=compression_type)
+
+
+class ReadAllVcfHeaders(PTransform):
+  """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading the
+  header lines of :class:`~apache_beam.pvalue.PCollection` of VCF files.
+
+  Reads a :class:`~apache_beam.pvalue.PCollection` of VCF files or file patterns
+  and produces a PCollection :class:`VcfHeader` objects.
+
+  This transform should be used when reading from massive (>70,000) number of
+  files.
+  """
+
+  DEFAULT_DESIRED_BUNDLE_SIZE = 64 * 1024 * 1024  # 64MB
+
+  def __init__(
+      self,
+      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
+      compression_type=CompressionTypes.AUTO,
+      **kwargs):
+    """Initialize the :class:`ReadAllVcfHeaders` transform.
+
+    Args:
+      desired_bundle_size (int): Desired size of bundles that should be
+        generated when splitting this source into bundles. See
+        :class:`~apache_beam.io.filebasedsource.FileBasedSource` for more
+        details.
+      compression_type (str): Used to handle compressed input files.
+        Typical value is :attr:`CompressionTypes.AUTO
+        <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
+        underlying file_path's extension will be used to detect the compression.
+    """
+    super(ReadAllVcfHeaders, self).__init__(**kwargs)
+    source_from_file = partial(
+        _create_vcf_header_source, compression_type=compression_type)
+    self._read_all_files = filebasedsource.ReadAllFiles(
+        False,  # splittable (we are just reading the headers)
+        CompressionTypes.AUTO, desired_bundle_size,
+        0,  # min_bundle_size
+        source_from_file)
+
+  def expand(self, pvalue):
+    return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
 class _HeaderTypeConstants(object):
