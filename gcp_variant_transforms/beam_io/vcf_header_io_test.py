@@ -26,6 +26,7 @@ from apache_beam.testing.util import equal_to
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeaderSource
+from gcp_variant_transforms.beam_io.vcf_header_io import ReadAllVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.beam_io.vcf_header_io import _WriteVcfHeaderFn
@@ -142,6 +143,21 @@ class VcfHeaderSourceTest(unittest.TestCase):
       assert_that(pcoll, equal_to([_get_vcf_header_from_lines(headers)]))
       pipeline.run()
 
+  def test_pipeline_read_all_file_headers(self):
+    headers = self.lines
+    self.lines = testdata_util.get_sample_vcf_file_lines()
+
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(suffix='.vcf', lines=self.lines)
+
+      pipeline = TestPipeline()
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([filename])
+               | 'ReadHeaders' >> ReadAllVcfHeaders())
+
+      assert_that(pcoll, equal_to([_get_vcf_header_from_lines(headers)]))
+      pipeline.run()
+
   def test_pipeline_read_file_pattern(self):
     with temp_dir.TempDir() as tempdir:
       headers_1 = [self.lines[1], self.lines[-1]]
@@ -155,6 +171,28 @@ class VcfHeaderSourceTest(unittest.TestCase):
       pipeline = TestPipeline()
       pcoll = pipeline | 'ReadHeaders' >> ReadVcfHeaders(
           os.path.join(tempdir.get_path(), '*.vcf'))
+
+      expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
+                                                          headers_2,
+                                                          headers_3]]
+      assert_that(pcoll, asserts.header_vars_equal(expected))
+      pipeline.run()
+
+  def test_pipeline_read_all_file_pattern(self):
+    with temp_dir.TempDir() as tempdir:
+      headers_1 = [self.lines[1], self.lines[-1]]
+      headers_2 = [self.lines[2], self.lines[3], self.lines[-1]]
+      headers_3 = [self.lines[4], self.lines[-1]]
+
+      tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
+      tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
+      tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
+
+      pipeline = TestPipeline()
+      pcoll = (pipeline
+               | 'Create' >> beam.Create(
+                   [os.path.join(tempdir.get_path(), '*.vcf')])
+               | 'ReadHeaders' >> ReadAllVcfHeaders())
 
       expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
                                                           headers_2,
