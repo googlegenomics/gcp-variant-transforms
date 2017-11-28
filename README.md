@@ -22,7 +22,9 @@ Run virtualenv and install pip packages:
 ```bash
 virtualenv venv
 source venv/bin/activate
-pip install apache-beam[gcp] pyvcf
+git clone git@github.com:googlegenomics/gcp-variant-transforms.git
+cd gcp-variant-transforms
+pip install --upgrade .
 ```
 
 Setup a [Google Cloud account](https://cloud.google.com/) and
@@ -130,7 +132,6 @@ docker run gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest \
   --staging_location gs://bucket/staging \
   --temp_location gs://bucket/temp \
   --job_name vcf-to-bq \
-  --setup_file /opt/gcp_variant_transforms/src/setup.py \
   --runner DataflowRunner
 ```
 
