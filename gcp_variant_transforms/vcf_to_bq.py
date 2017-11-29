@@ -37,39 +37,31 @@ import argparse
 import datetime
 import enum
 import logging
-import re
 import tempfile
 
 import apache_beam as beam
 from apache_beam.io.filesystems import FileSystems
-from apache_beam.io.gcp.internal.clients import bigquery
-from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import GoogleCloudOptions
-from apitools.base.py import exceptions
-from oauth2client.client import GoogleCredentials
+from apache_beam.options.pipeline_options import PipelineOptions
 
-# TODO: Replace with the version from Beam SDK once that is released.
-from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
+from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
+from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
-from gcp_variant_transforms.transforms import merge_headers
 
-_NONE_STRING = 'NONE'
-_MOVE_TO_CALLS_STRING = 'MOVE_TO_CALLS'
-_MERGE_WITH_NON_VARIANTS_STRING = 'MERGE_WITH_NON_VARIANTS'
-# List of supported merge strategies for variants.
-# - NONE: Variants will not be merged across files.
-# - MOVE_TO_CALLS: uses libs.variant_merge.move_to_calls_strategy
-#   for merging. Please see the documentation in that file for details.
-_VARIANT_MERGE_STRATEGIES = [
-    _NONE_STRING,
-    _MOVE_TO_CALLS_STRING,
+_COMMAND_LINE_OPTIONS = [
+    variant_transform_options.VcfReadOptions,
+    variant_transform_options.BigQueryWriteOptions,
+    variant_transform_options.FilterOptions,
+    variant_transform_options.MergeOptions,
 ]
+
 # If the # of files matching the input file_pattern exceeds this value, then
 # headers will be merged in beam.
 _SMALL_DATA_THRESHOLD = 100
@@ -86,69 +78,23 @@ class PipelineModes(enum.Enum):
 
 
 def _get_variant_merge_strategy(known_args):
+  merge_options = variant_transform_options.MergeOptions
   if (not known_args.variant_merge_strategy or
-      known_args.variant_merge_strategy == _NONE_STRING):
+      known_args.variant_merge_strategy == merge_options.NONE):
     return None
-  elif known_args.variant_merge_strategy == _MOVE_TO_CALLS_STRING:
+  elif known_args.variant_merge_strategy == merge_options.MOVE_TO_CALLS:
     return move_to_calls_strategy.MoveToCallsStrategy(
         known_args.info_keys_to_move_to_calls_regex,
         known_args.copy_quality_to_calls,
         known_args.copy_filter_to_calls)
-  elif known_args.variant_merge_strategy == _MERGE_WITH_NON_VARIANTS_STRING:
+  elif (known_args.variant_merge_strategy ==
+        merge_options.MERGE_WITH_NON_VARIANTS):
     return merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         known_args.info_keys_to_move_to_calls_regex,
         known_args.copy_quality_to_calls,
         known_args.copy_filter_to_calls)
   else:
     raise ValueError('Merge strategy is not supported.')
-
-
-def _validate_bq_path(output_table, client=None):
-  output_table_re_match = re.match(
-      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
-      output_table)
-  if not output_table_re_match:
-    raise ValueError(
-        'Expected a table reference (PROJECT:DATASET.TABLE) instead of %s.' % (
-            output_table))
-  try:
-    if not client:
-      credentials = GoogleCredentials.get_application_default().create_scoped(
-          ['https://www.googleapis.com/auth/bigquery'])
-      client = bigquery.BigqueryV2(credentials=credentials)
-    client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-        projectId=output_table_re_match.group('project'),
-        datasetId=output_table_re_match.group('dataset')))
-  except exceptions.HttpError as e:
-    if e.status_code == 404:
-      raise ValueError('Dataset %s:%s does not exist.' %
-                       (output_table_re_match.group('project'),
-                        output_table_re_match.group('dataset')))
-    else:
-      # For the rest of the errors, use BigQuery error message.
-      raise
-
-
-def _validate_args(known_args):
-  _validate_bq_path(known_args.output_table)
-
-  if (known_args.variant_merge_strategy != _MOVE_TO_CALLS_STRING
-      and known_args.variant_merge_strategy != _MERGE_WITH_NON_VARIANTS_STRING):
-    if known_args.info_keys_to_move_to_calls_regex:
-      raise ValueError(
-          '--info_keys_to_move_to_calls_regex requires '
-          '--variant_merge_strategy {}|{}'.format(
-              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
-    if known_args.copy_quality_to_calls:
-      raise ValueError(
-          '--copy_quality_to_calls requires '
-          '--variant_merge_strategy {}|{}'.format(
-              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
-    if known_args.copy_filter_to_calls:
-      raise ValueError(
-          '--copy_filter_to_calls requires '
-          '--variant_merge_strategy {}|{}'.format(
-              _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING))
 
 
 def _read_variants(pipeline, known_args):
@@ -222,100 +168,25 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
              known_args.representative_header_file))
 
 
+def _add_parser_arguments(options, parser):
+  for transform_options in options:
+    transform_options.add_arguments(parser)
+
+
+def _validate_args(options, parsed_args):
+  for transform_options in options:
+    transform_options.validate(parsed_args)
+
+
 def run(argv=None):
   """Runs VCF to BigQuery pipeline."""
 
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
-
-  # I/O options.
-  parser.add_argument('--input_pattern',
-                      required=True,
-                      help='Input pattern for VCF files to process.')
-  parser.add_argument('--output_table',
-                      required=True,
-                      help='BigQuery table to store the results.')
-  parser.add_argument(
-      '--representative_header_file',
-      default='',
-      help=('If provided, header values from the provided file will be used as '
-            'representative for all files matching input_pattern. '
-            'In particular, this will be used to generate the BigQuery schema. '
-            'If not provided, header values from all files matching '
-            'input_pattern will be merged by key. Only one value will be '
-            'chosen (in no particular order) in cases where multiple files use '
-            'the same key. Providing this file improves performance if a '
-            'large number of files are specified by input_pattern. '
-            'Note that each VCF file must still contain valid header files '
-            'even if this is provided.'))
-  parser.add_argument(
-      '--allow_malformed_records',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, failed VCF record reads will not raise errors. '
-            'Failed reads will be logged as warnings and returned as '
-            'MalformedVcfRecord objects.'))
-  parser.add_argument(
-      '--optimize_for_large_inputs',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, the pipeline runs in optimized way for handling large '
-            'inputs. Set this to true if you are loading more than 50,000 '
-            'files.'))
-
-  # Output schema options.
-  parser.add_argument(
-      '--split_alternate_allele_info_fields',
-      type='bool', default=True, nargs='?', const=True,
-      help=('If true, all INFO fields with Number=A (i.e. one value for each '
-            'alternate allele) will be stored under the alternate_bases '
-            'record. If false, they will be stored with the rest of the INFO '
-            'fields. Setting this option to true makes querying the data '
-            'easier, because it avoids having to map each field with the '
-            'corresponding alternate record while querying.'))
-  parser.add_argument(
-      '--append',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, existing records in output_table will not be '
-            'overwritten. New records will be appended to those that already '
-            'exist.'))
-  # Merging logic.
-  parser.add_argument(
-      '--variant_merge_strategy',
-      default='NONE',
-      choices=_VARIANT_MERGE_STRATEGIES,
-      help=('Variant merge strategy to use. Set to NONE if variants should '
-            'not be merged across files.'))
-  # Configs for MOVE_TO_CALLS strategy.
-  parser.add_argument(
-      '--info_keys_to_move_to_calls_regex',
-      default='',
-      help=('Regular expression specifying the INFO keys to move to the '
-            'associated calls in each VCF file. '
-            'Requires variant_merge_strategy={}|{}.'.format(
-                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
-  parser.add_argument(
-      '--copy_quality_to_calls',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, the QUAL field for each record will be copied to '
-            'the associated calls in each VCF file. '
-            'Requires variant_merge_strategy={}|{}.'.format(
-                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
-  parser.add_argument(
-      '--copy_filter_to_calls',
-      type='bool', default=False, nargs='?', const=True,
-      help=('If true, the FILTER field for each record will be copied to '
-            'the associated calls in each VCF file. '
-            'Requires variant_merge_strategy={}|{}.'.format(
-                _MOVE_TO_CALLS_STRING, _MERGE_WITH_NON_VARIANTS_STRING)))
-
-  parser.add_argument(
-      '--reference_names',
-      default=None, nargs='+',
-      help=('A list of reference names (separated by a space) to load '
-            'to BigQuery. If this parameter is not specified, all '
-            'references will be kept.'))
-
+  command_line_options = [option() for option in _COMMAND_LINE_OPTIONS]
+  _add_parser_arguments(command_line_options, parser)
   known_args, pipeline_args = parser.parse_known_args(argv)
-  _validate_args(known_args)
+  _validate_args(command_line_options, known_args)
 
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = _get_pipeline_mode(known_args)

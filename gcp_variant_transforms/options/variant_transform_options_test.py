@@ -12,45 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for vcf_to_bq script."""
+"""Tests for derivatives variant_transform_options."""
 
+import collections
 import mock
 import unittest
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 
-from gcp_variant_transforms.vcf_to_bq import _validate_bq_path
+from gcp_variant_transforms.options import variant_transform_options
 
 
-class VcfToBqTest(unittest.TestCase):
-  """Tests cases for the ``vcf_to_bq`` script."""
+BigQueryArgs = collections.namedtuple('BigQueryArgs', ['output_table'])
+
+
+class BigQueryWriteOptionsTest(unittest.TestCase):
+  """Tests cases for the BigQueryWriteOptions class."""
+
+  def setUp(self):
+    self.options = variant_transform_options.BigQueryWriteOptions()
 
   def test_valid_table_path(self):
-    output_table = 'project:dataset.table'
+    args = BigQueryArgs('project:dataset.table')
     client = mock.Mock()
     client.datasets.Get.return_value = bigquery.Dataset(
         datasetReference=bigquery.DatasetReference(
             projectId='project', datasetId='dataset'))
-    _validate_bq_path(output_table, client)
+    self.options.validate(args, client)
 
   def test_no_project(self):
-    output_table = 'dataset.table'
+    args = BigQueryArgs('dataset.table')
     client = mock.Mock()
-    self.assertRaises(ValueError, _validate_bq_path, output_table, client)
+    self.assertRaises(ValueError, self.options.validate, args, client)
 
   def test_invalid_table_path(self):
-    no_table = 'project:dataset'
-    incorrect_sep1 = 'project.dataset.table'
-    incorrect_sep2 = 'project:dataset:table'
+    no_table = BigQueryArgs('project:dataset')
+    incorrect_sep1 = BigQueryArgs('project.dataset.table')
+    incorrect_sep2 = BigQueryArgs('project:dataset:table')
     client = mock.Mock()
-    self.assertRaises(ValueError, _validate_bq_path, no_table, client)
-    self.assertRaises(ValueError, _validate_bq_path, incorrect_sep1, client)
-    self.assertRaises(ValueError, _validate_bq_path, incorrect_sep2, client)
+    self.assertRaises(ValueError, self.options.validate, no_table, client)
+    self.assertRaises(ValueError, self.options.validate, incorrect_sep1, client)
+    self.assertRaises(ValueError, self.options.validate, incorrect_sep2, client)
 
   def test_dataset_does_not_exists(self):
-    output_table = 'project:dataset.table'
+    args = BigQueryArgs('project:dataset.table')
     client = mock.Mock()
     client.datasets.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
-    self.assertRaises(ValueError, _validate_bq_path, output_table, client)
+    self.assertRaises(ValueError, self.options.validate, args, client)
