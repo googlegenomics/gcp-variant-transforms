@@ -34,6 +34,7 @@ python -m gcp_variant_transforms.vcf_to_bq \
 from __future__ import absolute_import
 
 import argparse
+import enum
 import logging
 import re
 import tempfile
@@ -70,9 +71,17 @@ _VARIANT_MERGE_STRATEGIES = [
 ]
 # If the # of files matching the input file_pattern exceeds this value, then
 # headers will be merged in beam.
-_USE_HEADER_MERGER_THRESHOLD = 100
+_SMALL_DATA_THRESHOLD = 100
+_LARGE_DATA_THRESHOLD = 50000
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
+
+
+class PipelineModes(enum.Enum):
+  """An Enum specifying the mode of the pipeline based on the data size."""
+  SMALL = 0
+  MEDIUM = 1
+  LARGE = 2
 
 
 def _get_variant_merge_strategy(known_args):
@@ -157,13 +166,53 @@ def _read_variants(pipeline, known_args):
   return variants
 
 
-def _use_beam_header_merger(known_args):
-  if known_args.representative_header_file:
-    return False
+def _get_pipeline_mode(known_args):
+  """Returns the mode the pipeline should operate in based on input size."""
+  if known_args.optimize_for_large_inputs:
+    return PipelineModes.LARGE
+
   match_results = FileSystems.match([known_args.input_pattern])
   if not match_results:
-    return False
-  return len(match_results[0].metadata_list) > _USE_HEADER_MERGER_THRESHOLD
+    raise ValueError('No files matched input_pattern: {}'.format(
+        known_args.input_pattern))
+
+  total_files = len(match_results[0].metadata_list)
+  if total_files > _LARGE_DATA_THRESHOLD:
+    return PipelineModes.LARGE
+  elif total_files > _SMALL_DATA_THRESHOLD:
+    return PipelineModes.MEDIUM
+
+  return PipelineModes.SMALL
+
+
+def _merge_headers(known_args, pipeline_args, pipeline_mode):
+  """Merges VCF headers using beam based on pipeline_mode."""
+  if (known_args.representative_header_file or
+      pipeline_mode == PipelineModes.SMALL):
+    return
+
+  pipeline_options = GoogleCloudOptions(pipeline_args)
+  if pipeline_options.job_name:
+    pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
+  else:
+    pipeline_options.job_name = _MERGE_HEADERS_FILE_NAME
+
+  temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
+  known_args.representative_header_file = FileSystems.join(
+      temp_directory, _MERGE_HEADERS_FILE_NAME)
+
+  with beam.Pipeline(options=pipeline_options) as p:
+    headers = p
+    if pipeline_mode == PipelineModes.LARGE:
+      headers |= (beam.Create([known_args.input_pattern])
+                  | vcf_header_io.ReadAllVcfHeaders())
+    else:
+      headers |= vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
+
+    _ = (headers
+         | 'MergeHeaders' >> merge_headers.MergeHeaders()
+         | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
+             known_args.representative_header_file))
 
 
 def run(argv=None):
@@ -262,23 +311,11 @@ def run(argv=None):
   _validate_args(known_args)
 
   variant_merger = _get_variant_merge_strategy(known_args)
+  pipeline_mode = _get_pipeline_mode(known_args)
 
-  if _use_beam_header_merger(known_args):
-    pipeline_options = GoogleCloudOptions(pipeline_args)
-    if pipeline_options.job_name:
-      pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
-    else:
-      pipeline_options.job_name = _MERGE_HEADERS_FILE_NAME
-    temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
-    known_args.representative_header_file = FileSystems.join(
-        temp_directory, _MERGE_HEADERS_FILE_NAME)
-    with beam.Pipeline(options=pipeline_options) as p:
-      _ = (p
-           | 'ReadHeaders' >> vcf_header_io.ReadVcfHeaders(
-               known_args.input_pattern)
-           | 'MergeHeaders' >> merge_headers.MergeHeaders()
-           | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
-               known_args.representative_header_file))
+  # Starts a pipeline to merge VCF headers in beam if the total files that
+  # match the input pattern exceeds _SMALL_DATA_THRESHOLD
+  _merge_headers(known_args, pipeline_args, pipeline_mode)
 
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQuery schema cannot yet be dynamically created based on input.
