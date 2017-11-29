@@ -150,9 +150,13 @@ class MergeOptions(VariantTransformsOptions):
   # - NONE: Variants will not be merged across files.
   # - MOVE_TO_CALLS: uses libs.variant_merge.move_to_calls_strategy
   #   for merging. Please see the documentation in that file for details.
+  # - MERGE_WITH_NON_VARIANTS: uses
+  #   libs.variant_merge.merge_with_non_varaitns_strategy for merging. Please
+  #   see the documentation in that file for details.
   VARIANT_MERGE_STRATEGIES = [
       NONE,
       MOVE_TO_CALLS,
+      MERGE_WITH_NON_VARIANTS,
   ]
 
   def add_arguments(self, parser):

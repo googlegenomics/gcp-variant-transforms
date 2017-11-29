@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 
+import copy
 import unittest
 
 from gcp_variant_transforms.beam_io import vcfio
@@ -241,7 +242,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
 
   def test_merge_many_different_alternates(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
-        None, None, None, 2)
+        None, None, None)
 
     variant_1 = vcfio.Variant(reference_name='1',
                               start=1,
@@ -267,7 +268,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
 
   def test_merge_one_overlap(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
-        None, None, None, 2)
+        None, None, None)
 
     variant_1 = vcfio.Variant(reference_name='1',
                               start=1,
@@ -304,3 +305,502 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     merged_variants = strategy.get_merged_variants(variants)
     self.assertEqual(
         sorted(merged_variants), sorted([merged, variant_2, variant_3]))
+
+  def test_merge_2_non_variants(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    non_variant_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    non_variant_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=15,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv2', 'nonv3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    non_variant_1.calls.append(call_1)
+    non_variant_2.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=5,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=10,
+        end=15,
+        reference_bases='.',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv2', 'nonv3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    expected_3 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=10,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2', 'nonv3'],
+        filters=['f1', 'f2', 'f3'],
+        quality=1)
+    expected_1.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    expected_3.calls.append(call_1)
+    expected_3.calls.append(call_2)
+    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    expected = [expected_1, expected_2, expected_3]
+
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_non_variants_same_start(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    non_variant_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    non_variant_2 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=15,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv2', 'nonv3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    non_variant_1.calls.append(call_1)
+    non_variant_2.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=10,
+        end=15,
+        reference_bases='.',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv2', 'nonv3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2', 'nonv3'],
+        filters=['f1', 'f2', 'f3'],
+        quality=1)
+    expected_1.calls.append(call_2)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    expected = [expected_1, expected_2]
+
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_2_non_variants_same_end(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    non_variant_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    non_variant_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=10,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv2', 'nonv3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    non_variant_1.calls.append(call_1)
+    non_variant_2.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=5,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=10,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nonv1', 'nonv2', 'nonv3'],
+        filters=['f1', 'f2', 'f3'],
+        quality=1)
+    expected_1.calls.append(call_1)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    expected = [expected_1, expected_2]
+
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_snp_with_non_variant(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    non_variant = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+
+    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    variant.calls.append(call_1)
+    non_variant.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=5,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=6,
+        end=10,
+        reference_bases='.',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+    expected_3 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    expected_1.calls.append(call_2)
+    expected_2.calls.append(call_2)
+    expected_3.calls.append(call_1)
+    expected_3.calls.append(call_2)
+    actual = strategy.get_merged_variants([variant, non_variant])
+    expected = [expected_1, expected_2, expected_3]
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_snp_with_non_variant_same_start(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    non_variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=10,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+
+    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    variant.calls.append(call_1)
+    non_variant.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=6,
+        end=10,
+        reference_bases='.',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    expected_1.calls.append(call_2)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    actual = strategy.get_merged_variants([variant, non_variant])
+    expected = [expected_1, expected_2]
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_snp_with_non_variant_same_end(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    non_variant = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=6,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+
+    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    variant.calls.append(call_1)
+    non_variant.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=5,
+        reference_bases='G',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='A',
+        alternate_bases=['C'],
+        names=['v'],
+        filters=['vf'],
+        quality=1)
+    expected_1.calls.append(call_2)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    actual = strategy.get_merged_variants([variant, non_variant])
+    expected = [expected_1, expected_2]
+    self.assertEqual(sorted(actual), sorted(expected))
+
+  def test_merge_mnps(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+
+    variant_1 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=8,
+        reference_bases='GTC',
+        alternate_bases=['G', 'GTCG'],
+        names=['mnp1', 'mnp2'],
+        filters=['f1', 'f2'],
+        quality=1)
+    variant_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=8,
+        reference_bases='GTC',
+        alternate_bases=['G', 'GTCG'],
+        names=['mnp2', 'mnp3'],
+        filters=['f2', 'f3'],
+        quality=2)
+    call_1 = vcfio.VariantCall(name='1', genotype=[1, 2])
+    call_2 = vcfio.VariantCall(name='2', genotype=[2, 0])
+    expected = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=8,
+        reference_bases='GTC',
+        alternate_bases=['G', 'GTCG'],
+        names=['mnp1', 'mnp2', 'mnp3'],
+        filters=['f1', 'f2', 'f3'],
+        quality=2)
+    expected.calls.append(call_1)
+    expected.calls.append(call_2)
+
+    variant_1.calls.append(call_1)
+    variant_2.calls.append(call_2)
+    actual = strategy.get_merged_variants([variant_1, variant_2])
+    self.assertEqual(actual, [expected])
+
+  def test_align_non_variant(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None, 2)
+
+    non_variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=12,
+        reference_bases='A',
+        alternate_bases=['<NON_REF>'],
+        names=['nv'],
+        filters=['nvf'],
+        quality=2)
+
+    expected = copy.deepcopy(non_variant)
+    expected.start = 8
+    expected.end = 10
+
+    actual = strategy.get_merged_variants([non_variant], '1:8')
+    self.assertEqual(actual, [expected])
+
+  def test_overlapping_two_non_variants(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+    non_variant_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A')
+    non_variant_2 = vcfio.Variant(
+        reference_name='1',
+        start=3,
+        end=5,
+        reference_bases='G')
+    non_variant_3 = vcfio.Variant(
+        reference_name='1',
+        start=4,
+        end=9,
+        reference_bases='C')
+    call_1 = vcfio.VariantCall('1', [0, 0])
+    call_2 = vcfio.VariantCall('2', [0, 0])
+    call_3 = vcfio.VariantCall('3', [0, 0])
+    non_variant_1.calls.append(call_1)
+    non_variant_2.calls.append(call_2)
+    non_variant_3.calls.append(call_3)
+
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=3,
+        reference_bases='A')
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=3,
+        end=4,
+        reference_bases='G')
+    expected_3 = vcfio.Variant(
+        reference_name='1',
+        start=4,
+        end=5,
+        reference_bases='C')
+    expected_4 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=9,
+        reference_bases='.')
+    expected_5 = vcfio.Variant(
+        reference_name='1',
+        start=9,
+        end=10,
+        reference_bases='.')
+    expected_1.calls.append(call_1)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    expected_3.calls.append(call_1)
+    expected_3.calls.append(call_2)
+    expected_3.calls.append(call_3)
+    expected_4.calls.append(call_1)
+    expected_4.calls.append(call_3)
+    expected_5.calls.append(call_1)
+    expected = [expected_1, expected_2, expected_3, expected_4, expected_5]
+    actual = strategy.get_merged_variants(
+        [non_variant_1, non_variant_2, non_variant_3])
+    self.assertEqual(actual, expected)
+
+  def test_non_variant_split_by_snp(self):
+    strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
+        None, None, None)
+    non_variant = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=10,
+        reference_bases='A')
+    variant = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='C')
+    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
+    call_2 = vcfio.VariantCall(name='2', genotype=[1, 0])
+    non_variant.calls.append(call_1)
+    variant.calls.append(call_2)
+    expected_1 = vcfio.Variant(
+        reference_name='1',
+        start=0,
+        end=5,
+        reference_bases='A')
+    expected_2 = vcfio.Variant(
+        reference_name='1',
+        start=5,
+        end=6,
+        reference_bases='C')
+    expected_3 = vcfio.Variant(
+        reference_name='1',
+        start=6,
+        end=10,
+        reference_bases='.')
+    expected_1.calls.append(call_1)
+    expected_2.calls.append(call_1)
+    expected_2.calls.append(call_2)
+    expected_3.calls.append(call_1)
+
+    actual = strategy.get_merged_variants([non_variant, variant])
+    expected = [expected_1, expected_2, expected_3]
+    self.assertEqual(actual, expected)

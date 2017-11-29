@@ -42,7 +42,7 @@ class MergeVariants(beam.PTransform):
       yield (key, variant)
 
   def _merge_variants_by_key(self, (key, variants)):
-    return self._variant_merger.get_merged_variants(variants)
+    return self._variant_merger.get_merged_variants(variants, key)
 
   def expand(self, pcoll):
     return (pcoll

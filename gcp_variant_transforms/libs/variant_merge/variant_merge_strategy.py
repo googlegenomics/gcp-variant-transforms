@@ -33,7 +33,7 @@ class VariantMergeStrategy(object):
     """
     raise NotImplementedError
 
-  def get_merge_keys(self, variant):
+  def get_merge_keys(self, variant, key=None):
     """Returns a generator of keys (str) used for merging variants."""
     raise NotImplementedError
 
