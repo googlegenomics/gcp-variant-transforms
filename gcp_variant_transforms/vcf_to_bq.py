@@ -34,6 +34,7 @@ python -m gcp_variant_transforms.vcf_to_bq \
 from __future__ import absolute_import
 
 import argparse
+import datetime
 import enum
 import logging
 import re
@@ -195,11 +196,17 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
   if pipeline_options.job_name:
     pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
   else:
-    pipeline_options.job_name = _MERGE_HEADERS_FILE_NAME
+    pipeline_options.job_name = _MERGE_HEADERS_JOB_NAME
 
   temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
+  # Add a time prefix to ensure files are unique in case multiple
+  # pipelines are run at the same time.
+  temp_merged_headers_file_name = '-'.join([
+      datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
+      pipeline_options.job_name,
+      _MERGE_HEADERS_FILE_NAME])
   known_args.representative_header_file = FileSystems.join(
-      temp_directory, _MERGE_HEADERS_FILE_NAME)
+      temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=pipeline_options) as p:
     headers = p
