@@ -58,7 +58,7 @@ def get_sample_vcf_record_lines():
       '20	1110696	.	A	G,T	67	PASS	AF=0.3,0.7	GT:GQ	1|2:21	2|1:2\n',
       '20	1230237	.	T	.	47	PASS	.	GT:GQ	0|0:54	0|0:48\n',
       '19	1234567	.	GTCT	G,GTACT	50	PASS	.	GT:GQ	0/1:35	0/2:17\n',
-      '20	1234	rs123	C	A,T	50	PASS	AF=0.5	GT:GQ	0/0:48	1/0:20\n',
+      '20	1234	rs123	C	A,T	50	PASS	AF=0.5,0.5	GT:GQ	0/0:48	1/0:20\n',
       '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n',
       '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:GQ	0|1:45 .:.\n'
   ]
