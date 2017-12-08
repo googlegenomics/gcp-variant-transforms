@@ -1,0 +1,6 @@
+{
+  "test_name": "valid-4-1-gz",
+  "table_name": "valid_4_1_gz",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.1-large.vcf.gz",
+  "runner": "DataflowRunner"
+}
