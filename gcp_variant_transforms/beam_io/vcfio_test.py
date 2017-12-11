@@ -431,7 +431,7 @@ class VcfSourceTest(unittest.TestCase):
     self._assert_variants_equal([variant_1, variant_2], read_data)
 
   def test_end_info_key(self):
-    phaseset_header_line = (
+    end_info_header_line = (
         '##INFO=<ID=END,Number=1,Type=Integer,Description="End of record.">\n')
     record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n',
                     '19	123	.	A	.	.	.	.	GT	0/1	1/1\n']
@@ -444,9 +444,36 @@ class VcfSourceTest(unittest.TestCase):
     variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
     variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
     read_data = self._create_temp_file_and_read_records(
-        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
+        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
     self._assert_variants_equal([variant_1, variant_2], read_data)
+
+  def test_end_info_key_unknown_number(self):
+    end_info_header_line = (
+        '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
+    record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n']
+    variant_1 = Variant(
+        reference_name='19', start=122, end=1111, reference_bases='A')
+    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    read_data = self._create_temp_file_and_read_records(
+        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
+    self.assertEqual(1, len(read_data))
+    self._assert_variants_equal([variant_1], read_data)
+
+  def test_end_info_key_unknown_number_invalid(self):
+    end_info_header_line = (
+        '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
+    # END should only have one field.
+    with self.assertRaises(ValueError):
+      self._create_temp_file_and_read_records(
+          [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
+          ['19	124	.	A	.	.	.	END=150,160	GT	1/0	0/1\n'])
+    # END should be an integer.
+    with self.assertRaises(ValueError):
+      self._create_temp_file_and_read_records(
+          [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
+          ['19	124	.	A	.	.	.	END=150.1	GT	1/0	0/1\n'])
 
   def test_custom_phaseset(self):
     phaseset_header_line = (
