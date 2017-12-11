@@ -757,6 +757,9 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
       Returns:
         A :class:`Variant` object from the given record.
+
+      Raises:
+        ValueError: if ``record`` is semantically invalid.
       """
       variant = Variant()
       variant.reference_name = record.CHROM
@@ -778,7 +781,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         # Special case: END info value specifies end of the record, so adjust
         # variant.end and do not include it as part of variant.info.
         if k == END_INFO_KEY:
-          variant.end = v
+          variant.end = self._get_variant_end_from_info(v)
           continue
         field_count = None
         if k in infos:
@@ -842,6 +845,19 @@ class _VcfSource(filebasedsource.FileBasedSource):
         return field_count_to_string[field_count]
       else:
         raise ValueError('Invalid value for field_count: %d' % field_count)
+
+    def _get_variant_end_from_info(self, end_info_value):
+      """Returns the value from the END INFO key."""
+      if isinstance(end_info_value, (int, long)):
+        return end_info_value
+      elif (isinstance(end_info_value, list) and len(end_info_value) == 1 and
+            isinstance(end_info_value[0], (int, long))):
+        # Some VCF files set the number of END info fields to unknown instead
+        # of one, which parses into a list in PyVCF.
+        return end_info_value[0]
+      else:
+        raise ValueError('Invalid END INFO field in record: {}'.format(
+            self._last_record))
 
 
 class ReadFromVcf(PTransform):
