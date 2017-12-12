@@ -127,7 +127,7 @@ Example command for DirectRunner:
 
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
-  --input_pattern gcp_variant_transforms/testing/testdata/valid-4.0.vcf \
+  --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
   --output_table projectname:bigquerydataset.tablename
 ```
 
