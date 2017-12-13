@@ -761,62 +761,47 @@ class _VcfSource(filebasedsource.FileBasedSource):
       Raises:
         ValueError: if ``record`` is semantically invalid.
       """
-      variant = Variant()
-      variant.reference_name = record.CHROM
-      variant.start = record.start
-      variant.end = record.end
-      variant.reference_bases = (
-          record.REF if record.REF != MISSING_FIELD_VALUE else None)
+      return Variant(
+          reference_name=record.CHROM,
+          start=record.start,
+          end=self._get_variant_end(record),
+          reference_bases=(
+              record.REF if record.REF != MISSING_FIELD_VALUE else None),
+          alternate_bases=self._get_variant_alternate_bases(record),
+          names=record.ID.split(';') if record.ID else [],
+          quality=record.QUAL,
+          filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,  # pylint: disable=C6403
+          info=self._get_variant_info(record, infos),
+          calls=self._get_variant_calls(record, formats))
+
+    def _get_variant_end(self, record):
+      if END_INFO_KEY not in record.INFO:
+        return record.end
+      end_info_value = record.INFO[END_INFO_KEY]
+      if isinstance(end_info_value, (int, long)):
+        return end_info_value
+      if (isinstance(end_info_value, list) and len(end_info_value) == 1 and
+          isinstance(end_info_value[0], (int, long))):
+        return end_info_value[0]
+      else:
+        raise ValueError('Invalid END INFO field in record: {}'.format(
+            self._last_record))
+
+    def _get_variant_alternate_bases(self, record):
       # ALT fields are classes in PyVCF (e.g. Substitution), so need convert
       # them to their string representations.
-      variant.alternate_bases.extend(
-          [str(r) for r in record.ALT if r] if record.ALT else [])
-      variant.names.extend(record.ID.split(';') if record.ID else [])
-      variant.quality = record.QUAL
-      # PyVCF uses None for '.' and an empty list for 'PASS'.
-      if record.FILTER is not None:
-        variant.filters.extend(
-            record.FILTER if record.FILTER else [PASS_FILTER])
+      return [str(r) for r in record.ALT if r] if record.ALT else []
+
+    def _get_variant_info(self, record, infos):
+      info = {}
       for k, v in record.INFO.iteritems():
-        # Special case: END info value specifies end of the record, so adjust
-        # variant.end and do not include it as part of variant.info.
-        if k == END_INFO_KEY:
-          variant.end = self._get_variant_end_from_info(v)
-          continue
-        field_count = None
-        if k in infos:
-          field_count = self._get_field_count_as_string(infos[k].num)
-        variant.info[k] = VariantInfo(data=v, field_count=field_count)
-      for sample in record.samples:
-        call = VariantCall()
-        call.name = sample.sample
-        for allele in sample.gt_alleles or [MISSING_GENOTYPE_VALUE]:
-          if allele is None:
-            allele = MISSING_GENOTYPE_VALUE
-          call.genotype.append(int(allele))
-        phaseset_from_format = (getattr(sample.data, PHASESET_FORMAT_KEY)
-                                if PHASESET_FORMAT_KEY in sample.data._fields
-                                else None)
-        # Note: Call is considered phased if it contains the 'PS' key regardless
-        # of whether it uses '|'.
-        if phaseset_from_format or sample.phased:
-          call.phaseset = (str(phaseset_from_format) if phaseset_from_format
-                           else DEFAULT_PHASESET_VALUE)
-        for field in sample.data._fields:
-          # Genotype and phaseset (if present) are already included.
-          if field in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
-            continue
-          data = getattr(sample.data, field)
-          # Convert single values to a list for cases where the number of fields
-          # is unknown. This is to ensure consistent types across all records.
-          # Note: this is already done for INFO fields in PyVCF.
-          if (field in formats and
-              formats[field].num is None and
-              isinstance(data, (int, float, long, basestring, bool))):
-            data = [data]
-          call.info[field] = data
-        variant.calls.append(call)
-      return variant
+        if k != END_INFO_KEY:
+          field_count = None
+          if k in infos:
+            field_count = self._get_field_count_as_string(infos[k].num)
+          info[k] = VariantInfo(data=v, field_count=field_count)
+
+      return info
 
     def _get_field_count_as_string(self, field_count):
       """Returns the string representation of field_count from PyVCF.
@@ -846,18 +831,39 @@ class _VcfSource(filebasedsource.FileBasedSource):
       else:
         raise ValueError('Invalid value for field_count: %d' % field_count)
 
-    def _get_variant_end_from_info(self, end_info_value):
-      """Returns the value from the END INFO key."""
-      if isinstance(end_info_value, (int, long)):
-        return end_info_value
-      elif (isinstance(end_info_value, list) and len(end_info_value) == 1 and
-            isinstance(end_info_value[0], (int, long))):
-        # Some VCF files set the number of END info fields to unknown instead
-        # of one, which parses into a list in PyVCF.
-        return end_info_value[0]
-      else:
-        raise ValueError('Invalid END INFO field in record: {}'.format(
-            self._last_record))
+    def _get_variant_calls(self, record, formats):
+      calls = []
+      for sample in record.samples:
+        call = VariantCall()
+        call.name = sample.sample
+        for allele in sample.gt_alleles or [MISSING_GENOTYPE_VALUE]:
+          if allele is None:
+            allele = MISSING_GENOTYPE_VALUE
+          call.genotype.append(int(allele))
+        phaseset_from_format = (getattr(sample.data, PHASESET_FORMAT_KEY)
+                                if PHASESET_FORMAT_KEY in sample.data._fields
+                                else None)
+        # Note: Call is considered phased if it contains the 'PS' key regardless
+        # of whether it uses '|'.
+        if phaseset_from_format or sample.phased:
+          call.phaseset = (str(phaseset_from_format) if phaseset_from_format
+                           else DEFAULT_PHASESET_VALUE)
+        for field in sample.data._fields:
+          # Genotype and phaseset (if present) are already included.
+          if field in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
+            continue
+          data = getattr(sample.data, field)
+          # Convert single values to a list for cases where the number of fields
+          # is unknown. This is to ensure consistent types across all records.
+          # Note: this is already done for INFO fields in PyVCF.
+          if (field in formats and
+              formats[field].num is None and
+              isinstance(data, (int, float, long, basestring, bool))):
+            data = [data]
+          call.info[field] = data
+        calls.append(call)
+
+      return calls
 
 
 class ReadFromVcf(PTransform):
