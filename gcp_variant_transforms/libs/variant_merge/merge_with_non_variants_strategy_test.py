@@ -69,11 +69,12 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         copy_filter_to_calls=False)
     variants = self._get_sample_variants()
 
+    actual = list(strategy.get_merged_variants([variants[0]]))
     # Test single variant merge.
-    self.assertEqual([variants[0]], strategy.get_merged_variants([variants[0]]))
+    self.assertEqual([variants[0]], actual)
 
     # Test multiple variant merge.
-    merged_variant = strategy.get_merged_variants(variants)[0]
+    merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
@@ -99,7 +100,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     variants = self._get_sample_variants()
 
     # Test single variant merge.
-    single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
+    single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
@@ -112,7 +113,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         single_merged_variant.calls)
 
     # Test multiple variant merge.
-    merged_variant = strategy.get_merged_variants(variants)[0]
+    merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
@@ -147,7 +148,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     variants = self._get_sample_variants()
 
     # Test single variant merge.
-    single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
+    single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
@@ -156,7 +157,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         single_merged_variant.calls)
 
     # Test multiple variant merge.
-    merged_variant = strategy.get_merged_variants(variants)[0]
+    merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
@@ -182,7 +183,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     variants = self._get_sample_variants()
 
     # Test single variant merge.
-    single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
+    single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
@@ -196,7 +197,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                                  ColumnKeyConstants.FILTER: ['PASS']})],
         single_merged_variant.calls)
 
-    merged_variant = strategy.get_merged_variants(variants)[0]
+    merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
         [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
@@ -263,7 +264,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 0]))
     variant_3.calls.append(vcfio.VariantCall(name='Sample3', genotype=[1, 0]))
     variants = [variant_1, variant_2, variant_3]
-    merged_variants = strategy.get_merged_variants(variants)
+    merged_variants = list(strategy.get_merged_variants(variants))
     self.assertEqual(sorted(merged_variants), sorted(variants))
 
   def test_merge_one_overlap(self):
@@ -302,11 +303,12 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                            alternate_bases=['C'])
     merged.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
     merged.calls.append(vcfio.VariantCall(name='Sample4', genotype=[1, 0]))
-    merged_variants = strategy.get_merged_variants(variants)
+    merged_variants = list(strategy.get_merged_variants(variants))
     self.assertEqual(
         sorted(merged_variants), sorted([merged, variant_2, variant_3]))
 
   def test_merge_2_non_variants(self):
+    self.maxDiff = None
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         None, None, None)
 
@@ -314,7 +316,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=10,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2'],
         filters=['f1', 'f2'],
@@ -323,7 +324,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=5,
         end=15,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
@@ -336,7 +336,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=5,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2'],
         filters=['f1', 'f2'],
@@ -345,7 +344,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=10,
         end=15,
-        reference_bases='.',
         alternate_bases=['<NON_REF>'],
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
@@ -354,7 +352,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=5,
         end=10,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2', 'nonv3'],
         filters=['f1', 'f2', 'f3'],
@@ -363,7 +360,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_2.calls.append(call_2)
     expected_3.calls.append(call_1)
     expected_3.calls.append(call_2)
-    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    actual = list(strategy.get_merged_variants([non_variant_1, non_variant_2]))
     expected = [expected_1, expected_2, expected_3]
 
     self.assertEqual(sorted(actual), sorted(expected))
@@ -376,7 +373,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=10,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2'],
         filters=['f1', 'f2'],
@@ -385,7 +381,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=15,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
@@ -398,7 +393,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=10,
         end=15,
-        reference_bases='.',
         alternate_bases=['<NON_REF>'],
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
@@ -407,7 +401,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=10,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2', 'nonv3'],
         filters=['f1', 'f2', 'f3'],
@@ -415,7 +408,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_1.calls.append(call_2)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
-    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    actual = list(strategy.get_merged_variants([non_variant_1, non_variant_2]))
     expected = [expected_1, expected_2]
 
     self.assertEqual(sorted(actual), sorted(expected))
@@ -450,7 +443,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=5,
-        reference_bases='A',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2'],
         filters=['f1', 'f2'],
@@ -459,7 +451,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=5,
         end=10,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nonv1', 'nonv2', 'nonv3'],
         filters=['f1', 'f2', 'f3'],
@@ -467,7 +458,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_1.calls.append(call_1)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
-    actual = strategy.get_merged_variants([non_variant_1, non_variant_2])
+    actual = list(strategy.get_merged_variants([non_variant_1, non_variant_2]))
     expected = [expected_1, expected_2]
 
     self.assertEqual(sorted(actual), sorted(expected))
@@ -503,7 +494,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=5,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nv'],
         filters=['nvf'],
@@ -512,7 +502,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=6,
         end=10,
-        reference_bases='.',
         alternate_bases=['<NON_REF>'],
         names=['nv'],
         filters=['nvf'],
@@ -530,7 +519,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_2.calls.append(call_2)
     expected_3.calls.append(call_1)
     expected_3.calls.append(call_2)
-    actual = strategy.get_merged_variants([variant, non_variant])
+    actual = list(strategy.get_merged_variants([variant, non_variant]))
     expected = [expected_1, expected_2, expected_3]
     self.assertEqual(sorted(actual), sorted(expected))
 
@@ -565,7 +554,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=6,
         end=10,
-        reference_bases='.',
         alternate_bases=['<NON_REF>'],
         names=['nv'],
         filters=['nvf'],
@@ -582,7 +570,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_1.calls.append(call_2)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
-    actual = strategy.get_merged_variants([variant, non_variant])
+    actual = list(strategy.get_merged_variants([variant, non_variant]))
     expected = [expected_1, expected_2]
     self.assertEqual(sorted(actual), sorted(expected))
 
@@ -603,7 +591,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=6,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nv'],
         filters=['nvf'],
@@ -617,7 +604,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='1',
         start=0,
         end=5,
-        reference_bases='G',
         alternate_bases=['<NON_REF>'],
         names=['nv'],
         filters=['nvf'],
@@ -634,7 +620,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_1.calls.append(call_2)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
-    actual = strategy.get_merged_variants([variant, non_variant])
+    actual = list(strategy.get_merged_variants([variant, non_variant]))
     expected = [expected_1, expected_2]
     self.assertEqual(sorted(actual), sorted(expected))
 
@@ -676,48 +662,28 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
 
     variant_1.calls.append(call_1)
     variant_2.calls.append(call_2)
-    actual = strategy.get_merged_variants([variant_1, variant_2])
+    actual = list(strategy.get_merged_variants([variant_1, variant_2]))
     self.assertEqual(actual, [expected])
 
   def test_align_non_variant(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         None, None, None, 2)
 
-    non_variant = vcfio.Variant(
-        reference_name='1',
-        start=5,
-        end=12,
-        reference_bases='A',
-        alternate_bases=['<NON_REF>'],
-        names=['nv'],
-        filters=['nvf'],
-        quality=2)
+    non_variant = vcfio.Variant(reference_name='1', start=5, end=12)
 
     expected = copy.deepcopy(non_variant)
     expected.start = 8
     expected.end = 10
 
-    actual = strategy.get_merged_variants([non_variant], '1:8')
+    actual = list(strategy.get_merged_variants([non_variant], '1:8'))
     self.assertEqual(actual, [expected])
 
-  def test_overlapping_two_non_variants(self):
+  def test_overlapping_three_non_variants(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         None, None, None)
-    non_variant_1 = vcfio.Variant(
-        reference_name='1',
-        start=0,
-        end=10,
-        reference_bases='A')
-    non_variant_2 = vcfio.Variant(
-        reference_name='1',
-        start=3,
-        end=5,
-        reference_bases='G')
-    non_variant_3 = vcfio.Variant(
-        reference_name='1',
-        start=4,
-        end=9,
-        reference_bases='C')
+    non_variant_1 = vcfio.Variant(reference_name='1', start=0, end=10)
+    non_variant_2 = vcfio.Variant(reference_name='1', start=3, end=5)
+    non_variant_3 = vcfio.Variant(reference_name='1', start=4, end=9)
     call_1 = vcfio.VariantCall('1', [0, 0])
     call_2 = vcfio.VariantCall('2', [0, 0])
     call_3 = vcfio.VariantCall('3', [0, 0])
@@ -725,31 +691,11 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     non_variant_2.calls.append(call_2)
     non_variant_3.calls.append(call_3)
 
-    expected_1 = vcfio.Variant(
-        reference_name='1',
-        start=0,
-        end=3,
-        reference_bases='A')
-    expected_2 = vcfio.Variant(
-        reference_name='1',
-        start=3,
-        end=4,
-        reference_bases='G')
-    expected_3 = vcfio.Variant(
-        reference_name='1',
-        start=4,
-        end=5,
-        reference_bases='C')
-    expected_4 = vcfio.Variant(
-        reference_name='1',
-        start=5,
-        end=9,
-        reference_bases='.')
-    expected_5 = vcfio.Variant(
-        reference_name='1',
-        start=9,
-        end=10,
-        reference_bases='.')
+    expected_1 = vcfio.Variant(reference_name='1', start=0, end=3)
+    expected_2 = vcfio.Variant(reference_name='1', start=3, end=4)
+    expected_3 = vcfio.Variant(reference_name='1', start=4, end=5)
+    expected_4 = vcfio.Variant(reference_name='1', start=5, end=9)
+    expected_5 = vcfio.Variant(reference_name='1', start=9, end=10)
     expected_1.calls.append(call_1)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
@@ -760,23 +706,20 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_4.calls.append(call_3)
     expected_5.calls.append(call_1)
     expected = [expected_1, expected_2, expected_3, expected_4, expected_5]
-    actual = strategy.get_merged_variants(
-        [non_variant_1, non_variant_2, non_variant_3])
-    self.assertEqual(actual, expected)
+    actual = list(strategy.get_merged_variants(
+        [non_variant_1, non_variant_2, non_variant_3]))
+    self.assertEqual(sorted(actual), sorted(expected))
 
   def test_non_variant_split_by_snp(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         None, None, None)
-    non_variant = vcfio.Variant(
-        reference_name='1',
-        start=0,
-        end=10,
-        reference_bases='A')
+    non_variant = vcfio.Variant(reference_name='1', start=0, end=10)
     variant = vcfio.Variant(
         reference_name='1',
         start=5,
         end=6,
-        reference_bases='C')
+        reference_bases='C',
+        alternate_bases=['A'])
     call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
     call_2 = vcfio.VariantCall(name='2', genotype=[1, 0])
     non_variant.calls.append(call_1)
@@ -784,23 +727,19 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     expected_1 = vcfio.Variant(
         reference_name='1',
         start=0,
-        end=5,
-        reference_bases='A')
+        end=5)
     expected_2 = vcfio.Variant(
         reference_name='1',
         start=5,
         end=6,
-        reference_bases='C')
-    expected_3 = vcfio.Variant(
-        reference_name='1',
-        start=6,
-        end=10,
-        reference_bases='.')
+        reference_bases='C',
+        alternate_bases=['A'])
+    expected_3 = vcfio.Variant(reference_name='1', start=6, end=10)
     expected_1.calls.append(call_1)
     expected_2.calls.append(call_1)
     expected_2.calls.append(call_2)
     expected_3.calls.append(call_1)
 
-    actual = strategy.get_merged_variants([non_variant, variant])
+    actual = list(strategy.get_merged_variants([non_variant, variant]))
     expected = [expected_1, expected_2, expected_3]
-    self.assertEqual(actual, expected)
+    self.assertEqual(sorted(actual), sorted(expected))
