@@ -17,6 +17,9 @@
 import setuptools
 
 REQUIRED_PACKAGES = [
+    # TODO(arostamianfar):
+    # Remove once https://issues.apache.org/jira/browse/BEAM-3357 is resolved.
+    'grpcio==1.7.3',
     'apache-beam[gcp]>=2.2',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
