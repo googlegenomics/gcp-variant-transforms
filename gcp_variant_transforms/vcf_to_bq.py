@@ -134,11 +134,14 @@ def _get_pipeline_mode(known_args):
 
 def _merge_headers(known_args, pipeline_args, pipeline_mode):
   """Merges VCF headers using beam based on pipeline_mode."""
-  if (known_args.representative_header_file or
-      pipeline_mode == PipelineModes.SMALL):
+  if known_args.representative_header_file:
     return
 
   pipeline_options = GoogleCloudOptions(pipeline_args)
+  # Always run pipeline locally if data is small.
+  if pipeline_mode == PipelineModes.SMALL:
+    pipeline_options.runner = 'DirectRunner'
+
   if pipeline_options.job_name:
     pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
   else:
@@ -198,8 +201,8 @@ def run(argv=None):
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQuery schema cannot yet be dynamically created based on input.
   # See https://issues.apache.org/jira/browse/BEAM-2801.
-  header_fields = vcf_header_parser.get_merged_vcf_headers(
-      known_args.representative_header_file or known_args.input_pattern)
+  header_fields = vcf_header_parser.get_vcf_headers(
+      known_args.representative_header_file)
 
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
