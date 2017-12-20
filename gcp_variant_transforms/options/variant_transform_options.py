@@ -77,6 +77,13 @@ class VcfReadOptions(VariantTransformsOptions):
               'large number of files are specified by input_pattern. '
               'Note that each VCF file must still contain valid header files '
               'even if this is provided.'))
+    # TODO(nmousavi): consider removing this flag. See issue #42
+    parser.add_argument(
+        '--force_merge_header_conflicts',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, all the resolvable conflicts (e.g, Integer vs Float)'
+              'in in the header fields of the given VCF files are resolved.'
+              'If not set, such conflicts raise errors.'))
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):

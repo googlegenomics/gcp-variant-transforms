@@ -166,10 +166,10 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       headers |= vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
 
     _ = (headers
-         | 'MergeHeaders' >> merge_headers.MergeHeaders()
+         | 'MergeHeaders' >> merge_headers.MergeHeaders(
+             known_args.force_merge_header_conflicts)
          | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
              known_args.representative_header_file))
-
 
 def _add_parser_arguments(options, parser):
   for transform_options in options:
