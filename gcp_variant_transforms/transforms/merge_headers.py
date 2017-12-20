@@ -23,6 +23,10 @@ __all__ = ['MergeHeaders']
 class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""
 
+  def __init__(self, force_merge_conflicts):
+    super(_MergeHeadersFn, self).__init__()
+    self._force_merge_conflicts = force_merge_conflicts
+
   def create_accumulator(self):
     return vcf_header_io.VcfHeader()
 
@@ -32,7 +36,7 @@ class _MergeHeadersFn(beam.CombineFn):
   def merge_accumulators(self, accumulators):
     merged_headers = self.create_accumulator()
     for to_merge in accumulators:
-      merged_headers.update(to_merge)
+      merged_headers.update(to_merge, self._force_merge_conflicts)
     return merged_headers
 
   def extract_output(self, merged_headers):
@@ -42,5 +46,9 @@ class _MergeHeadersFn(beam.CombineFn):
 class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
+  def __init__(self, force_merge_conflicts):
+    super(MergeHeaders, self).__init__()
+    self._force_merge_conflicts = force_merge_conflicts
+
   def expand(self, pcoll):
-    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn())
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(self._force_merge_conflicts))
