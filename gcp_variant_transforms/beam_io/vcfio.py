@@ -741,7 +741,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
-
     def _convert_to_variant_record(self, record, infos, formats):
       """Converts the PyVCF record to a :class:`Variant` object.
 
@@ -954,7 +953,7 @@ class ReadAllFromVcf(PTransform):
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,
-        0,  #min_bundle_size
+        0,  # min_bundle_size
         source_from_file)
 
   def expand(self, pvalue):

@@ -51,9 +51,9 @@ class HeaderConflictResolver(object):
     """
     self._resolvable_conflicts_dict = {}
     self._resolvable_conflicts_dict.update(
-        {rc[0] : {rc[1] : rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
+        {rc[0]: {rc[1]: rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
     self._resolvable_conflicts_dict.update(
-        {rc[1] : {rc[0] : rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
+        {rc[1]: {rc[0]: rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
 
   def can_resolve(self, first, second):
     """Returns true iff conflict between `first` and `second` is resolvable.
@@ -61,8 +61,8 @@ class HeaderConflictResolver(object):
     Order of args does not matter.
 
     Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
+      first (string): first given value.
+      second (string): second given value.
     """
     return (first == second or
             (first in self._resolvable_conflicts_dict and
@@ -75,8 +75,8 @@ class HeaderConflictResolver(object):
     Order of args does not matter.
 
     Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
+      first (string): first given value.
+      second (string): second given value.
     """
     if not self.can_resolve(first, second):
       raise ValueError('Incompatible values cannot be resolved: '
@@ -85,6 +85,7 @@ class HeaderConflictResolver(object):
       return first
     else:
       return self._resolvable_conflicts_dict[first][second]
+
 
 class VcfHeader(object):
   """Container for header data."""
@@ -182,13 +183,13 @@ class VcfHeader(object):
         # We only care about mistmach in 'num' and 'type' fields.
         if (to_merge_value[source_field_key] == source_field_value or
             source_field_key not in ['num', 'type']):
-          merged_value.update({source_field_key : source_field_value})
+          merged_value.update({source_field_key: source_field_value})
           continue
         # There is a conflict in header fields. Try to resolve it.
         try:
           resolution_field_value = resolver.resolve(
               source_field_value, to_merge_value[source_field_key])
-          merged_value.update({source_field_key : resolution_field_value})
+          merged_value.update({source_field_key: resolution_field_value})
         except ValueError as e:
           raise ValueError('Incompatible number or types in header fields:'
                            '{}, {} \n. Error: {}'.format(

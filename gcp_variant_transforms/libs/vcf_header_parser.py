@@ -54,6 +54,7 @@ def get_vcf_headers(input_file):
     raise ValueError('Invalid VCF header: %s' % str(e))
   return HeaderFields(vcf_reader.infos, vcf_reader.formats)
 
+
 def _line_generator(file_name):
   """Generator to return lines delimited by newline chars from ``file_name``."""
   with FileSystems.open(file_name) as f:
