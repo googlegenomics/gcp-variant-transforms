@@ -117,7 +117,6 @@ class TestCase(object):
             'No traceback. See logs for more information on error.')
 
 
-
 class TestContextManager(object):
   """Manages all resources for a given run of tests.
 
@@ -137,6 +136,11 @@ class TestContextManager(object):
     self.dataset_id = 'integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
     dataset_ref = client.dataset(self.dataset_id)
+    # TODO(bashir2): There is a mismatch between the bigquery API versions
+    # which we need to fix. With current setup, we get version 0.25.0 for
+    # google-cloud-bigquery which does not have the following constructor
+    # for Dataset but in newer versions, e.g., 0.29.0 it does.
+    # We need to fix the versioning issue.
     self.dataset = bigquery.Dataset(dataset_ref)
     _ = client.create_dataset(self.dataset)
     return self

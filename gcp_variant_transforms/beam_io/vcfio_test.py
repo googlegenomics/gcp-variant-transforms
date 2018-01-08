@@ -165,6 +165,9 @@ class VcfSourceTest(unittest.TestCase):
       suffix = '.vcf.gz'
     elif compression_type == CompressionTypes.BZIP2:
       suffix = '.vcf.bz2'
+    else:
+      raise ValueError('Unrecognized compression type {}'.format(
+          compression_type))
     return tempdir.create_temp_file(
         suffix=suffix, lines=lines, compression_type=compression_type)
 
@@ -298,6 +301,20 @@ class VcfSourceTest(unittest.TestCase):
         [], self._create_temp_file_and_read_records(['\n', '\r\n', '\n']))
     self.assertEqual(
         [], self._create_temp_file_and_read_records(_SAMPLE_HEADER_LINES))
+
+  def _default_variant_call(self):
+    return vcfio.VariantCall(
+        name='Sample1', genotype=[1, 0],
+        phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+        info={'GQ': 48})
+
+  def test_variant_call_order(self):
+    variant_call_1 = self._default_variant_call()
+    variant_call_2 = self._default_variant_call()
+    self.assertEqual(variant_call_1, variant_call_2)
+    variant_call_1.phaseset = 0
+    variant_call_2.phaseset = 1
+    self.assertGreater(variant_call_2, variant_call_1)
 
   def test_single_file_verify_details(self):
     variant_1, vcf_line_1 = _get_sample_variant_1()
