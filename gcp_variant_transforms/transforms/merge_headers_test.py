@@ -134,7 +134,6 @@ class MergeHeadersTest(unittest.TestCase):
                                        ('source', None),
                                        ('version', None)]))
 
-
   def test_combine_two_headers_with_bad_conflict(self):
     # Type mistmach (String vs Float) cannot be resolved..
     lines_1 = [

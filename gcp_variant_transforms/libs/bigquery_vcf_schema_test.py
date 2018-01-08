@@ -426,8 +426,8 @@ class GetRowsFromVariantTest(unittest.TestCase):
         },
     ]
 
+    original_max_row_size = bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES
     try:
-      original_max_row_size = bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES
       bigquery_vcf_schema._MAX_BIGQUERY_ROW_SIZE_BYTES = (
           len(json.dumps(expected_rows[0])) + 10)
       self.assertEqual(expected_rows, self._get_row_list_from_variant(variant))
