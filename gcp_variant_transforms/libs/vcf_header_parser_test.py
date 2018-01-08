@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 
-import os
 import unittest
 
 from gcp_variant_transforms.libs import vcf_header_parser

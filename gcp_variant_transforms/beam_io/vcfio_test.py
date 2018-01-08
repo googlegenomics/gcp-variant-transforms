@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 
-import bz2
 import glob
 import gzip
 import logging
@@ -30,14 +29,11 @@ import apache_beam as beam
 from apache_beam.io.filesystem import CompressionTypes
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
-from apache_beam.testing.util import BeamAssertException
 from apache_beam.testing.util import assert_that
 
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcfio import _VcfSource as VcfSource
-from gcp_variant_transforms.beam_io.vcfio import DEFAULT_PHASESET_VALUE
-from gcp_variant_transforms.beam_io.vcfio import MISSING_GENOTYPE_VALUE
 from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
@@ -167,7 +163,7 @@ class VcfSourceTest(unittest.TestCase):
       suffix = '.vcf'
     elif compression_type == CompressionTypes.GZIP:
       suffix = '.vcf.gz'
-    elif compression_type == CompressionTypes.BZIP:
+    elif compression_type == CompressionTypes.BZIP2:
       suffix = '.vcf.bz2'
     return tempdir.create_temp_file(
         suffix=suffix, lines=lines, compression_type=compression_type)
@@ -389,9 +385,9 @@ class VcfSourceTest(unittest.TestCase):
     record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
     expected_variant = Variant(reference_name='chr19', start=122, end=123)
     expected_variant.calls.append(
-        VariantCall(name='Sample1', genotype=[MISSING_GENOTYPE_VALUE]))
+        VariantCall(name='Sample1', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     expected_variant.calls.append(
-        VariantCall(name='Sample2', genotype=[MISSING_GENOTYPE_VALUE]))
+        VariantCall(name='Sample2', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES + [record_line])
     self.assertEqual(1, len(read_data))
@@ -610,6 +606,21 @@ class VcfSourceTest(unittest.TestCase):
       assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
       pipeline.run()
 
+  def test_pipeline_read_all_bzip2(self):
+    with TempDir() as tempdir:
+      file_name_1 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
+          compression_type=CompressionTypes.BZIP2)
+      file_name_2 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
+          compression_type=CompressionTypes.BZIP2)
+      pipeline = TestPipeline()
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([file_name_1, file_name_2])
+               | 'Read' >> ReadAllFromVcf())
+      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
+      pipeline.run()
+
   def test_pipeline_read_all_multiple_files(self):
     with TempDir() as tempdir:
       file_name_1 = self._create_temp_vcf_file(
@@ -754,7 +765,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | beam.core.Create(self.variants)
+    pcoll = pipeline | beam.Create(self.variants)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
     pipeline.run()
 
@@ -768,7 +779,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow_auto_compression(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | beam.core.Create(self.variants)
+    pcoll = pipeline | beam.Create(self.variants)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
         compression_type=CompressionTypes.AUTO)
@@ -784,7 +795,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow_header(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | 'Create' >> beam.core.Create(self.variants)
+    pcoll = pipeline | 'Create' >> beam.Create(self.variants)
     headers = ['foo\n']
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',

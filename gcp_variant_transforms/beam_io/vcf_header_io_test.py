@@ -297,7 +297,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     with temp_dir.TempDir() as tempdir:
       tempfile = tempdir.create_temp_file(suffix='.vcf')
       pipeline = TestPipeline()
-      pcoll = pipeline | beam.core.Create([header])
+      pcoll = pipeline | beam.Create([header])
       _ = pcoll | 'Write' >> WriteVcfHeaders(tempfile)
       pipeline.run()
       self._assert_file_contents_equal(tempfile, self.lines)

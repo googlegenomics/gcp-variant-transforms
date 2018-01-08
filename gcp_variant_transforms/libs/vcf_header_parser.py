@@ -21,7 +21,7 @@ from apache_beam.io.filesystems import FileSystems
 
 import vcf
 
-__all__ = ['HeaderFields', 'get_merged_vcf_headers']
+__all__ = ['HeaderFields', 'get_vcf_headers']
 
 
 # Stores parsed header information.

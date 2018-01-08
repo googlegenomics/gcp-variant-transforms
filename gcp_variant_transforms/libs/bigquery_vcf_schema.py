@@ -21,12 +21,13 @@ import json
 import re
 import sys
 
+import vcf
+
 from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
 
-import vcf
 
-__all__ = ['generate_schema_from_header_fields', 'get_row_from_variant',
+__all__ = ['generate_schema_from_header_fields', 'get_rows_from_variant',
            'ColumnKeyConstants']
 
 
@@ -256,7 +257,7 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
 
 
 def _get_call_record(call):
-  """A helper method for ``get_row_from_variant`` to get a call as JSON."""
+  """A helper method for ``get_rows_from_variant`` to get a call as JSON."""
   call_record = {
       ColumnKeyConstants.CALLS_NAME: _get_bigquery_sanitized_field(call.name),
       ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
@@ -270,7 +271,7 @@ def _get_call_record(call):
 
 
 def _get_base_row_from_variant(variant, split_alternate_allele_info_fields):
-  """A helper method for ``get_row_from_variant`` to get row without calls."""
+  """A helper method for ``get_rows_from_variant`` to get row without calls."""
   row = {
       ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
       ColumnKeyConstants.START_POSITION: variant.start,
@@ -443,5 +444,5 @@ def _get_bigquery_mode_from_vcf_num(vcf_num):
 def _is_alternate_allele_count(info_field):
   return info_field.field_count == _FIELD_COUNT_ALTERNATE_ALLELE
 
-def _get_json_object_size(object):
-  return len(json.dumps(object))
+def _get_json_object_size(obj):
+  return len(json.dumps(obj))

@@ -14,9 +14,10 @@
 
 """Tests for derivatives variant_transform_options."""
 
+import unittest
+
 import collections
 import mock
-import unittest
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions

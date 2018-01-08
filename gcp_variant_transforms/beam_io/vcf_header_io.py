@@ -130,11 +130,16 @@ class VcfHeader(object):
     if not isinstance(to_merge, VcfHeader):
       raise NotImplementedError
 
-    self._merge_header_fields(self.infos, to_merge.infos, force_merge_conflicts)
-    self._merge_header_fields(self.filters, to_merge.filters, force_merge_conflicts)
-    self._merge_header_fields(self.alts, to_merge.alts, force_merge_conflicts)
-    self._merge_header_fields(self.formats, to_merge.formats, force_merge_conflicts)
-    self._merge_header_fields(self.contigs, to_merge.contigs, force_merge_conflicts)
+    self._merge_header_fields(
+        self.infos, to_merge.infos, force_merge_conflicts)
+    self._merge_header_fields(
+        self.filters, to_merge.filters, force_merge_conflicts)
+    self._merge_header_fields(
+        self.alts, to_merge.alts, force_merge_conflicts)
+    self._merge_header_fields(
+        self.formats, to_merge.formats, force_merge_conflicts)
+    self._merge_header_fields(
+        self.contigs, to_merge.contigs, force_merge_conflicts)
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -226,7 +231,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                                           splittable=False)
     self._compression_type = compression_type
 
-  def read_records(self, file_name, range_tracker):
+  def read_records(self, file_name, unused_range_tracker):
     try:
       vcf_reader = vcf.Reader(fsock=self._read_headers(file_name))
     except StopIteration:

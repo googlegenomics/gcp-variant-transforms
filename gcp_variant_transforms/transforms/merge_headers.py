@@ -51,4 +51,5 @@ class MergeHeaders(beam.PTransform):
     self._force_merge_conflicts = force_merge_conflicts
 
   def expand(self, pcoll):
-    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(self._force_merge_conflicts))
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(
+        _MergeHeadersFn(self._force_merge_conflicts))
