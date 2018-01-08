@@ -61,4 +61,3 @@ class FilterVariants(beam.PTransform):
 
   def expand(self, pcoll):
     return pcoll | 'ApplyFilters' >> beam.ParDo(self._apply_filters)
-

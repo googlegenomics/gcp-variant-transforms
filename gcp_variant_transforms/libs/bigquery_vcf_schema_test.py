@@ -21,6 +21,10 @@ import json
 import sys
 import unittest
 
+from vcf.parser import _Format as Format
+from vcf.parser import _Info as Info
+from vcf.parser import field_counts
+
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
@@ -29,10 +33,6 @@ from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_vcf_schema import _TableFieldConstants as TableFieldConstants
 from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
-
-from vcf.parser import _Format as Format
-from vcf.parser import _Info as Info
-from vcf.parser import field_counts
 
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):

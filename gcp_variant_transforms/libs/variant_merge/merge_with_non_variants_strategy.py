@@ -65,7 +65,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
     """
     self._move_to_calls = move_to_calls_strategy.MoveToCallsStrategy(
         info_keys_to_move_to_calls_regex=info_keys_to_move_to_calls_regex,
-        copy_quality_to_calls=copy_filter_to_calls,
+        copy_quality_to_calls=copy_quality_to_calls,
         copy_filter_to_calls=copy_filter_to_calls)
     self._window_size = window_size
 

@@ -14,9 +14,10 @@
 
 """Tests for vcf_to_bq script."""
 
+import unittest
+
 import collections
 import mock
-import unittest
 
 from apache_beam.io.filesystems import FileSystems
 

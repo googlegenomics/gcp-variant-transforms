@@ -308,7 +308,6 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         sorted(merged_variants), sorted([merged, variant_2, variant_3]))
 
   def test_merge_2_non_variants(self):
-    self.maxDiff = None
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         None, None, None)
 

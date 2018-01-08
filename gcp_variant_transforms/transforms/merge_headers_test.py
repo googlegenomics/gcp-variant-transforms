@@ -14,19 +14,17 @@
 
 """Test cases for get_merged_headers module."""
 
+from collections import OrderedDict
 import unittest
+import vcf
 
-import apache_beam as beam
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
-from collections import OrderedDict
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
-
-import vcf
 
 FILE_1_LINES = [
     '##fileformat=VCFv4.2\n',
@@ -106,13 +104,13 @@ class MergeHeadersTest(unittest.TestCase):
   def test_combine_two_conflicting_headers(self):
     # These two headers have type conflict (Integer vs Float).
     lines_1 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
     lines_2 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
     vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
     vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
@@ -133,13 +131,13 @@ class MergeHeadersTest(unittest.TestCase):
     # doesn't raise error because the type conflict is resolvable and
     # flag '--force_merge_conflicts' is set.
     lines_1 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
     lines_2 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
     vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
     vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
@@ -167,13 +165,13 @@ class MergeHeadersTest(unittest.TestCase):
     # Type mistmach (String vs Float) cannot be resolved even with
     # flag '--force_merge_conflict' set to True.
     lines_1 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=String,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=String,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
     lines_2 = [
-      '##fileformat=VCFv4.2\n',
-      '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-      '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
     vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
     vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
@@ -201,6 +199,7 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = (
         pipeline
         | Create([headers_1, headers_2])
-        | 'MergeHeaders' >> merge_headers.MergeHeaders(force_merge_conflicts=False))
+        | 'MergeHeaders' >> merge_headers.MergeHeaders(
+            force_merge_conflicts=False))
 
     assert_that(merged_headers, equal_to([expected]))

@@ -26,13 +26,11 @@ from functools import partial
 import vcf
 
 from apache_beam.coders import coders
-from apache_beam.io import filebasedsink
 from apache_beam.io import filebasedsource
 from apache_beam.io import iobase
 from apache_beam.io import textio
 from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.iobase import Read
-from apache_beam.io.iobase import Write
 from apache_beam.transforms import PTransform
 from apache_beam.transforms.display import DisplayDataItem
 
@@ -217,7 +215,7 @@ class VariantCall(object):
     elif self.genotype != other.genotype:
       return self.genotype < other.genotype
     elif self.phaseset != other.phaseset:
-      return self.phaset < other.phaseset
+      return self.phaseset < other.phaseset
     else:
       return self.info < other.info
 
@@ -395,7 +393,7 @@ class _TextSource(filebasedsource.FileBasedSource):
       assert isinstance(value, (int, long))
       if value > len(self._data):
         raise ValueError('Cannot set position to %d since it\'s larger than '
-                         'size of data %d.', value, len(self._data))
+                         'size of data %d.' % (value, len(self._data)))
       self._position = value
 
     def reset(self):
@@ -440,8 +438,8 @@ class _TextSource(filebasedsource.FileBasedSource):
     self._coder = coder
     self._buffer_size = buffer_size
     if skip_header_lines < 0:
-      raise ValueError('Cannot skip negative number of header lines: %d',
-                       skip_header_lines)
+      raise ValueError(
+          'Cannot skip negative number of header lines: %d' % skip_header_lines)
     elif skip_header_lines > 10:
       logging.warning(
           'Skipping %d header lines. Skipping large number of header '
@@ -547,6 +545,7 @@ class _TextSource(filebasedsource.FileBasedSource):
 
     return position
 
+  # pylint: disable=inconsistent-return-statements
   def _find_separator_bounds(self, file_to_read, read_buffer):
     # Determines the start and end positions within 'read_buffer.data' of the
     # next separator starting from position 'read_buffer.position'.
@@ -770,7 +769,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
           alternate_bases=self._get_variant_alternate_bases(record),
           names=record.ID.split(';') if record.ID else [],
           quality=record.QUAL,
-          filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,  # pylint: disable=C6403
+          filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,
           info=self._get_variant_info(record, infos),
           calls=self._get_variant_calls(record, formats))
 

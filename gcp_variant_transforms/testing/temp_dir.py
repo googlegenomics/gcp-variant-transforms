@@ -71,7 +71,7 @@ class TempDir(object):
     elif compression_type == filesystem.CompressionTypes.GZIP:
       with gzip.GzipFile(f.name, 'w') as gzip_file:
         gzip_file.write(''.join(lines))
-    elif compression_type == filesystem.CompressionType.BZIP:
+    elif compression_type == filesystem.CompressionTypes.BZIP2:
       with bz2.BZ2File(f.name, 'w') as bzip_file:
         bzip_file.write(''.join(lines))
     else:

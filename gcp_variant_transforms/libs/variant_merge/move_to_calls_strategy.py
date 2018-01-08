@@ -92,7 +92,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
       if not self._should_move_info_key_to_calls(info_key):
         merged_variant.info[info_key] = info_value
 
-  def get_merged_variants(self, variants, key=None):
+  def get_merged_variants(self, variants, unused_key=None):
     if not variants:
       return []
     merged_variant = None
