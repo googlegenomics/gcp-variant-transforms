@@ -115,7 +115,7 @@ class VcfHeader(object):
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
 
-  def update(self, to_merge, force_merge_conflicts=False):
+  def update(self, to_merge):
     """Updates ``self``'s headers with values from ``to_merge``.
 
     If a specific key does not already exists in a specific one of ``self``'s
@@ -130,16 +130,11 @@ class VcfHeader(object):
     if not isinstance(to_merge, VcfHeader):
       raise NotImplementedError
 
-    self._merge_header_fields(
-        self.infos, to_merge.infos, force_merge_conflicts)
-    self._merge_header_fields(
-        self.filters, to_merge.filters, force_merge_conflicts)
-    self._merge_header_fields(
-        self.alts, to_merge.alts, force_merge_conflicts)
-    self._merge_header_fields(
-        self.formats, to_merge.formats, force_merge_conflicts)
-    self._merge_header_fields(
-        self.contigs, to_merge.contigs, force_merge_conflicts)
+    self._merge_header_fields(self.infos, to_merge.infos)
+    self._merge_header_fields(self.filters, to_merge.filters)
+    self._merge_header_fields(self.alts, to_merge.alts)
+    self._merge_header_fields(self.formats, to_merge.formats)
+    self._merge_header_fields(self.contigs, to_merge.contigs)
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -163,7 +158,7 @@ class VcfHeader(object):
     # https://docs.python.org/2/library/collections.html#collections.namedtuple
     return {key: header[key]._asdict() for key in header}  # pylint: disable=W0212
 
-  def _merge_header_fields(self, source, to_merge, force_merge_conflicts):
+  def _merge_header_fields(self, source, to_merge):
     """Modifies ``source`` to add any keys from ``to_merge`` not in ``source``.
 
     Args:
@@ -190,28 +185,17 @@ class VcfHeader(object):
           merged_value.update({source_field_key : source_field_value})
           continue
         # There is a conflict in header fields. Try to resolve it.
-        if force_merge_conflicts:
-          try:
-            resolution_field_value = resolver.resolve(
-                source_field_value, to_merge_value[source_field_key])
-            merged_value.update({source_field_key : resolution_field_value})
-          except ValueError as e:
-            raise ValueError('Incompatible number or types in header fields:'
-                             '{}, {} \n. Error: {}'.format(
-                                 source_field_value,
-                                 to_merge_value[source_field_key],
-                                 str(e)))
-
-        elif resolver.can_resolve(
-            source_field_value, to_merge_value[source_field_key]):
-          raise ValueError('Incompatible number or types in header fields'
-                           '({} vs {}) : {}{} \n'
-                           'Use flag --force_merge_header_conflicts to resolve'
-                           'such mistmatches.'.format(
+        try:
+          resolution_field_value = resolver.resolve(
+              source_field_value, to_merge_value[source_field_key])
+          merged_value.update({source_field_key : resolution_field_value})
+        except ValueError as e:
+          raise ValueError('Incompatible number or types in header fields:'
+                           '{}, {} \n. Error: {}'.format(
                                source_field_value,
                                to_merge_value[source_field_key],
-                               source_value,
-                               to_merge_value))
+                               str(e)))
+
       source[key] = merged_value
 
 
