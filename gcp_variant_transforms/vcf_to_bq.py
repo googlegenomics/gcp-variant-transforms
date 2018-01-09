@@ -166,8 +166,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       headers |= vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
 
     _ = (headers
-         | 'MergeHeaders' >> merge_headers.MergeHeaders(
-             known_args.force_merge_header_conflicts)
+         | 'MergeHeaders' >> merge_headers.MergeHeaders()
          | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
              known_args.representative_header_file))
 
