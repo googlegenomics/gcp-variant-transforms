@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 
-from collections import OrderedDict
 from functools import partial
 import vcf
 
@@ -29,63 +28,8 @@ from apache_beam.transforms import PTransform
 
 from gcp_variant_transforms.beam_io import vcfio
 
-__all__ = ['HeaderConflictResolver', 'VcfHeader', 'VcfHeaderSource',
-           'ReadAllVcfHeaders', 'ReadVcfHeaders', 'WriteVcfHeaders']
-
-
-class HeaderConflictResolver(object):
-  """A class for resolving mistmatch between header fields (e.g. type, num).
-  """
-
-  # List of all resolvable conflicts with their resolution.
-  # For example, entry [a, b, c] means mistmatch between a and b is resolved to
-  # c (where c is usually either a or b).
-  _RESOLVABLE_CONFLICTS = [
-      # Conflict between 'Integer' and 'Float' is resolved to 'Float'.
-      ['Integer', 'Float', 'Float'],
-  ]
-
-  def __init__(self):
-    """Initialize :class:`HeaderConflictResolver` by creating a dict of all
-    resolvable conflicts.
-    """
-    self._resolvable_conflicts_dict = {}
-    self._resolvable_conflicts_dict.update(
-        {rc[0]: {rc[1]: rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
-    self._resolvable_conflicts_dict.update(
-        {rc[1]: {rc[0]: rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
-
-  def can_resolve(self, first, second):
-    """Returns true iff conflict between `first` and `second` is resolvable.
-
-    Order of args does not matter.
-
-    Args:
-      first (string): first given value.
-      second (string): second given value.
-    """
-    return (first == second or
-            (first in self._resolvable_conflicts_dict and
-             second in self._resolvable_conflicts_dict[first]))
-
-  def resolve(self, first, second):
-    """Returns the resolution if the conflict between `first` and `second`
-    is resolvable.
-
-    Order of args does not matter.
-
-    Args:
-      first (string): first given value.
-      second (string): second given value.
-    """
-    if not self.can_resolve(first, second):
-      raise ValueError('Incompatible values cannot be resolved: '
-                       '{}, {}'.format(first, second))
-    if first == second:
-      return first
-    else:
-      return self._resolvable_conflicts_dict[first][second]
-
+_all__ = ['VcfHeader', 'VcfHeaderSource', 'ReadAllVcfHeaders',
+          'ReadVcfHeaders', 'WriteVcfHeaders']
 
 class VcfHeader(object):
   """Container for header data."""
@@ -116,27 +60,6 @@ class VcfHeader(object):
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
 
-  def update(self, to_merge):
-    """Updates ``self``'s headers with values from ``to_merge``.
-
-    If a specific key does not already exists in a specific one of ``self``'s
-    headers, that key and the associated value will be added. If the key does
-    already exist in the specific header of ``self``, then the value of that key
-    will be updated with the value from ``to_merge``.
-
-    Args:
-      to_merge (:class:`VcfHeader`): The VcfHeader object that's headers will be
-        merged into the headers of self.
-    """
-    if not isinstance(to_merge, VcfHeader):
-      raise NotImplementedError
-
-    self._merge_header_fields(self.infos, to_merge.infos)
-    self._merge_header_fields(self.filters, to_merge.filters)
-    self._merge_header_fields(self.alts, to_merge.alts)
-    self._merge_header_fields(self.formats, to_merge.formats)
-    self._merge_header_fields(self.contigs, to_merge.contigs)
-
   def __eq__(self, other):
     return (self.infos == other.infos and
             self.filters == other.filters and
@@ -158,47 +81,6 @@ class VcfHeader(object):
     # underscore to avoid confilcts with field names. For more info, see below:
     # https://docs.python.org/2/library/collections.html#collections.namedtuple
     return {key: header[key]._asdict() for key in header}  # pylint: disable=W0212
-
-  def _merge_header_fields(self, source, to_merge):
-    """Modifies ``source`` to add any keys from ``to_merge`` not in ``source``.
-
-    Args:
-      source (dict): Source header fields.
-      to_merge (dict): Header fields to merge with ``source``.
-    Raises:
-      ValueError: If the header fields are incompatible (e.g. same key with
-        different types or numbers).
-    """
-    for key, to_merge_value in to_merge.iteritems():
-      if key not in source:
-        source[key] = to_merge_value
-        continue
-      source_value = source[key]
-      if source_value.keys() != to_merge_value.keys():
-        raise ValueError('Incompatible header fields: {}, {}'.format(
-            source_value, to_merge_value))
-      resolver = HeaderConflictResolver()
-      merged_value = OrderedDict()
-      for source_field_key, source_field_value in source_value.iteritems():
-        # We only care about mistmach in 'num' and 'type' fields.
-        if (to_merge_value[source_field_key] == source_field_value or
-            source_field_key not in ['num', 'type']):
-          merged_value.update({source_field_key: source_field_value})
-          continue
-        # There is a conflict in header fields. Try to resolve it.
-        try:
-          resolution_field_value = resolver.resolve(
-              source_field_value, to_merge_value[source_field_key])
-          merged_value.update({source_field_key: resolution_field_value})
-        except ValueError as e:
-          raise ValueError('Incompatible number or types in header fields:'
-                           '{}, {} \n. Error: {}'.format(
-                               source_field_value,
-                               to_merge_value[source_field_key],
-                               str(e)))
-
-      source[key] = merged_value
-
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
   """A source for reading VCF file headers.
