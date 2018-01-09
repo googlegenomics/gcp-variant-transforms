@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file has been copied from
-# https://github.com/apache/beam/blob/master/sdks/python/.pylintrc with the
-# following license:
+# This file was copied from
+# https://github.com/apache/beam/blob/ad6dcf4d1d22b7e6e349db9027ef639a5410b494/sdks/python/.pylintrc
+# on January 8, 2018 with the following license:
 #
 #    Licensed to the Apache Software Foundation (ASF) under one or more
 #    contributor license agreements.  See the NOTICE file distributed with
