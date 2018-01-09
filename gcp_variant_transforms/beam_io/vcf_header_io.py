@@ -37,54 +37,79 @@ class HeaderConflictResolver(object):
   """A class for resolving mistmatch between header fields (e.g. type, num).
   """
 
-  # List of all resolvable conflicts with their resolution.
-  # For example, entry [a, b, c] means mistmatch between a and b is resolved to
-  # c (where c is usually either a or b).
-  _RESOLVABLE_CONFLICTS = [
-      # Conflict between 'Integer' and 'Float' is resolved to 'Float'.
-      ['Integer', 'Float', 'Float'],
-  ]
+  def resolve(self, vcf_field_key, first_vcf_field_value,
+              second_vcf_field_value, split_alternate_allele_info_fields):
+    """Returns resolution if the conflict between the given field values is
+    resolvable.
 
-  def __init__(self):
-    """Initialize :class:`HeaderConflictResolver` by creating a dict of all
-    resolvable conflicts.
-    """
-    self._resolvable_conflicts_dict = {}
-    self._resolvable_conflicts_dict.update(
-        {rc[0] : {rc[1] : rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
-    self._resolvable_conflicts_dict.update(
-        {rc[1] : {rc[0] : rc[2]} for rc in self._RESOLVABLE_CONFLICTS})
-
-  def can_resolve(self, first, second):
-    """Returns true iff conflict between `first` and `second` is resolvable.
-
-    Order of args does not matter.
-
+    Raises:
+      ValueError: if there is nothing to resolve, or conflict cannot
+        be resolved.
     Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
+      vcf_field_key (string): field key in VCF header.
+      first_vcf_field_value (integer or string): first field value.
+      second_vcf_field_value (integer or string): second field value.
+      split_alternate_allele_info_fields (bool): if true, all INFO fields with
+        `Number=A` (i.e. one value for each alternate allele) will be stored
+        underthe `alternate_bases` record. If false, they will be stored with
+        the rest of the INFO fields as a repeated fields, hence compatible with
+        `Number=.` for example.
     """
-    return (first == second or
-            (first in self._resolvable_conflicts_dict and
-             second in self._resolvable_conflicts_dict[first]))
+    if vcf_field_key == 'type':
+      return self._resolve_type(first_vcf_field_value, second_vcf_field_value)
+    elif vcf_field_key == 'num':
+      return self._resolve_number(first_vcf_field_value, second_vcf_field_value,
+                                  split_alternate_allele_info_fields)
+    else:
+      # We only care about conflicts in 'num' and 'type' fields.
+      return first_vcf_field_value
 
-  def resolve(self, first, second):
-    """Returns the resolution if the conflict between `first` and `second`
-    is resolvable.
-
-    Order of args does not matter.
-
-    Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
-    """
-    if not self.can_resolve(first, second):
+  def _resolve_type(self, first, second):
+    if first == second:
+      raise ValueError('Types are the same. Nothing to resolve: {}, {}'
+                       .format(first, second))
+    elif (first in ('Integer', 'Float') and second in ('Integer', 'Float')):
+      return 'Float'
+    else:
       raise ValueError('Incompatible values cannot be resolved: '
                        '{}, {}'.format(first, second))
+
+  def _resolve_number(self, first, second,
+                      split_alternate_allele_info_fields):
     if first == second:
-      return first
+      raise ValueError('Numbers are the same. Nothing to resolve: {}, {}'
+                       .format(first, second))
+    elif (self._is_bigquery_field_repeated(
+        first, split_alternate_allele_info_fields) and
+          self._is_bigquery_field_repeated(
+              second, split_alternate_allele_info_fields)):
+      # Unknown number of values
+      return None
     else:
-      return self._resolvable_conflicts_dict[first][second]
+      raise ValueError('Incompatible numbers cannot be resolved: '
+                       '{}, {}'.format(first, second))
+
+  def _is_bigquery_field_repeated(self, vcf_num,
+                                  split_alternate_allele_info_fields):
+    """Returns true if the corresponding field in bigquery schema is repeated.
+
+    Args:
+      vcf_num (integer): value of field `Number` in VCF header.
+      split_alternate_allele_info_fields (bool): if true, all INFO fields with
+        `Number=A` (i.e. one value for each alternate allele) will be stored
+        underthe `alternate_bases` record. If false, they will be stored with
+        the rest of the INFO fields as a repeated fields, hence compatible with
+        `Number=.` for example.
+    """
+    if vcf_num in (0, 1):
+      return False
+    elif vcf_num == -1 and split_alternate_allele_info_fields:
+      # info field with `Number=A` (represented by -1) becomes a repeated field
+      # only if flag `split_alternate_allele_info_fields` is off.
+      # See `variant_transform_options.py` for more details.
+      return False
+    else:
+      return True
 
 class VcfHeader(object):
   """Container for header data."""
@@ -115,7 +140,7 @@ class VcfHeader(object):
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
 
-  def update(self, to_merge):
+  def update(self, to_merge, split_alternate_allele_info_fields=True):
     """Updates ``self``'s headers with values from ``to_merge``.
 
     If a specific key does not already exists in a specific one of ``self``'s
@@ -126,15 +151,25 @@ class VcfHeader(object):
     Args:
       to_merge (:class:`VcfHeader`): The VcfHeader object that's headers will be
         merged into the headers of self.
+      split_alternate_allele_info_fields (bool): if true, all INFO fields with
+        `Number=A` (i.e. one value for each alternate allele) will be stored
+        under the `alternate_bases` record. If false, they will be stored with
+        the rest of the INFO fields as a repeated fields, hence compatible with
+        `Number=.` for example.
     """
     if not isinstance(to_merge, VcfHeader):
       raise NotImplementedError
 
-    self._merge_header_fields(self.infos, to_merge.infos)
-    self._merge_header_fields(self.filters, to_merge.filters)
-    self._merge_header_fields(self.alts, to_merge.alts)
-    self._merge_header_fields(self.formats, to_merge.formats)
-    self._merge_header_fields(self.contigs, to_merge.contigs)
+    self._merge_header_fields(self.infos, to_merge.infos,
+                              split_alternate_allele_info_fields)
+    self._merge_header_fields(self.filters, to_merge.filters,
+                              split_alternate_allele_info_fields)
+    self._merge_header_fields(self.alts, to_merge.alts,
+                              split_alternate_allele_info_fields)
+    self._merge_header_fields(self.formats, to_merge.formats,
+                              split_alternate_allele_info_fields)
+    self._merge_header_fields(self.contigs, to_merge.contigs,
+                              split_alternate_allele_info_fields)
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -158,12 +193,18 @@ class VcfHeader(object):
     # https://docs.python.org/2/library/collections.html#collections.namedtuple
     return {key: header[key]._asdict() for key in header}  # pylint: disable=W0212
 
-  def _merge_header_fields(self, source, to_merge):
+  def _merge_header_fields(self, source, to_merge,
+                           split_alternate_allele_info_fields):
     """Modifies ``source`` to add any keys from ``to_merge`` not in ``source``.
 
     Args:
       source (dict): Source header fields.
       to_merge (dict): Header fields to merge with ``source``.
+      split_alternate_allele_info_fields (bool): if true, all INFO fields with
+        `Number=A` (i.e. one value for each alternate allele) will be stored
+        underthe `alternate_bases` record. If false, they will be stored with
+        the rest of the INFO fields as a repeated fields, hence compatible with
+        `Number=.` for example.
     Raises:
       ValueError: If the header fields are incompatible (e.g. same key with
         different types or numbers).
@@ -179,15 +220,16 @@ class VcfHeader(object):
       resolver = HeaderConflictResolver()
       merged_value = OrderedDict()
       for source_field_key, source_field_value in source_value.iteritems():
-        # We only care about mistmach in 'num' and 'type' fields.
-        if (to_merge_value[source_field_key] == source_field_value or
-            source_field_key not in ['num', 'type']):
+        if to_merge_value[source_field_key] == source_field_value:
           merged_value.update({source_field_key : source_field_value})
           continue
         # There is a conflict in header fields. Try to resolve it.
         try:
           resolution_field_value = resolver.resolve(
-              source_field_value, to_merge_value[source_field_key])
+              source_field_key,
+              source_field_value,
+              to_merge_value[source_field_key],
+              split_alternate_allele_info_fields)
           merged_value.update({source_field_key : resolution_field_value})
         except ValueError as e:
           raise ValueError('Incompatible number or types in header fields:'
