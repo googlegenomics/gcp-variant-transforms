@@ -741,7 +741,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
-
     def _convert_to_variant_record(self, record, infos, formats):
       """Converts the PyVCF record to a :class:`Variant` object.
 
