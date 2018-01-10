@@ -953,7 +953,7 @@ class ReadAllFromVcf(PTransform):
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,
-        0,  #min_bundle_size
+        0,  # min_bundle_size
         source_from_file)
 
   def expand(self, pvalue):
