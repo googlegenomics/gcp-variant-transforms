@@ -137,7 +137,7 @@ class TestContextManager(object):
     self.dataset_id = 'integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
     dataset_ref = client.dataset(self.dataset_id)
-    self.dataset = bigquery.Dataset(dataset_ref)
+    self.dataset = bigquery.Dataset(dataset_ref, client)
     _ = client.create_dataset(self.dataset)
     return self
 
