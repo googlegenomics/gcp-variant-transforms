@@ -20,7 +20,7 @@ __all__ = ['VariantMergeStrategy']
 class VariantMergeStrategy(object):
   """Interface for a variant merge strategy."""
 
-  def get_merged_variants(self, variants):
+  def get_merged_variants(self, variants, key):
     """Returns a list of merged variant(s) from the provided `variants`.
 
     Args:
@@ -33,7 +33,7 @@ class VariantMergeStrategy(object):
     """
     raise NotImplementedError
 
-  def get_merge_keys(self, variant, key=None):
+  def get_merge_keys(self, variant):
     """Returns a generator of keys (str) used for merging variants."""
     raise NotImplementedError
 
