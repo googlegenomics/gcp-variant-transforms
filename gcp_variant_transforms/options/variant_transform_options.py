@@ -190,9 +190,9 @@ class MergeOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args):
     if (parsed_args.variant_merge_strategy !=
-          MergeOptions.MOVE_TO_CALLS and
+        MergeOptions.MOVE_TO_CALLS and
         parsed_args.variant_merge_strategy !=
-            MergeOptions.MERGE_WITH_NON_VARIANTS):
+        MergeOptions.MERGE_WITH_NON_VARIANTS):
       if parsed_args.info_keys_to_move_to_calls_regex:
         raise ValueError(
             '--info_keys_to_move_to_calls_regex requires '
