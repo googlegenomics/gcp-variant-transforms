@@ -61,8 +61,8 @@ class HeaderConflictResolver(object):
     Order of args does not matter.
 
     Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
+      first (string): first given value.
+      second (string): second given value.
     """
     return (first == second or
             (first in self._resolvable_conflicts_dict and
@@ -75,8 +75,8 @@ class HeaderConflictResolver(object):
     Order of args does not matter.
 
     Args:
-      first_value (string): first given value.
-      second_value (string): second given value.
+      first (string): first given value.
+      second (string): second given value.
     """
     if not self.can_resolve(first, second):
       raise ValueError('Incompatible values cannot be resolved: '
