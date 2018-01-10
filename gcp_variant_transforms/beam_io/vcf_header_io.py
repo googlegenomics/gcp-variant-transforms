@@ -346,7 +346,7 @@ class _WriteVcfHeaderFn(beam.DoFn):
     self._file_path = file_path
     self._file_to_write = None
 
-  def process(self, header):
+  def process(self, header, *args, **kwargs):
     with FileSystems.create(self._file_path) as self._file_to_write:
       self._write_headers_by_type(_HeaderTypeConstants.INFO, header.infos)
       self._write_headers_by_type(_HeaderTypeConstants.FILTER, header.filters)

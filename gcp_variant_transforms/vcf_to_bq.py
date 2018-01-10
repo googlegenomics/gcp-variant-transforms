@@ -170,6 +170,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
          | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
              known_args.representative_header_file))
 
+
 def _add_parser_arguments(options, parser):
   for transform_options in options:
     transform_options.add_arguments(parser)
