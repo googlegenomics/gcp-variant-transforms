@@ -86,6 +86,7 @@ class HeaderConflictResolver(object):
     else:
       return self._resolvable_conflicts_dict[first][second]
 
+
 class VcfHeader(object):
   """Container for header data."""
 

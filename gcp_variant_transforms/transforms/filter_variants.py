@@ -60,4 +60,7 @@ class FilterVariants(beam.PTransform):
       yield variant
 
   def expand(self, pcoll):
+    # TODO(bashir): It seems there is a type check violation here as the
+    # argument to ParDo should be a DoFn and there is a specific check
+    # for that in ParDo.__init__, not sure how this code works!
     return pcoll | 'ApplyFilters' >> beam.ParDo(self._apply_filters)
