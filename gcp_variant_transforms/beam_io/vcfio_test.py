@@ -165,6 +165,9 @@ class VcfSourceTest(unittest.TestCase):
       suffix = '.vcf.gz'
     elif compression_type == CompressionTypes.BZIP2:
       suffix = '.vcf.bz2'
+    else:
+      raise ValueError('Unrecognized compression type {}'.format(
+          compression_type))
     return tempdir.create_temp_file(
         suffix=suffix, lines=lines, compression_type=compression_type)
 
