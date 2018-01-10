@@ -19,9 +19,13 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 
 __all__ = ['MergeHeaders']
 
-
 class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""
+
+  def __init__(self, split_alternate_allele_info_fields=True):
+    super(_MergeHeadersFn, self).__init__()
+    self._split_alternate_allele_info_fields = (
+        split_alternate_allele_info_fields)
 
   def create_accumulator(self):
     return vcf_header_io.VcfHeader()
@@ -32,7 +36,7 @@ class _MergeHeadersFn(beam.CombineFn):
   def merge_accumulators(self, accumulators):
     merged_headers = self.create_accumulator()
     for to_merge in accumulators:
-      merged_headers.update(to_merge)
+      merged_headers.update(to_merge, self._split_alternate_allele_info_fields)
     return merged_headers
 
   def extract_output(self, merged_headers):
@@ -42,5 +46,11 @@ class _MergeHeadersFn(beam.CombineFn):
 class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
+  def __init__(self, split_alternate_allele_info_fields=True):
+    super(MergeHeaders, self).__init__()
+    self._split_alternate_allele_info_fields = (
+        split_alternate_allele_info_fields)
+
   def expand(self, pcoll):
-    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn())
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
+        self._split_alternate_allele_info_fields))

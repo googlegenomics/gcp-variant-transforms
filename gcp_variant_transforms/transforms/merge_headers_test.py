@@ -101,7 +101,7 @@ class MergeHeadersTest(unittest.TestCase):
     self.assertItemsEqual(merged_headers.infos.keys(), ['NS', 'AF', 'NS2'])
     self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ', 'GQ2'])
 
-  def test_combine_two_conflicting_but_resolvable_headers(self):
+  def test_combine_two_type_conflicting_but_resolvable_headers(self):
     # These two headers have type conflict (Integer vs Float), however pipeline
     # doesn't raise error because the type conflict is resolvable.
     lines_1 = [
@@ -134,6 +134,138 @@ class MergeHeadersTest(unittest.TestCase):
                                        ('source', None),
                                        ('version', None)]))
 
+  def test_combine_two_num_conflicting_but_resolvable_headers_1(self):
+    # These two headers have conflict in Number field (2 vs dot), however
+    # pipeline doesn't raise error because the conflict is resolvable.
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=2,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+
+    combiner_fn = merge_headers._MergeHeadersFn()
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', '.'),
+                                       ('type', 'Integer'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+
+  def test_combine_two_num_conflicting_but_resolvable_headers_2(self):
+    # These two headers have conflict in Number field (2 vs 3), however
+    # pipeline doesn't raise error because the conflict is resolvable.
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=2,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=3,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+
+    combiner_fn = merge_headers._MergeHeadersFn()
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', '.'),
+                                       ('type', 'Integer'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+
+  def test_combine_two_num_conflicting_but_resolvable_headers_3(self):
+   # Test with split_alternate_allele_info_fields=False
+    #
+    # These two headers have incompable Number field (A vs dot).
+    # `Number=A` is compatible with dot when flag
+    # split_alternate_allele_info_fields is off.
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=A,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+
+    combiner_fn = merge_headers._MergeHeadersFn(
+        split_alternate_allele_info_fields=False)
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', '.'),
+                                       ('type', 'Integer'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+
+  def test_combine_two_num_conflicting_but_not_resolvable_headers(self):
+    # Test with split_alternate_allele_info_fields=True
+    #
+    # These two headers have incompable Number field (A vs dot).
+    # `Number=A` is incompatible with dot when flag
+    # split_alternate_allele_info_fields is set.
+
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=A,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+
+    combiner_fn = merge_headers._MergeHeadersFn(
+        split_alternate_allele_info_fields=True)
+
+    with self.assertRaises(ValueError):
+      merged_headers = combiner_fn.create_accumulator()
+      merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+      merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+      merged_headers = combiner_fn.extract_output(merged_headers)
 
   def test_combine_two_headers_with_bad_conflict(self):
     # Type mistmach (String vs Float) cannot be resolved..

@@ -43,6 +43,7 @@ import apache_beam as beam
 from apache_beam.io.filesystems import FileSystems
 from apache_beam.options.pipeline_options import GoogleCloudOptions
 from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import StandardOptions
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
@@ -137,27 +138,30 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
   if known_args.representative_header_file:
     return
 
-  pipeline_options = GoogleCloudOptions(pipeline_args)
+  options = PipelineOptions(pipeline_args)
+
   # Always run pipeline locally if data is small.
   if pipeline_mode == PipelineModes.SMALL:
-    pipeline_options.runner = 'DirectRunner'
+    options.view_as(StandardOptions).runner = 'DirectRunner'
 
-  if pipeline_options.job_name:
-    pipeline_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
+
+  google_cloud_options = options.view_as(GoogleCloudOptions)
+  if google_cloud_options.job_name:
+    google_cloud_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
   else:
-    pipeline_options.job_name = _MERGE_HEADERS_JOB_NAME
+    google_cloud_options.job_name = _MERGE_HEADERS_JOB_NAME
 
-  temp_directory = pipeline_options.temp_location or tempfile.mkdtemp()
+  temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
   # Add a time prefix to ensure files are unique in case multiple
   # pipelines are run at the same time.
   temp_merged_headers_file_name = '-'.join([
       datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
-      pipeline_options.job_name,
+      google_cloud_options.job_name,
       _MERGE_HEADERS_FILE_NAME])
   known_args.representative_header_file = FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
 
-  with beam.Pipeline(options=pipeline_options) as p:
+  with beam.Pipeline(options=options) as p:
     headers = p
     if pipeline_mode == PipelineModes.LARGE:
       headers |= (beam.Create([known_args.input_pattern])
@@ -166,7 +170,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       headers |= vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
 
     _ = (headers
-         | 'MergeHeaders' >> merge_headers.MergeHeaders()
+         | 'MergeHeaders' >> merge_headers.MergeHeaders(
+             known_args.split_alternate_allele_info_fields)
          | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
              known_args.representative_header_file))
 
