@@ -117,7 +117,6 @@ class TestCase(object):
             'No traceback. See logs for more information on error.')
 
 
-
 class TestContextManager(object):
   """Manages all resources for a given run of tests.
 
