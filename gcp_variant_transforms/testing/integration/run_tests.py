@@ -136,7 +136,7 @@ class TestContextManager(object):
     self.dataset_id = 'integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
     dataset_ref = client.dataset(self.dataset_id)
-    # TODO(bashir): There is a mismatch between the bigquery API versions
+    # TODO(bashir2): There is a mismatch between the bigquery API versions
     # which we need to fix. With current setup, we get version 0.25.0 for
     # google-cloud-bigquery which does not have the following constructor
     # for Dataset but in newer versions, e.g., 0.29.0 it does.
