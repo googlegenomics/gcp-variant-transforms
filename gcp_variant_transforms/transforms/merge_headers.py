@@ -35,7 +35,7 @@ class _MergeHeadersFn(beam.CombineFn):
       merged_headers.update(to_merge)
     return merged_headers
 
-  def extract_output(self, merged_headers, *args, **kwargs):
+  def extract_output(self, merged_headers):
     return merged_headers
 
 
