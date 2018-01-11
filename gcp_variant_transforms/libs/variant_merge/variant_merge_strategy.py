@@ -26,6 +26,7 @@ class VariantMergeStrategy(object):
     Args:
       variants (list of ``Variant`` objects): A list of variants grouped by
         the key as specified in ``get_merge_key``.
+      key (str): This is the key representing variants to be merged.
     Returns:
       A list of merged variants. Typically this is one variant, but the
       interface allows for potentially multiple variants to be returned (e.g.
