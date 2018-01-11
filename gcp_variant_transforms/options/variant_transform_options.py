@@ -78,6 +78,7 @@ class VcfReadOptions(VariantTransformsOptions):
               'Note that each VCF file must still contain valid header files '
               'even if this is provided.'))
 
+
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
