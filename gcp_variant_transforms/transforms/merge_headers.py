@@ -26,10 +26,10 @@ class _MergeHeadersFn(beam.CombineFn):
   def create_accumulator(self):
     return vcf_header_io.VcfHeader()
 
-  def add_input(self, source, to_merge):
+  def add_input(self, source, to_merge, *args, **kwargs):
     return self.merge_accumulators([source, to_merge])
 
-  def merge_accumulators(self, accumulators):
+  def merge_accumulators(self, accumulators, *args, **kwargs):
     merged_headers = self.create_accumulator()
     for to_merge in accumulators:
       merged_headers.update(to_merge)
