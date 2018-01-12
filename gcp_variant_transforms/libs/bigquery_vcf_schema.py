@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import copy
 import json
+import math
 import re
 import sys
 
@@ -364,6 +365,8 @@ def _get_bigquery_sanitized_field(
     return field
   if isinstance(field, basestring):
     return _get_bigquery_sanitized_string(field)
+  elif isinstance(field, float):
+    return _get_bigquery_sanitized_float(field)
   elif isinstance(field, list):
     return _get_bigquery_sanitized_list(field, null_numeric_value_replacement)
   else:
@@ -414,8 +417,28 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
       i = null_replacement_value
     elif isinstance(i, basestring):
       i = _get_bigquery_sanitized_string(i)
+    elif isinstance(i, float):
+      sanitized_float = _get_bigquery_sanitized_float(i)
+      i = (sanitized_float if sanitized_float is not None
+           else null_replacement_value)
     sanitized_list.append(i)
   return sanitized_list
+
+
+def _get_bigquery_sanitized_float(input_float):
+  """Returns a sanitized float for BigQuery.
+
+  This method replaces INF with sys.maxint, -INF with -sys.maxint, and NaN
+  with None. It returns the same value for all other values.
+  """
+  if input_float == float('inf'):
+    return sys.maxint
+  elif input_float == float('-inf'):
+    return -sys.maxint
+  elif math.isnan(input_float):
+    return None
+  else:
+    return input_float
 
 
 def _get_bigquery_sanitized_string(input_str):
@@ -443,6 +466,7 @@ def _get_bigquery_mode_from_vcf_num(vcf_num):
 
 def _is_alternate_allele_count(info_field):
   return info_field.field_count == _FIELD_COUNT_ALTERNATE_ALLELE
+
 
 def _get_json_object_size(obj):
   return len(json.dumps(obj))
