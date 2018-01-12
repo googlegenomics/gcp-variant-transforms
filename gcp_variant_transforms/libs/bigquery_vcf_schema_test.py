@@ -344,6 +344,26 @@ class GetRowsFromVariantTest(unittest.TestCase):
         'AS2': [sample_unicode_str, sample_unicode_str]}
     self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
+  def test_nonstandard_float_values(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[],
+        info={'F1': vcfio.VariantInfo(float('inf'), '1'),
+              'F2': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
+              'F3': vcfio.VariantInfo(float('nan'), '1'),})
+    null_replacement_value = -sys.maxint
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        'F1': sys.maxint,
+        'F2': [-sys.maxint, null_replacement_value, 1.2],
+        'F3': None}
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+
   def test_nonstandard_fields_names(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
