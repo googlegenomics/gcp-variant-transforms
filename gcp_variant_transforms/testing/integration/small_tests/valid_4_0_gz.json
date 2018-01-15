@@ -2,5 +2,8 @@
   "test_name": "valid-4-0-gz",
   "table_name": "valid_4_0_gz",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf.gz",
-  "runner": "DataflowRunner"
+  "runner": "DataflowRunner",
+  "num_rows": 5,
+  "sum_start": 3607195,
+  "sum_end": 3607203
 }

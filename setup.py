@@ -25,6 +25,8 @@ REQUIRED_PACKAGES = [
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
     'google-api-python-client>=1.6',
+    # Need to explicitly install v>0.25 as the BigQuery python API has changed.
+    'google-cloud-bigquery>0.25',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
     ]
