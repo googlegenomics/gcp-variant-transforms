@@ -27,11 +27,16 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
-    ]
+]
+
+INTEGRATION_TEST_REQUIREMENTS = [
+    # Need to explicitly install v>0.25 as the BigQuery python API has changed.
+    'google-cloud-bigquery>0.25',
+]
 
 REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
-    ]
+]
 
 setuptools.setup(
     name='gcp_variant_transforms',
@@ -56,6 +61,9 @@ setuptools.setup(
 
     setup_requires=REQUIRED_SETUP_PACKAGES,
     install_requires=REQUIRED_PACKAGES,
+    extras_require={
+        'int_test': INTEGRATION_TEST_REQUIREMENTS,
+    },
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
     package_data={
