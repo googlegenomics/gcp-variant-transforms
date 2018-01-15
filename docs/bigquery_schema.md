@@ -14,4 +14,27 @@ compared to the linked page:
   prefer to use the old schema where `Number=A` fields appear independent of
   alternate bases, then set `--split_alternate_allele_info_fields False` when
   running the pipeline.
+* `call_set_name` has been renamed to `name`.
+* `call_set_id` and `variant_set_id` columns have been removed. These fields
+  are no longer applicable in this pipeline.
+* Explicit transform of `call.GL` to `call.genotype_likelihood` has been
+  removed, so any `GL` field will be loaded to BigQuery 'as is'.
+
+In addition, the schema from Variant Transforms has the following properties:
+* If a record has a large number of calls such that the resulting BigQuery
+  row is more than 10MB, then that record will be automatically split into
+  multiple rows such that each row is less than 10MB. This is needed to
+  accommodate BigQuery's
+  [10MB per row limit](https://cloud.google.com/bigquery/quotas#import).
+* _Only for float/integer repeated fields containing a null value:_ BigQuery
+  does not allow null values in repeated fields (the entire record can be null,
+  but values within the record must each have a value). For instance, if a
+  VCF INFO field is `1,.,2`, we cannot load `1,null,2` to BigQuery and need to
+  use a numeric replacement for the null value. The replacement value is
+  currently set to `-sys.maxint` (equal to `-9223372036854775807` on
+  64-bit machines).
+  [Issue #68](https://github.com/googlegenomics/gcp-variant-transforms/issues/68)
+  tracks the feature to make this value configurable. The alternative is to
+  convert such values to a string and use `.` to represent the null value.
+  To do this, please change the header to specify the type as `String`.
 
