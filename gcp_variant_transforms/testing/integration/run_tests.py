@@ -12,19 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration testing runner."""
+r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
+
+You may run this test in any project (the test files are publicly accessible).
+Execute the following command from the root source directory:
+python gcp_variant_transforms/testing/integration/run_tests.py \
+  --project myproject \
+  --staging_location gs://mybucket/staging \
+  --temp_location gs://mybucket/temp \
+  --logging_location gs://mybucket/temp/integration_test_logs
+
+By default, it runs all integration tests inside
+`gcp_variant_transforms/testing/integration/`.
+"""
 
 import argparse
 import json
 import multiprocessing
 import os
+import time
 
 from datetime import datetime
+# TODO(bashir2): Figure out why pylint can't find this.
+# pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
-import time
+
 
 IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 PIPELINE_NAME = 'gcp-variant-transforms-integration-test'
@@ -88,6 +103,8 @@ class TestCase(object):
   def run(self, context):
     service = discovery.build(
         'genomics', 'v1alpha2', credentials=context.credentials)
+    # TODO(bashir2): Figure out why pylint can't find this.
+    # pylint: disable=no-member
     request = service.pipelines().run(body=self._pipelines_api_request)
 
     operation_name = request.execute()['name']
@@ -129,18 +146,14 @@ class TestContextManager(object):
     self.temp_location = args.temp_location
     self.logging_location = args.logging_location
     self.project = args.project
-
-  def __enter__(self):
     self.credentials = GoogleCredentials.get_application_default()
-    client = bigquery.Client(project=self.project)
     self.dataset_id = 'integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
+    self.dataset = None
+
+  def __enter__(self):
+    client = bigquery.Client(project=self.project)
     dataset_ref = client.dataset(self.dataset_id)
-    # TODO(bashir2): There is a mismatch between the bigquery API versions
-    # which we need to fix. With current setup, we get version 0.25.0 for
-    # google-cloud-bigquery which does not have the following constructor
-    # for Dataset but in newer versions, e.g., 0.29.0 it does.
-    # We need to fix the versioning issue.
     self.dataset = bigquery.Dataset(dataset_ref)
     _ = client.create_dataset(self.dataset)
     return self
@@ -151,6 +164,7 @@ class TestContextManager(object):
     # Delete tables, otherwise dataset deletion will fail because it is still
     # "in use".
     for table in tables:
+      # TODO(bashir2): Figure out why this fails.
       client.delete_table(table)
     client.delete_dataset(self.dataset)
 
@@ -236,7 +250,7 @@ def main():
     pool = multiprocessing.Pool(processes=len(test_case_configs))
     results = []
     for config in test_case_configs:
-      test = TestCase(context, **test_case_config)
+      test = TestCase(context, **config)
       results.append(
           (pool.apply_async(func=_run_test, args=(test, context)), test))
 

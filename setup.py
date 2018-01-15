@@ -21,6 +21,10 @@ REQUIRED_PACKAGES = [
     # This is needed due to https://issues.apache.org/jira/browse/BEAM-3357.
     'grpcio>=1.3.5,<=1.7.3',
     'apache-beam[gcp]>=2.2',
+    # Note that adding 'google-api-python-client>=1.6' causes some dependency
+    # mismatch issues. This is fatal if using 'setup.py install', but works on
+    # 'pip install .' as it ignores conflicting versions. See Issue #71.
+    'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
     ]
