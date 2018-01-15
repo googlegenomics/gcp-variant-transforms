@@ -23,6 +23,16 @@ REQUIRED_PACKAGES = [
     'apache-beam[gcp]>=2.2',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
+    'google-api-python-client>=1.6',
+    # TODO(bashir2): It seems that setuptools cannot find the intersection of
+    # dependency requirements. For example the following dependencies are
+    # listed only because installing google-api-python-client brings versions
+    # of these packages that are newer than versions required in apache-beam
+    # or its dependencies. I think there should be a better of doing this that
+    # I am not aware of!
+    'six<1.11',
+    'oauth2client<4.0.0',
+    'httplib2<0.10',
     ]
 
 REQUIRED_SETUP_PACKAGES = [
