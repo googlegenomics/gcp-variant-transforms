@@ -21,11 +21,14 @@ RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transf
 ADD / /opt/gcp_variant_transforms/src/
 
 # Install dependencies.
+# TODO(arostamianfar): Remove explicit installation of Beam once Issue #65
+# is resolved.
 RUN pip install --upgrade pip && pip install --upgrade virtualenv && \
     virtualenv /opt/gcp_variant_transforms/venv && \
     . /opt/gcp_variant_transforms/venv/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    pip install --upgrade .
+    pip install --upgrade . && \
+    pip install --upgrade apache_beam[gcp]
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
