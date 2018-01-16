@@ -45,8 +45,11 @@ virtualenv venv
 
 #### Install dependences
 ```bash
-python setup.py install
+pip install --upgrade .
 ```
+Note that after running the above command we get some dependency conflicts in
+installed packages which is currently safe to ignore. For details see
+[Issue #71](https://github.com/googlegenomics/gcp-variant-transforms/issues/71).
 
 ## Making Changes
 ### Create a branch in your forked repository
