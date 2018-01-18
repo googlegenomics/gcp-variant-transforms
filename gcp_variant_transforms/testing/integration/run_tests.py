@@ -24,6 +24,12 @@ python gcp_variant_transforms/testing/integration/run_tests.py \
 
 By default, it runs all integration tests inside
 `gcp_variant_transforms/testing/integration/`.
+
+To keep the tables that this test creates, use the --keep_tables option.
+
+To validate old tables and skip most of the test (including table creation and
+populating) and only run the validation step, use --revalidate_dataset, e.g.,
+--revalidate_dataset integration_tests_20180117_151528
 """
 
 import argparse
@@ -66,11 +72,19 @@ class TestCase(object):
                test_name,
                table_name,
                input_pattern,
+               num_rows,
+               sum_start,
+               sum_end,
                **kwargs):
 
     self._name = test_name
     dataset_id = context.dataset_id
-    output_table = '{}:{}.{}'.format(context.project, dataset_id, table_name)
+    self._project = context.project
+    self._table_name = '{}.{}'.format(dataset_id, table_name)
+    output_table = '{}:{}'.format(context.project, self._table_name)
+    self._num_rows = num_rows
+    self._sum_start = sum_start
+    self._sum_end = sum_end
     args = ['--input_pattern {}'.format(input_pattern),
             '--output_table {}'.format(output_table),
             '--project {}'.format(context.project),
@@ -101,19 +115,36 @@ class TestCase(object):
     return self._name
 
   def run(self, context):
+    if context.revalidate_dataset:
+      self._validate_table()
+      return ''
+
     service = discovery.build(
         'genomics', 'v1alpha2', credentials=context.credentials)
-    # TODO(bashir2): Figure out why pylint can't find this.
+    # The following pylint hint is needed because `pipelines` is a method that
+    # is dynamically added to the returned `service` object above. See
+    # `googleapiclient.discovery.Resource._set_service_methods`.
     # pylint: disable=no-member
     request = service.pipelines().run(body=self._pipelines_api_request)
 
     operation_name = request.execute()['name']
     response = self._wait_for_operation_done(service, operation_name)
-
     self._handle_failure(response)
     return response
 
   def _wait_for_operation_done(self, service, operation_name):
+    """Waits until the given operation is done.
+
+    :type service: :class:`googleapiclient.discovery.Resource`
+    :param service: A resource object for accessing genomics APIs; this is used
+        for checking the status of the operation.
+
+    :type operation_name: str
+    :param operation_name: The identifier for the operation to wait for.
+
+    :type str
+    :return: The full response string after the operation is done.
+    """
     time.sleep(60)
     operations = service.operations()
     request = operations.get(name=operation_name)
@@ -133,6 +164,29 @@ class TestCase(object):
         raise TestCaseFailure(
             'No traceback. See logs for more information on error.')
 
+  def _validate_table(self):
+    """Runs a simple query against the output table and verifies aggregates."""
+    client = bigquery.Client(project=self._project)
+    query = (
+        'SELECT COUNT(0) AS num_rows, '
+        'SUM(start_position) AS sum_start, '
+        'SUM(end_position) AS sum_end '
+        'FROM {}'
+    ).format(self._table_name)
+    query_job = client.query(query)
+    assert query_job.state == 'RUNNING'
+    iterator = query_job.result(timeout=60)
+    rows = list(iterator)
+    if len(rows) != 1:
+      raise TestCaseFailure('Expected one row in query result, got {}').format(
+          len(rows))
+    row = rows[0]
+    for column in ['num_rows', 'sum_start', 'sum_end']:
+      self_column_value = self.__dict__['_{}'.format(column)]
+      if row[column] != self_column_value:
+        raise TestCaseFailure('Expected {} to be {}, got {}'.format(
+            column, row[column], self_column_value))
+
 
 class TestContextManager(object):
   """Manages all resources for a given run of tests.
@@ -147,26 +201,37 @@ class TestContextManager(object):
     self.logging_location = args.logging_location
     self.project = args.project
     self.credentials = GoogleCredentials.get_application_default()
-    self.dataset_id = 'integration_tests_{}'.format(
-        datetime.now().strftime('%Y%m%d_%H%M%S'))
-    self.dataset = None
+    self._keep_tables = args.keep_tables
+    self.revalidate_dataset = args.revalidate_dataset
+    if self.revalidate_dataset:
+      self.dataset_id = self.revalidate_dataset
+    else:
+      self.dataset_id = 'integration_tests_{}'.format(
+          datetime.now().strftime('%Y%m%d_%H%M%S'))
 
   def __enter__(self):
-    client = bigquery.Client(project=self.project)
-    dataset_ref = client.dataset(self.dataset_id)
-    self.dataset = bigquery.Dataset(dataset_ref)
-    _ = client.create_dataset(self.dataset)
+    if not self.revalidate_dataset:
+      client = bigquery.Client(project=self.project)
+      dataset_ref = client.dataset(self.dataset_id)
+      dataset = bigquery.Dataset(dataset_ref)
+      _ = client.create_dataset(dataset)
     return self
 
   def __exit__(self, *args):
-    client = bigquery.Client(project=self.project)
-    tables = client.list_dataset_tables(self.dataset)
-    # Delete tables, otherwise dataset deletion will fail because it is still
-    # "in use".
-    for table in tables:
-      # TODO(bashir2): Figure out why this fails.
-      client.delete_table(table)
-    client.delete_dataset(self.dataset)
+    if not self._keep_tables:
+      client = bigquery.Client(project=self.project)
+      dataset_ref = client.dataset(self.dataset_id)
+      dataset = bigquery.Dataset(dataset_ref)
+      tables = client.list_tables(dataset)
+      # Delete tables, otherwise dataset deletion will fail because it is still
+      # "in use".
+      for table in tables:
+        # The returned tables are of type TableListItem which has similar
+        # properties like Table with the exception of a few missing ones.
+        # This seems to be the easiest (but not cleanest) way of creating a
+        # Table instance from a TableListItem.
+        client.delete_table(bigquery.Table(table))
+      client.delete_dataset(dataset)
 
 
 def _get_args():
@@ -175,6 +240,14 @@ def _get_args():
   parser.add_argument('--staging_location', required=True)
   parser.add_argument('--temp_location', required=True)
   parser.add_argument('--logging_location', required=True)
+  parser.add_argument('--keep_tables',
+                      help='If set, created tables are not deleted.',
+                      action='store_true')
+  parser.add_argument('--revalidate_dataset',
+                      help='If set, instead of running the full test, skips '
+                      'most of it and only validates the tables in the given '
+                      'dataset. This is useful when --keep_tables is used '
+                      'in a previous run.')
   return parser.parse_args()
 
 
@@ -187,6 +260,9 @@ def _get_test_configs():
     for filename in files:
       if filename.endswith('.json'):
         test_configs.append(_load_test_config(os.path.join(root, filename)))
+  if len(test_configs) == 0:
+    raise TestCaseFailure('Found no .json files in directory {}'.format(
+        test_file_path))
   return test_configs
 
 
@@ -199,7 +275,8 @@ def _load_test_config(filename):
 
 
 def _validate_test(test, filename):
-  required_keys = ['test_name', 'table_name', 'input_pattern']
+  required_keys = ['test_name', 'table_name', 'input_pattern', 'num_rows',
+                   'sum_start', 'sum_end']
   for key in required_keys:
     if key not in test:
       raise ValueError('Test case in {} is missing required key: {}'.format(
@@ -221,6 +298,8 @@ def _print_errors(results):
     except TestCaseFailure as e:
       print 'FAIL'
       errors.append((test.get_name(), _get_traceback(str(e))))
+    except Exception as e:
+      print 'Unexpected exception {}'.format(e)
   for test_name, error in errors:
     print _get_failure_message(test_name, error)
 
