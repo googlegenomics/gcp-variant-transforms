@@ -47,7 +47,7 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
 
-IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
+DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 PIPELINE_NAME = 'gcp-variant-transforms-integration-test'
 SCOPES = ['https://www.googleapis.com/auth/bigquery']
 DEFAULT_ZONES = ['us-west1-b']
@@ -103,7 +103,7 @@ class TestCase(object):
             'name': PIPELINE_NAME,
             'resources': {'zones': DEFAULT_ZONES},
             'docker': {
-                'imageName': IMAGE_NAME,
+                'imageName': context.image,
                 'cmd': ' '.join([SCRIPT_PATH] + args)
             },
         }
@@ -184,6 +184,7 @@ class TestContextManager(object):
     self.logging_location = args.logging_location
     self.project = args.project
     self.credentials = GoogleCredentials.get_application_default()
+    self.image = args.image
     self._keep_tables = args.keep_tables
     self.revalidation_dataset_id = args.revalidation_dataset_id
     if self.revalidation_dataset_id:
@@ -223,6 +224,15 @@ def _get_args():
   parser.add_argument('--staging_location', required=True)
   parser.add_argument('--temp_location', required=True)
   parser.add_argument('--logging_location', required=True)
+  parser.add_argument(
+      '--image',
+      help=('The name of the container image to run the test against it, for '
+            'example: gcr.io/test-gcp-variant-transforms/'
+            'test_gcp-variant-transforms_2018-01-20-13-47-12. '
+            'By default the production image {} is used.'
+           ).format(DEFAULT_IMAGE_NAME),
+      default=DEFAULT_IMAGE_NAME,
+      required=False)
   parser.add_argument('--keep_tables',
                       help='If set, created tables are not deleted.',
                       action='store_true')
