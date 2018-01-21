@@ -15,13 +15,15 @@
 # Builds docker image for gcp-variant-transforms:
 # Run using:
 # $ gcloud container builds submit --config cloudbuild.yaml --timeout 1h .
+substitutions:
+  _CUSTOM_TAG_NAME: 'latest'
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--tag=gcr.io/$PROJECT_ID/gcp-variant-transforms'
+      - '--tag=gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
       - '--file=docker/Dockerfile'
       - '.'
     dir: '.'
 images:
-  - 'gcr.io/$PROJECT_ID/gcp-variant-transforms'
+  - 'gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
