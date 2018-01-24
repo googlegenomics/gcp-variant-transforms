@@ -18,7 +18,7 @@ set -euo pipefail
 # A helper script for ensuring all checks pass before submitting any change.
 
 echo ========== Running unit tests.
-python setup.py test
+coverage run --source=gcp_variant_transforms setup.py test
 
 echo ========== Running pylint.
 pylint gcp_variant_transforms
