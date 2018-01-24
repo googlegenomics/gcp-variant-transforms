@@ -1,7 +1,8 @@
 # GCP Variant Transforms
 
 [![Build Status](https://travis-ci.org/googlegenomics/gcp-variant-transforms.svg?branch=master)](https://travis-ci.org/googlegenomics/gcp-variant-transforms)
-
+[![Coverage
+Status](https://coveralls.io/repos/github/googlegenomics/gcp-variant-transforms/badge.svg)](https://coveralls.io/github/googlegenomics/gcp-variant-transforms)
 
 ## Overview
 
