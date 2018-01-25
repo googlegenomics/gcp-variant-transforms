@@ -25,17 +25,21 @@ set -euo pipefail
 #
 # - The user should have access to the 'gcp-variant-transforms-test' project.
 
-PROJECT="gcp-variant-transforms-test"
-GS_DIR="integration_test_runs"
 GREEN="\e[32m"
 RED="\e[31m"
 TEST_ARGUMENTS=""
+GS_DIR_OPT="--gs_dir"
 KEEP_IMAGE_OPT="--keep_image"
 IMAGE_TAG_OPT="--image_tag"
+PROJECT_OPT="--project"
+RUN_UNIT_TEST_OPT="--run_unit_tests"
 SKIP_BUILD_OPT="--skip_build"
 image_tag=""
 keep_image=""
 skip_build=""
+gs_dir="integration_test_runs"  # default GS dir to store logs, etc.
+project="gcp-variant-transforms-test"  # default project to use
+run_unit_tests=""  # By default do not run unit-tests.
 
 #################################################
 # Prints a given message with a color.
@@ -53,11 +57,19 @@ color_print() {
 # Prints the usage.
 #################################################
 usage() {
-  echo "Usage: $0 [${KEEP_IMAGE_OPT}] [${IMAGE_TAG_OPT} image_tag] "
-  echo "    [${SKIP_BUILD_OPT}] [... test script options ...]"
+  echo "Usage: $0  [${GS_DIR_OPT} gs_dir] [${KEEP_IMAGE_OPT}]"
+  echo "    [${IMAGE_TAG_OPT} image_tag] [${PROJECT_OPT} project_name] "
+  echo "    [${RUN_UNIT_TEST_OPT}] [${SKIP_BUILD_OPT}] [... test script options ...]"
+  echo "  ${GS_DIR_OPT} can be used to change the default GS bucket used for"
+  echo "    test run artifacts like logs, staging, etc. This has to be set if"
+  echo "    the default project is not used."
   echo "  With ${KEEP_IMAGE_OPT} the tested image is not deleted at the end."
   echo "  If ${IMAGE_TAG_OPT} is not set, a new image with the current time"
   echo "    tag is created and used in tests, otherwise the given tag is used."
+  echo "  ${PROJECT_OPT} sets the cloud project. This project is used to push "
+  echo "    the image, create BigQuery tables, run Genomics pipelines etc."
+  echo "    Default is gcp-variant-transforms-test."
+  echo "  ${RUN_UNIT_TEST_OPT} runs the unit-tests before integration tests."
   echo "  ${SKIP_BUILD_OPT} skips the build step so it has to be used with "
   echo "    a valid tag_name passed through {$IMAGE_TAG_OPT}."
   echo "  This script should be run from the root of source tree."
@@ -68,11 +80,13 @@ usage() {
 # file exists.
 #################################################
 check_dir() {
-  dir_ok="$(pwd | sed -e 's/.*gcp-variant-transforms$/MATCHED/')"
+  local test_script="gcp_variant_transforms/testing/integration/run_tests.py"
+  ls_script_file="$(ls ${test_script})" || true
+  dir_ok="$(echo "${ls_script_file}" | sed -e 's/.*run_tests.py$/MATCHED/')"
   if [[ "${dir_ok}" != "MATCHED" ]]; then
     usage
-    color_print "ERROR: Not run from the gcp-variant-transforms root!" \
-        "${RED}"
+    color_print "ERROR: Cannot find ${test_script}" "${RED}"
+    color_print "Seems not run from the root of the source tree!" "${RED}"
     exit 1
   fi
   # The condition with 'true' is to work around 'set -e'.
@@ -95,6 +109,16 @@ parse_args() {
     if [[ "$1" = "${KEEP_IMAGE_OPT}" ]]; then
       keep_image="yes"  # can be any non-empty string
       shift
+    elif [[ "$1" = "${GS_DIR_OPT}" ]]; then
+      shift
+      if [[ $# == 0 ]]; then
+        usage
+        color_print "ERROR: No name provided after ${GS_DIR_OPT}!" "${RED}"
+        exit 1
+      fi
+      gs_dir="$1"
+      color_print "Using GS directory: ${gs_dir}" "${GREEN}"
+      shift
     elif [[ "$1" = "${IMAGE_TAG_OPT}" ]]; then
       shift
       if [[ $# == 0 ]]; then
@@ -104,6 +128,19 @@ parse_args() {
       fi
       image_tag="$1"
       color_print "Using custom image tag: ${image_tag}" "${GREEN}"
+      shift
+    elif [[ "$1" = "${PROJECT_OPT}" ]]; then
+      shift
+      if [[ $# == 0 ]]; then
+        usage
+        color_print "ERROR: No name provided after ${PROJECT_OPT}!" "${RED}"
+        exit 1
+      fi
+      project="$1"
+      color_print "Using project: ${project}" "${GREEN}"
+      shift
+    elif [[ "$1" = "${RUN_UNIT_TEST_OPT}" ]]; then
+      run_unit_tests="yes"  # can be any non-empty string
       shift
     elif [[ "$1" = "${SKIP_BUILD_OPT}" ]]; then
       skip_build="yes"  # can be any non-empty string
@@ -148,7 +185,7 @@ if [[ -z "${image_tag}" ]]; then
   time_tag="$(date +%F-%H-%M-%S)"
   image_tag="test_${time_tag}"
 fi
-full_image_name="gcr.io/${PROJECT}/gcp-variant-transforms:${image_tag}"
+full_image_name="gcr.io/${project}/gcp-variant-transforms:${image_tag}"
 
 if [[ -z "${skip_build}" ]]; then
   color_print "Building the Docker image with tag ${image_tag}" "${GREEN}"
@@ -156,7 +193,7 @@ if [[ -z "${skip_build}" ]]; then
   # including local build and library dirs that do not need to be included.
   # Update this to include only the required files/directories.
   gcloud container builds submit --config "${build_file}" \
-      --project "${PROJECT}" \
+      --project "${project}" \
       --substitutions _CUSTOM_TAG_NAME="${image_tag}" .
 fi
 
@@ -168,20 +205,18 @@ export VIRTUAL_ENV_DISABLE_PROMPT="something"
 virtualenv "${temp_dir}"
 source ${temp_dir}/bin/activate;
 trap clean_up EXIT
+if [[ -n "${run_unit_tests}" ]]; then
+  pip install --upgrade .
+  python setup.py test
+fi
 pip install --upgrade .[int_test]
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_tests.py \
-    --project "${PROJECT}" \
-    --staging_location "gs://${GS_DIR}/staging" \
-    --temp_location "gs://${GS_DIR}/temp" \
-    --logging_location "gs://${GS_DIR}/temp/logs" \
+    --project "${project}" \
+    --staging_location "gs://${gs_dir}/staging" \
+    --temp_location "gs://${gs_dir}/temp" \
+    --logging_location "gs://${gs_dir}/temp/logs" \
     --image "${full_image_name}" ${TEST_ARGUMENTS}
 
-error_code="$?"
-if [[ ${error_code} == 0 ]]; then
-  color_print "Success!" "${GREEN}"
-else
-  color_print "FAILED!" "${RED}"
-fi
-
+color_print "$0 succeeded!" "${GREEN}"
 
