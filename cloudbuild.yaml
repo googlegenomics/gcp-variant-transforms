@@ -24,6 +24,5 @@ steps:
       - '--tag=gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
       - '--file=docker/Dockerfile'
       - '.'
-    dir: '.'
 images:
   - 'gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'

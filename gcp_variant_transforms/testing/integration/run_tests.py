@@ -36,6 +36,7 @@ import argparse
 import json
 import multiprocessing
 import os
+import sys
 import time
 
 from datetime import datetime
@@ -297,6 +298,10 @@ def _print_errors(results):
       errors.append((test.get_name(), _get_traceback(str(e))))
   for test_name, error in errors:
     print _get_failure_message(test_name, error)
+  if errors:
+    return 1
+  else:
+    return 0
 
 
 def _get_traceback(message):
@@ -331,8 +336,9 @@ def main():
     pool.close()
     pool.join()
 
-  _print_errors(results)
+  return _print_errors(results)
 
 
 if __name__ == '__main__':
-  main()
+  ret_code = main()
+  sys.exit(ret_code)

@@ -1,0 +1,50 @@
+# Copyright 2018 Google Inc.  All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This is meant to be used by the Build Triggers set in Container Builder Builds
+# of a cloud project. This is what it does:
+# * Builds an image using the last GitHub commit hash as the tag.
+# * Pushes that image to Container Registry.
+# * Runs the integration test from that very image.
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag=gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+      - '--file=docker/Dockerfile'
+      - '.'
+  # We have to push now since we are using this image in the next step.
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+  # Run the test script from the image we just built and pushed.
+  - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+    args:
+      - 'bash'
+      - './deploy_and_run_tests.sh'
+      - '--keep_image'
+      - '--skip_build'
+      - '--project ${PROJECT_ID}'
+      - '--image_tag ${COMMIT_SHA}'
+      - '--run_unit_tests'
+      # By default the script uses a GS bucket of gcp-variant-transforms-test
+      # project. For other projects we should either use the following option
+      # or change the script to create a temporary bucket on the fly.
+      #
+      # - '--gs_dir bashir-variant_integration_test_runs'
+images:
+  - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+timeout: 20m
