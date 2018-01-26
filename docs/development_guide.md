@@ -62,7 +62,7 @@ git checkout -b <branch-name> origin/master
 ```
 
 ### Testing
-To run all tests:
+To run all unit tests:
 
 ```bash
 python setup.py test
@@ -72,6 +72,20 @@ To run a specific test:
 ```bash
 python setup.py test -s gcp_variant_transforms.<module>.<test class>.<test method>
 ```
+To run integration tests, run this script in the root of the source tree:
+```bash
+./deploy_and_run_tests.sh
+```
+This will create a Docker image from your current source and run integration
+tests against that. Have a look at script's top comments and usage. In
+particular, if you want to run integration tests against a specific image `TAG`
+in the container registry of cloud project `gcp-variant-transforms-test`,
+you can do:
+```bash
+./deploy_and_run_tests.sh --skip_build --keep_image --image_tag TAG
+```
+For other projects you can use the `--project` and `--gs_dir` options of the
+script.
 
 ### Pushing changes to your fork's branch
 To push changes to your forked branch, you can run:
@@ -110,7 +124,11 @@ by visiting the
 [gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms)
 and selecting "Create pull request". You will then be prompted to enter a
 description of your commits and select reviewers and assignees. Please add
-one of the repository contributors (@arostamianfar, @mhsaul).
+one of the repository contributors (@arostamianfar, @bashir2, @nmousavi).
+
+In the pull request description, please include a `Tested:` field with a brief
+description of how you have tested your change. As a minimum you should have
+unit-test coverage for your change and make sure integration tests pass.
 
 ### Updating changes
 After making changes, you must again add, commit, and push those changes. Rather
@@ -122,4 +140,31 @@ git commit --amend
 git push -f
 ```
 
-To ammend those changes to the original commit.
+To amend those changes to the original commit. Please note that using `--amend`
+creates a new commit and is a way of rewriting git history. In particular, if
+you have branched from the current branch to work on another change on top of
+the current one, `--amend` will make merging of these branches non-trivial.
+
+Another git approach that you can take is to create a new _review branch_ and use
+the `--squash` option of `git merge` to create one commit from all your changes
+and push that for review. For example, if you are on branch `foo` and ready to
+send a pull request, you can:
+```bash
+git checkout master
+git checkout -b foo_review
+git merge --squash foo
+git push origin foo_review
+```
+This approach is specially useful if you tend to do a lot of small commits
+during your feature development and like to keep them as checkpoints.
+
+### Continuous integration
+Once your pull request is approved and merged into the main repo, there is an
+automated process to create a new docker image from this commit, push it to the
+[Container Registry](
+https://cloud.google.com/container-builder/docs/running-builds/automate-builds)
+of `gcp-variant-transforms-test` project, and run integration tests against
+that image (see [`cloudbuild_CI.md`](../cloudbuild_CI.yaml)).
+If this fails, your commit might be reverted. If you have access to this test
+project, you can check the status of your build in the "Build history"
+dashboard of Container Registry.
