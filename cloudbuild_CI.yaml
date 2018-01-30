@@ -31,6 +31,13 @@ steps:
       - 'push'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
   # Run the test script from the image we just built and pushed.
+  #
+  # Note that the only reason that we use the built image in the 'name' argument
+  # is convenience. IOW, we could, for example, use 'ubuntu', install required
+  # dependencies like virtualenv, python, etc. with apt-get, then run the test
+  # script against the built image (i.e., --image_tag ${COMMIT_SHA}). So the
+  # deploy_and_run_tests.sh that is referenced here is coming from the source
+  # downloaded from GitHub not the one included in the image.
   - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     args:
       - 'bash'
