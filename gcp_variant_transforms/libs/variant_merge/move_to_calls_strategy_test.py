@@ -225,19 +225,33 @@ class MoveToCallsStrategyTest(unittest.TestCase):
   def test_get_merge_keys(self):
     strategy = move_to_calls_strategy.MoveToCallsStrategy(None, None, None)
 
+    def get_expected_key(reference_name, start, end,
+                         reference_bases, alternate_bases):
+      return '%s:%s:%s:%s:%s'%(
+          reference_name or '',
+          str(start or ''),
+          str(end or ''),
+          strategy._get_hash(reference_bases or ''),
+          strategy._get_hash(','.join(alternate_bases or [])))
+
     variant = vcfio.Variant()
-    self.assertEqual('::::', next(strategy.get_merge_keys(variant)))
+    self.assertEqual(get_expected_key(None, None, None, None, None),
+                     next(strategy.get_merge_keys(variant)))
 
     variant.reference_name = '19'
-    self.assertEqual('19::::', next(strategy.get_merge_keys(variant)))
+    self.assertEqual(get_expected_key(19, None, None, None, None),
+                     next(strategy.get_merge_keys(variant)))
+
 
     variant.start = 123
     variant.end = 125
     variant.reference_bases = 'AT'
-    self.assertEqual('19:123:125:AT:', next(strategy.get_merge_keys(variant)))
+    self.assertEqual(get_expected_key(19, 123, 125, 'AT', None),
+                     next(strategy.get_merge_keys(variant)))
+
 
     variant.alternate_bases = ['A', 'C']
-    self.assertEqual('19:123:125:AT:A,C',
+    self.assertEqual(get_expected_key(19, 123, 125, 'AT', ['A', 'C']),
                      next(strategy.get_merge_keys(variant)))
 
   def _get_base_schema(self, info_keys):
