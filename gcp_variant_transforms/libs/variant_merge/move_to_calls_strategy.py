@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 
+import hashlib
 import re
 
 from gcp_variant_transforms.beam_io.vcfio import Variant
@@ -103,6 +104,17 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
                                  end=variant.end,
                                  reference_bases=variant.reference_bases,
                                  alternate_bases=variant.alternate_bases)
+      # Since we use hash function in generating the merge key, there is
+      # a chance (extremely low though) to have variants with different
+      # `reference_bases` or `alternate_base` here due to a collision in
+      # the hash function.
+      assert variant.reference_bases == merged_variant.reference_bases, (
+          'Cannot merge variants with different reference bases. {} vs {}'
+          .format(variant.reference_bases, merged_variant.reference_bases))
+      assert variant.alternate_bases == merged_variant.alternate_bases, (
+          'Cannot merge variants with different alternate bases. {} vs {}'
+          .format(variant.alternate_bases, merged_variant.alternate_bases))
+
       merged_variant.names.extend(variant.names)
       merged_variant.filters.extend(variant.filters)
       merged_variant.quality = max(merged_variant.quality, variant.quality)
@@ -123,8 +135,8 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
             variant.reference_name or '',
             variant.start or '',
             variant.end or '',
-            variant.reference_bases or '',
-            ','.join(variant.alternate_bases or [])]])
+            self._get_hash(variant.reference_bases or ''),
+            self._get_hash(','.join(variant.alternate_bases or []))]])
 
   def modify_bigquery_schema(self, schema, info_keys):
     # Find the calls record so that it's easier to reference it below.
@@ -162,6 +174,9 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
       else:
         updated_fields.append(field)
     schema.fields = updated_fields
+
+  def _get_hash(self, value):
+    return hashlib.md5(value).hexdigest()
 
   def _should_move_info_key_to_calls(self, info_key):
     return bool(self._info_keys_to_move_to_calls_re and
