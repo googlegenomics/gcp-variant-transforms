@@ -216,10 +216,11 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
 
 
 # TODO: refactor this to use a class instead.
-def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
+def get_rows_from_variant(variant, split_alternate_allele_info_fields=True,
+                          omit_empty_sample_calls=False):
   """Yields BigQuery rows according to the schema from the given variant.
 
-  There is a 10MB limit for each BigQuqery row, which can exceed by having
+  There is a 10MB limit for each BigQuery row, which can be exceeded by having
   a large number of calls. This method may split up a row into multiple rows if
   it exceeds 10MB.
 
@@ -229,6 +230,8 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
       `Number=A` (i.e. one value for each alternate allele) will be stored under
       the `alternate_bases` record. If false, they will be stored with the rest
       of the INFO fields.
+    omit_empty_sample_calls (bool): If true, samples that don't have a given
+      call will be omitted.
   Yields:
     A dict representing a BigQuery row from the given variant. The row may have
     a subset of the calls if it exceeds the maximum allowed BigQuery row size.
@@ -243,7 +246,10 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
   row_size_in_bytes = base_row_size_in_bytes
   row = copy.deepcopy(base_row)  # Keep base_row intact.
   for call in variant.calls:
-    call_record = _get_call_record(call)
+    call_record, empty = _get_call_record(call)
+    if omit_empty_sample_calls and empty:
+      continue
+
     # Add a few bytes to account for surrounding characters when concatenating.
     call_record_size_in_bytes = (
         _get_json_object_size(call_record) + _JSON_CONCATENATION_OVERHEAD_BYTES)
@@ -258,17 +264,27 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True):
 
 
 def _get_call_record(call):
-  """A helper method for ``get_rows_from_variant`` to get a call as JSON."""
+  """A helper method for ``get_rows_from_variant`` to get a call as JSON.
+
+  Args:
+     call (``VariantCall``): Variant call to convert.
+
+  Returns:
+    BigQuery call value (dict).
+  """
   call_record = {
       ColumnKeyConstants.CALLS_NAME: _get_bigquery_sanitized_field(call.name),
       ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
       ColumnKeyConstants.CALLS_GENOTYPE: call.genotype or []
   }
+  is_empty = (not call.genotype or
+              set(call.genotype) == set((vcfio.MISSING_GENOTYPE_VALUE,)))
   for key, field in call.info.iteritems():
     if field is not None:
-      call_record[_get_bigquery_sanitized_field_name(key)] = (
-          _get_bigquery_sanitized_field(field))
-  return call_record
+      sanitized = _get_bigquery_sanitized_field(field)
+      call_record[_get_bigquery_sanitized_field_name(key)] = sanitized
+      is_empty = is_empty and _is_empty_field(sanitized)
+  return call_record, is_empty
 
 
 def _get_base_row_from_variant(variant, split_alternate_allele_info_fields):
@@ -466,6 +482,11 @@ def _get_bigquery_mode_from_vcf_num(vcf_num):
 
 def _is_alternate_allele_count(info_field):
   return info_field.field_count == _FIELD_COUNT_ALTERNATE_ALLELE
+
+
+def _is_empty_field(value):
+  return (value in (vcfio.MISSING_FIELD_VALUE, [vcfio.MISSING_FIELD_VALUE]) or
+          (not value and value != 0))
 
 
 def _get_json_object_size(obj):

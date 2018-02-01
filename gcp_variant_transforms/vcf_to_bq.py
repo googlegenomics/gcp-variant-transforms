@@ -223,7 +223,8 @@ def run(argv=None):
              header_fields,
              variant_merger,
              known_args.split_alternate_allele_info_fields,
-             append=known_args.append))
+             append=known_args.append,
+             omit_empty_sample_calls=known_args.omit_empty_sample_calls))
 
 
 if __name__ == '__main__':

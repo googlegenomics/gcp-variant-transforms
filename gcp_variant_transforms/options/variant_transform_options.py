@@ -101,6 +101,10 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         help=('If true, existing records in output_table will not be '
               'overwritten. New records will be appended to those that '
               'already exist.'))
+    parser.add_argument(
+        '--omit_empty_sample_calls',
+        type='bool', default=False, nargs='?', const=True,
+        help=("If true, samples that don't have a given call will be omitted."))
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
