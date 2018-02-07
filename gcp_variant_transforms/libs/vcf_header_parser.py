@@ -32,6 +32,42 @@ __all__ = ['HeaderFields', 'get_vcf_headers']
 HeaderFields = namedtuple('HeaderFields', ['infos', 'formats'])
 
 
+def extract_annotation_list_with_alt(annotation_str):
+  """Extracts annotations from an annotation INFO field.
+
+  This works by dividing the ``annotation_str`` on '|'. The first element is
+  the alternate allele and the rest are the annotations.
+
+  Args:
+    annotation_str (``str``): The content of annotation field for one alt.
+
+  Returns:
+    The list of annotations with the first element being the alternate.
+  """
+  return annotation_str.split('|')
+
+
+def extract_annotation_names(description):
+  """Extracts annotation list from the description of an annotation INFO field.
+
+  This is similar to extract_extract_annotation_list_with_alt with the
+  difference that it ignores everything before the first '|'.
+
+  Args:
+    description (``str``): The "Description" part of the annotation INFO field
+      in the header of VCF.
+
+  Returns:
+    The list of annotation names.
+  """
+  annotation_names = extract_annotation_list_with_alt(description)
+  if len(annotation_names) < 2:
+    raise ValueError(
+        'Expected at least one | in annotation description {}'.format(
+            description))
+  return annotation_names[1:]
+
+
 def get_vcf_headers(input_file):
   """Returns VCF headers (FORMAT and INFO) from ``input_file``.
 

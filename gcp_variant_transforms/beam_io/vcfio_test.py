@@ -78,8 +78,10 @@ def _get_sample_variant_1():
       reference_name='20', start=1233, end=1234, reference_bases='C',
       alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
       filters=['PASS'],
-      info={'AF': vcfio.VariantInfo(data=[0.5, 0.1], field_count='A'),
-            'NS': vcfio.VariantInfo(data=1, field_count='1')})
+      info={'AF': vcfio.VariantInfo(data=[0.5, 0.1], field_count='A',
+                                    annotation_names=None),
+            'NS': vcfio.VariantInfo(data=1, field_count='1',
+                                    annotation_names=None)})
   variant.calls.append(
       vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
   variant.calls.append(
@@ -103,7 +105,8 @@ def _get_sample_variant_2():
       reference_name='19', start=122, end=125, reference_bases='GTC',
       alternate_bases=[], names=['rs1234'], quality=40,
       filters=['q10', 's50'],
-      info={'NS': vcfio.VariantInfo(data=2, field_count='1')})
+      info={'NS': vcfio.VariantInfo(data=2, field_count='1',
+                                    annotation_names=None)})
   variant.calls.append(
       vcfio.VariantCall(name='Sample1', genotype=[1, 0],
                         phaseset=vcfio.DEFAULT_PHASESET_VALUE,
@@ -127,7 +130,8 @@ def _get_sample_variant_3():
   variant = vcfio.Variant(
       reference_name='19', start=11, end=12, reference_bases='C',
       alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-      info={'AF': vcfio.VariantInfo(data=[0.5], field_count='A')})
+      info={'AF': vcfio.VariantInfo(data=[0.5], field_count='A',
+                                    annotation_names=None)})
   variant.calls.append(
       vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                         phaseset='1',
@@ -392,7 +396,8 @@ class VcfSourceTest(unittest.TestCase):
     expected_variant = Variant(
         reference_name='19', start=122, end=123, reference_bases='G',
         alternate_bases=['A'], filters=['PASS'],
-        info={'AF': VariantInfo(data=[0.2], field_count='A')})
+        info={'AF': VariantInfo(data=[0.2], field_count='A',
+                                annotation_names=None)})
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES[:-1] + [header_line, record_line])
     self.assertEqual(1, len(read_data))
@@ -423,19 +428,27 @@ class VcfSourceTest(unittest.TestCase):
     variant_1 = Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T', 'C'],
-        info={'HA': VariantInfo(data=['a1', 'a2'], field_count='A'),
-              'HG': VariantInfo(data=[1, 2, 3], field_count='G'),
-              'HR': VariantInfo(data=['a', 'b', 'c'], field_count='R'),
-              'HF': VariantInfo(data=True, field_count='0'),
-              'HU': VariantInfo(data=[0.1], field_count=None)})
+        info={'HA': VariantInfo(data=['a1', 'a2'], field_count='A',
+                                annotation_names=None),
+              'HG': VariantInfo(data=[1, 2, 3], field_count='G',
+                                annotation_names=None),
+              'HR': VariantInfo(data=['a', 'b', 'c'], field_count='R',
+                                annotation_names=None),
+              'HF': VariantInfo(data=True, field_count='0',
+                                annotation_names=None),
+              'HU': VariantInfo(data=[0.1], field_count=None,
+                                annotation_names=None)})
     variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
     variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
     variant_2 = Variant(
         reference_name='19', start=123, end=124, reference_bases='A',
         alternate_bases=['T'],
-        info={'HG': VariantInfo(data=[3, 4, 5], field_count='G'),
-              'HR': VariantInfo(data=['d', 'e'], field_count='R'),
-              'HU': VariantInfo(data=[1.1, 1.2], field_count=None)})
+        info={'HG': VariantInfo(data=[3, 4, 5], field_count='G',
+                                annotation_names=None),
+              'HR': VariantInfo(data=['d', 'e'], field_count='R',
+                                annotation_names=None),
+              'HU': VariantInfo(data=[1.1, 1.2], field_count=None,
+                                annotation_names=None)})
     variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
     variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
     read_data = self._create_temp_file_and_read_records(
@@ -755,9 +768,12 @@ class VcfSinkTest(unittest.TestCase):
   def test_info_field_count(self):
     coder = self._get_coder()
     variant = Variant()
-    variant.info['NS'] = VariantInfo(data=3, field_count='1')
-    variant.info['AF'] = VariantInfo(data=[0.333, 0.667], field_count='A')
-    variant.info['DB'] = VariantInfo(data=True, field_count='0')
+    variant.info['NS'] = VariantInfo(data=3, field_count='1',
+                                     annotation_names=None)
+    variant.info['AF'] = VariantInfo(data=[0.333, 0.667], field_count='A',
+                                     annotation_names=None)
+    variant.info['DB'] = VariantInfo(data=True, field_count='0',
+                                     annotation_names=None)
     expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)

@@ -26,6 +26,7 @@ import vcf
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import vcf_header_parser
 
 
 __all__ = ['generate_schema_from_header_fields', 'get_rows_from_variant',
@@ -82,8 +83,15 @@ _MAX_BIGQUERY_ROW_SIZE_BYTES = 10 * 1024 * 1024 - 10 * 1024
 _JSON_CONCATENATION_OVERHEAD_BYTES = 5
 
 
+# TODO(bashir2): Using type identifiers like ``HeaderFields`` does not seem
+# to be picked up by tools, because they cannot resolve these type identifiers.
+# We should either fix these or otherwise stop using the convention of using
+# double ` when not recognized by tools.
+
+
 def generate_schema_from_header_fields(header_fields, variant_merger=None,
-                                       split_alternate_allele_info_fields=True):
+                                       split_alternate_allele_info_fields=True,
+                                       annotation_field=None):
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
 
   Args:
@@ -141,6 +149,28 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
             type=_get_bigquery_type_from_vcf_type(field.type),
             mode=_TableFieldConstants.MODE_NULLABLE,
             description=_get_bigquery_sanitized_field(field.desc)))
+  if annotation_field:
+    annotation_names = []
+    for key, field in header_fields.infos.iteritems():
+      if key == annotation_field:
+        annotation_names = vcf_header_parser.extract_annotation_names(
+            field.desc)
+        break
+    if not annotation_names:
+      raise ValueError('Annotation field {} not found'.format(annotation_field))
+    annotation_record = bigquery.TableFieldSchema(
+        name=_get_bigquery_sanitized_field(annotation_field),
+        type=_TableFieldConstants.TYPE_RECORD,
+        mode=_TableFieldConstants.MODE_REPEATED,
+        description='List of annotations for this alternate.')
+    for annotation in annotation_names:
+      annotation_record.fields.append(bigquery.TableFieldSchema(
+          name=_get_bigquery_sanitized_field(annotation),
+          type=_TableFieldConstants.TYPE_STRING,
+          mode=_TableFieldConstants.MODE_NULLABLE,
+          # TODO(bashir2): Add descriptions of known annotations, e.g., from VEP
+          description=''))
+    alternate_bases_record.fields.append(annotation_record)
   schema.fields.append(alternate_bases_record)
 
   schema.fields.append(bigquery.TableFieldSchema(
@@ -202,7 +232,8 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
     # END info is already included by modifying the end_position.
     if (key == vcfio.END_INFO_KEY or
         (split_alternate_allele_info_fields and
-         field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
+         field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]) or
+        key == annotation_field):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=_get_bigquery_sanitized_field_name(key),
@@ -217,7 +248,7 @@ def generate_schema_from_header_fields(header_fields, variant_merger=None,
 
 # TODO: refactor this to use a class instead.
 def get_rows_from_variant(variant, split_alternate_allele_info_fields=True,
-                          omit_empty_sample_calls=False):
+                          omit_empty_sample_calls=False, annotation_field=None):
   """Yields BigQuery rows according to the schema from the given variant.
 
   There is a 10MB limit for each BigQuery row, which can be exceeded by having
@@ -232,6 +263,8 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True,
       of the INFO fields.
     omit_empty_sample_calls (bool): If true, samples that don't have a given
       call will be omitted.
+    annotation_field (str): If provided, it is the name of the INFO field
+      that contains the annotation list.
   Yields:
     A dict representing a BigQuery row from the given variant. The row may have
     a subset of the calls if it exceeds the maximum allowed BigQuery row size.
@@ -241,9 +274,11 @@ def get_rows_from_variant(variant, split_alternate_allele_info_fields=True,
   # TODO: Add error checking here for cases where the schema defined
   # by the headers does not match actual records.
   base_row = _get_base_row_from_variant(
-      variant, split_alternate_allele_info_fields)
+      variant, split_alternate_allele_info_fields, annotation_field)
   base_row_size_in_bytes = _get_json_object_size(base_row)
   row_size_in_bytes = base_row_size_in_bytes
+  # TODO(bashir2): It seems that BigQueryWriter buffers 1000 rows and this
+  # can cause BigQuery API exceptions. We need to fix this!
   row = copy.deepcopy(base_row)  # Keep base_row intact.
   for call in variant.calls:
     call_record, empty = _get_call_record(call)
@@ -287,7 +322,34 @@ def _get_call_record(call):
   return call_record, is_empty
 
 
-def _get_base_row_from_variant(variant, split_alternate_allele_info_fields):
+def _create_list_of_annotation_lists(alt, info):
+  """Extracts list of annotations for an alternate.
+
+  Args:
+    alt (str): The alternate for which the annotation lists are extracted.
+    info (``VariantInfo``): The data for the annotation INFO field.
+  """
+  annotation_record = []
+  for data in info.data:
+    annotation_list = vcf_header_parser.extract_annotation_list_with_alt(data)
+    if len(annotation_list) != len(info.annotation_names) + 1:
+      # TODO(bashir2): This and several other annotation related checks should
+      # be made "soft", i.e., handled gracefully. We will do this as part of the
+      # bigger issue to make schema error checking more robust.
+      raise ValueError('Number of annotations does not match header')
+    # TODO(bashir2): The alternate allele format is not necessarily as simple
+    # as being equal to an 'alt', so this needs to be fixed to handle all
+    # possible formats.
+    if annotation_list[0] == alt:
+      annotation_dict = {}
+      for i in range(len(info.annotation_names)):
+        annotation_dict[info.annotation_names[i]] = annotation_list[i + 1]
+      annotation_record.append(annotation_dict)
+  return annotation_record
+
+
+def _get_base_row_from_variant(variant, split_alternate_allele_info_fields,
+                               annotation_field):
   """A helper method for ``get_rows_from_variant`` to get row without calls."""
   row = {
       ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
@@ -315,12 +377,22 @@ def _get_base_row_from_variant(variant, split_alternate_allele_info_fields):
                     info_key, variant))
           alt_record[_get_bigquery_sanitized_field_name(info_key)] = (
               _get_bigquery_sanitized_field(info.data[alt_index]))
+    if annotation_field:
+      for info_key, info in variant.info.iteritems():
+        if info_key == annotation_field:
+          if not info.annotation_names:
+            raise ValueError(
+                'Annotation list not found for field {}'.format(info_key))
+          alt_record[_get_bigquery_sanitized_field(annotation_field)] = (
+              _create_list_of_annotation_lists(alt, info))
+          break
     row[ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
   # Add info.
   for key, info in variant.info.iteritems():
     if (info.data is not None and
         (not split_alternate_allele_info_fields or
-         info.field_count != _FIELD_COUNT_ALTERNATE_ALLELE)):
+         info.field_count != _FIELD_COUNT_ALTERNATE_ALLELE) and
+        key != annotation_field):
       row[_get_bigquery_sanitized_field_name(key)] = (
           _get_bigquery_sanitized_field(info.data))
   # Set calls to empty for now (will be filled later).

@@ -37,10 +37,10 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A', None),
+              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A', None),
+              'A1': vcfio.VariantInfo('some data', '1', None),
+              'A2': vcfio.VariantInfo(['data1', 'data2'], '2', None)},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -84,7 +84,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'INTINFO': vcfio.VariantInfo(1234, '1')})
+        info={'INTINFO': vcfio.VariantInfo(1234, '1', None)})
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,

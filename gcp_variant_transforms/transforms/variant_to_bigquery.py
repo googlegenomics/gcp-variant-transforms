@@ -27,16 +27,18 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
   """Converts a ``Variant`` record to a BigQuery row."""
 
   def __init__(self, split_alternate_allele_info_fields=True,
-               omit_empty_sample_calls=False):
+               omit_empty_sample_calls=False, annotation_field=None):
     super(_ConvertToBigQueryTableRow, self).__init__()
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
     self._omit_empty_sample_calls = omit_empty_sample_calls
+    self._annotation_field = annotation_field
 
   def process(self, record):
     return bigquery_vcf_schema.get_rows_from_variant(
         record, self._split_alternate_allele_info_fields,
-        self._omit_empty_sample_calls)
+        self._omit_empty_sample_calls,
+        self._annotation_field)
 
 
 class VariantToBigQuery(beam.PTransform):
@@ -44,7 +46,8 @@ class VariantToBigQuery(beam.PTransform):
 
   def __init__(self, output_table, header_fields, variant_merger=None,
                split_alternate_allele_info_fields=True, append=False,
-               omit_empty_sample_calls=False):
+               omit_empty_sample_calls=False,
+               annotation_field=None):
     """Initializes the transform.
 
     Args:
@@ -63,6 +66,8 @@ class VariantToBigQuery(beam.PTransform):
         overwritten. New records will be appended to those that already exist.
       omit_empty_sample_calls (bool): If true, samples that don't have a given
         call will be omitted.
+      annotation_field (str): If provided, it is the name of the INFO field
+        that contains the annotation list.
     """
     self._output_table = output_table
     self._header_fields = header_fields
@@ -71,19 +76,22 @@ class VariantToBigQuery(beam.PTransform):
         split_alternate_allele_info_fields)
     self._append = append
     self._omit_empty_sample_calls = omit_empty_sample_calls
+    self._annotation_field = annotation_field
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertToBigQueryTableRow' >> beam.ParDo(
                 _ConvertToBigQueryTableRow(
                     self._split_alternate_allele_info_fields,
-                    self._omit_empty_sample_calls))
+                    self._omit_empty_sample_calls,
+                    self._annotation_field))
             | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,
                 schema=bigquery_vcf_schema.generate_schema_from_header_fields(
                     self._header_fields,
                     self._variant_merger,
-                    self._split_alternate_allele_info_fields),
+                    self._split_alternate_allele_info_fields,
+                    annotation_field=self._annotation_field),
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
                 write_disposition=(

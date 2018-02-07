@@ -203,15 +203,15 @@ class GetRowsFromVariantTest(unittest.TestCase):
   def _get_row_list_from_variant(self, variant, **kwargs):
     return list(bigquery_vcf_schema.get_rows_from_variant(variant, **kwargs))
 
-  def test_all_fields(self):
-    variant = vcfio.Variant(
+  def _create_variant_with_two_alts(self):
+    return vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'I1': vcfio.VariantInfo('some data', '1'),
-              'I2': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A', None),
+              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A', None),
+              'I1': vcfio.VariantInfo('some data', '1', None),
+              'I2': vcfio.VariantInfo(['data1', 'data2'], '2', None)},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -221,6 +221,9 @@ class GetRowsFromVariantTest(unittest.TestCase):
                 info={'GQ': 10, 'FLAG1': True}),
             vcfio.VariantCall(
                 name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
+
+  def test_all_fields(self):
+    variant = self._create_variant_with_two_alts()
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -261,12 +264,105 @@ class GetRowsFromVariantTest(unittest.TestCase):
         self._get_row_list_from_variant(
             variant, split_alternate_allele_info_fields=False))
 
+  def test_annotation_field_no_split(self):
+    variant = self._create_variant_with_two_alts()
+    # PyVCF returns None for '.' and this is to simulate that behavior.
+    variant.info['CSQ'] = vcfio.VariantInfo(
+        data=['A|ugv1|M1|pc1', 'TT|ugv2|M2|pc2', 'A|ugv3|M3|pc3'],
+        field_count=None,
+        annotation_names=None)
+    # TODO(bashir2): Refactor expectations as well; this is left to be done with
+    # the bigger refactoring of the production code under test here.
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'C',
+        ColumnKeyConstants.ALTERNATE_BASES: [
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A',
+             'AF': 0.1, 'AF2': 0.2},
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT',
+             'AF': 0.2, 'AF2': 0.3}],
+        ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+        ColumnKeyConstants.QUALITY: 2,
+        ColumnKeyConstants.FILTER: ['PASS'],
+        ColumnKeyConstants.CALLS: [
+            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+             ColumnKeyConstants.CALLS_PHASESET: '*',
+             'GQ': 20, 'HQ': [10, 20]},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+             ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+             ColumnKeyConstants.CALLS_PHASESET: None,
+             'GQ': 10, 'FLAG1': True},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample3',
+             ColumnKeyConstants.CALLS_GENOTYPE: [vcfio.MISSING_GENOTYPE_VALUE],
+             ColumnKeyConstants.CALLS_PHASESET: None}],
+        'I1': 'some data',
+        'I2': ['data1', 'data2'],
+        'CSQ': ['A|ugv1|M1|pc1', 'TT|ugv2|M2|pc2', 'A|ugv3|M3|pc3'],
+    }
+    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+
+  def test_annotation_field(self):
+    variant = self._create_variant_with_two_alts()
+    # PyVCF returns None for '.' and this is to simulate that behavior.
+    variant.info['CSQ'] = vcfio.VariantInfo(
+        data=['A|ugv1|M1|pc1', 'TT|ugv2|M2|pc2', 'A|ugv3|M3|pc3'],
+        field_count=None,
+        annotation_names=vcf_header_parser.extract_annotation_names(
+            'SOME_DESC|upstream_gene_variant|MODIFIER|protein_coding'))
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'C',
+        ColumnKeyConstants.ALTERNATE_BASES: [
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A',
+             'AF': 0.1, 'AF2': 0.2,
+             'CSQ': [{'upstream_gene_variant': 'ugv1',
+                      'MODIFIER': 'M1',
+                      'protein_coding': 'pc1'},
+                     {'upstream_gene_variant': 'ugv3',
+                      'MODIFIER': 'M3',
+                      'protein_coding': 'pc3'},
+                    ],
+            },
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT',
+             'AF': 0.2, 'AF2': 0.3,
+             'CSQ': [{'upstream_gene_variant': 'ugv2',
+                      'MODIFIER': 'M2',
+                      'protein_coding': 'pc2'},
+                    ],
+            }],
+        ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+        ColumnKeyConstants.QUALITY: 2,
+        ColumnKeyConstants.FILTER: ['PASS'],
+        ColumnKeyConstants.CALLS: [
+            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+             ColumnKeyConstants.CALLS_PHASESET: '*',
+             'GQ': 20, 'HQ': [10, 20]},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+             ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+             ColumnKeyConstants.CALLS_PHASESET: None,
+             'GQ': 10, 'FLAG1': True},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample3',
+             ColumnKeyConstants.CALLS_GENOTYPE: [vcfio.MISSING_GENOTYPE_VALUE],
+             ColumnKeyConstants.CALLS_PHASESET: None}],
+        'I1': 'some data',
+        'I2': ['data1', 'data2'],
+    }
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(
+                         variant, annotation_field='CSQ'))
+
   def test_no_alternate_bases(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')})
+        info={'A1': vcfio.VariantInfo('some data', '1', None),
+              'A2': vcfio.VariantInfo(['data1', 'data2'], '2', None)})
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -308,10 +404,10 @@ class GetRowsFromVariantTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'AI': vcfio.VariantInfo([0, 1, None], '3'),
-              'AB': vcfio.VariantInfo([True, None, False], '3'),
-              'AF': vcfio.VariantInfo([0.1, 0.2, None, 0.4], '4'),
-              'AS': vcfio.VariantInfo([None, 'data1', 'data2'], '3')})
+        info={'AI': vcfio.VariantInfo([0, 1, None], '3', None),
+              'AB': vcfio.VariantInfo([True, None, False], '3', None),
+              'AF': vcfio.VariantInfo([0.1, 0.2, None, 0.4], '4', None),
+              'AS': vcfio.VariantInfo([None, 'data1', 'data2'], '3', None)})
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -332,9 +428,9 @@ class GetRowsFromVariantTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[sample_unicode_str, sample_utf8_str],
-        info={'AS1': vcfio.VariantInfo(sample_utf8_str, '1'),
+        info={'AS1': vcfio.VariantInfo(sample_utf8_str, '1', None),
               'AS2': vcfio.VariantInfo(
-                  [sample_unicode_str, sample_utf8_str], '2')})
+                  [sample_unicode_str, sample_utf8_str], '2', None)})
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -351,9 +447,10 @@ class GetRowsFromVariantTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'F1': vcfio.VariantInfo(float('inf'), '1'),
-              'F2': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
-              'F3': vcfio.VariantInfo(float('nan'), '1'),})
+        info={'F1': vcfio.VariantInfo(float('inf'), '1', None),
+              'F2': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3',
+                                      None),
+              'F3': vcfio.VariantInfo(float('nan'), '1', None),})
     null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -371,8 +468,8 @@ class GetRowsFromVariantTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[],
-        info={'A-1': vcfio.VariantInfo('data1', '1'),
-              '_A': vcfio.VariantInfo('data2', '2')})
+        info={'A-1': vcfio.VariantInfo('data1', '1', None),
+              '_A': vcfio.VariantInfo('data2', '2', None)})
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -389,9 +486,9 @@ class GetRowsFromVariantTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'I1': vcfio.VariantInfo('some data', '1'),},
+        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A', None),
+              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A', None),
+              'I1': vcfio.VariantInfo('some data', '1', None),},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
