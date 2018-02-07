@@ -34,6 +34,8 @@ from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 from apache_beam.transforms.display import DisplayDataItem
 
+from gcp_variant_transforms.libs import vcf_header_parser
+
 __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
            'VariantInfo', 'MalformedVcfRecord']
 
@@ -46,7 +48,11 @@ __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
 #   - 'A': one value per alternate allele.
 #   - 'G': one value for each possible genotype.
 #   - 'R': one value for each possible allele (including the reference).
-VariantInfo = namedtuple('VariantInfo', ['data', 'field_count'])
+# `annotation_names` is only filled for the annotation field and it is the
+# list of annotation names extracted from the description part of the annotation
+# field metadata in the VCF header.
+VariantInfo = namedtuple('VariantInfo',
+                         ['data', 'field_count', 'annotation_names'])
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
 # failed in.
@@ -652,7 +658,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
                compression_type=CompressionTypes.AUTO,
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,
                validate=True,
-               allow_malformed_records=False):
+               allow_malformed_records=False,
+               annotation_field=None):
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
                                      validate=validate)
@@ -660,6 +667,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
+    self._annotation_field = annotation_field
 
   def read_records(self, file_name, range_tracker):
     record_iterator = _VcfSource._VcfRecordIterator(
@@ -668,6 +676,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         self._pattern,
         self._compression_type,
         self._allow_malformed_records,
+        annotation_field=self._annotation_field,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -684,11 +693,13 @@ class _VcfSource(filebasedsource.FileBasedSource):
                  file_pattern,
                  compression_type,
                  allow_malformed_records,
+                 annotation_field=None,
                  **kwargs):
       self._header_lines = []
       self._last_record = None
       self._file_name = file_name
       self._allow_malformed_records = allow_malformed_records
+      self._annotation_field = annotation_field
 
       text_source = _TextSource(
           file_pattern,
@@ -795,10 +806,19 @@ class _VcfSource(filebasedsource.FileBasedSource):
       for k, v in record.INFO.iteritems():
         if k != END_INFO_KEY:
           field_count = None
+          annotation_names = None
           if k in infos:
             field_count = self._get_field_count_as_string(infos[k].num)
-          info[k] = VariantInfo(data=v, field_count=field_count)
-
+            if k == self._annotation_field:
+              annotation_names = vcf_header_parser.extract_annotation_names(
+                  infos[k].desc)
+          # TODO(bashir2): The reason we keep annotation_names with each variant
+          # is to do better merging, e.g., when some variants from two VCF files
+          # have different annotations. This merging logic needs to be
+          # implemented though.
+          info[k] = VariantInfo(data=v,
+                                field_count=field_count,
+                                annotation_names=annotation_names)
       return info
 
     def _get_field_count_as_string(self, field_count):
@@ -880,6 +900,7 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,
       validate=True,
       allow_malformed_records=False,
+      annotation_field=None,
       **kwargs):
     """Initialize the :class:`ReadFromVcf` transform.
 
@@ -892,23 +913,29 @@ class ReadFromVcf(PTransform):
         underlying file_path's extension will be used to detect the compression.
       validate (bool): flag to verify that the files exist during the pipeline
         creation time.
+      annotation_field (str): If set, it is the field which will be treated as
+        annotation field, i.e., the description from header is split and copied
+        into the `VariantInfo.annotation_names` field of each variant.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
     self._source = _VcfSource(
         file_pattern,
         compression_type,
         validate=validate,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        annotation_field=annotation_field)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
 
 
 def _create_vcf_source(
-    file_pattern=None, compression_type=None, allow_malformed_records=None):
+    file_pattern=None, compression_type=None, allow_malformed_records=None,
+    annotation_field=None):
   return _VcfSource(file_pattern=file_pattern,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records)
+                    allow_malformed_records=allow_malformed_records,
+                    annotation_field=annotation_field)
 
 
 class ReadAllFromVcf(PTransform):
@@ -930,6 +957,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
       compression_type=CompressionTypes.AUTO,
       allow_malformed_records=False,
+      annotation_field=None,
       **kwargs):
     """Initialize the :class:`ReadAllFromVcf` transform.
 
@@ -945,11 +973,15 @@ class ReadAllFromVcf(PTransform):
       allow_malformed_records (bool): If true, malformed records from VCF files
         will be returned as :class:`MalformedVcfRecord` instead of failing
         the pipeline.
+      annotation_field (`str`): If set, that is the field which will be treated
+        as annotation field, i.e., the description from header is split and
+        copied into the `VariantInfo.annotation_names` field of each variant.
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_source, compression_type=compression_type,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        annotation_field=annotation_field)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

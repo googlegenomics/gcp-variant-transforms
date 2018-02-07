@@ -106,11 +106,13 @@ def _read_variants(pipeline, known_args):
                     [known_args.input_pattern])
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                     allow_malformed_records=(
-                        known_args.allow_malformed_records)))
+                        known_args.allow_malformed_records),
+                    annotation_field=known_args.annotation_field))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         known_args.input_pattern,
-        allow_malformed_records=known_args.allow_malformed_records)
+        allow_malformed_records=known_args.allow_malformed_records,
+        annotation_field=known_args.annotation_field)
   return variants
 
 
@@ -224,7 +226,8 @@ def run(argv=None):
              variant_merger,
              known_args.split_alternate_allele_info_fields,
              append=known_args.append,
-             omit_empty_sample_calls=known_args.omit_empty_sample_calls))
+             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+             annotation_field=known_args.annotation_field))
 
 
 if __name__ == '__main__':

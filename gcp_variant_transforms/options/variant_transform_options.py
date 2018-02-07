@@ -59,6 +59,13 @@ class VcfReadOptions(VariantTransformsOptions):
               'Failed reads will be logged as warnings and returned as '
               'MalformedVcfRecord objects.'))
     parser.add_argument(
+        '--annotation_field',
+        default=None,
+        help=('If set, it is the name of the annotation field. The content '
+              'of this INFO field will be broken into multiple columns in the '
+              'output BigQuery table and stored as repeated fields with '
+              'corresponding alternate alleles. [EXPERIMENTAL]'))
+    parser.add_argument(
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, the pipeline runs in optimized way for handling large '
