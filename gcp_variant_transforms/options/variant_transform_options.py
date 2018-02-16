@@ -77,7 +77,13 @@ class VcfReadOptions(VariantTransformsOptions):
               'large number of files are specified by input_pattern. '
               'Note that each VCF file must still contain valid header files '
               'even if this is provided.'))
-
+    parser.add_argument(
+        '--infer_undefined_headers',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, header fields (e.g. FORMAT, INFO) are not only '
+              'extracted from header section of VCF files, but also from '
+              'variants. This is useful when there are header fields in '
+              'variants not defined in the header sections.'))
 
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
