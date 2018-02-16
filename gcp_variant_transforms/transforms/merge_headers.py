@@ -201,4 +201,4 @@ class MergeHeaders(beam.PTransform):
 
   def expand(self, pcoll):
     return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
-        self._header_merger))
+        self._header_merger)).without_defaults()

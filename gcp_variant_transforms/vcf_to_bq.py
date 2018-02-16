@@ -55,6 +55,7 @@ from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
+from gcp_variant_transforms.transforms import infer_undefined_headers
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
@@ -132,6 +133,21 @@ def _get_pipeline_mode(known_args):
 
   return PipelineModes.SMALL
 
+def _add_inferred_headers(pipeline, known_args, merged_header):
+  inferred_headers = (
+      _read_variants(pipeline, known_args)
+      | 'FilterVariants' >> filter_variants.FilterVariants(
+          reference_names=known_args.reference_names)
+      | ' InferUndefinedHeaderFields' >>
+      infer_undefined_headers.InferUndefinedHeaderFields(
+          beam.pvalue.AsSingleton(merged_header)))
+  merged_header = (
+      (inferred_headers, merged_header)
+      | beam.Flatten()
+      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields))
+  return merged_header
+
 
 def _merge_headers(known_args, pipeline_args, pipeline_mode):
   """Merges VCF headers using beam based on pipeline_mode."""
@@ -141,7 +157,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
   options = PipelineOptions(pipeline_args)
 
   # Always run pipeline locally if data is small.
-  if pipeline_mode == PipelineModes.SMALL:
+  if (pipeline_mode == PipelineModes.SMALL and
+      not known_args.infer_undefined_headers):
     options.view_as(StandardOptions).runner = 'DirectRunner'
 
 
@@ -169,12 +186,15 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     else:
       headers |= vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
 
-    _ = (headers
-         | 'MergeHeaders' >> merge_headers.MergeHeaders(
-             known_args.split_alternate_allele_info_fields)
-         | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
-             known_args.representative_header_file))
+    merged_header = (headers
+                     | 'MergeHeaders' >> merge_headers.MergeHeaders(
+                         known_args.split_alternate_allele_info_fields))
 
+    if known_args.infer_undefined_headers:
+      merged_header = _add_inferred_headers(p, known_args, merged_header)
+
+    _ = (merged_header | 'WriteHeaders' >> vcf_header_io.WriteVcfHeaders(
+        known_args.representative_header_file))
 
 def _add_parser_arguments(options, parser):
   for transform_options in options:
