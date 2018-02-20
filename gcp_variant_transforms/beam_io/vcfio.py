@@ -38,6 +38,10 @@ __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
            'VariantInfo', 'MalformedVcfRecord']
 
 
+# TODO(bashir2): We should remove VariantInfo and instead use the raw 'data'
+# only; field_count does not need to be carried with the variant and should
+# be extracted from the header data wherever needed.
+#
 # Stores data about variant INFO fields. The type of 'data' is specified in the
 # VCF headers. 'field_count' is a string that specifies the number of fields
 # that the data type contains. Its value can either be a number representing a

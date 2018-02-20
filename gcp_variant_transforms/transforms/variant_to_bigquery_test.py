@@ -25,6 +25,8 @@ from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
@@ -110,24 +112,17 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     variant_1, row_1 = self._get_sample_variant_1()
     variant_2, row_2 = self._get_sample_variant_2()
     variant_3, row_3 = self._get_sample_variant_3()
+    header_fields = vcf_header_parser.HeaderFields({}, {})
+    proc_var_1 = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant_1)
+    proc_var_2 = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant_2)
+    proc_var_3 = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant_3)
     pipeline = TestPipeline()
     bigquery_rows = (
         pipeline
-        | Create([variant_1, variant_2, variant_3])
+        | Create([proc_var_1, proc_var_2, proc_var_3])
         | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow()))
-    assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
-    pipeline.run()
-
-  def test_convert_variant_to_bigquery_row_no_split_alternate_headers(self):
-    variant_1, row_1 = self._get_sample_variant_1(
-        split_alternate_allele_info_fields=False)
-    variant_2, row_2 = self._get_sample_variant_2()
-    variant_3, row_3 = self._get_sample_variant_3()
-    pipeline = TestPipeline()
-    bigquery_rows = (
-        pipeline
-        | Create([variant_1, variant_2, variant_3])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
-            split_alternate_allele_info_fields=False)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()

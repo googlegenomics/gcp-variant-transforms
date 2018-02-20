@@ -50,6 +50,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_headers
@@ -188,7 +189,6 @@ def _validate_args(options, parsed_args):
 
 def run(argv=None):
   """Runs VCF to BigQuery pipeline."""
-
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   command_line_options = [option() for option in _COMMAND_LINE_OPTIONS]
@@ -208,6 +208,10 @@ def run(argv=None):
   # See https://issues.apache.org/jira/browse/BEAM-2801.
   header_fields = vcf_header_parser.get_vcf_headers(
       known_args.representative_header_file)
+  processed_variant_factory = processed_variant.ProcessedVariantFactory(
+      header_fields,
+      known_args.split_alternate_allele_info_fields,
+      known_args.annotation_fields)
 
   pipeline_options = PipelineOptions(pipeline_args)
   with beam.Pipeline(options=pipeline_options) as p:
@@ -217,13 +221,18 @@ def run(argv=None):
     if variant_merger:
       variants |= (
           'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
-    _ = (variants |
+    proc_variants = variants | 'ProcessVaraints' >> beam.Map(
+        processed_variant_factory.create_processed_variant).\
+      with_output_types(processed_variant.ProcessedVariant)
+    _ = (proc_variants |
          'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
              known_args.output_table,
              header_fields,
              variant_merger,
              known_args.split_alternate_allele_info_fields,
-             append=known_args.append))
+             append=known_args.append,
+             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+             annotation_fields=known_args.annotation_fields))
 
 
 if __name__ == '__main__':

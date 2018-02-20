@@ -101,6 +101,19 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         help=('If true, existing records in output_table will not be '
               'overwritten. New records will be appended to those that '
               'already exist.'))
+    parser.add_argument(
+        '--omit_empty_sample_calls',
+        type='bool', default=False, nargs='?', const=True,
+        help=("If true, samples that don't have a given call will be omitted."))
+    parser.add_argument(
+        '--annotation_fields',
+        default=None, nargs='+',
+        help=('If set, it is a list of field names (separated by space) that '
+              'should be treated as annotation fields. The content of these '
+              'INFO fields will be broken into multiple columns in the output '
+              'BigQuery table and stored as repeated fields with '
+              'corresponding alternate alleles. [EXPERIMENTAL]'))
+
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
