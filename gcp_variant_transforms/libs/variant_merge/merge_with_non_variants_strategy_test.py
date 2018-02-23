@@ -20,7 +20,7 @@ import copy
 import unittest
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 
 

@@ -104,3 +104,5 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+
+# TODO(bashir2): Add tests for create_alt_record_for_schema.

@@ -21,8 +21,10 @@ import unittest
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.libs.bigquery_vcf_schema import _TableFieldConstants as TableFieldConstants
-from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+# TODO(bashir2): Style guide suggests not to import individual classes or
+# functions and instead import the whole module. Fix it here and elsewhere.
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
+from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 
 

@@ -20,6 +20,8 @@ import apache_beam as beam
 
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  #pylint: disable=unused-import
 
 __all__ = ['VariantToBigQuery']
 
@@ -39,41 +41,40 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class VariantToBigQuery(beam.PTransform):
-  """Writes PCollection of ``Variant`` records to BigQuery."""
+  """Writes PCollection of `ProcessedVariant` records to BigQuery."""
 
-  def __init__(self, output_table, header_fields, variant_merger=None,
-               split_alternate_allele_info_fields=True, append=False,
-               omit_empty_sample_calls=False,
-               annotation_fields=None):
+  def __init__(
+      self,
+      output_table,  # type: str
+      header_fields,  # type: vcf_header_parser.HeaderFields
+      variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
+      proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
+      append=False,  # type: bool
+      omit_empty_sample_calls=False  # type: bool
+  ):
     """Initializes the transform.
 
     Args:
-      output_table (str): Full path of the output BigQuery table.
-      header_fields (``HeaderFields``): A ``namedtuple`` containing
-        representative header fields for all ``Variant`` records.
-        This is needed for dynamically generating the schema.
-      variant_merger (``VariantMergeStrategy``): The strategy used for merging
-        variants (if any). Some strategies may change the schema, which is why
-        this may be needed here.
-      split_alternate_allele_info_fields (bool): If true, all INFO fields with
-        `Number=A` (i.e. one value for each alternate allele) will be stored
-        under the `alternate_bases` record. If false, they will be stored with
-        the rest of the INFO fields.
-      append (bool): If true, existing records in output_table will not be
+      output_table: Full path of the output BigQuery table.
+      header_fields: A `namedtuple` containing representative header fields for
+        all variants. This is needed for dynamically generating the schema.
+      variant_merger: The strategy used for merging variants (if any). Some
+        strategies may change the schema, which is why this may be needed here.
+      proc_var_factory: The factory class that knows how to convert Variant
+        instances to ProcessedVariant. As a side effect it also knows how to
+        modify BigQuery schema based on the ProcessedVariants that it generates.
+        The latter functionality is what is needed here.
+      append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
-      omit_empty_sample_calls (bool): If true, samples that don't have a given
-        call will be omitted.
-      annotation_fields (List[str]): If provided, it is the list of annotation
-        fields.
+      omit_empty_sample_calls: If true, samples that don't have a given call
+        will be omitted.
     """
     self._output_table = output_table
     self._header_fields = header_fields
     self._variant_merger = variant_merger
-    self._split_alternate_allele_info_fields = (
-        split_alternate_allele_info_fields)
+    self._proc_var_factory = proc_var_factory
     self._append = append
     self._omit_empty_sample_calls = omit_empty_sample_calls
-    self._annotation_fields = annotation_fields
 
   def expand(self, pcoll):
     return (pcoll
@@ -83,9 +84,8 @@ class VariantToBigQuery(beam.PTransform):
                 self._output_table,
                 schema=bigquery_vcf_schema.generate_schema_from_header_fields(
                     self._header_fields,
-                    self._variant_merger,
-                    self._split_alternate_allele_info_fields,
-                    self._annotation_fields),
+                    self._proc_var_factory,
+                    self._variant_merger),
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
                 write_disposition=(

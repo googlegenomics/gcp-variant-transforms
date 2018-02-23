@@ -31,8 +31,8 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.libs.bigquery_vcf_schema import _TableFieldConstants as TableFieldConstants
-from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
+from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 
 
@@ -93,7 +93,9 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     header_fields = vcf_header_parser.HeaderFields({}, {})
     self._assert_fields_equal(
         self._generate_expected_fields(),
-        bigquery_vcf_schema.generate_schema_from_header_fields(header_fields))
+        bigquery_vcf_schema.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields)))
 
   def test_info_header_fields(self):
     infos = OrderedDict([
@@ -112,11 +114,16 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         self._generate_expected_fields(
             alt_fields=['IA', 'IA2'],
             info_fields=['I1', 'I2', 'IU', 'IG', 'I0']),
-        bigquery_vcf_schema.generate_schema_from_header_fields(header_fields))
+        bigquery_vcf_schema.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields)))
 
     # Test with split_alternate_allele_info_fields=False.
     actual_schema = bigquery_vcf_schema.generate_schema_from_header_fields(
-        header_fields, split_alternate_allele_info_fields=False)
+        header_fields,
+        processed_variant.ProcessedVariantFactory(
+            header_fields,
+            split_alternate_allele_info_fields=False))
     self._assert_fields_equal(
         self._generate_expected_fields(
             info_fields=['I1', 'I2', 'IA', 'IU', 'IG', 'I0', 'IA2']),
@@ -161,7 +168,9 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             alt_fields=['IA'],
             call_fields=['F1', 'F2', 'FU'],
             info_fields=['I1']),
-        bigquery_vcf_schema.generate_schema_from_header_fields(header_fields))
+        bigquery_vcf_schema.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields)))
 
   def test_bigquery_field_name_sanitize(self):
     infos = OrderedDict([
@@ -181,7 +190,9 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             call_fields=['a_b', 'OK_format_09'],
             info_fields=['field__', 'field__A', 'field_0a', 'A_B_C',
                          'OK_info_09']),
-        bigquery_vcf_schema.generate_schema_from_header_fields(header_fields))
+        bigquery_vcf_schema.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields)))
 
   def test_variant_merger_modify_schema(self):
     infos = OrderedDict([
@@ -195,7 +206,9 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             call_fields=['F1'],
             info_fields=['I1', 'ADDED_BY_MERGER']),
         bigquery_vcf_schema.generate_schema_from_header_fields(
-            header_fields, variant_merger=_DummyVariantMergeStrategy()))
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields),
+            variant_merger=_DummyVariantMergeStrategy()))
 
 
 class GetRowsFromVariantTest(unittest.TestCase):
