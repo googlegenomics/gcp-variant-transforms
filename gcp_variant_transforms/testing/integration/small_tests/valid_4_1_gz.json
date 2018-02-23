@@ -3,15 +3,19 @@
   "table_name": "valid_4_1_gz",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.1-large.vcf.gz",
   "runner": "DataflowRunner",
-  "validation_query": [
-    "SELECT COUNT(0) AS num_rows, ",
-    "  SUM(start_position) AS sum_start, ",
-    "  SUM(end_position) AS sum_end ",
-    "FROM {TABLE_NAME}"
-  ],
-  "expected_query_result": {
-    "num_rows": 9882,
-    "sum_start": 5434957328,
-    "sum_end": 5435327553
-  }
+  "test_cases": [
+    {
+      "validation_query": [
+        "SELECT COUNT(0) AS num_rows, ",
+        "  SUM(start_position) AS sum_start, ",
+        "  SUM(end_position) AS sum_end ",
+        "FROM {TABLE_NAME}"
+      ],
+      "expected_query_result": {
+        "num_rows": 9882,
+        "sum_start": 5434957328,
+        "sum_end": 5435327553
+      }
+    }
+  ]
 }

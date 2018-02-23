@@ -73,8 +73,7 @@ class TestCase(object):
                test_name,
                table_name,
                input_pattern,
-               validation_query,
-               expected_query_result,
+               test_cases,
                **kwargs):
 
     self._name = test_name
@@ -82,8 +81,7 @@ class TestCase(object):
     self._project = context.project
     self._table_name = '{}.{}'.format(dataset_id, table_name)
     output_table = '{}:{}'.format(context.project, self._table_name)
-    self._validation_query = (" ").join(validation_query)
-    self._expected_query_result = expected_query_result
+    self._test_cases = test_cases
     args = ['--input_pattern {}'.format(input_pattern),
             '--output_table {}'.format(output_table),
             '--project {}'.format(context.project),
@@ -152,24 +150,26 @@ class TestCase(object):
     client = bigquery.Client(project=self._project)
     # TODO(bashir2): Create macros for common queries and add the option for
     # having a list of queries instead of just one.
-    query = self._validation_query.format(TABLE_NAME=self._table_name)
-    query_job = client.query(query)
-    assert query_job.state == 'RUNNING'
-    iterator = query_job.result(timeout=60)
-    rows = list(iterator)
-    if len(rows) != 1:
-      raise TestCaseFailure('Expected one row in query result, got {}'.format(
+    for test_case in self._test_cases:
+      query = (" ").join(test_case['validation_query']).format(TABLE_NAME=self._table_name)
+      query_job = client.query(query)
+      assert query_job.state == 'RUNNING'
+      iterator = query_job.result(timeout=60)
+      rows = list(iterator)
+      if len(rows) != 1:
+        raise TestCaseFailure('Expected one row in query result, got {}'.format(
           len(rows)))
-    row = rows[0]
-    if len(self._expected_query_result) != len(row):
-      raise TestCaseFailure(
-          'Expected {} columns in the query result, got {}'.format(
-              len(self._expected_query_result), len(row)))
-    for key in self._expected_query_result.keys():
-      if self._expected_query_result[key] != row.get(key):
+      row = rows[0]
+      expected_result = test_case['expected_query_result']
+      if len(expected_result) != len(row):
         raise TestCaseFailure(
+          'Expected {} columns in the query result, got {}'.format(
+            len(expected_result), len(row)))
+      for key in expected_result.keys():
+        if expected_result[key] != row.get(key):
+          raise TestCaseFailure(
             'Column {} mismatch: expected {}, got {}'.format(
-                key, self._expected_query_result[key], row.get(key)))
+              key, expected_result[key], row.get(key)))
 
 
 class TestContextManager(object):
@@ -272,7 +272,7 @@ def _load_test_config(filename):
 
 def _validate_test(test, filename):
   required_keys = ['test_name', 'table_name', 'input_pattern',
-                   'validation_query', 'expected_query_result']
+                   'test_cases']
   for key in required_keys:
     if key not in test:
       raise ValueError('Test case in {} is missing required key: {}'.format(

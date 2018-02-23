@@ -4,12 +4,16 @@
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2_VEP.vcf",
   "annotation_field": "CSQ",
   "runner": "DataflowRunner",
-  "validation_query": [
-    "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-    "FROM {TABLE_NAME} AS t, t.alternate_bases as alts, alts.CSQ as CSQ ",
-    "WHERE start_position = 1110695 AND alts.alt = 'G'"
-  ],
-  "expected_query_result": {
-    "num_features": 3
-  }
+  "test_cases": [
+    {
+      "validation_query": [
+        "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
+        "FROM {TABLE_NAME} AS t, t.alternate_bases as alts, alts.CSQ as CSQ ",
+        "WHERE start_position = 1110695 AND alts.alt = 'G'"
+      ],
+      "expected_query_result": {
+        "num_features": 3
+      }
+    }
+  ]
 }
