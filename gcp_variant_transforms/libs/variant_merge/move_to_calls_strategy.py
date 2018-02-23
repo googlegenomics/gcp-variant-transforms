@@ -20,7 +20,7 @@ import hashlib
 import re
 
 from gcp_variant_transforms.beam_io.vcfio import Variant
-from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 
 __all__ = ['MoveToCallsStrategy']
@@ -71,9 +71,11 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     """
     additional_call_info = {}
     if self._should_copy_filter_to_calls():
-      additional_call_info[ColumnKeyConstants.FILTER] = variant.filters
+      additional_call_info[
+          bigquery_util.ColumnKeyConstants.FILTER] = variant.filters
     if self._should_copy_quality_to_calls():
-      additional_call_info[ColumnKeyConstants.QUALITY] = variant.quality
+      additional_call_info[
+          bigquery_util.ColumnKeyConstants.QUALITY] = variant.quality
     for info_key, info_value in variant.info.iteritems():
       if self._should_move_info_key_to_calls(info_key):
         additional_call_info[info_key] = info_value.data
@@ -142,7 +144,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     # Find the calls record so that it's easier to reference it below.
     calls_record = None
     for field in schema.fields:
-      if field.name == ColumnKeyConstants.CALLS:
+      if field.name == bigquery_util.ColumnKeyConstants.CALLS:
         calls_record = field
         break
     if not calls_record:
@@ -152,17 +154,19 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     updated_fields = []
     for field in schema.fields:
       if (self._should_copy_filter_to_calls() and
-          field.name == ColumnKeyConstants.FILTER):
-        if ColumnKeyConstants.FILTER in existing_calls_keys:
-          self._raise_duplicate_key_error(ColumnKeyConstants.FILTER,
-                                          'should_copy_filter_to_calls')
+          field.name == bigquery_util.ColumnKeyConstants.FILTER):
+        if bigquery_util.ColumnKeyConstants.FILTER in existing_calls_keys:
+          self._raise_duplicate_key_error(
+              bigquery_util.ColumnKeyConstants.FILTER,
+              'should_copy_filter_to_calls')
         calls_record.fields.append(field)
         updated_fields.append(field)
       elif (self._should_copy_quality_to_calls() and
-            field.name == ColumnKeyConstants.QUALITY):
-        if ColumnKeyConstants.QUALITY in existing_calls_keys:
-          self._raise_duplicate_key_error(ColumnKeyConstants.QUALITY,
-                                          'should_copy_quality_to_calls')
+            field.name == bigquery_util.ColumnKeyConstants.QUALITY):
+        if bigquery_util.ColumnKeyConstants.QUALITY in existing_calls_keys:
+          self._raise_duplicate_key_error(
+              bigquery_util.ColumnKeyConstants.QUALITY,
+              'should_copy_quality_to_calls')
         calls_record.fields.append(field)
         updated_fields.append(field)
       elif (field.name in info_keys and

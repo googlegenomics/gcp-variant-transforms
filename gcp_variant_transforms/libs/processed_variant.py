@@ -23,10 +23,15 @@ functions are "private".
 from __future__ import absolute_import
 
 import logging
+
 from collections import defaultdict
 from typing import Dict, List, Any  #pylint: disable=unused-import
 
+import vcf
+
+from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
 
 
@@ -224,7 +229,7 @@ class ProcessedVariantFactory(object):
       raise ValueError('{} INFO not found in the header, variant: {}'.format(
           field_name, proc_var))
     header_desc = self._header_fields.infos[field_name].desc
-    annotation_names = extract_annotation_names(header_desc)
+    annotation_names = _extract_annotation_names(header_desc)
     alt_annotation_map = self._convert_annotation_strs_to_alt_map(
         annotation_names, data)
     for alt_bases, annotations_list in alt_annotation_map.iteritems():
@@ -261,6 +266,67 @@ class ProcessedVariantFactory(object):
       annotation_dict[name] = annotations[index + 1]
     return annotation_dict
 
+  def create_alt_bases_field_schema(self):
+    # type: () -> bigquery.TableFieldSchema
+    """Returns the alternate_bases record compatible with this factory.
+
+    Depending on how this class is set up to split INFO fields among alternate
+    bases, this function produces a compatible alternate_bases record and
+    returns it which can be added to a bigquery schema by the caller.
+    """
+    alternate_bases_record = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    alternate_bases_record.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Alternate base.'))
+    if self._split_alternate_allele_info_fields:
+      for key, field in self._header_fields.infos.iteritems():
+        if field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]:
+          alternate_bases_record.fields.append(bigquery.TableFieldSchema(
+              name=bigquery_util.get_bigquery_sanitized_field_name(key),
+              type=bigquery_util.get_bigquery_type_from_vcf_type(field.type),
+              mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+              description=bigquery_util.get_bigquery_sanitized_field(
+                  field.desc)))
+
+    for annot_field in self._annotation_field_set:
+      if annot_field not in self._header_fields.infos:
+        raise ValueError('Annotation field {} not found'.format(annot_field))
+      annotation_names = _extract_annotation_names(
+          self._header_fields.infos[annot_field].desc)
+      annotation_record = bigquery.TableFieldSchema(
+          name=bigquery_util.get_bigquery_sanitized_field(annot_field),
+          type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+          mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+          description='List of {} annotations for this alternate.'.format(
+              annot_field))
+      for annotation_name in annotation_names:
+        annotation_record.fields.append(bigquery.TableFieldSchema(
+            name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
+            type=bigquery_util.TableFieldConstants.TYPE_STRING,
+            mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+            # TODO(bashir2): Add descriptions of well known annotations, e.g.,
+            # from VEP.
+            description=''))
+      alternate_bases_record.fields.append(annotation_record)
+    return alternate_bases_record
+
+  def info_is_in_alt_bases(self, info_field_name):
+    # type: (str) -> bool
+    if info_field_name not in self._header_fields.infos:
+      raise ValueError('INFO field {} not found'.format(info_field_name))
+    is_per_alt_info = (
+        self._split_alternate_allele_info_fields and
+        self._header_fields.infos[info_field_name].num ==
+        vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])
+    is_annotation = info_field_name in self._annotation_field_set
+    return is_per_alt_info or is_annotation
+
 
 def _extract_annotation_list_with_alt(annotation_str):
   # type: (str) -> List[str]
@@ -280,10 +346,7 @@ def _extract_annotation_list_with_alt(annotation_str):
   return annotation_str.split('|')
 
 
-# TODO(bashir2): Once the refactoring of bigquery_vcf_schema is complete, these
-# functions should not be used outside this module (mark them as 'private').
-
-def extract_annotation_names(description):
+def _extract_annotation_names(description):
   # type: (str) -> List[str]
   """Extracts annotation list from the description of an annotation INFO field.
 
