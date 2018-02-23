@@ -31,6 +31,12 @@ steps:
       - 'push'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
   # Run the test script from the image we just built and pushed.
+  #
+  # Note that ./deploy_and_run_tests.sh that is referenced here is coming from
+  # the source downloaded from GitHub and not the file in the docker image.
+  # The only reason that we use the built image in the 'name' argument is
+  # convenience, i.e., to avoid installing python, virtualenv, etc. on the
+  # image.
   - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     args:
       - 'bash'

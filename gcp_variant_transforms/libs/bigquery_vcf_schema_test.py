@@ -29,6 +29,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_vcf_schema
+from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_vcf_schema import _TableFieldConstants as TableFieldConstants
 from gcp_variant_transforms.libs.bigquery_vcf_schema import ColumnKeyConstants
@@ -201,7 +202,14 @@ class GetRowsFromVariantTest(unittest.TestCase):
   """Test cases for the ``get_rows_from_variant`` library function."""
 
   def _get_row_list_from_variant(self, variant, **kwargs):
-    return list(bigquery_vcf_schema.get_rows_from_variant(variant, **kwargs))
+    # TODO(bashir2): To make this more of a "unit" test, we should create
+    # ProcessedVariant instances directly (instead of Variant) and avoid calling
+    # create_processed_variant here. Then we should also add cases that
+    # have annotation fields.
+    header_fields = vcf_header_parser.HeaderFields({}, {})
+    proc_var = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant)
+    return list(bigquery_vcf_schema.get_rows_from_variant(proc_var, **kwargs))
 
   def test_all_fields(self):
     variant = vcfio.Variant(
@@ -249,17 +257,6 @@ class GetRowsFromVariantTest(unittest.TestCase):
         'I1': 'some data',
         'I2': ['data1', 'data2']}
     self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
-
-    # Test with split_alternate_allele_info_fields=False.
-    expected_row[ColumnKeyConstants.ALTERNATE_BASES] = [
-        {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A'},
-        {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT'}]
-    expected_row['AF'] = [0.1, 0.2]
-    expected_row['AF2'] = [0.2, 0.3]
-    self.assertEqual(
-        [expected_row],
-        self._get_row_list_from_variant(
-            variant, split_alternate_allele_info_fields=False))
 
   def test_no_alternate_bases(self):
     variant = vcfio.Variant(
