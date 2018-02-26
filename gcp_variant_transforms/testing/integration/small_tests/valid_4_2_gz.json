@@ -3,15 +3,15 @@
   "table_name": "valid_4_2_gz",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf.gz",
   "runner": "DataflowRunner",
-  "test_cases": [
+  "assertion_configs": [
     {
-      "validation_query": [
+      "query": [
         "SELECT COUNT(0) AS num_rows, ",
         "  SUM(start_position) AS sum_start, ",
         "  SUM(end_position) AS sum_end ",
         "FROM {TABLE_NAME}"
       ],
-      "expected_query_result": {
+      "expected_result": {
         "num_rows": 13,
         "sum_start": 23031929,
         "sum_end": 23033052
