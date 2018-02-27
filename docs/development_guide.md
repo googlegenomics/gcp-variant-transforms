@@ -159,7 +159,8 @@ git push -u origin <branch name>
 To commit and push those changes to your branch.
 
 ### Syncing your branch
-If you want to pull in changes from the target branch (i.e. googlegenomic:master), run:
+If you want to pull in changes from the target branch (i.e. googlegenomic:master), 
+run:
 ```bash
 git pull --rebase upstream master
 ```
