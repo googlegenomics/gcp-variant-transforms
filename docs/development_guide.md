@@ -50,7 +50,9 @@ installed packages which is currently safe to ignore. For details see
 [Issue #71](https://github.com/googlegenomics/gcp-variant-transforms/issues/71).
 
 ### Setup IDE
+
 You may choose any IDE as you like. The following steps are intended for IntelliJ users.
+
 #### Install IntelliJ IDE
 
 Download [IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/download/#section=linux) and install.
@@ -64,17 +66,19 @@ In the dialog that opens, search for Python Community Edition and then install t
 For more details, refer to [Install plugins](https://www.jetbrains.com/help/idea/installing-updating-and-uninstalling-repository-plugins.html).
 
 #### Setup IntelliJ SDK
+
 1. Choose File | Project Structure on the main menu, and then go to Project.
 2. Create a new project SDK by clicking the New button, choose Python SDK then add Local.
 3. In the dialog that opens, click the Virtual Environment node. Select New environment, and specify the location of the new virtual environment. Note that the folder where the new virtual environment should be located must be empty! For the Base interpreter, add the python path gcp-variant-transforms/venv/bin/python under the created virtualenv.
 
 #### Code Inspection
+
 The inspection profile in .idea/inspectionProfiles/Project_Default.xml is checked into the git repository and can be imported into File | Settings | Editor | Inspections.
 
 Code inspections can be run from the Analyze menu. The result window can be accessed from View > Tool Windows.
 
 #### Code Style
-To comply with pylint coding style, you may change the default line length in File | Settings | Editor | Code Style. Set the hard wrap at 80 columns and checked the Wrap on typing. Further, go to Python in the dropdown list, you can set the indent to 2 and continuation indent to 4.
+To comply with pylint coding style, you may change the default line length in File | Settings | Editor | Code Style. Set the hard wrap at 80 columns and check Wrap on typing. Further, go to Python in the dropdown list, you can set the indent to 2 and continuation indent to 4.
 
 ## Making Changes
 ### Create a branch in your forked repository
