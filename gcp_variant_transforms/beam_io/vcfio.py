@@ -859,7 +859,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
           # is unknown. This is to ensure consistent types across all records.
           # Note: this is already done for INFO fields in PyVCF.
           if (field in formats and
-              formats[field].num is None and
+              formats[field].num not in (0, 1) and
               isinstance(data, (int, float, long, basestring, bool))):
             data = [data]
           call.info[field] = data
