@@ -15,8 +15,13 @@ for more information on using pull requests.
 ## Setup
 
 ### Fork the repository on Github
-Visit the [gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms) to create your own fork of the repository. See [https://guides.github.com/activities/forking/](https://guides.github.com/activities/forking/)
-for more information. Do not create branches on the main repository. Meanwhile, do not commit anything to the master of the forked repository to keep the syncing process simple.
+Visit the 
+[gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms) 
+to create your own fork of the repository. See 
+[https://guides.github.com/activities/forking/](https://guides.github.com/activities/forking/)
+for more information. Do not create branches on the main repository. Meanwhile, 
+do not commit anything to the master of the forked repository to keep the 
+syncing process simple.
 
 
 ### Setup dev environment
@@ -51,34 +56,50 @@ installed packages which is currently safe to ignore. For details see
 
 ### Setup IDE
 
-You may choose any IDE as you like. The following steps are intended for IntelliJ users.
+You may choose any IDE as you like. The following steps are intended for 
+IntelliJ users.
 
 #### Install IntelliJ IDE
 
-Download [IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/download/#section=linux) and install.
+Download 
+[IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/download/#section=linux) 
+and install.
 
 #### Install Python plugin
 
 Choose File | Settings on the main menu, and then go to Plugins.
 Click the Install JetBrains plugin button.
-In the dialog that opens, search for Python Community Edition and then install the plugin.
+In the dialog that opens, search for Python Community Edition and then install 
+the plugin.
 
-For more details, refer to [Install plugins](https://www.jetbrains.com/help/idea/installing-updating-and-uninstalling-repository-plugins.html).
+For more details, refer to 
+[Install plugins](https://www.jetbrains.com/help/idea/installing-updating-and-uninstalling-repository-plugins.html).
 
 #### Setup IntelliJ SDK
 
 1. Choose File | Project Structure on the main menu, and then go to Project.
-2. Create a new project SDK by clicking the New button, choose Python SDK then add Local.
-3. In the dialog that opens, click the Virtual Environment node. Select New environment, and specify the location of the new virtual environment. Note that the folder where the new virtual environment should be located must be empty! For the Base interpreter, add the python path gcp-variant-transforms/venv/bin/python under the created virtualenv.
+2. Create a new project SDK by clicking the New button, choose Python SDK then 
+add Local.
+3. In the dialog that opens, click the Virtual Environment node. Select New 
+environment, and specify the location of the new virtual environment. Note that 
+the folder where the new virtual environment should be located must be empty! 
+For the Base interpreter, add the python path 
+gcp-variant-transforms/venv/bin/python under the created virtualenv.
 
 #### Code Inspection
 
-The inspection profile in .idea/inspectionProfiles/Project_Default.xml is checked into the git repository and can be imported into File | Settings | Editor | Inspections.
+The inspection profile in .idea/inspectionProfiles/Project_Default.xml is 
+checked into the git repository and can be imported into 
+File | Settings | Editor | Inspections.
 
-Code inspections can be run from the Analyze menu. The result window can be accessed from View > Tool Windows.
+Code inspections can be run from the Analyze menu. The result window can be 
+accessed from View > Tool Windows.
 
 #### Code Style
-To comply with pylint coding style, you may change the default line length in File | Settings | Editor | Code Style. Set the hard wrap at 80 columns and check Wrap on typing. Further, go to Python in the dropdown list, you can set the indent to 2 and continuation indent to 4.
+To comply with pylint coding style, you may change the default line length in 
+File | Settings | Editor | Code Style. Set the hard wrap at 80 columns and 
+check Wrap on typing. Further, go to Python in the dropdown list, you can 
+set the indent to 2 and continuation indent to 4.
 
 ## Making Changes
 ### Create a branch in your forked repository
@@ -138,11 +159,6 @@ git push -u origin <branch name>
 To commit and push those changes to your branch.
 
 ### Syncing your branch
-To update the forked repository, you may follow instructions on [syncing a fork](https://help.github.com/articles/syncing-a-fork/), or simply set upstream to the main repository and do:
-```bash
-git pull upstream master
-git push
-```
 If you want to pull in changes from the target branch (i.e. googlegenomic:master), run:
 ```bash
 git pull --rebase upstream master
@@ -158,7 +174,9 @@ to your branch. If this happens, you can force push after a rebase by runnning:
 ```bash
 git push -f
 ```
-For more information, you may check on [merge](https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging#_basic_merging) and [rebase](https://git-scm.com/book/en/v2/Git-Branching-Rebasing). 
+For more information, you may check on 
+[merge](https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging#_basic_merging) 
+and [rebase](https://git-scm.com/book/en/v2/Git-Branching-Rebasing). 
 
 ### Creating a pull request
 Once your changes are pushed and ready for review, you can create a pull request
