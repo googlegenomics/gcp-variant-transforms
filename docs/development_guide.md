@@ -17,7 +17,7 @@ for more information on using pull requests.
 ### Fork the repository on Github
 
 Visit the
-[gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms) 
+[gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms)
 to create your own fork of the repository. See
 [https://guides.github.com/activities/forking/](https://guides.github.com/activities/forking/)
 for more information. Do not create branches on the main repository. Meanwhile,
