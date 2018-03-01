@@ -33,6 +33,7 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
+import enum
 import json
 import multiprocessing
 import os
@@ -40,6 +41,7 @@ import sys
 import time
 
 from datetime import datetime
+from typing import List  # pylint: disable=unused-import
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -73,8 +75,7 @@ class TestCase(object):
                test_name,
                table_name,
                input_pattern,
-               validation_query,
-               expected_query_result,
+               assertion_configs,
                **kwargs):
 
     self._name = test_name
@@ -82,8 +83,7 @@ class TestCase(object):
     self._project = context.project
     self._table_name = '{}.{}'.format(dataset_id, table_name)
     output_table = '{}:{}'.format(context.project, self._table_name)
-    self._validation_query = (" ").join(validation_query)
-    self._expected_query_result = expected_query_result
+    self._assertion_configs = assertion_configs
     args = ['--input_pattern {}'.format(input_pattern),
             '--output_table {}'.format(output_table),
             '--project {}'.format(context.project),
@@ -148,12 +148,26 @@ class TestCase(object):
             'No traceback. See logs for more information on error.')
 
   def validate_table(self):
-    """Runs a simple query against the output table and verifies aggregates."""
+    """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
-    # TODO(bashir2): Create macros for common queries and add the option for
-    # having a list of queries instead of just one.
-    query = self._validation_query.format(TABLE_NAME=self._table_name)
-    query_job = client.query(query)
+    query_formatter = QueryFormatter(self._table_name)
+    for assertion_config in self._assertion_configs:
+      query = query_formatter.format_query(assertion_config['query'])
+      assertion = QueryAssertion(client, query, assertion_config[
+          'expected_result'])
+      assertion.run_assertion()
+
+
+class QueryAssertion(object):
+  """Runs a query and verifies that the output matches the expected result."""
+
+  def __init__(self, client, query, expected_result):
+    self._client = client
+    self._query = query
+    self._expected_result = expected_result
+
+  def run_assertion(self):
+    query_job = self._client.query(self._query)
     assert query_job.state == 'RUNNING'
     iterator = query_job.result(timeout=60)
     rows = list(iterator)
@@ -161,15 +175,52 @@ class TestCase(object):
       raise TestCaseFailure('Expected one row in query result, got {}'.format(
           len(rows)))
     row = rows[0]
-    if len(self._expected_query_result) != len(row):
+    if len(self._expected_result) != len(row):
       raise TestCaseFailure(
           'Expected {} columns in the query result, got {}'.format(
-              len(self._expected_query_result), len(row)))
-    for key in self._expected_query_result.keys():
-      if self._expected_query_result[key] != row.get(key):
+              len(self._expected_result), len(row)))
+    for key in self._expected_result.keys():
+      if self._expected_result[key] != row.get(key):
         raise TestCaseFailure(
             'Column {} mismatch: expected {}, got {}'.format(
-                key, self._expected_query_result[key], row.get(key)))
+                key, self._expected_result[key], row.get(key)))
+
+
+class QueryFormatter(object):
+  """Formats a query.
+
+  Replaces macros and variables in the query.
+  """
+
+  class _QueryMacros(enum.Enum):
+    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
+    SUM_START_QUERY = (
+        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}')
+    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
+
+  def __init__(self, table_name):
+    # type: (str) -> None
+    self._table_name = table_name
+
+  def format_query(self, query):
+    # type: (List[str]) -> str
+    """Formats the given ``query``.
+
+    Formatting logic is as follows:
+    - Concatenates ``query`` parts into one string.
+    - Replaces macro with the corresponding value defined in _QueryMacros.
+    - Replaces variables associated for the query.
+    """
+    return self._replace_variables(self._replace_macros(' '.join(query)))
+
+  def _replace_variables(self, query):
+    return query.format(TABLE_NAME=self._table_name)
+
+  def _replace_macros(self, query):
+    for macro in self._QueryMacros:
+      if macro.name == query:
+        return macro.value
+    return query
 
 
 class TestContextManager(object):
@@ -272,11 +323,22 @@ def _load_test_config(filename):
 
 def _validate_test(test, filename):
   required_keys = ['test_name', 'table_name', 'input_pattern',
-                   'validation_query', 'expected_query_result']
+                   'assertion_configs']
   for key in required_keys:
     if key not in test:
       raise ValueError('Test case in {} is missing required key: {}'.format(
           filename, key))
+  assertion_configs = test['assertion_configs']
+  for assertion_config in assertion_configs:
+    _validate_assertion_config(assertion_config)
+
+
+def _validate_assertion_config(assertion_config):
+  required_keys = ['query', 'expected_result']
+  for key in required_keys:
+    if key not in assertion_config:
+      raise ValueError('Test case in {} is missing required key: {}'.format(
+          assertion_config, key))
 
 
 def _run_test(test, context):
