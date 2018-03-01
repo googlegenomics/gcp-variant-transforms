@@ -28,6 +28,7 @@ syncing process simple.
 ### Setup dev environment
 
 #### Clone the forked repository
+
 ```bash
 git clone git@github.com:<username>/gcp-variant-transforms.git
 cd gcp_variant_transforms
@@ -39,6 +40,7 @@ git remote add upstream git@github.com:googlegenomics/gcp-variant-transforms.git
 ```
 
 #### Setup virtualenv
+
 ```bash
 sudo apt-get install python-pip python-dev build-essential
 sudo pip install --upgrade pip
@@ -48,6 +50,7 @@ virtualenv venv
 ```
 
 #### Install dependences
+
 ```bash
 pip install --upgrade .
 ```
@@ -84,7 +87,7 @@ in the dialog that opens. To setup the Project SDK, follow the following steps.
 2. In the dialog that opens, click the Virtual Environment node. Select New
 environment, and specify the location of the new virtual environment. Note that
 the folder where the new virtual environment should be located must be empty!
-For the Base interpreter, add the python path [PATH_TO_VENE]/bin/python under
+For the Base interpreter, add the python path [PATH_TO_VENV]/bin/python under
 the virtualenv directory created in "Setup virtualenv" above.
 
 Then go to Next, navigate the Project location to the local git project
@@ -151,11 +154,12 @@ script.
 
 Before pushing changes, make sure the pylint checks pass. To install pylint:
 ```bash
-sudo apt-get install pylint
+.[PATH_TO_VENV]/bin/activate
+pip install pylint
 ```
 Then run:
 ```bash
-pylint gcp_variant_transforms
+pylint --rcfile=.pylintrc gcp_variant_transforms/
 ```
 To push changes to your forked branch, you can run:
 ```bash
@@ -192,6 +196,7 @@ For more information, you may check on
 and [rebase](https://git-scm.com/book/en/v2/Git-Branching-Rebasing).
 
 ### Creating a pull request
+
 Once your changes are pushed and ready for review, you can create a pull request
 by visiting the
 [gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms)
@@ -205,10 +210,11 @@ unit-test coverage for your change and make sure integration tests pass.
 
 ### Updating changes
 
-After making changes, you must again add, commit, and push those changes.
-If you are making changes after a review process, you may create new commits for
-related changes by following the steps stated in "Pushing changes to your fork's
-branch". Otherwise, please run the following:
+After making changes, you must again add, commit, and push those changes. It is
+preferred to have one commit per review round such that your reviewers can
+easily check what you have changed since last time. To create new commits, you
+may follow the steps stated in "Pushing changes to your fork's branch".
+Otherwise, please run the following:
 
 ```bash
 git add -p
@@ -235,6 +241,7 @@ This approach is specially useful if you tend to do a lot of small commits
 during your feature development and like to keep them as checkpoints.
 
 ### Continuous integration
+
 Once your pull request is approved and merged into the main repo, there is an
 automated process to create a new docker image from this commit, push it to the
 [Container Registry](
