@@ -76,16 +76,19 @@ the plugin.
 For more details, refer to
 [Install plugins](https://www.jetbrains.com/help/idea/installing-updating-and-uninstalling-repository-plugins.html).
 
-#### Setup IntelliJ SDK
+#### Create Project
 
-1. Choose File | Project Structure on the main menu, and then go to Project.
-2. Create a new project SDK by clicking the New button, choose Python SDK then
-add Local.
-3. In the dialog that opens, click the Virtual Environment node. Select New
+Choose File | New | Project on the main menu, and create a new Python project
+in the dialog that opens. To setup the Project SDK, follow the following steps.
+1. Click the New button, then add Local.
+2. In the dialog that opens, click the Virtual Environment node. Select New
 environment, and specify the location of the new virtual environment. Note that
 the folder where the new virtual environment should be located must be empty!
-For the Base interpreter, add the python path
-gcp-variant-transforms/venv/bin/python under the created virtualenv.
+For the Base interpreter, add the python path [PATH_TO_VENE]/bin/python under
+the virtualenv directory created in "Setup virtualenv" above.
+
+Then go to Next, navigate the Project location to the local git project
+directory created in "Clone the forked repository" step. Click Finish.
 
 #### Code Inspection
 
@@ -93,8 +96,11 @@ The inspection profile in .idea/inspectionProfiles/Project_Default.xml is
 checked into the git repository and can be imported into
 File | Settings | Editor | Inspections.
 
-Code inspections can be run from the Analyze menu. The result window can be
-accessed from View > Tool Windows.
+Code inspections can be run from the Analyze menu. To speed up the inspection
+process, you can go to File | Project Structure | Modules and only set the 
+gcp_variant_transforms as the Sources. You may exclude other folders, or specify
+the inspection scope to be only Module 'gcp-variant-transforms' when running
+the inspection. The result window can be accessed from View > Tool Windows.
 
 #### Code Style
 
@@ -198,8 +204,11 @@ description of how you have tested your change. As a minimum you should have
 unit-test coverage for your change and make sure integration tests pass.
 
 ### Updating changes
-After making changes, you must again add, commit, and push those changes. Rather
-than creating new commits for related changes please run the following:
+
+After making changes, you must again add, commit, and push those changes.
+If you are making changes after a review process, you may create new commits for
+related changes by following the steps stated in "Pushing changes to your fork's
+branch". Otherwise, please run the following:
 
 ```bash
 git add -p
