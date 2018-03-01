@@ -197,11 +197,11 @@ class QueryFormatter(object):
 
   def format_query(self, query):
     # type: (List[str]) -> str
-    """Formats the given ''query''.
+    """Formats the given ``query``.
 
     Formatting logic is as follows:
-      Concatenates ''query'' parts into one string.
-      Replaces TABLE_NAME with the table associated for the query.
+    - Concatenates ``query`` parts into one string.
+    - Replaces TABLE_NAME with the table associated for the query.
     """
     return (' ').join(query).format(TABLE_NAME=self._table_name)
 
