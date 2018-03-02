@@ -15,15 +15,20 @@ for more information on using pull requests.
 ## Setup
 
 ### Fork the repository on Github
+
 Visit the
 [gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms)
 to create your own fork of the repository. See
 [https://guides.github.com/activities/forking/](https://guides.github.com/activities/forking/)
-for more information.
+for more information. Do not create branches on the main repository. Meanwhile,
+do not commit anything to the master of the forked repository to keep the
+syncing process simple.
+
 
 ### Setup dev environment
 
 #### Clone the forked repository
+
 ```bash
 git clone git@github.com:<username>/gcp-variant-transforms.git
 cd gcp_variant_transforms
@@ -35,6 +40,7 @@ git remote add upstream git@github.com:googlegenomics/gcp-variant-transforms.git
 ```
 
 #### Setup virtualenv
+
 ```bash
 sudo apt-get install python-pip python-dev build-essential
 sudo pip install --upgrade pip
@@ -44,6 +50,7 @@ virtualenv venv
 ```
 
 #### Install dependences
+
 ```bash
 pip install --upgrade .
 ```
@@ -51,7 +58,62 @@ Note that after running the above command we get some dependency conflicts in
 installed packages which is currently safe to ignore. For details see
 [Issue #71](https://github.com/googlegenomics/gcp-variant-transforms/issues/71).
 
+### Setup IDE
+
+You may choose any IDE as you like. The following steps are intended for
+IntelliJ users.
+
+#### Install IntelliJ IDE
+
+Download
+[IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/download/#section=linux)
+and install.
+
+#### Install Python plugin
+
+Choose File | Settings on the main menu, and then go to Plugins.
+Click the Install JetBrains plugin button.
+In the dialog that opens, search for Python Community Edition and then install
+the plugin.
+
+For more details, refer to
+[Install plugins](https://www.jetbrains.com/help/idea/installing-updating-and-uninstalling-repository-plugins.html).
+
+#### Create Project
+
+Choose File | New | Project on the main menu, and create a new Python project
+in the dialog that opens. To setup the Project SDK, follow the following steps.
+1. Click the New button, then add Local.
+2. In the dialog that opens, click the Virtual Environment node. Select New
+environment, and specify the location of the new virtual environment. Note that
+the folder where the new virtual environment should be located must be empty!
+For the Base interpreter, add the python path [PATH_TO_VENV]/bin/python under
+the virtualenv directory created in "Setup virtualenv" above.
+
+Then go to Next, navigate the Project location to the local git project
+directory created in "Clone the forked repository" step. Click Finish.
+
+#### Code Inspection
+
+The inspection profile in .idea/inspectionProfiles/Project_Default.xml is
+checked into the git repository and can be imported into
+File | Settings | Editor | Inspections.
+
+Code inspections can be run from the Analyze menu. To speed up the inspection
+process, you can go to File | Project Structure | Modules and only set the 
+gcp_variant_transforms as the Sources. You may exclude other folders, or specify
+the inspection scope to be only Module 'gcp-variant-transforms' when running
+the inspection. The result window can be accessed from View > Tool Windows.
+
+#### Code Style
+
+To comply with pylint coding style, you may change the default line length in
+File | Settings | Editor | Code Style. Set the hard wrap at 80 columns and
+check Wrap on typing. Further, go to Python in the dropdown list, you can
+set the indent to 2 and continuation indent to 4.
+
 ## Making Changes
+
 ### Create a branch in your forked repository
 
 Running this command will create a branch named `<branch-name>` and switch
@@ -62,6 +124,7 @@ git checkout -b <branch-name> origin/master
 ```
 
 ### Testing
+
 To run all unit tests:
 
 ```bash
@@ -88,6 +151,16 @@ For other projects you can use the `--project` and `--gs_dir` options of the
 script.
 
 ### Pushing changes to your fork's branch
+
+Before pushing changes, make sure the pylint checks pass. To install pylint:
+```bash
+source [PATH_TO_VENV]/bin/activate
+pip install --upgrade pylint
+```
+Then run:
+```bash
+pylint --rcfile=.pylintrc gcp_variant_transforms/
+```
 To push changes to your forked branch, you can run:
 ```bash
 git add -p
@@ -101,6 +174,7 @@ git push -u origin <branch name>
 To commit and push those changes to your branch.
 
 ### Syncing your branch
+
 If you want to pull in changes from the target branch (i.e. googlegenomic:master),
 run:
 ```bash
@@ -117,8 +191,12 @@ to your branch. If this happens, you can force push after a rebase by runnning:
 ```bash
 git push -f
 ```
+For more information, you may check on
+[merge](https://git-scm.com/book/en/v2/Git-Branching-Basic-Branching-and-Merging#_basic_merging)
+and [rebase](https://git-scm.com/book/en/v2/Git-Branching-Rebasing).
 
 ### Creating a pull request
+
 Once your changes are pushed and ready for review, you can create a pull request
 by visiting the
 [gcp-variant-transforms repository](https://github.com/googlegenomics/gcp-variant-transforms)
@@ -131,8 +209,12 @@ description of how you have tested your change. As a minimum you should have
 unit-test coverage for your change and make sure integration tests pass.
 
 ### Updating changes
-After making changes, you must again add, commit, and push those changes. Rather
-than creating new commits for related changes please run the following:
+
+After making changes, you must again add, commit, and push those changes. It is
+preferred to have one commit per review round such that your reviewers can
+easily check what you have changed since last time. To create new commits, you
+may follow the steps stated in "Pushing changes to your fork's branch".
+Otherwise, please run the following:
 
 ```bash
 git add -p
@@ -159,6 +241,7 @@ This approach is specially useful if you tend to do a lot of small commits
 during your feature development and like to keep them as checkpoints.
 
 ### Continuous integration
+
 Once your pull request is approved and merged into the main repo, there is an
 automated process to create a new docker image from this commit, push it to the
 [Container Registry](
