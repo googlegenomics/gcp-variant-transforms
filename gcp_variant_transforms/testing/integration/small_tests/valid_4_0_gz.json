@@ -6,14 +6,25 @@
   "assertion_configs": [
     {
       "query": [
-        "SELECT COUNT(0) AS num_rows, ",
-        "  SUM(start_position) AS sum_start, ",
-        "  SUM(end_position) AS sum_end ",
-        "FROM {TABLE_NAME}"
+        "{NUM_ROWS}"
       ],
       "expected_result": {
-        "num_rows": 5,
-        "sum_start": 3607195,
+        "num_rows": 5
+      }
+    },
+    {
+      "query": [
+        "{SUM_START}"
+      ],
+      "expected_result": {
+        "sum_start": 3607195
+      }
+    },
+    {
+      "query": [
+        "{SUM_END}"
+      ],
+      "expected_result": {
         "sum_end": 3607203
       }
     }

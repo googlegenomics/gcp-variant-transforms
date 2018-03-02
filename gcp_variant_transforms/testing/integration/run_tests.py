@@ -148,7 +148,6 @@ class TestCase(object):
   def validate_table(self):
     """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
-    # TODO(yifangchen): Create macros for common queries
     query_formatter = QueryFormatter(self._table_name)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
@@ -188,22 +187,31 @@ class QueryAssertion(object):
 class QueryFormatter(object):
   """Formats a query.
 
-  Replaces keyword TABLE_NAME and eventually macros in the query.
+  Replaces keyword TABLE_NAME and macros in the query.
   """
+
+  NUM_ROWS = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
+  SUM_START = 'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}'
+  SUM_END = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
 
   def __init__(self, table_name):
     # type: (str) -> None
     self._table_name = table_name
 
   def format_query(self, query):
-    # type: (List[str]) -> str
+    # type: (list[str]) -> str
     """Formats the given ``query``.
 
     Formatting logic is as follows:
     - Concatenates ``query`` parts into one string.
+    - Replaces NUM_ROWS/SUM_START/SUM_END with the corresponding query.
     - Replaces TABLE_NAME with the table associated for the query.
     """
-    return (' ').join(query).format(TABLE_NAME=self._table_name)
+    return (' ').join(query).format(NUM_ROWS=self.NUM_ROWS,
+                                    SUM_START=self.SUM_START,
+                                    SUM_END=self.SUM_END,
+                                    TABLE_NAME=self._table_name).format(
+                                        TABLE_NAME=self._table_name)
 
 
 class TestContextManager(object):
