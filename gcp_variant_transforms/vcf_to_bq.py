@@ -37,6 +37,7 @@ import argparse
 import datetime
 import enum
 import logging
+import sys
 import tempfile
 
 import apache_beam as beam
@@ -209,6 +210,7 @@ def _validate_args(options, parsed_args):
 
 def run(argv=None):
   """Runs VCF to BigQuery pipeline."""
+  logging.info('Command: %s', ' '.join(argv or sys.argv))
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   command_line_options = [option() for option in _COMMAND_LINE_OPTIONS]
