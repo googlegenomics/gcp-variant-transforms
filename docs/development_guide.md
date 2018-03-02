@@ -154,8 +154,8 @@ script.
 
 Before pushing changes, make sure the pylint checks pass. To install pylint:
 ```bash
-.[PATH_TO_VENV]/bin/activate
-pip install pylint
+source [PATH_TO_VENV]/bin/activate
+pip install --upgrade pylint
 ```
 Then run:
 ```bash
