@@ -210,10 +210,7 @@ def _validate_args(options, parsed_args):
 
 def run(argv=None):
   """Runs VCF to BigQuery pipeline."""
-  if argv:
-    logging.info('Command: %s', ' '.join(argv))
-  else:
-    logging.info('Command: %s', ' '.join(sys.argv))
+  logging.info('Command: %s', ' '.join(argv or sys.argv))
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   command_line_options = [option() for option in _COMMAND_LINE_OPTIONS]
