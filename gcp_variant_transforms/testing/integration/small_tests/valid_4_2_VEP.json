@@ -6,28 +6,16 @@
   "runner": "DataflowRunner",
   "assertion_configs": [
     {
-      "query": [
-        "{NUM_ROWS}"
-      ],
-      "expected_result": {
-        "num_rows": 11
-      }
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 11}
     },
     {
-      "query": [
-        "{SUM_START}"
-      ],
-      "expected_result": {
-        "sum_start": 21801693
-      }
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 21801693}
     },
     {
-      "query": [
-        "{SUM_END}"
-      ],
-      "expected_result": {
-        "sum_end": 21802814
-      }
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 21802814}
     },
     {
       "query": [
@@ -35,9 +23,7 @@
         "FROM {TABLE_NAME} AS t, t.alternate_bases as alts, alts.CSQ as CSQ ",
         "WHERE start_position = 1110695 AND alts.alt = 'G'"
       ],
-      "expected_result": {
-        "num_features": 3
-      }
+      "expected_result": {"num_features": 3}
     }
   ]
 }

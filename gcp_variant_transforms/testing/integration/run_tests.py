@@ -33,6 +33,7 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
+import enum
 import json
 import multiprocessing
 import os
@@ -187,12 +188,14 @@ class QueryAssertion(object):
 class QueryFormatter(object):
   """Formats a query.
 
-  Replaces keyword TABLE_NAME and macros in the query.
+  Replaces macros and variable TABLE_NAME in the query.
   """
 
-  NUM_ROWS = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
-  SUM_START = 'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}'
-  SUM_END = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
+  class _QueryMacros(enum.Enum):
+    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
+    SUM_START_QUERY = ('SELECT SUM(start_position) AS sum_start FROM {'
+                       'TABLE_NAME}')
+    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
 
   def __init__(self, table_name):
     # type: (str) -> None
@@ -204,14 +207,20 @@ class QueryFormatter(object):
 
     Formatting logic is as follows:
     - Concatenates ``query`` parts into one string.
-    - Replaces NUM_ROWS/SUM_START/SUM_END with the corresponding query.
+    - Replaces macro NUM_ROWS_QUERY/SUM_START_QUERY/SUM_END_QUERY with the
+    corresponding value defined in _QueryMacros.
     - Replaces TABLE_NAME with the table associated for the query.
     """
-    return (' ').join(query).format(NUM_ROWS=self.NUM_ROWS,
-                                    SUM_START=self.SUM_START,
-                                    SUM_END=self.SUM_END,
-                                    TABLE_NAME=self._table_name).format(
-                                        TABLE_NAME=self._table_name)
+    return self._replace_variables(self._replace_macros((' ').join(query)))
+
+  def _replace_variables(self, query):
+    return query.format(TABLE_NAME=self._table_name)
+
+  def _replace_macros(self, query):
+    for macro in self._QueryMacros:
+      if macro.name == query:
+        return macro.value
+    return query
 
 
 class TestContextManager(object):
