@@ -41,6 +41,7 @@ import sys
 import time
 
 from datetime import datetime
+from typing import List  # pylint: disable=unused-import
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -202,13 +203,12 @@ class QueryFormatter(object):
     self._table_name = table_name
 
   def format_query(self, query):
-    # type: (list[str]) -> str
+    # type: (List[str]) -> str
     """Formats the given ``query``.
 
     Formatting logic is as follows:
     - Concatenates ``query`` parts into one string.
-    - Replaces macro NUM_ROWS_QUERY/SUM_START_QUERY/SUM_END_QUERY with the
-    corresponding value defined in _QueryMacros.
+    - Replaces macro with the corresponding value defined in _QueryMacros.
     - Replaces TABLE_NAME with the table associated for the query.
     """
     return self._replace_variables(self._replace_macros((' ').join(query)))
