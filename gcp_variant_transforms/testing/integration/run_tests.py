@@ -33,6 +33,7 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
+import enum
 import json
 import multiprocessing
 import os
@@ -40,6 +41,7 @@ import sys
 import time
 
 from datetime import datetime
+from typing import List  # pylint: disable=unused-import
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -148,7 +150,6 @@ class TestCase(object):
   def validate_table(self):
     """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
-    # TODO(yifangchen): Create macros for common queries
     query_formatter = QueryFormatter(self._table_name)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
@@ -188,8 +189,14 @@ class QueryAssertion(object):
 class QueryFormatter(object):
   """Formats a query.
 
-  Replaces keyword TABLE_NAME and eventually macros in the query.
+  Replaces macros and variables in the query.
   """
+
+  class _QueryMacros(enum.Enum):
+    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
+    SUM_START_QUERY = (
+        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}')
+    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
 
   def __init__(self, table_name):
     # type: (str) -> None
@@ -201,9 +208,19 @@ class QueryFormatter(object):
 
     Formatting logic is as follows:
     - Concatenates ``query`` parts into one string.
-    - Replaces TABLE_NAME with the table associated for the query.
+    - Replaces macro with the corresponding value defined in _QueryMacros.
+    - Replaces variables associated for the query.
     """
-    return (' ').join(query).format(TABLE_NAME=self._table_name)
+    return self._replace_variables(self._replace_macros(' '.join(query)))
+
+  def _replace_variables(self, query):
+    return query.format(TABLE_NAME=self._table_name)
+
+  def _replace_macros(self, query):
+    for macro in self._QueryMacros:
+      if macro.name == query:
+        return macro.value
+    return query
 
 
 class TestContextManager(object):

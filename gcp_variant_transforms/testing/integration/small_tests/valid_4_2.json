@@ -5,17 +5,16 @@
   "runner": "DataflowRunner",
   "assertion_configs": [
     {
-      "query": [
-        "SELECT COUNT(0) AS num_rows, ",
-        "  SUM(start_position) AS sum_start, ",
-        "  SUM(end_position) AS sum_end ",
-        "FROM {TABLE_NAME}"
-      ],
-      "expected_result": {
-        "num_rows": 13,
-        "sum_start": 23031929,
-        "sum_end": 23033052
-      }
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 13}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 23031929}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 23033052}
     }
   ]
 }
