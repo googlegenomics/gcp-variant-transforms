@@ -189,13 +189,13 @@ class QueryAssertion(object):
 class QueryFormatter(object):
   """Formats a query.
 
-  Replaces macros and variable TABLE_NAME in the query.
+  Replaces macros and variables in the query.
   """
 
   class _QueryMacros(enum.Enum):
     NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
-    SUM_START_QUERY = ('SELECT SUM(start_position) AS sum_start FROM {'
-                       'TABLE_NAME}')
+    SUM_START_QUERY = (
+        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}')
     SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
 
   def __init__(self, table_name):
@@ -209,9 +209,9 @@ class QueryFormatter(object):
     Formatting logic is as follows:
     - Concatenates ``query`` parts into one string.
     - Replaces macro with the corresponding value defined in _QueryMacros.
-    - Replaces TABLE_NAME with the table associated for the query.
+    - Replaces variables associated for the query.
     """
-    return self._replace_variables(self._replace_macros((' ').join(query)))
+    return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
     return query.format(TABLE_NAME=self._table_name)
