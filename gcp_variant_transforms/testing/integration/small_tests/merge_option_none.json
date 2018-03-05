@@ -1,0 +1,20 @@
+{
+  "test_name": "merge-option-none",
+  "table_name": "merge_option_none",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
+  "runner": "DataflowRunner",
+  "assertion_configs": [
+    {
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 7}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 2546857}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 2546870}
+    }
+  ]
+}
