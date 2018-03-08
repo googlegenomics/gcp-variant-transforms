@@ -22,20 +22,28 @@ functions are "private".
 
 from __future__ import absolute_import
 
+import enum
 import logging
 
 from collections import defaultdict
-from typing import Dict, List, Any  #pylint: disable=unused-import
+from typing import Dict, List, Any  # pylint: disable=unused-import
 
 import vcf
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_header_parser  # pylint: disable=unused-import
 
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+
+# Counter names
+class _CounterEnum(enum.Enum):
+  VARIANT = 'variant_counter'
+  ANNOTATION = 'annotation_counter'
+  ANNOTATION_ALT_MISMATCH = 'annotation_alt_mismatch_counter'
 
 
 class ProcessedVariant(object):
@@ -164,10 +172,11 @@ class ProcessedVariantFactory(object):
   """
   def __init__(
       self,
-      header_fields,
-      split_alternate_allele_info_fields=True,
-      annotation_fields=None):
-    # type: (vcf_header_parser.HeaderFields, bool, List[str]) -> None
+      header_fields,  # type: vcf_header_parser.HeaderFields
+      split_alternate_allele_info_fields=True,  # type: bool
+      annotation_fields=None,  # type: List[str]
+      counter_factory=None  # type: metrics_util.CounterFactoryInterface
+  ):
     """Sets the internal state of the factory class.
 
     Args:
@@ -183,6 +192,13 @@ class ProcessedVariantFactory(object):
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
     self._annotation_field_set = set(annotation_fields or [])
+    cfactory = counter_factory or metrics_util.NoOpCounterFactory()
+    self._variant_counter = cfactory.create_counter(
+        _CounterEnum.VARIANT.value)
+    self._annotation_counter = cfactory.create_counter(
+        _CounterEnum.ANNOTATION.value)
+    self._annotation_alt_mismatch_counter = cfactory.create_counter(
+        _CounterEnum.ANNOTATION_ALT_MISMATCH.value)
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -192,6 +208,7 @@ class ProcessedVariantFactory(object):
       variant (:class:`vcfio.Variant`): The raw variant information.
     """
     proc_var = ProcessedVariant(variant)
+    self._variant_counter.inc()
     for key, variant_info in variant.info.iteritems():
       # TODO(bashir2): field_count should be removed from VariantInfo and
       # instead looked up from header_fields.
@@ -239,11 +256,13 @@ class ProcessedVariantFactory(object):
       for alt in proc_var._alternate_datas:
         if alt.alternate_bases == alt_bases:
           alt._info[field_name] = annotations_list
+          self._annotation_counter.inc()
           break
       # TODO(bashir2): Currently we only check exact matches of alternate bases
       # which is not enough. We should implement the whole standard for finding
       # alternate bases for an annotation list.
       else:
+        self._annotation_alt_mismatch_counter.inc()
         logging.warning('Could not find matching alternate bases for %s in '
                         'annotation filed %s', alt_bases, field_name)
 
