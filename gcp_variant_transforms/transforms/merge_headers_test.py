@@ -25,7 +25,7 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
-from gcp_variant_transforms.transforms.merge_headers import _HeaderConflictResolver as HeaderConflictResolver
+from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
 from gcp_variant_transforms.transforms.merge_headers import _HeaderMerger as HeaderMerger
 
 FILE_1_LINES = [
@@ -57,7 +57,8 @@ class MergeHeadersTest(unittest.TestCase):
         contigs=reader.contigs)
 
   def _get_combiner_fn(self, split_alternate_allele_info_fields=True):
-    resolver = HeaderConflictResolver(split_alternate_allele_info_fields)
+    resolver = vcf_field_conflict_resolver.FieldConflictResolver(
+        split_alternate_allele_info_fields)
     header_merger = HeaderMerger(resolver)
     combiner_fn = merge_headers._MergeHeadersFn(header_merger)
     return combiner_fn
@@ -305,8 +306,9 @@ class MergeHeadersTest(unittest.TestCase):
     headers_1 = self._get_header_from_reader(vcf_reader_1)
     headers_2 = self._get_header_from_reader(vcf_reader_2)
 
-    header_merger = HeaderMerger(HeaderConflictResolver(
-        split_alternate_allele_info_fields=True))
+    header_merger = HeaderMerger(
+        vcf_field_conflict_resolver.FieldConflictResolver(
+            split_alternate_allele_info_fields=True))
     expected = vcf_header_io.VcfHeader()
     header_merger.merge(expected, headers_1)
     header_merger.merge(expected, headers_2)

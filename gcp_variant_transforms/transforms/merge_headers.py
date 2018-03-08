@@ -15,81 +15,11 @@
 """beam combiner function for merging VCF file headers."""
 from collections import OrderedDict
 import apache_beam as beam
-import vcf
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
 
 __all__ = ['MergeHeaders']
-
-class _HeaderConflictResolver(object):
-  """A class for resolving mistmatch between header fields (e.g. type, num).
-  """
-
-  def __init__(self, split_alternate_allele_info_fields=True):
-    """Initialize the class.
-
-    Args:
-     split_alternate_allele_info_fields (bool): Whether INFO fields with
-       `Number=A` are store under the alternate_bases record.
-     """
-    self._split_alternate_allele_info_fields = (
-        split_alternate_allele_info_fields)
-
-  def resolve(self, vcf_field_key, first_vcf_field_value,
-              second_vcf_field_value):
-    """Returns resolution for the conflicting field values.
-
-    Args:
-      vcf_field_key (str): field key in VCF header.
-      first_vcf_field_value (int or str): first field value.
-      second_vcf_field_value (int or str): second field value.
-    Raises:
-      ValueError: if the conflict cannot be resolved.
-    """
-    if vcf_field_key == 'type':
-      return self._resolve_type(first_vcf_field_value, second_vcf_field_value)
-    elif vcf_field_key == 'num':
-      return self._resolve_number(first_vcf_field_value, second_vcf_field_value)
-    else:
-      # We only care about conflicts in 'num' and 'type' fields.
-      return first_vcf_field_value
-
-  def _resolve_type(self, first, second):
-    if first == second:
-      return first
-    elif (first in ('Integer', 'Float') and second in ('Integer', 'Float')):
-      return 'Float'
-    else:
-      raise ValueError('Incompatible values cannot be resolved: '
-                       '{}, {}'.format(first, second))
-
-  def _resolve_number(self, first, second):
-    if first == second:
-      return first
-    elif (self._is_bigquery_field_repeated(first) and
-          self._is_bigquery_field_repeated(second)):
-      # None implies arbitrary number of values.
-      return None
-    else:
-      raise ValueError('Incompatible numbers cannot be resolved: '
-                       '{}, {}'.format(first, second))
-
-  def _is_bigquery_field_repeated(self, vcf_num):
-    """Returns true if the corresponding field in bigquery schema is repeated.
-
-    Args:
-      vcf_num (int): value of field `Number` in VCF header.
-    """
-    if vcf_num in (0, 1):
-      return False
-    elif (vcf_num == vcf.parser.field_counts['A'] and
-          self._split_alternate_allele_info_fields):
-      # info field with `Number=A` does not become a repeated field if flag
-      # `split_alternate_allele_info_fields` is on.
-      # See `variant_transform_options.py` for more details.
-      return False
-    else:
-      return True
 
 
 class _HeaderMerger(object):
@@ -99,8 +29,8 @@ class _HeaderMerger(object):
     """Initialize :class:`VcfHeader` object.
 
     Args:
-      resolver (:class:`_HeaderConflictResolver`): for resolving possible
-        header value mistmatches.
+      resolver (:class:`vcf_field_cnflict_resolver.FieldConflictResolver``):
+        for resolving possible header value mistmatches.
     """
     self._resolver = resolver
 
@@ -197,7 +127,8 @@ class MergeHeaders(beam.PTransform):
     """
     super(MergeHeaders, self).__init__()
     self._header_merger = _HeaderMerger(
-        _HeaderConflictResolver(split_alternate_allele_info_fields))
+        vcf_field_conflict_resolver.FieldConflictResolver(
+            split_alternate_allele_info_fields))
 
   def expand(self, pcoll):
     return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
