@@ -46,6 +46,7 @@ steps:
       - '--project ${PROJECT_ID}'
       - '--image_tag ${COMMIT_SHA}'
       - '--run_unit_tests'
+      - '--include_large_tests'
       # By default the script uses a GS bucket of gcp-variant-transforms-test
       # project. For other projects we should either use the following option
       # or change the script to create a temporary bucket on the fly.
