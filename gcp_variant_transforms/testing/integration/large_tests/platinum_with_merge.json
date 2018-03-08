@@ -5,19 +5,19 @@
   "runner": "DataflowRunner",
   "variant_merge_strategy": "MOVE_TO_CALLS",
   "worker_machine_type": "n1-standard-16",
-  "max_num_workers": "10",
+  "max_num_workers": "20",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 309551691}
+      "expected_result": {"num_rows": 261285806}
     },
     {
       "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 24107891293483855}
+      "expected_result": {"sum_start": 20441297971132809}
     },
     {
       "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 24107908471506508}
+      "expected_result": {"sum_end": 20441314888077665}
     }
   ]
 }
