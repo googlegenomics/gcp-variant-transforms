@@ -48,6 +48,7 @@ from apache_beam.options.pipeline_options import StandardOptions
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
@@ -230,30 +231,36 @@ def run(argv=None):
   # See https://issues.apache.org/jira/browse/BEAM-2801.
   header_fields = vcf_header_parser.get_vcf_headers(
       known_args.representative_header_file)
+  counter_factory = metrics_util.CounterFactory()
   processed_variant_factory = processed_variant.ProcessedVariantFactory(
       header_fields,
       known_args.split_alternate_allele_info_fields,
-      known_args.annotation_fields)
+      known_args.annotation_fields,
+      counter_factory)
 
   pipeline_options = PipelineOptions(pipeline_args)
-  with beam.Pipeline(options=pipeline_options) as p:
-    variants = _read_variants(p, known_args)
-    variants |= 'FilterVariants' >> filter_variants.FilterVariants(
-        reference_names=known_args.reference_names)
-    if variant_merger:
-      variants |= (
-          'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
-    proc_variants = variants | 'ProcessVaraints' >> beam.Map(
-        processed_variant_factory.create_processed_variant).\
-      with_output_types(processed_variant.ProcessedVariant)
-    _ = (proc_variants |
-         'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
-             known_args.output_table,
-             header_fields,
-             variant_merger,
-             processed_variant_factory,
-             append=known_args.append,
-             omit_empty_sample_calls=known_args.omit_empty_sample_calls))
+  pipeline = beam.Pipeline(options=pipeline_options)
+  variants = _read_variants(pipeline, known_args)
+  variants |= 'FilterVariants' >> filter_variants.FilterVariants(
+      reference_names=known_args.reference_names)
+  if variant_merger:
+    variants |= (
+        'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
+  proc_variants = variants | 'ProcessVaraints' >> beam.Map(
+      processed_variant_factory.create_processed_variant).\
+    with_output_types(processed_variant.ProcessedVariant)
+  _ = (proc_variants |
+       'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
+           known_args.output_table,
+           header_fields,
+           variant_merger,
+           processed_variant_factory,
+           append=known_args.append,
+           omit_empty_sample_calls=known_args.omit_empty_sample_calls))
+  result = pipeline.run()
+  result.wait_until_finish()
+
+  metrics_util.log_all_counters(result)
 
 
 if __name__ == '__main__':
