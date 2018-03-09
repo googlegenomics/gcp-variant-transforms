@@ -285,9 +285,12 @@ def _get_args():
            ).format(DEFAULT_IMAGE_NAME),
       default=DEFAULT_IMAGE_NAME,
       required=False)
+  parser.add_argument('--include_large_tests',
+                      type=bool, default=False, nargs='?', const=True,
+                      help='If set, runs the large_tests too.')
   parser.add_argument('--keep_tables',
-                      help='If set, created tables are not deleted.',
-                      action='store_true')
+                      type=bool, default=False, nargs='?', const=True,
+                      help='If set, created tables are not deleted.')
   parser.add_argument(
       '--revalidation_dataset_id',
       help=('If set, instead of running the full test, skips '
@@ -298,11 +301,16 @@ def _get_args():
   return parser.parse_args()
 
 
-def _get_test_configs():
+def _get_test_configs(include_large_tests):
+  # type: (bool) -> List
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
-  test_file_path = os.path.join(
-      os.getcwd(), 'gcp_variant_transforms/testing/integration')
+  if include_large_tests:
+    test_file_path = os.path.join(
+        os.getcwd(), 'gcp_variant_transforms/testing/integration')
+  else:
+    test_file_path = os.path.join(
+        os.getcwd(), 'gcp_variant_transforms/testing/integration/small_tests')
   for root, _, files in os.walk(test_file_path):
     for filename in files:
       if filename.endswith('.json'):
@@ -386,8 +394,9 @@ def _get_failure_message(test_name, message):
 
 
 def main():
-  test_case_configs = _get_test_configs()
-  with TestContextManager(_get_args()) as context:
+  args = _get_args()
+  test_case_configs = _get_test_configs(args.include_large_tests)
+  with TestContextManager(args) as context:
     pool = multiprocessing.Pool(processes=len(test_case_configs))
     results = []
     for config in test_case_configs:
