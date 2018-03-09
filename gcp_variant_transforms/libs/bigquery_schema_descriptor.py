@@ -11,17 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A dict based description for BigQuery's schema."""
+"""A dict based description for BigQuery schema."""
 
 from __future__ import absolute_import
 
-from collections import namedtuple
+from typing import NamedTuple
 from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 
 __all__ = ['SchemaDescriptor']
 
+
 # Stores data about a simple field (not a record) in BigQuery Schema.
-FieldDescriptor = namedtuple('FieldDescriptor', ['type', 'mode'])
+FieldDescriptor = NamedTuple('FieldDescriptor', [('type', str), ('mode', str)])
 
 
 class SchemaDescriptor(object):
@@ -40,7 +41,6 @@ class SchemaDescriptor(object):
   def _extract_all_descriptors(self, table_schema):
     # type: (bigquery.TableSchema) -> None
     """Extracts descriptor for fields and records in `table_schema`."""
-
     for field in table_schema.fields:
       if field.fields:
         # Record field.
@@ -52,7 +52,11 @@ class SchemaDescriptor(object):
 
   def get_field_descriptor(self, field_name):
     # type: (str) -> FieldDescriptor
+    """Returns :class:`FieldDescriptor obj for the given field.
 
+    Args:
+      field_name: name of a simple (not a record) field in BigQuery table.
+    """
     if field_name in self.field_descriptor_dict:
       return self.field_descriptor_dict[field_name]
     else:
@@ -61,9 +65,8 @@ class SchemaDescriptor(object):
 
   def get_record_schema_descriptor(self, record_name):
     # type: (str) -> SchemaDescriptor
-
     if record_name in self.schema_descriptor_dict:
       return self.schema_descriptor_dict[record_name]
     else:
-      raise ValueError('Schema descriptor not found. Not such record '
+      raise ValueError('Schema descriptor not found. No such record '
                        'in Bigquery schema: {}'.format(record_name))
