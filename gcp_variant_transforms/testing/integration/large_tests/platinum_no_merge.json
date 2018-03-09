@@ -5,6 +5,7 @@
   "runner": "DataflowRunner",
   "worker_machine_type": "n1-standard-16",
   "max_num_workers": "20",
+  "num_workers": "20",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
