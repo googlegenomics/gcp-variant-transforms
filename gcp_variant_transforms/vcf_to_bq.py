@@ -63,6 +63,7 @@ from gcp_variant_transforms.transforms import infer_undefined_headers
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
     variant_transform_options.BigQueryWriteOptions,
+    variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
     variant_transform_options.MergeOptions,
 ]
@@ -236,6 +237,7 @@ def run(argv=None):
       header_fields,
       known_args.split_alternate_allele_info_fields,
       known_args.annotation_fields,
+      known_args.minimal_VEP_alt_matching,
       counter_factory)
 
   pipeline_options = PipelineOptions(pipeline_args)

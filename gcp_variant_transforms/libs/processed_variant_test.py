@@ -22,6 +22,9 @@ from vcf import parser
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
+# This is intentionally breaking the style guide because without this the lines
+# referencing the counter names are too long and hard to read.
+from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
 from gcp_variant_transforms.libs import vcf_header_parser
 
 class _CounterSpy(metrics_util.CounterInterface):
@@ -82,13 +85,12 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         processed_variant.AlternateBaseData(a) for a in ['A', 'TT']]
     self.assertEqual([proc_var_synthetic], [proc_var])
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 0)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 0)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value
-        ].get_value(), 0)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
 
   def test_create_processed_variant_move_alt_info(self):
     variant = self._get_sample_variant()
@@ -134,26 +136,28 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
+            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C3',
+             'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {'ALT': 'TT', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 2)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value
-        ].get_value(), 0)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
 
   def test_create_processed_variant_mismatched_annotation_alt(self):
     # This is like `test_create_processed_variant_move_alt_info_and_annotation`
@@ -175,26 +179,28 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
+            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C3',
+             'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {'ALT': 'TT', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 2)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value
-        ].get_value(), 1)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 1)
 
   def test_create_processed_variant_symbolic_and_breakend_annotation_alt(self):
     # The returned variant is ignored as we create a custom one next.
@@ -219,28 +225,30 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('<SYMBOLIC>')
     alt1._info = {
         'CSQ': [
-            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+            {'ALT': 'SYMBOLIC', 'ambiguous_ALT': False, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('[13:123457[.')
     alt2._info = {
         'CSQ': [
-            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {'ALT': '[13', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('C[10:10357[.')
     alt3._info = {
         'CSQ': [
-            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+            {'ALT': 'C[10', 'ambiguous_ALT': False, 'Consequence': 'C3',
+             'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 3)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 3)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
-          get_value(), 1)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 1)
 
   def test_create_processed_variant_annotation_alt_prefix(self):
     # The returned variant is ignored as we create a custom one next.
@@ -264,28 +272,30 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('CT')
     alt1._info = {
         'CSQ': [
-            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+            {'ALT': 'T', 'ambiguous_ALT': False, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('CC')
     alt2._info = {
         'CSQ': [
-            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {'ALT': 'C', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('CCC')
     alt3._info = {
         'CSQ': [
-            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+            {'ALT': 'CC', 'ambiguous_ALT': False, 'Consequence': 'C3',
+             'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 3)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 3)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
-          get_value(), 0)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
 
   def test_create_processed_variant_annotation_alt_prefix_but_ref(self):
     # The returned variant is ignored as we create a custom one next.
@@ -309,22 +319,80 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('AA')
     alt1._info = {
         'CSQ': [
-            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+            {'ALT': 'AA', 'ambiguous_ALT': False, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('AAA')
     alt2._info = {
         'CSQ': [
-            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {'ALT': 'AAA', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+        CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 2)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
     self.assertEqual(
         counter_factory.counter_map[
-            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
-          get_value(), 0)
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 0)
+
+  def test_create_processed_variant_annotation_alt_minimal(self):
+    # The returned variant is ignored as we create a custom one next.
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='CC',
+        # The following represent a SNV, an insertion, and a deletion, resp.
+        alternate_bases=['CT', 'CCT', 'C'],
+        names=['rs1'], quality=2,
+        filters=['PASS'],
+        # Note that in the minimal mode, 'T' is an ambiguous annotation ALT
+        # because it can map to either the 'CT' SNV or the 'CCT' insertion.
+        # It is not ambiguous in the non-minimal mode (it only maps to `CT`).
+        info={'CSQ': vcfio.VariantInfo(
+            data=[
+                'T|C1|I1|S1|G1', '-|C2|I2|S2|G2'],
+            field_count='.')})
+    counter_factory = _CounterSpyFactory()
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'],
+        minimal_match=True,
+        counter_factory=counter_factory)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('CT')
+    alt1._info = {}
+    alt2 = processed_variant.AlternateBaseData('CCT')
+    alt2._info = {
+        'CSQ': [
+            {'ALT': 'T', 'ambiguous_ALT': True, 'Consequence': 'C1',
+             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+    }
+    alt3 = processed_variant.AlternateBaseData('C')
+    alt3._info = {
+        'CSQ': [
+            {'ALT': '-', 'ambiguous_ALT': False, 'Consequence': 'C2',
+             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+    }
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
+    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertEqual(counter_factory.counter_map[
+        CEnum.VARIANT.value].get_value(), 1)
+    self.assertEqual(counter_factory.counter_map[
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 2)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 1)
 
 # TODO(bashir2): Add tests for create_alt_record_for_schema.
