@@ -15,6 +15,13 @@
     {
       "query": ["SUM_END_QUERY"],
       "expected_result": {"sum_end": 2546870}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} ",
+        "WHERE start_position = 14369"
+      ],
+      "expected_result": {"num_rows": 3}
     }
   ]
 }
