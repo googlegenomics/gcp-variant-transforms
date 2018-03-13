@@ -1,6 +1,3 @@
-#!/bin/bash
-set -euo pipefail
-
 # Copyright 2018 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +12,20 @@ set -euo pipefail
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A helper script for ensuring all checks pass before submitting any change.
+"""Unit tests for metrics_util module."""
 
-echo ========== Running unit tests.
-if [[ -z `which coverage` ]];then
-  echo "coverage is not installed. Installing ..."
-  pip install coverage
-fi
-coverage run --source=gcp_variant_transforms setup.py test
+from __future__ import absolute_import
 
-echo ========== Running pylint.
-if [[ -z `which pylint` ]];then
-  echo "pylint is not installed. Installing ..."
-  pip install pylint
-fi
-pylint gcp_variant_transforms
+import unittest
+
+from gcp_variant_transforms.libs import metrics_util
+
+
+_TEST_COUNTER = 'test_counter'
+
+
+class CounterFactoryTest(unittest.TestCase):
+
+  def test_create_counter(self):
+    counter = metrics_util.CounterFactory().create_counter(_TEST_COUNTER)
+    self.assertTrue(isinstance(counter, metrics_util.CounterInterface))

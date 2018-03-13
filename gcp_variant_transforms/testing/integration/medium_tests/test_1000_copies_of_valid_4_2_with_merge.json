@@ -1,0 +1,37 @@
+{
+  "test_name": "test-1000-copies-of-valid-4-2-with-merge",
+  "table_name": "test_1000_copies_of_valid_4_2_with_merge",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/valid-1000-copies/*.vcf",
+  "variant_merge_strategy": "MOVE_TO_CALLS",
+  "runner": "DataflowRunner",
+  "worker_machine_type": "n1-standard-16",
+  "max_num_workers": "20",
+  "num_workers": "20",
+  "assertion_configs": [
+    {
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 13}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 23031929}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 23033052}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call ",
+        "WHERE start_position = 17329"
+      ],
+      "expected_result": {"num_rows": 6000}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call "
+      ],
+      "expected_result": {"num_rows": 39000}
+    }
+  ]
+}
