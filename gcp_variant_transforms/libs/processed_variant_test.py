@@ -196,4 +196,135 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
             processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value
         ].get_value(), 1)
 
+  def test_create_processed_variant_symbolic_and_breakend_annotation_alt(self):
+    # The returned variant is ignored as we create a custom one next.
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['<SYMBOLIC>', '[13:123457[.', 'C[10:10357[.'],
+        names=['rs1'], quality=2,
+        filters=['PASS'],
+        info={'CSQ': vcfio.VariantInfo(
+            data=[
+                'SYMBOLIC|C1|I1|S1|G1', '[13|C2|I2|S2|G2', 'C[10|C3|I3|S3|G3',
+                'C[1|C3|I3|S3|G3'],  # The last one does not match any alts.
+            field_count='.')})
+    counter_factory = _CounterSpyFactory()
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'],
+        counter_factory=counter_factory)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('<SYMBOLIC>')
+    alt1._info = {
+        'CSQ': [
+            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+    }
+    alt2 = processed_variant.AlternateBaseData('[13:123457[.')
+    alt2._info = {
+        'CSQ': [
+            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+    }
+    alt3 = processed_variant.AlternateBaseData('C[10:10357[.')
+    alt3._info = {
+        'CSQ': [
+            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+    }
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
+    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 3)
+    self.assertEqual(
+        counter_factory.counter_map[
+            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
+          get_value(), 1)
+
+  def test_create_processed_variant_annotation_alt_prefix(self):
+    # The returned variant is ignored as we create a custom one next.
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['CT', 'CC', 'CCC'],
+        names=['rs1'], quality=2,
+        filters=['PASS'],
+        info={'CSQ': vcfio.VariantInfo(
+            data=[
+                'T|C1|I1|S1|G1', 'C|C2|I2|S2|G2', 'CC|C3|I3|S3|G3'],
+            field_count='.')})
+    counter_factory = _CounterSpyFactory()
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'],
+        counter_factory=counter_factory)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('CT')
+    alt1._info = {
+        'CSQ': [
+            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+    }
+    alt2 = processed_variant.AlternateBaseData('CC')
+    alt2._info = {
+        'CSQ': [
+            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+    }
+    alt3 = processed_variant.AlternateBaseData('CCC')
+    alt3._info = {
+        'CSQ': [
+            {'Consequence': 'C3', 'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
+    }
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
+    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 3)
+    self.assertEqual(
+        counter_factory.counter_map[
+            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
+          get_value(), 0)
+
+  def test_create_processed_variant_annotation_alt_prefix_but_ref(self):
+    # The returned variant is ignored as we create a custom one next.
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['AA', 'AAA'],
+        names=['rs1'], quality=2,
+        filters=['PASS'],
+        info={'CSQ': vcfio.VariantInfo(
+            data=[
+                'AA|C1|I1|S1|G1', 'AAA|C2|I2|S2|G2'],
+            field_count='.')})
+    counter_factory = _CounterSpyFactory()
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'],
+        counter_factory=counter_factory)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('AA')
+    alt1._info = {
+        'CSQ': [
+            {'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+    }
+    alt2 = processed_variant.AlternateBaseData('AAA')
+    alt2._info = {
+        'CSQ': [
+            {'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+    }
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.VARIANT.value].get_value(), 1)
+    self.assertEqual(counter_factory.counter_map[
+        processed_variant._CounterEnum.ANNOTATION.value].get_value(), 2)
+    self.assertEqual(
+        counter_factory.counter_map[
+            processed_variant._CounterEnum.ANNOTATION_ALT_MISMATCH.value].\
+          get_value(), 0)
+
 # TODO(bashir2): Add tests for create_alt_record_for_schema.
