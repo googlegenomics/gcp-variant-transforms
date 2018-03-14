@@ -18,23 +18,26 @@ from __future__ import absolute_import
 from typing import NamedTuple
 from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 
-__all__ = ['SchemaDescriptor']
-
 
 # Stores data about a simple field (not a record) in BigQuery Schema.
 FieldDescriptor = NamedTuple('FieldDescriptor', [('type', str), ('mode', str)])
 
 
 class SchemaDescriptor(object):
-  """A dict based description for :class:`bigquery.TableSchema` object."""
+  """A dict based description for :class:`bigquery.TableSchema` object.
+
+     This class provides APIs for checking if and how (e.g. type, mode) a field
+     is defined in the BigQuery schema. This is useful when checking if
+     data matches its field definition in the schema for example.
+  """
 
   def __init__(self, table_schema):
     # type: (bigquery.TableSchema) -> None
 
     # Dict of (field_name, :class:`FieldDescriptor`).
-    self.field_descriptor_dict = {}
+    self._field_descriptor_dict = {}
     # Dict of (record_name, :class:`SchemaDescriptor`).
-    self.schema_descriptor_dict = {}
+    self._schema_descriptor_dict = {}
 
     self._extract_all_descriptors(table_schema)
 
@@ -44,10 +47,10 @@ class SchemaDescriptor(object):
     for field in table_schema.fields:
       if field.fields:
         # Record field.
-        self.schema_descriptor_dict[field.name] = SchemaDescriptor(field)
+        self._schema_descriptor_dict[field.name] = SchemaDescriptor(field)
       else:
         # Simple field.
-        self.field_descriptor_dict[field.name] = FieldDescriptor(
+        self._field_descriptor_dict[field.name] = FieldDescriptor(
             type=field.type, mode=field.mode)
 
   def get_field_descriptor(self, field_name):
@@ -57,16 +60,16 @@ class SchemaDescriptor(object):
     Args:
       field_name: name of a simple (not a record) field in BigQuery table.
     """
-    if field_name in self.field_descriptor_dict:
-      return self.field_descriptor_dict[field_name]
+    if field_name in self._field_descriptor_dict:
+      return self._field_descriptor_dict[field_name]
     else:
       raise ValueError('Field descriptor not found. Not such field in Bigquery '
                        'schema: {}'.format(field_name))
 
   def get_record_schema_descriptor(self, record_name):
     # type: (str) -> SchemaDescriptor
-    if record_name in self.schema_descriptor_dict:
-      return self.schema_descriptor_dict[record_name]
+    if record_name in self._schema_descriptor_dict:
+      return self._schema_descriptor_dict[record_name]
     else:
       raise ValueError('Schema descriptor not found. No such record '
                        'in Bigquery schema: {}'.format(record_name))
