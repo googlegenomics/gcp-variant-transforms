@@ -1,0 +1,54 @@
+{
+  "test_name": "merge-option-info-keys-to-move-to-calls-regex",
+  "table_name": "merge_option_info_keys_to_move_to_calls_regex",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
+  "variant_merge_strategy": "MOVE_TO_CALLS",
+  "info_keys_to_move_to_calls_regex": "^NS$",
+  "runner": "DataflowRunner",
+  "assertion_configs": [
+    {
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 4}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 1283553}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 1283560}
+    },
+    {
+      "query": [
+        "SELECT call.NS AS NS ",
+        "FROM {TABLE_NAME} AS t, t.call as call ",
+        "WHERE start_position = 14369 AND call.name ='NA00001'"
+      ],
+      "expected_result": {"NS": 2}
+    },
+    {
+      "query": [
+        "SELECT call.NS AS NS ",
+        "FROM {TABLE_NAME} AS t, t.call as call ",
+        "WHERE start_position = 14369 AND call.name ='NA00002'"
+      ],
+      "expected_result": {"NS": 2}
+    },
+    {
+      "query": [
+        "SELECT call.NS AS NS ",
+        "FROM {TABLE_NAME} AS t, t.call as call ",
+        "WHERE start_position = 14369 AND call.name ='NA00003'"
+      ],
+      "expected_result": {"NS": 1}
+    },
+    {
+      "query": [
+        "SELECT call.NS AS NS ",
+        "FROM {TABLE_NAME} AS t, t.call as call ",
+        "WHERE start_position = 14369 AND call.name ='NA00004'"
+      ],
+      "expected_result": {"NS": 1}
+    }
+  ]
+}

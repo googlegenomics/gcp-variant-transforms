@@ -24,6 +24,8 @@ from __future__ import absolute_import
 
 import enum
 import logging
+import os
+import re
 
 from collections import defaultdict
 from typing import Dict, List, Any  # pylint: disable=unused-import
@@ -180,13 +182,13 @@ class ProcessedVariantFactory(object):
     """Sets the internal state of the factory class.
 
     Args:
-      header_fields (:class:`vcf_header_parser.HeaderFields`): Header
-        information used for parsing and splitting INFO fields of thei variant.
-      split_alternate_allele_info_fields (bool): If True, splits fields with
+      header_fields: Header information used for parsing and splitting INFO
+        fields of thei variant.
+      split_alternate_allele_info_fields: If True, splits fields with
         field_count='A' (i.e., one value for each alternate) among alternates.
-      annotation_fields (List[str]): If provided, this is the list of
-        INFO field names that store variant annotations. The format of how
-        annotations are stored and their names are extracted from header_fields.
+      annotation_fields: If provided, this is the list of INFO field names that
+        store variant annotations. The format of how annotations are stored and
+        their names are extracted from header_fields.
     """
     self._header_fields = header_fields
     self._split_alternate_allele_info_fields = (
@@ -199,6 +201,9 @@ class ProcessedVariantFactory(object):
         _CounterEnum.ANNOTATION.value)
     self._annotation_alt_mismatch_counter = cfactory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MISMATCH.value)
+    self._annotation_processor = _AnnotationProcessor(
+        annotation_fields, self._header_fields, self._annotation_counter,
+        self._annotation_alt_mismatch_counter)
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -216,7 +221,8 @@ class ProcessedVariantFactory(object):
           variant_info.field_count == _FIELD_COUNT_ALTERNATE_ALLELE):
         self._add_per_alt_info(proc_var, key, variant_info.data)
       elif key in self._annotation_field_set:
-        self._add_annotation(proc_var, key, variant_info.data)
+        self._annotation_processor.add_annotation_data(
+            proc_var, key, variant_info.data)
       else:
         proc_var._non_alt_info[key] = variant_info.data
     return proc_var
@@ -231,59 +237,6 @@ class ProcessedVariantFactory(object):
               len(proc_var._alternate_datas)))
     for alt_index, info in enumerate(variant_info_data):
       proc_var._alternate_datas[alt_index]._info[field_name] = info
-
-  def _add_annotation(self, proc_var, field_name, data):
-    # type: (ProcessedVariant, str, List[str]) -> None
-    """Adds an annotation INFO field based on the format in the header.
-
-    Args:
-      proc_var (ProcessedVariant): The object to which the annotations are being
-        added.
-      field_name (str): The name of the annotation field.
-      data(List[str]): The data part of the field separated on comma.
-    """
-    if field_name not in self._header_fields.infos:
-      raise ValueError('{} INFO not found in the header, variant: {}'.format(
-          field_name, proc_var))
-    header_desc = self._header_fields.infos[field_name].desc
-    annotation_names = _extract_annotation_names(header_desc)
-    alt_annotation_map = self._convert_annotation_strs_to_alt_map(
-        annotation_names, data)
-    for alt_bases, annotations_list in alt_annotation_map.iteritems():
-      # This assumes that number of alternate bases and annotation segments
-      # are not too big. If this assumption is not true, we should replace the
-      # following loop with a hash table search and avoid the quadratic time.
-      for alt in proc_var._alternate_datas:
-        if alt.alternate_bases == alt_bases:
-          alt._info[field_name] = annotations_list
-          self._annotation_counter.inc()
-          break
-      # TODO(bashir2): Currently we only check exact matches of alternate bases
-      # which is not enough. We should implement the whole standard for finding
-      # alternate bases for an annotation list.
-      else:
-        self._annotation_alt_mismatch_counter.inc()
-        logging.warning('Could not find matching alternate bases for %s in '
-                        'annotation filed %s', alt_bases, field_name)
-
-  def _convert_annotation_strs_to_alt_map(self, annotation_names, field_data):
-    # type: (List[str], List[str]) -> Dict[str, List[Dict[str, str]]]
-    alt_annotation_map = defaultdict(list)
-    for annotation_str in field_data:
-      annotations = _extract_annotation_list_with_alt(annotation_str)
-      alt_annotation_map[annotations[0]].append(
-          self._create_annotation_map(annotations, annotation_names))
-    return alt_annotation_map
-
-  def _create_annotation_map(self, annotations, annotation_names):
-    # type: (List[str], List[str]) -> Dict[str, str]
-    if len(annotation_names) != len(annotations) - 1:
-      raise ValueError('Expected {} annotations, got {}'.format(
-          len(annotation_names), len(annotations) - 1))
-    annotation_dict = {}
-    for index, name in enumerate(annotation_names):
-      annotation_dict[name] = annotations[index + 1]
-    return annotation_dict
 
   def create_alt_bases_field_schema(self):
     # type: () -> bigquery.TableFieldSchema
@@ -345,6 +298,199 @@ class ProcessedVariantFactory(object):
         vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])
     is_annotation = info_field_name in self._annotation_field_set
     return is_per_alt_info or is_annotation
+
+
+class _AnnotationProcessor(object):
+  """This is for handling all annotation related logic for variants."""
+
+  # Regular expressions to identify symbolic and breakend ALTs used in
+  # annotation alt matching.
+  # Check the VCF spec for symbolic and breakend ALT formats.
+  _SYMBOLIC_ALT_RE = re.compile(r'^<(?P<ID>.*)>$')
+  _BREAKEND_ALT_RE = (re.compile(
+      r'^(?P<up_to_chr>.*([\[\]]).*):(?P<pos>.*)([\[\]]).*$'))
+
+  def __init__(self,
+               annotation_fields,  # type: List[str]
+               header_fields,  # type: vcf_header_parser.HeaderFields
+               annotation_alt_match_counter,  # type: metrics_util.BaseCounter
+               annotation_alt_mismatch_counter  # type: metrics_util.BaseCounter
+              ):
+    """Creates an instance for adding annotations to `ProcessedVariant` objects.
+
+    Note this class is intended to be an auxiliary for ProcessedVariantFactory
+    and is used for creating annotation related parts of a `ProcessedVariant`
+    object. So it is an implementation detail and not part of the public API.
+
+    Args:
+      annotation_fields: The list of INFO field names that store variant
+        annotations. The format of how annotations are stored and their names
+        are extracted from header_fields.
+      header_fields: The VCF header information.
+    """
+    self._annotation_names_map = {}  # type: Dict[str, List[str]]
+    for field in annotation_fields or []:
+      if field not in header_fields.infos:
+        raise ValueError('{} INFO not found in the header'.format(field))
+      header_desc = header_fields.infos[field].desc
+      self._annotation_names_map[field] = _extract_annotation_names(
+          header_desc)
+    self._annotation_alt_match_counter = annotation_alt_match_counter
+    self._annotation_alt_mismatch_counter = annotation_alt_mismatch_counter
+
+  def add_annotation_data(self, proc_var, annotation_field_name, data):
+    # type: (ProcessedVariant, str, List[str]) -> None
+    """The main function for adding annotation data to `proc_var`.
+
+    This adds the data for annotation INFO field `annotation_field_name` based
+    on the format specified for it in the header. `data` items are split
+    among `proc_var._alternate_datas` based on the ALT matching logic.
+
+    The only assumption about `proc_var` is that its `_alternate_datas`
+    has been initialized with valid `AlternateBaseData` objects.
+
+    Args:
+      proc_var: The object to which the annotations are being added.
+      annotation_field_name: The name of the annotation field, e.g., ANN or CSQ.
+      data: The data part of the field separated on comma. A single element
+        of this list looks something like (taken from an Ensembl VEP run):
+
+        G|upstream_gene_variant|MODIFIER|PSMF1|ENSG00000125818|...
+
+        where the '|' character is the separator. The first element is a way
+        to identify the allele (one of the ALTs) that this annotation data
+        refers to. The rest of the elements are annotations corresponding to the
+        `annotation_field_name` format description in the hearder, e.g.,
+
+        Allele|Consequence|IMPACT|SYMBOL|Gene|...
+    """
+    common_prefix = self._find_common_alt_ref_prefix(proc_var)
+    alt_annotation_map = self._convert_annotation_strs_to_alt_map(
+        annotation_field_name, data)
+    for alt_bases, annotations_list in alt_annotation_map.iteritems():
+      self._add_annotation_list(
+          proc_var, common_prefix, alt_bases, annotations_list,
+          annotation_field_name)
+
+  def _find_common_alt_ref_prefix(self, proc_var):
+    # type: (ProcessedVariant) -> str
+    alt_list = [
+        alt.alternate_bases for alt in proc_var._alternate_datas]
+    alt_list.append(proc_var.reference_bases or '')
+    return os.path.commonprefix(alt_list)
+
+  def _convert_annotation_strs_to_alt_map(
+      self, annotation_field_name, field_data):
+    # type: (str, List[str]) -> Dict[str, List[Dict[str, str]]]
+    """Given the list of annotation data, extracts ALTs and annotations.
+
+    Args:
+      annotation_field_name: The name of the annotation field, e.g., ANN or CSQ.
+      field_data: A list of data strings. One element of this list looks like:
+
+        G|upstream_gene_variant|MODIFIER|PSMF1|ENSG00000125818|...
+
+        This function splits these strings on '|', uses the first element (i.e.,
+        the ALT identifier) as the key and creates a dictionary for annotations,
+        e.g.,
+          Consequence: upstream_gene_variant
+          IMPACT: MODIFIER
+          SYMBOL: PSMF1
+          Gene: ENSG00000125818
+          ...
+        Note that a single ALT can have multiple annotation sets. That is why
+        the value elements in the returned map are lists of dictionaries.
+    """
+    # TODO(bashir2): Instead of a `Dict[str, List[Dict[str, str]]]` define a new
+    # class for holding annotation data.
+    if annotation_field_name not in self._annotation_names_map:
+      raise ValueError('{} not in annotation fields'.format(
+          annotation_field_name))
+    annotation_names = self._annotation_names_map[annotation_field_name]
+    alt_annotation_map = defaultdict(list)
+    for annotation_str in field_data:
+      annotations = _extract_annotation_list_with_alt(annotation_str)
+      alt_annotation_map[annotations[0]].append(
+          self._create_map(annotations, annotation_names))
+    return alt_annotation_map
+
+  def _create_map(self, annotations, annotation_names):
+    # type: (List[str], List[str]) -> Dict[str, str]
+    if len(annotation_names) != len(annotations) - 1:
+      raise ValueError('Expected {} annotations, got {}'.format(
+          len(annotation_names), len(annotations) - 1))
+    annotation_dict = {}
+    for index, name in enumerate(annotation_names):
+      annotation_dict[name] = annotations[index + 1]
+    return annotation_dict
+
+  def _add_annotation_list(
+      self, proc_var, common_prefix, alt_bases, annotations_list,
+      annotation_field_name):
+    # type: (ProcessedVariant, str, str, List[Dict[str, str]], str) -> None
+    """Adds all annotations to the given `proc_var`.
+
+    Args:
+      proc_var: The object to which the annotations are being added.
+      common_prefix: The common prefix of all ALTs and REF string.
+      alt_bases: The ALT part of annotation data. Note that this is not
+        necessarily equal to an ALT string in `proc_var` as the matching rules
+        are not always exact match.
+      annotations_list: The lists of annotation dictionaries. Each element of
+        this list is a map of annotation names to values, see the example in
+        `_convert_annotation_strs_to_alt_map` which creates these maps.
+      annotation_field_name: The name of the annotation field, e.g., ANN, CSQ.
+    """
+    # This assumes that number of alternate bases and annotation segments
+    # are not too big. If this assumption is not true, we should replace the
+    # following loop with a hash table search and avoid the quadratic time.
+    for alt in proc_var._alternate_datas:
+      if self._alt_matches_annotation_alt(
+          common_prefix, alt.alternate_bases, alt_bases):
+        alt._info[annotation_field_name] = annotations_list
+        self._annotation_alt_match_counter.inc()
+        break
+    else:
+      self._annotation_alt_mismatch_counter.inc()
+      logging.warning(
+          'Could not find matching alternate bases for %s in '
+          'annotation filed %s', alt_bases, annotation_field_name)
+
+  def _alt_matches_annotation_alt(
+      self, common_prefix, alt_bases, annotation_alt):
+    # type: (str, str, str) -> bool
+    """Returns true if `alt_bases` matches `annotation_alt`
+
+    See the "VCF" and "Complex VCF entries" sections of
+    https://useast.ensembl.org/info/docs/tools/vep/vep_formats.html
+    for details of prefix matching and indels. Some examples:
+    REF      ALT         annotation-ALT
+    A        T           T
+    AT       ATT,A       TT,-
+    A        <ID>        ID
+    A        .[13:123[   .[13
+    """
+    # Check equality without the common prefix. Note according to VCF spec
+    # the length of this common prefix should be at most one but we have
+    # not checked/enforced that here.
+    if alt_bases[len(common_prefix):] == annotation_alt:
+      return True
+    # Handling deletion.
+    if (len(common_prefix) == len(alt_bases)
+        and annotation_alt == '-'):
+      return True
+    # Handling symbolic ALTs.
+    id_match = self._SYMBOLIC_ALT_RE.match(alt_bases)
+    if id_match and id_match.group('ID') == annotation_alt:
+      return True
+    # Handling breakend ALTs.
+    # TODO(bashir2): Check if the following logic is documented anywhere! I
+    # could not find it explicitly in any documentation but that's how I saw
+    # VEP does it in some examples I ran.
+    breakend_match = self._BREAKEND_ALT_RE.match(alt_bases)
+    if breakend_match and breakend_match.group('up_to_chr') == annotation_alt:
+      return True
+    return False
 
 
 def _extract_annotation_list_with_alt(annotation_str):
