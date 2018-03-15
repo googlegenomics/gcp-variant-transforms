@@ -1,0 +1,23 @@
+{
+  "test_name": "test-1000-copies-of-valid-4-2-no-merge",
+  "table_name": "test_1000_copies_of_valid_4_2_no_merge",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/valid-1000-copies/*.vcf",
+  "runner": "DataflowRunner",
+  "worker_machine_type": "n1-standard-16",
+  "max_num_workers": "20",
+  "num_workers": "20",
+  "assertion_configs": [
+    {
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 13000}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 23031929000}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 23033052000}
+    }
+  ]
+}
