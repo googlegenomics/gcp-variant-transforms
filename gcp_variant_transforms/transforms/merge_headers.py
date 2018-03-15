@@ -14,8 +14,9 @@
 
 """beam combiner function for merging VCF file headers."""
 from collections import OrderedDict
-import apache_beam as beam
 from typing import Dict, Any  #pylint: disable=unused-import
+
+import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
