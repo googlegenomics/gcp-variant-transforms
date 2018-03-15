@@ -24,8 +24,8 @@ from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.transforms import merge_headers
-from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
 from gcp_variant_transforms.transforms.merge_headers import _HeaderMerger as HeaderMerger
 
 FILE_1_LINES = [

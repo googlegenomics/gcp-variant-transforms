@@ -18,7 +18,7 @@ import apache_beam as beam
 from typing import Dict, Any  #pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 # TODO(nmousavi): Consider moving this into a separate file.
 class _HeaderMerger(object):
