@@ -57,8 +57,8 @@ class _HeaderMerger(object):
     self._merge_header_fields(first.contigs, second.contigs)
 
   def _merge_header_fields(self, first, second):
-    #type: (Dict[str, OrderedDict[str, Any]],
-    #       Dict[str, OrderedDict[str, Any]]) -> None
+    #type: (Dict[str, OrderedDict[str, Union[str, int]]],
+    #       Dict[str, OrderedDict[str, Union[str, int]]]) -> None
     """Modifies ``first`` to add any keys from ``second`` not in ``first``.
 
     Args:
