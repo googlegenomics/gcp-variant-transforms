@@ -23,6 +23,7 @@ class VcfParserConstants(object):
 
 class FieldConflictResolver(object):
   """A class for resolving all VCF field related mistmatches."""
+  # TODO(nmousavi): explain this class more.
 
   def __init__(self, split_alternate_allele_info_fields=True):
     # type: (bool) -> None

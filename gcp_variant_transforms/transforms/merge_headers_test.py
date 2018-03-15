@@ -306,6 +306,9 @@ class MergeHeadersTest(unittest.TestCase):
     headers_1 = self._get_header_from_reader(vcf_reader_1)
     headers_2 = self._get_header_from_reader(vcf_reader_2)
 
+    # TODO(nmousavi): Either use TestPipeline or combiner_fn.* everywhere.
+    # After moving out _HeaderMerger to its file, it makes sense to use
+    # TestPipeline everywhere.
     header_merger = HeaderMerger(
         vcf_field_conflict_resolver.FieldConflictResolver(
             split_alternate_allele_info_fields=True))
