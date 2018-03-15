@@ -17,7 +17,8 @@
 import unittest
 import vcf
 
-from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
 
 class ConflictResolverTest(unittest.TestCase):
@@ -35,34 +36,38 @@ class ConflictResolverTest(unittest.TestCase):
 
   def test_resolving_field_definition_conflict_in_type(self):
     self.assertEqual(
-        self._resolver.resolve('type', 'Integer', 'Float'), 'Float')
+        self._resolver.resolve(VcfParserConstants.TYPE,
+                               VcfParserConstants.INTEGER,
+                               VcfParserConstants.FLOAT),
+        VcfParserConstants.FLOAT)
     with self.assertRaises(ValueError):
-      self._resolver.resolve('type', 'Integer', 'String')
+      self._resolver.resolve(VcfParserConstants.TYPE,
+                             VcfParserConstants.INTEGER, 'String')
       self.fail('Should raise exception for unresolvable types')
 
   def test_resolving_field_definition_conflict_in_number(self):
     self.assertEqual(
-        self._resolver.resolve('num', 2, 3), None)
+        self._resolver.resolve(VcfParserConstants.NUM, 2, 3), None)
     self.assertEqual(
-        self._resolver.resolve('num', 2, None), None)
+        self._resolver.resolve(VcfParserConstants.NUM, 2, None), None)
     # Unresolvable cases.
     for i in [0, 1]:
       for j in [self._field_count('R'), self._field_count('G'),
                 self._field_count('A'), 2, None]:
         with self.assertRaises(ValueError):
-          self._resolver.resolve('num', i, j)
+          self._resolver.resolve(VcfParserConstants.NUM, i, j)
           self.fail(
               'Should raise exception for unresolvable number: %d vs %d'%(i, j))
 
   def test_resolving_field_definition_conflict_in_number_allele(self):
     self.assertEqual(
-        self._resolver_allele.resolve('num', 2, 3), None)
+        self._resolver_allele.resolve(VcfParserConstants.NUM, 2, 3), None)
     self.assertEqual(
-        self._resolver_allele.resolve('num', 2, None), None)
+        self._resolver_allele.resolve(VcfParserConstants.NUM, 2, None), None)
     # Unresolvable cases.
     for i in [self._field_count('A')]:
       for j in [self._field_count('R'), self._field_count('G'), 0, 1, 2, None]:
         with self.assertRaises(ValueError):
-          self._resolver.resolve('num', i, j)
+          self._resolver.resolve(VcfParserConstants.NUM, i, j)
           self.fail(
               'Should raise exception for unresolvable number: %d vs %d'%(i, j))

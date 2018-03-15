@@ -15,22 +15,21 @@
 """beam combiner function for merging VCF file headers."""
 from collections import OrderedDict
 import apache_beam as beam
+from typing import Dict, Any  #pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import vcf_field_conflict_resolver
 
-__all__ = ['MergeHeaders']
-
-
+# TODO(nmousavi): Consider moving this into a separate file.
 class _HeaderMerger(object):
   """Class for merging two :class:`VcfHeader`s."""
 
   def __init__(self, resolver):
+    # type: (vcf_field_cnflict_resolver.FieldConflictResolver) -> None
     """Initialize :class:`VcfHeader` object.
 
     Args:
-      resolver (:class:`vcf_field_cnflict_resolver.FieldConflictResolver``):
-        for resolving possible header value mistmatches.
+      resolver: Auxiliary class for resolving possible header value mismatches.
     """
     self._resolver = resolver
 
@@ -50,7 +49,6 @@ class _HeaderMerger(object):
     if (not isinstance(first, vcf_header_io.VcfHeader) or
         not isinstance(first, vcf_header_io.VcfHeader)):
       raise NotImplementedError
-
     self._merge_header_fields(first.infos, second.infos)
     self._merge_header_fields(first.filters, second.filters)
     self._merge_header_fields(first.alts, second.alts)
@@ -58,6 +56,8 @@ class _HeaderMerger(object):
     self._merge_header_fields(first.contigs, second.contigs)
 
   def _merge_header_fields(self, first, second):
+    #type: (Dict[str, OrderedDict[str, Any]],
+    #       Dict[str, OrderedDict[str, Any]]) -> None
     """Modifies ``first`` to add any keys from ``second`` not in ``first``.
 
     Args:
@@ -118,10 +118,11 @@ class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
   def __init__(self, split_alternate_allele_info_fields=True):
+    # type: (bool) -> None
     """Initializes :class:`MergeHeaders` object.
 
     Args:
-      split_alternate_allele_info_fields (bool): Whether INFO fields with
+      split_alternate_allele_info_fields: Whether INFO fields with
         `Number=A` are store under the alternate_bases record. This is relevant
         as it changes the header compatibility rules as it changes the schema.
     """

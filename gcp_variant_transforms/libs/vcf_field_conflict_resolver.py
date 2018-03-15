@@ -14,7 +14,12 @@
 
 import vcf
 
-__all__ = ['FieldConflictResolver']
+class VcfParserConstants(object):
+  """Constants for type and number from VCF parser."""
+  FLOAT = 'Float'
+  INTEGER = 'Integer'
+  NUM = 'num'
+  TYPE = 'type'
 
 class FieldConflictResolver(object):
   """A class for resolving all VCF field related mistmatches."""
@@ -24,8 +29,8 @@ class FieldConflictResolver(object):
     """Initialize the class.
 
     Args:
-     split_alternate_allele_info_fields (bool): Whether INFO fields with
-       `Number=A` are store under the alternate_bases record.
+     split_alternate_allele_info_fields: Whether INFO fields with
+       `Number=A` are stored under the alternate_bases record.
      """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
@@ -33,7 +38,6 @@ class FieldConflictResolver(object):
   def resolve(self, vcf_field_key, first_vcf_field_value,
               second_vcf_field_value):
     # type: (str, Union[str, int], Union[str, int]) -> Union[str, int]
-
     """Returns resolution for the conflicting field values.
 
     Args:
@@ -43,9 +47,9 @@ class FieldConflictResolver(object):
     Raises:
       ValueError: if the conflict cannot be resolved.
     """
-    if vcf_field_key == 'type':
+    if vcf_field_key == VcfParserConstants.TYPE:
       return self._resolve_type(first_vcf_field_value, second_vcf_field_value)
-    elif vcf_field_key == 'num':
+    elif vcf_field_key == VcfParserConstants.NUM:
       return self._resolve_number(first_vcf_field_value, second_vcf_field_value)
     else:
       # We only care about conflicts in 'num' and 'type' fields.
@@ -54,8 +58,9 @@ class FieldConflictResolver(object):
   def _resolve_type(self, first, second):
     if first == second:
       return first
-    elif (first in ('Integer', 'Float') and second in ('Integer', 'Float')):
-      return 'Float'
+    elif (first in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT) and
+          second in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT)):
+      return VcfParserConstants.FLOAT
     else:
       raise ValueError('Incompatible values cannot be resolved: '
                        '{}, {}'.format(first, second))
