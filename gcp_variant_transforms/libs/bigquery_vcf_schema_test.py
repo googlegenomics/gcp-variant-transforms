@@ -21,20 +21,22 @@ import json
 import sys
 import unittest
 
+from apache_beam.io.gcp.internal.clients import bigquery
+
 from vcf.parser import _Format as Format
 from vcf.parser import _Info as Info
 from vcf.parser import field_counts
 
-from apache_beam.io.gcp.internal.clients import bigquery
-
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_vcf_schema
+from gcp_variant_transforms.libs import dummy_bigquery_schema_descriptor
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
-
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
   """A dummy strategy. It just adds a new field to the schema."""
@@ -214,7 +216,68 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 class GetRowsFromVariantTest(unittest.TestCase):
   """Test cases for the ``get_rows_from_variant`` library function."""
 
-  def _get_row_list_from_variant(self, variant, **kwargs):
+  def setUp(self):
+    self._schema_descriptor = bigquery_schema_descriptor.SchemaDescriptor(
+        self._get_table_schema())
+    self._conflict_resolver = (
+        vcf_field_conflict_resolver.FieldConflictResolver())
+
+  def _get_table_schema(self):
+    # type (None) -> bigquery.TableSchema
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IBR',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='II',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IF',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IS',
+        type=TableFieldConstants.TYPE_STRING,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    # Call record.
+    call_record = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='FI',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='FS',
+        type=TableFieldConstants.TYPE_STRING,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    schema.fields.append(call_record)
+    return schema
+
+  def _get_row_list_from_variant(
+      self, variant, schema_descriptor=None, conflict_resolver=None,
+      allow_incompatible_records=False, **kwargs):
     # TODO(bashir2): To make this more of a "unit" test, we should create
     # ProcessedVariant instances directly (instead of Variant) and avoid calling
     # create_processed_variant here. Then we should also add cases that
@@ -222,7 +285,13 @@ class GetRowsFromVariantTest(unittest.TestCase):
     header_fields = vcf_header_parser.HeaderFields({}, {})
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
-    return list(bigquery_vcf_schema.get_rows_from_variant(proc_var, **kwargs))
+    if schema_descriptor is None:
+      schema_descriptor = (
+          dummy_bigquery_schema_descriptor.DummySchemaDescriptor())
+
+    return list(bigquery_vcf_schema.get_rows_from_variant(
+        proc_var, schema_descriptor, conflict_resolver,
+        allow_incompatible_records, **kwargs))
 
   def test_all_fields(self):
     variant = vcfio.Variant(
@@ -499,3 +568,144 @@ class GetRowsFromVariantTest(unittest.TestCase):
     self.assertEqual(
         [expected_row],
         self._get_row_list_from_variant(variant, omit_empty_sample_calls=True))
+
+  def test_schema_conflict_in_info_field_type(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[],
+        info={'IB': vcfio.VariantInfo(data=1, field_count='1'),
+              'II': vcfio.VariantInfo(data=1.1, field_count='1'),
+              'IF': vcfio.VariantInfo(data=[1, 2], field_count='2'),
+              'IS': vcfio.VariantInfo(data=[1.0, 2.0], field_count='2')})
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        'IB': True,
+        'II': 1,
+        'IF': [1.0, 2.0],
+        'IS': ['1.0', '2.0']}
+    self.assertEqual([expected_row], self._get_row_list_from_variant(
+        variant, self._schema_descriptor, self._conflict_resolver,
+        allow_incompatible_records=True))
+
+    with self.assertRaises(ValueError):
+      variant = vcfio.Variant(
+          reference_name='chr19', start=11, end=12, reference_bases='CT',
+          alternate_bases=[], filters=[],
+          # String cannot be casted to integer.
+          info={'II': vcfio.VariantInfo(data='1.1', field_count='1'),})
+      self._get_row_list_from_variant(
+          variant, self._schema_descriptor, self._conflict_resolver,
+          allow_incompatible_records=True)
+      self.fail('String data for an integer schema must cause an exception')
+
+  def test_schema_conflict_in_info_field_number(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[],
+        info={'IB': vcfio.VariantInfo(data=[1, 2], field_count='2'),
+              'IBR': vcfio.VariantInfo(data=1, field_count='1'),
+              'II': vcfio.VariantInfo(data=[10, 20], field_count='2'),
+              'IF': vcfio.VariantInfo(data=1.1, field_count='1'),
+              'IS': vcfio.VariantInfo(data='foo', field_count='1')},)
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        'IB': True,
+        'IBR': [True],
+        'II': 10,
+        'IF': [1.1],
+        'IS': ['foo'],}
+    self.assertEqual([expected_row], self._get_row_list_from_variant(
+        variant, self._schema_descriptor, self._conflict_resolver,
+        allow_incompatible_records=True))
+
+  def test_schema_conflict_in_format_field_type(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[],
+        calls=[
+            vcfio.VariantCall(
+                name='Sample1', genotype=[0, 1], phaseset='*',
+                info={'FB': '', 'FI': 1.0, 'FS': [1, 2]}),
+            vcfio.VariantCall(
+                name='Sample2', genotype=[1, 0],
+                info={'FB': 1, 'FI': True, 'FS': [1.0, 2.0]})])
+
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        ColumnKeyConstants.CALLS: [
+            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+             ColumnKeyConstants.CALLS_PHASESET: '*',
+             'FB': False, 'FI': 1, 'FS': ['1', '2']},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+             ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+             ColumnKeyConstants.CALLS_PHASESET: None,
+             'FB': True, 'FI': 1, 'FS': ['1.0', '2.0']},],
+    }
+
+    self.assertEqual([expected_row], self._get_row_list_from_variant(
+        variant, self._schema_descriptor, self._conflict_resolver,
+        allow_incompatible_records=True))
+
+    with self.assertRaises(ValueError):
+      variant = vcfio.Variant(
+          reference_name='chr19', start=11, end=12, reference_bases='CT',
+          alternate_bases=[], filters=[],
+          # String cannot be casted to integer.
+          calls=[
+              vcfio.VariantCall(
+                  name='Sample1', genotype=[0, 1], phaseset='*',
+                  info={'FI': 'string_for_int_field'}),],)
+      self._get_row_list_from_variant(
+          variant, self._schema_descriptor, self._conflict_resolver,
+          allow_incompatible_records=True)
+      self.fail('String data for an integer schema must cause an exception')
+
+  def test_schema_conflict_in_format_field_number(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='CT',
+        alternate_bases=[], filters=[],
+        calls=[
+            vcfio.VariantCall(
+                name='Sample1', genotype=[0, 1], phaseset='*',
+                info={'FB': [1, 2], 'FI': [1, 2], 'FS': 'str'}),
+            vcfio.VariantCall(
+                name='Sample2', genotype=[1, 0],
+                info={'FB': [], 'FI': [], 'FS': ''})])
+
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'CT',
+        ColumnKeyConstants.ALTERNATE_BASES: [],
+        ColumnKeyConstants.CALLS: [],
+        ColumnKeyConstants.CALLS: [
+            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+             ColumnKeyConstants.CALLS_PHASESET: '*',
+             'FB': True, 'FI': 1, 'FS': ['str']},
+            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+             ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+             ColumnKeyConstants.CALLS_PHASESET: None,
+             'FB': False, 'FI': None, 'FS': ['']},],
+    }
+
+    self.assertEqual([expected_row], self._get_row_list_from_variant(
+        variant, self._schema_descriptor, self._conflict_resolver,
+        allow_incompatible_records=True))

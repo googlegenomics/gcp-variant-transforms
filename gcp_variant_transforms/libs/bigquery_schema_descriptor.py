@@ -53,6 +53,17 @@ class SchemaDescriptor(object):
         self._field_descriptor_dict[field.name] = FieldDescriptor(
             type=field.type, mode=field.mode)
 
+  def has_field(self, field_name):
+    # type: (str) -> bool
+    """Returns true iff the schema has a simple field named 'field_name'.
+
+    Args:
+      field_name: name of a field in the schema.
+    Note:
+      Records and their fields are ignored.
+    """
+    return field_name in self._field_descriptor_dict
+
   def get_field_descriptor(self, field_name):
     # type: (str) -> FieldDescriptor
     """Returns :class:`FieldDescriptor obj for the given field.

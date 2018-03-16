@@ -18,17 +18,16 @@ from __future__ import absolute_import
 
 import copy
 import json
-from typing import Dict, Any  #pylint: disable=unused-import
+from typing import Dict, Any  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
-from gcp_variant_transforms.libs import processed_variant  #pylint: disable=unused-import
-from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  #pylint: disable=unused-import
-
-
-__all__ = ['generate_schema_from_header_fields', 'get_rows_from_variant']
+from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_header_parser # pylint: disable=unused-import
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy # pylint: disable=unused-import
 
 
 # Maximum size of a BigQuery row is 10MB. See
@@ -157,8 +156,16 @@ def generate_schema_from_header_fields(
 
 
 # TODO: refactor this to use a class instead.
-def get_rows_from_variant(variant, omit_empty_sample_calls=False):
-  # type: (processed_variant.ProcessedVariant, bool) -> Dict
+def get_rows_from_variant(variant,
+                          schema_descriptor,
+                          conflict_resolver=None,
+                          allow_incompatible_records=False,
+                          omit_empty_sample_calls=False):
+  # type: (processed_variant.ProcessedVariant,
+  #        bigquery_schema_descriptor.SchemaDescriptor,
+  #        vcf_field_conflict_resolver.ConflictResolver,
+  #        processed_variant.ProcessedVariant,
+  #        bool) -> Dict
   """Yields BigQuery rows according to the schema from the given variant.
 
   There is a 10MB limit for each BigQuery row, which can be exceeded by having
@@ -166,8 +173,13 @@ def get_rows_from_variant(variant, omit_empty_sample_calls=False):
   it exceeds 10MB.
 
   Args:
-    variant (``ProcessedVariant``): Variant to convert to a row.
-    omit_empty_sample_calls (bool): If true, samples that don't have a given
+    variant: Variant to convert to a row.
+    schema_descriptor: Descriptor for the BigQuery schema.
+    conflict_resolver: Used to resolve conflicts between schema and variant data
+      (if any).
+    allow_incompatible_records: If true, field values are casted to Bigquery
+      schema if there is a mistmatch.
+    omit_empty_sample_calls: If true, samples that don't have a given
       call will be omitted.
   Yields:
     A dict representing a BigQuery row from the given variant. The row may have
@@ -177,12 +189,19 @@ def get_rows_from_variant(variant, omit_empty_sample_calls=False):
   """
   # TODO: Add error checking here for cases where the schema defined
   # by the headers does not match actual records.
-  base_row = _get_base_row_from_variant(variant)
+  base_row = _get_base_row_from_variant(
+      variant, schema_descriptor, conflict_resolver, allow_incompatible_records)
   base_row_size_in_bytes = _get_json_object_size(base_row)
   row_size_in_bytes = base_row_size_in_bytes
   row = copy.deepcopy(base_row)  # Keep base_row intact.
+
+  call_record_schema_descriptor = (
+      schema_descriptor.get_record_schema_descriptor(
+          bigquery_util.ColumnKeyConstants.CALLS))
   for call in variant.calls:
-    call_record, empty = _get_call_record(call)
+    call_record, empty = _get_call_record(
+        call, call_record_schema_descriptor, conflict_resolver,
+        allow_incompatible_records)
     if omit_empty_sample_calls and empty:
       continue
 
@@ -199,11 +218,21 @@ def get_rows_from_variant(variant, omit_empty_sample_calls=False):
   yield row
 
 
-def _get_call_record(call):
+def _get_call_record(call, schema_descriptor, conflict_resolver=None,
+                     allow_incompatible_records=False):
+  # type: (VariantCall,
+  #        bigquery_schema_descriptor.SchemaDescriptor,
+  #        vcf_field_conflict_resolver.ConflictResolver,
+  #        bool) -> Dict
   """A helper method for ``get_rows_from_variant`` to get a call as JSON.
 
   Args:
-     call (``VariantCall``): Variant call to convert.
+    call: Variant call to convert.
+    schema_descriptor: Descriptor for the BigQuery schema.
+    conflict_resolver: Used to resolve conflicts between schema and variant
+      data (if any).
+    allow_incompatible_records: If true, field values are casted to Bigquery
+      schema if there is a mistmatch.
 
   Returns:
     BigQuery call value (dict).
@@ -216,17 +245,40 @@ def _get_call_record(call):
   }
   is_empty = (not call.genotype or
               set(call.genotype) == set((vcfio.MISSING_GENOTYPE_VALUE,)))
-  for key, field in call.info.iteritems():
-    if field is not None:
-      sanitized = bigquery_util.get_bigquery_sanitized_field(field)
-      call_record[
-          bigquery_util.get_bigquery_sanitized_field_name(key)] = sanitized
-      is_empty = is_empty and _is_empty_field(sanitized)
+  for key, data in call.info.iteritems():
+    if data is not None:
+      field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
+      field_data = bigquery_util.get_bigquery_sanitized_field(data)
+      if allow_incompatible_records:
+        field_data = _make_field_data_compatible_with_schema(
+            field_name, field_data, schema_descriptor, conflict_resolver)
+      call_record[field_name] = field_data
+      is_empty = is_empty and _is_empty_field(field_data)
   return call_record, is_empty
 
 
-def _get_base_row_from_variant(variant):
-  # type: (processed_variant.ProcessedVariant) -> Dict[str, Any]
+def _make_field_data_compatible_with_schema(field_name,
+                                            field_data,
+                                            schema_descriptor,
+                                            conflict_resolver):
+  if not schema_descriptor.has_field(field_name):
+    raise ValueError('BigQuery schema has no such field:%s.\n'
+                     'This happen if the field is not defined in the VCF '
+                     'headers, nor is inferred automatically. If latter, try '
+                     'piepline again with --infer_undefined_headers flag.')
+  # Check for conflict between field data and schema. Resolve it if any.
+  field_data = conflict_resolver.resolve_schema_conflict(
+      schema_descriptor.get_field_descriptor(field_name), field_data)
+  return field_data
+
+
+def _get_base_row_from_variant(variant,
+                               schema_descriptor,
+                               conflict_resolver=None,
+                               allow_incompatible_records=False):
+  # type: (processed_variant.ProcessedVariant,
+  #        bigquery_schema_descriptor.SchemaDescriptor,
+  #        vcf_field_conflict_resolver.ConflictResolver) -> Dict[str, Any]
   """A helper method for ``get_rows_from_variant`` to get row without calls."""
   row = {
       bigquery_util.ColumnKeyConstants.REFERENCE_NAME: variant.reference_name,
@@ -253,12 +305,15 @@ def _get_base_row_from_variant(variant):
   # Add info.
   for key, data in variant.non_alt_info.iteritems():
     if data is not None:
-      row[bigquery_util.get_bigquery_sanitized_field_name(key)] = (
-          bigquery_util.get_bigquery_sanitized_field(data))
+      field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
+      field_data = bigquery_util.get_bigquery_sanitized_field(data)
+      if allow_incompatible_records:
+        field_data = _make_field_data_compatible_with_schema(
+            field_name, field_data, schema_descriptor, conflict_resolver)
+      row[field_name] = field_data
   # Set calls to empty for now (will be filled later).
   row[bigquery_util.ColumnKeyConstants.CALLS] = []
   return row
-
 
 
 def _get_bigquery_mode_from_vcf_num(vcf_num):

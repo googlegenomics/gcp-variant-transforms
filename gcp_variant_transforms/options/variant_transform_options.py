@@ -59,6 +59,11 @@ class VcfReadOptions(VariantTransformsOptions):
               'Failed reads will be logged as warnings and returned as '
               'MalformedVcfRecord objects.'))
     parser.add_argument(
+        '--allow_incompatible_records',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, VCF records incompatible with BigQuery schema will not '
+              'raise errors, and instead are casted to the schema. '))
+    parser.add_argument(
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, the pipeline runs in optimized way for handling large '

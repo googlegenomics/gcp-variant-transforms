@@ -24,7 +24,9 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
+
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import dummy_bigquery_schema_descriptor
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -123,6 +125,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow()))
+        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+            dummy_bigquery_schema_descriptor.DummySchemaDescriptor())))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
