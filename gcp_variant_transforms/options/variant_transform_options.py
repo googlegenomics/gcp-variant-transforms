@@ -85,6 +85,7 @@ class VcfReadOptions(VariantTransformsOptions):
               'variants. This is useful when there are header fields in '
               'variants not defined in the header sections.'))
 
+
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
@@ -111,15 +112,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--omit_empty_sample_calls',
         type='bool', default=False, nargs='?', const=True,
         help=("If true, samples that don't have a given call will be omitted."))
-    parser.add_argument(
-        '--annotation_fields',
-        default=None, nargs='+',
-        help=('If set, it is a list of field names (separated by space) that '
-              'should be treated as annotation fields. The content of these '
-              'INFO fields will be broken into multiple columns in the output '
-              'BigQuery table and stored as repeated fields with '
-              'corresponding alternate alleles. [EXPERIMENTAL]'))
-
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
@@ -145,6 +137,31 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       else:
         # For the rest of the errors, use BigQuery error message.
         raise
+
+
+class AnnotationOptions(VariantTransformsOptions):
+  """Options for how to treat annotation fields."""
+
+  def add_arguments(self, parser):
+    parser.add_argument(
+        '--annotation_fields',
+        default=None, nargs='+',
+        help=('If set, it is a list of field names (separated by space) that '
+              'should be treated as annotation fields. The content of these '
+              'INFO fields will be broken into multiple columns in the output '
+              'BigQuery table and stored as repeated fields with '
+              'corresponding alternate alleles. [EXPERIMENTAL]'))
+    parser.add_argument(
+        '--minimal_vep_alt_matching',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, for ALT matching of annotation fields, the --minimal '
+              'mode of VEP is simulated. Note that this can lead to ambiguous '
+              'matches so by default this is False but if the VCF files are '
+              'generated with VEP in --minimal mode, then this option should '
+              'be turned on. The ambiguous cases are logged and counted.'
+              'See the "Complext VCF Entries" of this doc for details:'
+              'http://www.ensembl.org/info/docs/tools/vep/online/'
+              'VEP_web_documentation.pdf'))
 
 
 class FilterOptions(VariantTransformsOptions):
