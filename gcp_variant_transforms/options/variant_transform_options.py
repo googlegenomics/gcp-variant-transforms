@@ -159,7 +159,8 @@ class AnnotationOptions(VariantTransformsOptions):
               'of ALT matching and should be used if available. In particular, '
               'if the annotation tool was VEP and it was used with --minimal, '
               'this option is preferred over --minimal_vep_alt_matching '
-              'because it avoids ambiguity.'))
+              'because it avoids ambiguity. When --use_allele_num is set '
+              '--minimal_vep_alt_matching is ignored.'))
     parser.add_argument(
         '--minimal_vep_alt_matching',
         type='bool', default=False, nargs='?', const=True,
