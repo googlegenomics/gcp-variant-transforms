@@ -55,6 +55,7 @@ PIPELINE_NAME = 'gcp-variant-transforms-integration-test'
 SCOPES = ['https://www.googleapis.com/auth/bigquery']
 DEFAULT_ZONES = ['us-west1-b']
 SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
+_BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration'
 
 
 class TestCaseFailure(Exception):
@@ -305,7 +306,7 @@ def _get_args():
 
 
 def _get_test_configs(include_large_tests, include_huge_tests):
-  # type: (bool) -> List
+  # type: (bool, bool) -> List
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
   test_file_path = _get_test_file_path(include_large_tests, include_huge_tests)
@@ -320,18 +321,15 @@ def _get_test_configs(include_large_tests, include_huge_tests):
 
 
 def _get_test_file_path(include_large_tests, include_huge_tests):
+  # type: (bool, bool) -> str
   if include_huge_tests:
-    test_file_path = os.path.join(
-        os.getcwd(), 'gcp_variant_transforms/testing/integration')
+    test_file_path = os.path.join(os.getcwd(), _BASE_TEST_FOLDER)
   elif include_large_tests:
     test_file_path = os.path.join(
-        os.getcwd(),
-        'gcp_variant_transforms/testing/integration/presubmit_tests')
+        os.getcwd(), _BASE_TEST_FOLDER, 'presubmit_tests')
   else:
     test_file_path = os.path.join(
-        os.getcwd(),
-        'gcp_variant_transforms/testing/integration/presubmit_tests/small_tests'
-    )
+        os.getcwd(), _BASE_TEST_FOLDER, 'presubmit_tests/small_tests')
   return test_file_path
 
 
