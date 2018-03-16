@@ -45,11 +45,11 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 _COMPLETELY_DELETED_ALT = '-'
 
 # The field name in the BigQuery table that holds annotation ALT.
-_ANNOTATION_ALT = 'allele_string'
+_ANNOTATION_ALT = 'allele'
 
 # The field name in the BigQuery table that indicates whether the annotation ALT
 # matching was ambiguous or not.
-_ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_allele_string'
+_ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_allele'
 
 
 # Counter names
@@ -401,7 +401,8 @@ class _AnnotationProcessor(object):
       alt, ambiguous = self._find_matching_alt(
           proc_var, common_prefix, alt_bases, annotation_field_name)
       if alt:
-        self._add_ambiguous_fields(annotations_list, ambiguous)
+        if self._minimal_match:
+          self._add_ambiguous_fields(annotations_list, ambiguous)
         alt._info[annotation_field_name] = annotations_list
 
   def _find_common_alt_ref_prefix(self, proc_var):
@@ -459,9 +460,8 @@ class _AnnotationProcessor(object):
 
   def _add_ambiguous_fields(self, annotations_list, ambiguous):
     # type: (List[Dict[str, str]], bool) -> None
-    if self._minimal_match:
-      for annotation_map in annotations_list:
-        annotation_map[_ANNOTATION_ALT_AMBIGUOUS] = ambiguous
+    for annotation_map in annotations_list:
+      annotation_map[_ANNOTATION_ALT_AMBIGUOUS] = ambiguous
 
   def _find_matching_alt(self,
                          proc_var,  # type: ProcessedVariant
