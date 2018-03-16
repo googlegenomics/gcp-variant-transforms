@@ -51,6 +51,10 @@ _ANNOTATION_ALT = 'ALT'
 # matching was ambiguous or not.
 _ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_ALT'
 
+# The annotation field that VEP uses to record the index of the alternate
+# allele (i.e., ALT) that an annotation list is for.
+_ALLELE_NUM_ANNOTATION = 'ALLELE_NUM'
+
 
 # Counter names
 class _CounterEnum(enum.Enum):
@@ -59,6 +63,8 @@ class _CounterEnum(enum.Enum):
   ANNOTATION_ALT_MINIMAL_MATCH = 'annotation_alt_minimal_match_counter'
   ANNOTATION_ALT_MINIMAL_AMBIGUOUS = 'annotation_alt_minimal_ambiguous_counter'
   ANNOTATION_ALT_MISMATCH = 'annotation_alt_mismatch_counter'
+  ALLELE_NUM_MISSING = 'allele_num_missing'
+  ALLELE_NUM_INCORRECT = 'allele_num_incorrect'
 
 
 class ProcessedVariant(object):
@@ -190,6 +196,7 @@ class ProcessedVariantFactory(object):
       header_fields,  # type: vcf_header_parser.HeaderFields
       split_alternate_allele_info_fields=True,  # type: bool
       annotation_fields=None,  # type: List[str]
+      use_allele_num=False,  # type: bool
       minimal_match=False,  # type: bool
       counter_factory=None  # type: metrics_util.CounterFactoryInterface
   ):
@@ -203,6 +210,8 @@ class ProcessedVariantFactory(object):
       annotation_fields: If provided, this is the list of INFO field names that
         store variant annotations. The format of how annotations are stored and
         their names are extracted from header_fields.
+      use_allele_num: If set, then "ALLELE_NUM" annotation is used to determine
+        the index of the ALT that corresponds to an annotation set.
       minimal_match: If set, then the --minimal mode of VEP is simulated for
         annotation ALT matching.
     """
@@ -214,7 +223,8 @@ class ProcessedVariantFactory(object):
     self._variant_counter = cfactory.create_counter(
         _CounterEnum.VARIANT.value)
     self._annotation_processor = _AnnotationProcessor(
-        annotation_fields, self._header_fields, cfactory, minimal_match)
+        annotation_fields, self._header_fields, cfactory, use_allele_num,
+        minimal_match)
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -335,6 +345,7 @@ class _AnnotationProcessor(object):
                annotation_fields,  # type: List[str]
                header_fields,  # type: vcf_header_parser.HeaderFields
                counter_factory,  # type: metrics_util.CounterFactoryInterface
+               use_allele_num,  # type: bool
                minimal_match,  # type: bool
               ):
     """Creates an instance for adding annotations to `ProcessedVariant` objects.
@@ -364,6 +375,11 @@ class _AnnotationProcessor(object):
         _CounterEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value)
     self._alt_mismatch_counter = counter_factory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MISMATCH.value)
+    self._allele_num_missing_counter = counter_factory.create_counter(
+        _CounterEnum.ALLELE_NUM_MISSING.value)
+    self._allele_num_incorrect_counter = counter_factory.create_counter(
+        _CounterEnum.ALLELE_NUM_INCORRECT.value)
+    self._use_allele_num = use_allele_num
     self._minimal_match = minimal_match
 
   def add_annotation_data(self, proc_var, annotation_field_name, data):
@@ -396,11 +412,20 @@ class _AnnotationProcessor(object):
     alt_annotation_map = self._convert_annotation_strs_to_alt_map(
         annotation_field_name, data)
     for alt_bases, annotations_list in alt_annotation_map.iteritems():
-      alt, ambiguous = self._find_matching_alt(
-          proc_var, common_prefix, alt_bases, annotation_field_name)
-      if alt:
-        self._add_ambiguous_fields(annotations_list, ambiguous)
-        alt._info[annotation_field_name] = annotations_list
+      if self._use_allele_num:
+        # TODO(bashir2): This class needs a major refactoring which should be
+        # done as part of creating a class for holding annotation data. The
+        # choice of mapping annotation lists to their annotation ALT string
+        # needs to be revisited in case of using ALLELE_NUM.
+        for annotation_dict in annotations_list:
+          self._add_annotations_by_allele_num(
+              proc_var, annotation_dict, annotation_field_name)
+      else:
+        alt, ambiguous = self._find_matching_alt(
+            proc_var, common_prefix, alt_bases, annotation_field_name)
+        if alt:
+          self._add_ambiguous_fields(annotations_list, ambiguous)
+          alt._info[annotation_field_name] = annotations_list
 
   def _find_common_alt_ref_prefix(self, proc_var):
     # type: (ProcessedVariant) -> str
@@ -598,6 +623,27 @@ class _AnnotationProcessor(object):
         annotation_alt == _COMPLETELY_DELETED_ALT):
       return True
     return False
+
+  def _add_annotations_by_allele_num(
+      self, proc_var, annotation_dict, annotation_field_name):
+    # type: (ProcessedVariant, Dict[str, str], str) -> None
+    if _ALLELE_NUM_ANNOTATION not in annotation_dict:
+      self._allele_num_missing_counter.inc()
+      return
+    index_str = annotation_dict[_ALLELE_NUM_ANNOTATION]
+    try:
+      alt_index = int(index_str) - 1
+      alt_list = proc_var._alternate_datas
+      if alt_index >= len(alt_list) or alt_index < 0:
+        raise ValueError
+      alt = alt_list[alt_index]
+      self._alt_match_counter.inc()
+      if annotation_field_name not in alt._info:
+        alt._info[annotation_field_name] = [annotation_dict]
+      else:
+        alt._info[annotation_field_name].append(annotation_dict)
+    except ValueError:
+      self._allele_num_incorrect_counter.inc()
 
 
 def _extract_annotation_list_with_alt(annotation_str):
