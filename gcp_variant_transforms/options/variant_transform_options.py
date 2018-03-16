@@ -161,7 +161,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'this option is preferred over --minimal_vep_alt_matching '
               'because it avoids ambiguity.'))
     parser.add_argument(
-        '--minimal_VEP_alt_matching',
+        '--minimal_vep_alt_matching',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, for ALT matching of annotation fields, the --minimal '
               'mode of VEP is simulated. Note that this can lead to ambiguous '

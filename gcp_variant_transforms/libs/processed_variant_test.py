@@ -136,16 +136,16 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C1',
+            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C3',
+            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {'ALT': 'TT', 'ambiguous_ALT': False, 'Consequence': 'C2',
+            {processed_variant._ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -179,16 +179,16 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C1',
+            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {'ALT': 'A', 'ambiguous_ALT': False, 'Consequence': 'C3',
+            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {'ALT': 'TT', 'ambiguous_ALT': False, 'Consequence': 'C2',
+            {processed_variant._ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -225,19 +225,19 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('<SYMBOLIC>')
     alt1._info = {
         'CSQ': [
-            {'ALT': 'SYMBOLIC', 'ambiguous_ALT': False, 'Consequence': 'C1',
+            {processed_variant._ANNOTATION_ALT: 'SYMBOLIC', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('[13:123457[.')
     alt2._info = {
         'CSQ': [
-            {'ALT': '[13', 'ambiguous_ALT': False, 'Consequence': 'C2',
+            {processed_variant._ANNOTATION_ALT: '[13', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('C[10:10357[.')
     alt3._info = {
         'CSQ': [
-            {'ALT': 'C[10', 'ambiguous_ALT': False, 'Consequence': 'C3',
+            {processed_variant._ANNOTATION_ALT: 'C[10', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -272,19 +272,19 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('CT')
     alt1._info = {
         'CSQ': [
-            {'ALT': 'T', 'ambiguous_ALT': False, 'Consequence': 'C1',
+            {processed_variant._ANNOTATION_ALT: 'T', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('CC')
     alt2._info = {
         'CSQ': [
-            {'ALT': 'C', 'ambiguous_ALT': False, 'Consequence': 'C2',
+            {processed_variant._ANNOTATION_ALT: 'C', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('CCC')
     alt3._info = {
         'CSQ': [
-            {'ALT': 'CC', 'ambiguous_ALT': False, 'Consequence': 'C3',
+            {processed_variant._ANNOTATION_ALT: 'CC', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -319,13 +319,13 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('AA')
     alt1._info = {
         'CSQ': [
-            {'ALT': 'AA', 'ambiguous_ALT': False, 'Consequence': 'C1',
+            {processed_variant._ANNOTATION_ALT: 'AA', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('AAA')
     alt2._info = {
         'CSQ': [
-            {'ALT': 'AAA', 'ambiguous_ALT': False, 'Consequence': 'C2',
+            {processed_variant._ANNOTATION_ALT: 'AAA', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -370,14 +370,16 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt2 = processed_variant.AlternateBaseData('CCT')
     alt2._info = {
         'CSQ': [
-            {'ALT': 'T', 'ambiguous_ALT': True, 'Consequence': 'C1',
-             'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
+            {processed_variant._ANNOTATION_ALT: 'T',
+             processed_variant._ANNOTATION_ALT_AMBIGUOUS: True,
+             'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt3 = processed_variant.AlternateBaseData('C')
     alt3._info = {
         'CSQ': [
-            {'ALT': '-', 'ambiguous_ALT': False, 'Consequence': 'C2',
-             'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
+            {processed_variant._ANNOTATION_ALT: '-',
+             processed_variant._ANNOTATION_ALT_AMBIGUOUS: False,
+             'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
     self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))

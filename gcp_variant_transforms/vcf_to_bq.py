@@ -238,7 +238,7 @@ def run(argv=None):
       known_args.split_alternate_allele_info_fields,
       known_args.annotation_fields,
       known_args.use_allele_num,
-      known_args.minimal_VEP_alt_matching,
+      known_args.minimal_vep_alt_matching,
       counter_factory)
 
   pipeline_options = PipelineOptions(pipeline_args)
