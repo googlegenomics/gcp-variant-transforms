@@ -287,7 +287,10 @@ def _get_args():
       required=False)
   parser.add_argument('--include_large_tests',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, runs the large_tests too.')
+                      help='If set, runs the large_tests and medium_tests too.')
+  parser.add_argument('--include_huge_tests',
+                      type=bool, default=False, nargs='?', const=True,
+                      help='If set, runs the huge_tests too.')
   parser.add_argument('--keep_tables',
                       type=bool, default=False, nargs='?', const=True,
                       help='If set, created tables are not deleted.')
@@ -301,16 +304,11 @@ def _get_args():
   return parser.parse_args()
 
 
-def _get_test_configs(include_large_tests):
+def _get_test_configs(include_large_tests, include_huge_tests):
   # type: (bool) -> List
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
-  if include_large_tests:
-    test_file_path = os.path.join(
-        os.getcwd(), 'gcp_variant_transforms/testing/integration')
-  else:
-    test_file_path = os.path.join(
-        os.getcwd(), 'gcp_variant_transforms/testing/integration/small_tests')
+  test_file_path = _get_test_file_path(include_large_tests, include_huge_tests)
   for root, _, files in os.walk(test_file_path):
     for filename in files:
       if filename.endswith('.json'):
@@ -319,6 +317,22 @@ def _get_test_configs(include_large_tests):
     raise TestCaseFailure('Found no .json files in directory {}'.format(
         test_file_path))
   return test_configs
+
+
+def _get_test_file_path(include_large_tests, include_huge_tests):
+  if include_huge_tests:
+    test_file_path = os.path.join(
+        os.getcwd(), 'gcp_variant_transforms/testing/integration')
+  elif include_large_tests:
+    test_file_path = os.path.join(
+        os.getcwd(),
+        'gcp_variant_transforms/testing/integration/presubmit_tests')
+  else:
+    test_file_path = os.path.join(
+        os.getcwd(),
+        'gcp_variant_transforms/testing/integration/presubmit_tests/small_tests'
+    )
+  return test_file_path
 
 
 def _load_test_config(filename):
@@ -395,7 +409,8 @@ def _get_failure_message(test_name, message):
 
 def main():
   args = _get_args()
-  test_case_configs = _get_test_configs(args.include_large_tests)
+  test_case_configs = _get_test_configs(
+      args.include_large_tests, args.include_huge_tests)
   with TestContextManager(args) as context:
     pool = multiprocessing.Pool(processes=len(test_case_configs))
     results = []
