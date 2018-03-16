@@ -45,11 +45,11 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 _COMPLETELY_DELETED_ALT = '-'
 
 # The field name in the BigQuery table that holds annotation ALT.
-_ANNOTATION_ALT = 'ALT'
+_ANNOTATION_ALT = 'allele_string'
 
 # The field name in the BigQuery table that indicates whether the annotation ALT
 # matching was ambiguous or not.
-_ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_ALT'
+_ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_allele_string'
 
 
 # Counter names
@@ -215,6 +215,7 @@ class ProcessedVariantFactory(object):
         _CounterEnum.VARIANT.value)
     self._annotation_processor = _AnnotationProcessor(
         annotation_fields, self._header_fields, cfactory, minimal_match)
+    self._minimal_match = minimal_match
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -293,11 +294,12 @@ class ProcessedVariantFactory(object):
           type=bigquery_util.TableFieldConstants.TYPE_STRING,
           mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
           description='The ALT part of the annotation field.'))
-      annotation_record.fields.append(bigquery.TableFieldSchema(
-          name=_ANNOTATION_ALT_AMBIGUOUS,
-          type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
-          mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-          description='Whether the annotation ALT matching was ambiguous.'))
+      if self._minimal_match:
+        annotation_record.fields.append(bigquery.TableFieldSchema(
+            name=_ANNOTATION_ALT_AMBIGUOUS,
+            type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
+            mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+            description='Whether the annotation ALT matching was ambiguous.'))
       for annotation_name in annotation_names:
         annotation_record.fields.append(bigquery.TableFieldSchema(
             name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
@@ -457,8 +459,9 @@ class _AnnotationProcessor(object):
 
   def _add_ambiguous_fields(self, annotations_list, ambiguous):
     # type: (List[Dict[str, str]], bool) -> None
-    for annotation_map in annotations_list:
-      annotation_map[_ANNOTATION_ALT_AMBIGUOUS] = ambiguous
+    if self._minimal_match:
+      for annotation_map in annotations_list:
+        annotation_map[_ANNOTATION_ALT_AMBIGUOUS] = ambiguous
 
   def _find_matching_alt(self,
                          proc_var,  # type: ProcessedVariant
@@ -513,16 +516,13 @@ class _AnnotationProcessor(object):
           found_alt = alt
           # Note we do not `break` in this case because we want to know if this
           # match was an ambiguous match or an exact one.
-
-    if found_alt:
-      return found_alt, is_ambiguous
-    else:
+    if not found_alt:
       self._alt_mismatch_counter.inc()
       logging.warning(
           'Could not find matching alternate bases for %s in '
           'annotation filed %s for variant at reference %s start %s', alt_bases,
           annotation_field_name, proc_var.reference_name, proc_var.start)
-      return None, False
+    return found_alt, is_ambiguous
 
   def _alt_matches_annotation_alt(
       self, common_prefix, alt_bases, annotation_alt):

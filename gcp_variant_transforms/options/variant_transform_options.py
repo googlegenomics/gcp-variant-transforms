@@ -152,7 +152,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'BigQuery table and stored as repeated fields with '
               'corresponding alternate alleles. [EXPERIMENTAL]'))
     parser.add_argument(
-        '--minimal_VEP_alt_matching',
+        '--minimal_vep_alt_matching',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, for ALT matching of annotation fields, the --minimal '
               'mode of VEP is simulated. Note that this can lead to ambiguous '
