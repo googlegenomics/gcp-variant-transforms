@@ -27,6 +27,7 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
+    'oauth2client<4.0.0,>=2.0.1'
 ]
 
 INTEGRATION_TEST_REQUIREMENTS = [
