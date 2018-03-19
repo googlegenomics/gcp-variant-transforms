@@ -286,12 +286,12 @@ def _get_args():
            ).format(DEFAULT_IMAGE_NAME),
       default=DEFAULT_IMAGE_NAME,
       required=False)
-  parser.add_argument('--include_large_tests',
+  parser.add_argument('--run_presubmit_tests',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, runs the large_tests and medium_tests too.')
-  parser.add_argument('--include_huge_tests',
+                      help='If set, runs the presubmit_tests.')
+  parser.add_argument('--run_all_tests',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, runs the huge_tests too.')
+                      help='If set, runs all integration tests.')
   parser.add_argument('--keep_tables',
                       type=bool, default=False, nargs='?', const=True,
                       help='If set, created tables are not deleted.')
@@ -305,11 +305,11 @@ def _get_args():
   return parser.parse_args()
 
 
-def _get_test_configs(include_large_tests, include_huge_tests):
+def _get_test_configs(run_presubmit_tests, run_all_tests):
   # type: (bool, bool) -> List
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
-  test_file_path = _get_test_file_path(include_large_tests, include_huge_tests)
+  test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests)
   for root, _, files in os.walk(test_file_path):
     for filename in files:
       if filename.endswith('.json'):
@@ -320,11 +320,11 @@ def _get_test_configs(include_large_tests, include_huge_tests):
   return test_configs
 
 
-def _get_test_file_path(include_large_tests, include_huge_tests):
+def _get_test_file_path(run_presubmit_tests, run_all_tests):
   # type: (bool, bool) -> str
-  if include_huge_tests:
+  if run_all_tests:
     test_file_path = os.path.join(os.getcwd(), _BASE_TEST_FOLDER)
-  elif include_large_tests:
+  elif run_presubmit_tests:
     test_file_path = os.path.join(
         os.getcwd(), _BASE_TEST_FOLDER, 'presubmit_tests')
   else:
@@ -408,7 +408,7 @@ def _get_failure_message(test_name, message):
 def main():
   args = _get_args()
   test_case_configs = _get_test_configs(
-      args.include_large_tests, args.include_huge_tests)
+      args.run_presubmit_tests, args.run_all_tests)
   with TestContextManager(args) as context:
     pool = multiprocessing.Pool(processes=len(test_case_configs))
     results = []
