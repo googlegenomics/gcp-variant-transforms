@@ -1,0 +1,47 @@
+{
+  "test_name": "option-optimize-for-large-inputs",
+  "table_name": "option_optimize_for_large_inputs",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/valid-70000-copies/*.vcf",
+  "variant_merge_strategy": "MOVE_TO_CALLS",
+  "optimize_for_large_inputs": true,
+  "runner": "DataflowRunner",
+  "worker_machine_type": "n1-standard-16",
+  "max_num_workers": "20",
+  "num_workers": "20",
+  "assertion_configs": [
+    {
+      "query": ["NUM_ROWS_QUERY"],
+      "expected_result": {"num_rows": 26}
+    },
+    {
+      "query": ["SUM_START_QUERY"],
+      "expected_result": {"sum_start": 46063858}
+    },
+    {
+      "query": ["SUM_END_QUERY"],
+      "expected_result": {"sum_end": 46066104}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM ( ",
+        "SELECT reference_name, start_position, end_position ",
+        "FROM  {TABLE_NAME} GROUP BY 1, 2, 3)"
+      ],
+      "expected_result": {"num_rows": 13}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call ",
+        "WHERE start_position = 17329"
+      ],
+      "expected_result": {"num_rows": 420000}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call "
+      ],
+      "expected_result": {"num_rows": 2730000}
+    }
+  ]
+}
+
