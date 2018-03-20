@@ -152,6 +152,16 @@ class AnnotationOptions(VariantTransformsOptions):
               'BigQuery table and stored as repeated fields with '
               'corresponding alternate alleles. [EXPERIMENTAL]'))
     parser.add_argument(
+        '--use_allele_num',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, uses the "ALLELE_NUM" annotation to determine the ALT'
+              'that matches each annotation set. Note this is the preferred way'
+              'of ALT matching and should be used if available. In particular, '
+              'if the annotation tool was VEP and it was used with --minimal, '
+              'this option is preferred over --minimal_vep_alt_matching '
+              'because it avoids ambiguity. When --use_allele_num is set '
+              '--minimal_vep_alt_matching is ignored.'))
+    parser.add_argument(
         '--minimal_vep_alt_matching',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, for ALT matching of annotation fields, the --minimal '
