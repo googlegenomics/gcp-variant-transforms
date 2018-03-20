@@ -1,8 +1,9 @@
 {
-  "test_name": "test-1000-copies-of-valid-4-2-with-merge",
-  "table_name": "test_1000_copies_of_valid_4_2_with_merge",
-  "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/valid-1000-copies/*.vcf",
+  "test_name": "option-optimize-for-large-inputs",
+  "table_name": "option_optimize_for_large_inputs",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/valid-70000-copies/*.vcf",
   "variant_merge_strategy": "MOVE_TO_CALLS",
+  "optimize_for_large_inputs": true,
   "runner": "DataflowRunner",
   "worker_machine_type": "n1-standard-16",
   "max_num_workers": "20",
@@ -10,49 +11,58 @@
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 13}
+      "expected_result": {"num_rows": 26}
     },
     {
       "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 23031929}
+      "expected_result": {"sum_start": 46063858}
     },
     {
       "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 23033052}
+      "expected_result": {"sum_end": 46066104}
+    },
+    {
+      "query": [
+        "SELECT COUNT(0) AS num_unique_rows FROM ( ",
+        "SELECT reference_name, start_position, end_position ",
+        "FROM  {TABLE_NAME} GROUP BY 1, 2, 3)"
+      ],
+      "expected_result": {"num_unique_rows": 13}
     },
     {
       "query": [
         "SELECT COUNT(0) AS num_ref_calls FROM {TABLE_NAME} AS t, ",
         "t.call AS call, call.genotype AS genotype WHERE genotype = 0"
       ],
-      "expected_result": {"num_ref_calls": 33000}
+      "expected_result": {"num_ref_calls": 2310000}
     },
     {
       "query": [
         "SELECT COUNT(0) AS num_alt_calls FROM {TABLE_NAME} AS t, ",
         "t.call AS call, call.genotype AS genotype WHERE genotype > 0"
       ],
-      "expected_result": {"num_alt_calls": 40000}
+      "expected_result": {"num_alt_calls": 2800000}
     },
     {
       "query": [
         "SELECT COUNT(0) AS num_no_calls FROM {TABLE_NAME} AS t, ",
         "t.call AS call, call.genotype AS genotype WHERE genotype < 0"
       ],
-      "expected_result": {"num_no_calls": 2000}
+      "expected_result": {"num_no_calls": 140000}
     },
     {
       "query": [
         "SELECT COUNT(0) AS num_calls FROM {TABLE_NAME} AS t, t.call AS call ",
         "WHERE reference_name = 'Y'"
       ],
-      "expected_result": {"num_calls": 3000}
+      "expected_result": {"num_calls": 210000}
     },
     {
       "query": [
         "SELECT COUNT(0) AS num_calls FROM {TABLE_NAME} AS t, t.call AS call "
       ],
-      "expected_result": {"num_calls": 39000}
+      "expected_result": {"num_calls": 2730000}
     }
   ]
 }
+
