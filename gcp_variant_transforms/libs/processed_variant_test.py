@@ -397,4 +397,66 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 1)
 
+  def test_create_processed_variant_annotation_alt_allele_num(self):
+    csq_info = parser._Info(
+        id=None, num='.', type=None,
+        desc='some desc Allele|Consequence|IMPACT|ALLELE_NUM',
+        source=None, version=None)
+    header_fields = vcf_header_parser.HeaderFields(
+        infos={'CSQ': csq_info}, formats={})
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        # The following represent a SNV and an insertion, resp.
+        alternate_bases=['T', 'CT'],
+        names=['rs1'], quality=2,
+        filters=['PASS'],
+        # Note that in the minimal mode of VEP, 'T' is an ambiguous annotation
+        # ALT because it can map to either the 'T' SNV or the 'CT' insertion.
+        # But because there is ALLELE_NUM there should be no ambiguity.
+        # The last four annotations have incorrect ALLELE_NUMs.
+        info={'CSQ': vcfio.VariantInfo(
+            data=[
+                'T|C1|I1|1', 'T|C2|I2|2', 'T|C3|I3|0', 'T|C4|I4|3',
+                'T|C5|I5|TEST', 'T|C6|I6|'], field_count='.')})
+    counter_factory = _CounterSpyFactory()
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'],
+        use_allele_num=True,
+        minimal_match=True,  # This should be ignored by the factory method.
+        counter_factory=counter_factory)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('T')
+    alt1._info = {
+        'CSQ': [
+            {processed_variant._ANNOTATION_ALT: 'T',
+             'Consequence': 'C1', 'IMPACT': 'I1', 'ALLELE_NUM': '1'}]
+    }
+    alt2 = processed_variant.AlternateBaseData('CT')
+    alt2._info = {
+        'CSQ': [
+            {processed_variant._ANNOTATION_ALT: 'T',
+             'Consequence': 'C2', 'IMPACT': 'I2', 'ALLELE_NUM': '2'}]
+    }
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertEqual(counter_factory.counter_map[
+        CEnum.VARIANT.value].get_value(), 1)
+    self.assertEqual(counter_factory.counter_map[
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 0)
+    self.assertEqual(
+        counter_factory.counter_map[
+            CEnum.ALLELE_NUM_INCORRECT.value].get_value(), 4)
+
+
 # TODO(bashir2): Add tests for create_alt_record_for_schema.
