@@ -36,7 +36,7 @@ class FieldConflictResolver(object):
   """A class for resolving all VCF field related mistmatches.
 
   Example mistmatch: conflict in definition of a VCF field (INFO, FORMAT, etc),
-      or conflict between schema definition and parsed value for a VCF field.
+    or conflict between schema definition and parsed value for a VCF field.
   """
 
   def __init__(self,
@@ -67,7 +67,7 @@ class FieldConflictResolver(object):
     Returns:
       a copy of the given field value that matches the schema.
     """
-    if schema_field_descriptor is None:
+    if not schema_field_descriptor:
       # Nothing to resolve.
       return vcf_field_value
 
@@ -77,7 +77,7 @@ class FieldConflictResolver(object):
     if isinstance(vcf_field_value, list) and not is_schema_repeated:
       if (schema_field_descriptor.type ==
           bigquery_util.TableFieldConstants.TYPE_BOOLEAN):
-        vcf_field_value = True if vcf_field_value  else False
+        vcf_field_value = bool(vcf_field_value)
       else:
         vcf_field_value = vcf_field_value[0] if vcf_field_value else None
     elif not isinstance(vcf_field_value, list) and is_schema_repeated:
@@ -117,9 +117,9 @@ class FieldConflictResolver(object):
     Raises:
       ValueError: if the conflict cannot be resolved.
     """
-    if attribute_name == 'type':
+    if attribute_name == VcfParserConstants.TYPE:
       return self._resolve_type(first_attribute_value, second_attribute_value)
-    elif attribute_name == 'num':
+    elif attribute_name == VcfParserConstants.NUM:
       return self._resolve_number(first_attribute_value, second_attribute_value)
     else:
       # We only care about conflicts in 'num' and 'type' attributes.

@@ -98,6 +98,7 @@ def get_bigquery_type_from_vcf_type(vcf_type):
   return _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP[vcf_type]
 
 def get_python_type_from_bigquery_type(bigquery_type):
+  # type: (str) -> Union[str, int, bool, float]
   if bigquery_type not in _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP:
     raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
   return _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP[bigquery_type]

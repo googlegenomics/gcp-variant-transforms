@@ -26,10 +26,10 @@ from apache_beam.transforms import Create
 
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.libs import dummy_bigquery_schema_descriptor
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
+from gcp_variant_transforms.testing import dummy_bigquery_schema_descriptor
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
 

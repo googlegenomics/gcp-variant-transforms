@@ -30,13 +30,13 @@ from vcf.parser import field_counts
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_vcf_schema
-from gcp_variant_transforms.libs import dummy_bigquery_schema_descriptor
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
+from gcp_variant_transforms.testing import dummy_bigquery_schema_descriptor
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
   """A dummy strategy. It just adds a new field to the schema."""

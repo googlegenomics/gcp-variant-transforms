@@ -187,8 +187,6 @@ def get_rows_from_variant(variant,
   Raises:
     ValueError: If variant data is inconsistent or invalid.
   """
-  # TODO: Add error checking here for cases where the schema defined
-  # by the headers does not match actual records.
   base_row = _get_base_row_from_variant(
       variant, schema_descriptor, conflict_resolver, allow_incompatible_records)
   base_row_size_in_bytes = _get_json_object_size(base_row)
@@ -218,12 +216,12 @@ def get_rows_from_variant(variant,
   yield row
 
 
-def _get_call_record(call, schema_descriptor, conflict_resolver=None,
-                     allow_incompatible_records=False):
-  # type: (VariantCall,
-  #        bigquery_schema_descriptor.SchemaDescriptor,
-  #        vcf_field_conflict_resolver.ConflictResolver,
-  #        bool) -> Dict
+def _get_call_record(
+    call, # type: VariantCall
+    schema_descriptor, # type: bigquery_schema_descriptor.SchemaDescriptor
+    conflict_resolver=None, # type: vcf_field_conflict_resolver.ConflictResolver
+    allow_incompatible_records=False # type: bool
+    ):
   """A helper method for ``get_rows_from_variant`` to get a call as JSON.
 
   Args:
@@ -248,6 +246,12 @@ def _get_call_record(call, schema_descriptor, conflict_resolver=None,
   for key, data in call.info.iteritems():
     if data is not None:
       field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
+      if not schema_descriptor.has_simple_field(field_name):
+        raise ValueError('BigQuery schema has no such field:%s.\n'
+                         'This happen if the field is not defined in the VCF '
+                         'headers, nor is inferred automatically. If latter, '
+                         'try piepline again with --infer_undefined_headers '
+                         'flag.')
       field_data = bigquery_util.get_bigquery_sanitized_field(data)
       if allow_incompatible_records:
         field_data = _make_field_data_compatible_with_schema(
@@ -261,11 +265,6 @@ def _make_field_data_compatible_with_schema(field_name,
                                             field_data,
                                             schema_descriptor,
                                             conflict_resolver):
-  if not schema_descriptor.has_field(field_name):
-    raise ValueError('BigQuery schema has no such field:%s.\n'
-                     'This happen if the field is not defined in the VCF '
-                     'headers, nor is inferred automatically. If latter, try '
-                     'piepline again with --infer_undefined_headers flag.')
   # Check for conflict between field data and schema. Resolve it if any.
   field_data = conflict_resolver.resolve_schema_conflict(
       schema_descriptor.get_field_descriptor(field_name), field_data)

@@ -20,7 +20,7 @@ from __future__ import absolute_import
 class DummySchemaDescriptor(object):
   """Dummy schema descriptor that returns default value to an API call."""
 
-  def has_field(self, field_name):
+  def has_simple_field(self, field_name):
     #pylint: disable=unused-argument
     return True
 
