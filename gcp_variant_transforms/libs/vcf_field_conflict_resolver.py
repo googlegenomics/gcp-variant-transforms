@@ -14,27 +14,38 @@
 
 import vcf
 
+
 class VcfParserConstants(object):
   """Constants for type and number from VCF parser."""
   FLOAT = 'Float'
   INTEGER = 'Integer'
+  STRING = 'String'
+  FLAG = 'Flag'
+  CHARACTER = 'Character'
   NUM = 'num'
   TYPE = 'type'
 
+
 class FieldConflictResolver(object):
-  """A class for resolving all VCF field related mistmatches."""
+  """A class for resolving all VCF field related mismatches."""
   # TODO(nmousavi): explain this class more.
 
-  def __init__(self, split_alternate_allele_info_fields=True):
-    # type: (bool) -> None
+  def __init__(self,
+               split_alternate_allele_info_fields=True,
+               resolve_all=False):
+    # type: (bool, bool) -> None
     """Initialize the class.
 
     Args:
-     split_alternate_allele_info_fields: Whether INFO fields with
-       `Number=A` are stored under the alternate_bases record.
-     """
+      split_alternate_allele_info_fields: Whether INFO fields with `Number=A`
+        are stored under the alternate_bases record.
+      resolve_all: Resolves all incompatible conflicts:
+        any incompatible type conflict is resolved as type = `String`
+        any incompatible number conflict is resolved as number = `.`
+    """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
+    self._resolve_all = resolve_all
 
   def resolve(self, vcf_field_key, first_vcf_field_value,
               second_vcf_field_value):
@@ -62,6 +73,8 @@ class FieldConflictResolver(object):
     elif (first in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT) and
           second in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT)):
       return VcfParserConstants.FLOAT
+    elif self._resolve_all:
+      return VcfParserConstants.STRING
     else:
       raise ValueError('Incompatible values cannot be resolved: '
                        '{}, {}'.format(first, second))
@@ -72,6 +85,8 @@ class FieldConflictResolver(object):
     elif (self._is_bigquery_field_repeated(first) and
           self._is_bigquery_field_repeated(second)):
       # None implies arbitrary number of values.
+      return None
+    elif self._resolve_all:
       return None
     else:
       raise ValueError('Incompatible numbers cannot be resolved: '
