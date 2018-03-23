@@ -36,7 +36,7 @@ from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
-from gcp_variant_transforms.testing import dummy_bigquery_schema_descriptor
+from gcp_variant_transforms.testing import mock_bigquery_schema_descriptor
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
   """A dummy strategy. It just adds a new field to the schema."""
@@ -276,7 +276,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
     return schema
 
   def _get_row_list_from_variant(
-      self, variant, schema_descriptor=None, conflict_resolver=None,
+      self, variant, schema_descriptor=None,
       allow_incompatible_records=False, **kwargs):
     # TODO(bashir2): To make this more of a "unit" test, we should create
     # ProcessedVariant instances directly (instead of Variant) and avoid calling
@@ -285,12 +285,11 @@ class GetRowsFromVariantTest(unittest.TestCase):
     header_fields = vcf_header_parser.HeaderFields({}, {})
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
-    if schema_descriptor is None:
-      schema_descriptor = (
-          dummy_bigquery_schema_descriptor.DummySchemaDescriptor())
+    if not schema_descriptor:
+      schema_descriptor = mock_bigquery_schema_descriptor.MockSchemaDescriptor()
 
     return list(bigquery_vcf_schema.get_rows_from_variant(
-        proc_var, schema_descriptor, conflict_resolver,
+        proc_var, schema_descriptor, self._conflict_resolver,
         allow_incompatible_records, **kwargs))
 
   def test_all_fields(self):
@@ -589,8 +588,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
         'IF': [1.0, 2.0],
         'IS': ['1.0', '2.0']}
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, self._schema_descriptor, self._conflict_resolver,
-        allow_incompatible_records=True))
+        variant, self._schema_descriptor, allow_incompatible_records=True))
 
     with self.assertRaises(ValueError):
       variant = vcfio.Variant(
@@ -599,8 +597,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
           # String cannot be casted to integer.
           info={'II': vcfio.VariantInfo(data='1.1', field_count='1'),})
       self._get_row_list_from_variant(
-          variant, self._schema_descriptor, self._conflict_resolver,
-          allow_incompatible_records=True)
+          variant, self._schema_descriptor, allow_incompatible_records=True)
       self.fail('String data for an integer schema must cause an exception')
 
   def test_schema_conflict_in_info_field_number(self):
@@ -625,8 +622,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
         'IF': [1.1],
         'IS': ['foo'],}
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, self._schema_descriptor, self._conflict_resolver,
-        allow_incompatible_records=True))
+        variant, self._schema_descriptor, allow_incompatible_records=True))
 
   def test_schema_conflict_in_format_field_type(self):
     variant = vcfio.Variant(
@@ -659,8 +655,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, self._schema_descriptor, self._conflict_resolver,
-        allow_incompatible_records=True))
+        variant, self._schema_descriptor, allow_incompatible_records=True))
 
     with self.assertRaises(ValueError):
       variant = vcfio.Variant(
@@ -672,8 +667,7 @@ class GetRowsFromVariantTest(unittest.TestCase):
                   name='Sample1', genotype=[0, 1], phaseset='*',
                   info={'FI': 'string_for_int_field'}),],)
       self._get_row_list_from_variant(
-          variant, self._schema_descriptor, self._conflict_resolver,
-          allow_incompatible_records=True)
+          variant, self._schema_descriptor, allow_incompatible_records=True)
       self.fail('String data for an integer schema must cause an exception')
 
   def test_schema_conflict_in_format_field_number(self):
@@ -707,5 +701,4 @@ class GetRowsFromVariantTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, self._schema_descriptor, self._conflict_resolver,
-        allow_incompatible_records=True))
+        variant, self._schema_descriptor, allow_incompatible_records=True))

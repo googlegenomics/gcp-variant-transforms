@@ -62,7 +62,7 @@ class VcfReadOptions(VariantTransformsOptions):
         '--allow_incompatible_records',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, VCF records incompatible with BigQuery schema will not '
-              'raise errors, and instead are casted to the schema. '))
+              'raise errors, and instead are casted to the schema.'))
     parser.add_argument(
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,

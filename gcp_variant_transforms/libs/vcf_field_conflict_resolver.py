@@ -65,7 +65,8 @@ class FieldConflictResolver(object):
       schema_field_descriptor: BigQuery field schema.
       vcf_field_value: field value parsed from VCF file.
     Returns:
-      a copy of the given field value that matches the schema.
+      a copy of the given field value that matches the schema if there is
+      a mismatch, otherwise the same given field value is returned.
     """
     if not schema_field_descriptor:
       # Nothing to resolve.
@@ -90,19 +91,16 @@ class FieldConflictResolver(object):
     schema_field_type = bigquery_util.get_python_type_from_bigquery_type(
         schema_field_descriptor.type)
     if (vcf_field_value is None or
-        (isinstance(vcf_field_value, list) and not vcf_field_value) or
         isinstance(vcf_field_value, schema_field_type) or
         (isinstance(vcf_field_value, list) and
-         isinstance(vcf_field_value[0], schema_field_type))):
+         (not vcf_field_value or
+          isinstance(vcf_field_value[0], schema_field_type)))):
       return vcf_field_value
 
     # There is a type conflict. Resolve it.
     if not isinstance(vcf_field_value, list):
       return schema_field_type(vcf_field_value)
-    new_vcf_field_value = []
-    for value in vcf_field_value:
-      new_vcf_field_value.append(schema_field_type(value))
-    return new_vcf_field_value
+    return [schema_field_type(v) for v in vcf_field_value]
 
   def resolve_attribute_conflict(self, attribute_name, first_attribute_value,
                                  second_attribute_value):
@@ -123,6 +121,8 @@ class FieldConflictResolver(object):
       return self._resolve_number(first_attribute_value, second_attribute_value)
     else:
       # We only care about conflicts in 'num' and 'type' attributes.
+      # TODO(bashir2): add check for he desc for annotation_fields
+      # (the desc must be equal).
       return first_attribute_value
 
   def _resolve_type(self, first, second):

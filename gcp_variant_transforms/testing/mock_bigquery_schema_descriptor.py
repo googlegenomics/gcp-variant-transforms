@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A dummy version of SchemaDescriptor class for testing."""
+"""A mock for SchemaDescriptor class for testing."""
 
 from __future__ import absolute_import
 
+from apache_beam.io.gcp.internal.clients import bigquery
+from gcp_variant_transforms.libs import bigquery_schema_descriptor
 
-class DummySchemaDescriptor(object):
-  """Dummy schema descriptor that returns default value to an API call."""
+
+# TODO(nmousavi): consider using mock.patch once pickling issue is solve.
+# https://bugs.python.org/issue14577
+class MockSchemaDescriptor(bigquery_schema_descriptor.SchemaDescriptor):
+  """Mock schema descriptor that returns default value to an API call."""
+
+  def __init__(self):
+    empty_schema = bigquery.TableSchema()
+    super(MockSchemaDescriptor, self).__init__(empty_schema)
 
   def has_simple_field(self, field_name):
     #pylint: disable=unused-argument

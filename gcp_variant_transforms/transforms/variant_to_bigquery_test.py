@@ -29,7 +29,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
-from gcp_variant_transforms.testing import dummy_bigquery_schema_descriptor
+from gcp_variant_transforms.testing import mock_bigquery_schema_descriptor
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
 
@@ -126,6 +126,6 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
         | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
-            dummy_bigquery_schema_descriptor.DummySchemaDescriptor())))
+            mock_bigquery_schema_descriptor.MockSchemaDescriptor())))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()

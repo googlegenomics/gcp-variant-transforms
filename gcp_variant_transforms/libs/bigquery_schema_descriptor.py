@@ -57,11 +57,10 @@ class SchemaDescriptor(object):
     # type: (str) -> bool
     """Returns true iff the schema has a non-record field named `field_name`.
 
-    Note:
-      Records and their fields are ignored.
+    Note: Records and their fields are ignored.
 
     Args:
-      field_name: name of a field in the schema.
+        field_name: name of a field in the schema.
    """
     return field_name in self._field_descriptor_dict
 

@@ -34,7 +34,7 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
                schema_descriptor,
                allow_incompatible_records=False,
                omit_empty_sample_calls=False):
-    # type: (bigquery_schema_descriptor.SchemaDescriptor, bool) -> None
+    # type: (bigquery_schema_descriptor.SchemaDescriptor, bool, bool) -> None
     super(_ConvertToBigQueryTableRow, self).__init__()
     self._schema_descriptor = schema_descriptor
     self._conflict_resolver = (
