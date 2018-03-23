@@ -39,7 +39,8 @@ class VcfHeader(object):
                filters=None,
                alts=None,
                formats=None,
-               contigs=None):
+               contigs=None,
+               conflicts=None):
     """Initializes a VcfHeader object.
 
     Args:
@@ -53,12 +54,15 @@ class VcfHeader(object):
         metadata values (:class:`~vcf.parser._Format`).
       contigs (dict): A dictionary mapping contig keys (str) to vcf contig
         metadata values (:class:`~vcf.parser._Contig`).
+      conflicts (dict): A dictionary mapping keys (str) to a set of conflicts
+        (set[str])
     """
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
     self.alts = self._values_asdict(alts or {})
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
+    self.conflicts = self._values_asdict(conflicts or {})
 
   def __eq__(self, other):
     return (self.infos == other.infos and
