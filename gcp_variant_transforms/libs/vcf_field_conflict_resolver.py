@@ -32,20 +32,20 @@ class FieldConflictResolver(object):
 
   def __init__(self,
                split_alternate_allele_info_fields=True,
-               resolve_all=False):
+               resolve_always=False):
     # type: (bool, bool) -> None
     """Initialize the class.
 
     Args:
       split_alternate_allele_info_fields: Whether INFO fields with `Number=A`
         are stored under the alternate_bases record.
-      resolve_all: Resolves all incompatible conflicts:
-        any incompatible type conflict is resolved as type = `String`
-        any incompatible number conflict is resolved as number = `.`
+      resolve_always: Always find a solution for the conflicts. When the
+        conflicts are incompatible, convert all type conflicts to `String` and
+        number conflicts to `.`.
     """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
-    self._resolve_all = resolve_all
+    self._resolve_always = resolve_always
 
   def resolve(self, vcf_field_key, first_vcf_field_value,
               second_vcf_field_value):
@@ -73,7 +73,7 @@ class FieldConflictResolver(object):
     elif (first in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT) and
           second in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT)):
       return VcfParserConstants.FLOAT
-    elif self._resolve_all:
+    elif self._resolve_always:
       return VcfParserConstants.STRING
     else:
       raise ValueError('Incompatible values cannot be resolved: '
@@ -86,7 +86,7 @@ class FieldConflictResolver(object):
           self._is_bigquery_field_repeated(second)):
       # None implies arbitrary number of values.
       return None
-    elif self._resolve_all:
+    elif self._resolve_always:
       return None
     else:
       raise ValueError('Incompatible numbers cannot be resolved: '

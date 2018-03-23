@@ -28,9 +28,8 @@ class ConflictResolverTest(unittest.TestCase):
     self._resolver = vcf_field_conflict_resolver.FieldConflictResolver()
     self._resolver_allele = vcf_field_conflict_resolver.FieldConflictResolver(
         split_alternate_allele_info_fields=True)
-    self._resolver_all = vcf_field_conflict_resolver.FieldConflictResolver(
-        resolve_all=True
-    )
+    self._resolver_always = vcf_field_conflict_resolver.FieldConflictResolver(
+        resolve_always=True)
 
   def _field_count(self, symbol):
     # type: (str) -> int
@@ -77,25 +76,25 @@ class ConflictResolverTest(unittest.TestCase):
 
   def test_resolving_all_field_definition_conflict_in_type(self):
     self.assertEqual(
-        self._resolver_all.resolve(VcfParserConstants.TYPE,
-                                   VcfParserConstants.INTEGER,
-                                   VcfParserConstants.FLOAT),
+        self._resolver_always.resolve(VcfParserConstants.TYPE,
+                                      VcfParserConstants.INTEGER,
+                                      VcfParserConstants.FLOAT),
         VcfParserConstants.FLOAT)
     for i in [VcfParserConstants.FLOAT, VcfParserConstants.INTEGER,
               VcfParserConstants.STRING, VcfParserConstants.CHARACTER]:
       for j in [VcfParserConstants.FLAG, VcfParserConstants.STRING]:
         self.assertEqual(
-            self._resolver_all.resolve(VcfParserConstants.TYPE, i, j),
+            self._resolver_always.resolve(VcfParserConstants.TYPE, i, j),
             VcfParserConstants.STRING)
 
   def test_resolving_all_field_definition_conflict_in_number(self):
     self.assertEqual(
-        self._resolver_all.resolve(VcfParserConstants.NUM, 2, 3), None)
+        self._resolver_always.resolve(VcfParserConstants.NUM, 2, 3), None)
     self.assertEqual(
-        self._resolver_all.resolve(VcfParserConstants.NUM, 2, None), None)
+        self._resolver_always.resolve(VcfParserConstants.NUM, 2, None), None)
 
     for i in [0, 1]:
       for j in [self._field_count('R'), self._field_count('G'),
                 self._field_count('A'), 2, None]:
         self.assertEqual(
-            self._resolver_all.resolve(VcfParserConstants.NUM, i, j), None)
+            self._resolver_always.resolve(VcfParserConstants.NUM, i, j), None)
