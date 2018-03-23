@@ -22,37 +22,16 @@
     },
     {
       "query": [
-        "SELECT COUNT(0) AS num_ref_calls FROM {TABLE_NAME} AS t, ",
-        "t.call AS call, call.genotype AS genotype WHERE genotype = 0"
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call ",
+        "WHERE start_position = 17329"
       ],
-      "expected_result": {"num_ref_calls": 33000}
+      "expected_result": {"num_rows": 6000}
     },
     {
       "query": [
-        "SELECT COUNT(0) AS num_alt_calls FROM {TABLE_NAME} AS t, ",
-        "t.call AS call, call.genotype AS genotype WHERE genotype > 0"
+        "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME} AS t, t.call AS call "
       ],
-      "expected_result": {"num_alt_calls": 40000}
-    },
-    {
-      "query": [
-        "SELECT COUNT(0) AS num_no_calls FROM {TABLE_NAME} AS t, ",
-        "t.call AS call, call.genotype AS genotype WHERE genotype < 0"
-      ],
-      "expected_result": {"num_no_calls": 2000}
-    },
-    {
-      "query": [
-        "SELECT COUNT(0) AS num_calls FROM {TABLE_NAME} AS t, t.call AS call ",
-        "WHERE reference_name = 'Y'"
-      ],
-      "expected_result": {"num_calls": 3000}
-    },
-    {
-      "query": [
-        "SELECT COUNT(0) AS num_calls FROM {TABLE_NAME} AS t, t.call AS call "
-      ],
-      "expected_result": {"num_calls": 39000}
+      "expected_result": {"num_rows": 39000}
     }
   ]
 }
