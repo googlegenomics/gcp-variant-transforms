@@ -1,7 +1,9 @@
 {
   "test_name": "test-1000-genomes-no-merge",
   "table_name": "test_1000_genomes_no_merge",
-  "input_pattern": "gs://genomics-public-data/1000-genomes/vcf/ALL*phase1*vcf",
+  "input_pattern": "gs://genomics-public-data/1000-genomes/vcf/*.vcf",
+  "infer_undefined_headers": "",
+  "allow_incompatible_records": "",
   "runner": "DataflowRunner",
   "worker_machine_type": "n1-standard-64",
   "max_num_workers": "64",
@@ -9,15 +11,15 @@
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 79434956}
+      "expected_result": {"num_rows": 39728277}
     },
     {
       "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 6275666979737096}
+      "expected_result": {"sum_start": 3137997872226881}
     },
     {
       "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 6275667294475596}
+      "expected_result": {"sum_end": 3137998030038799}
     }
   ]
 }
