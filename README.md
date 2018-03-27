@@ -154,9 +154,11 @@ python -m gcp_variant_transforms.vcf_to_bq \
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table Schema](docs/bigquery_schema.md)
+* [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
 * [Appending data to existing tables](docs/data_append.md)
+* [Troubleshooting](docs/troubleshooting.md)
 
 ## Development
 
