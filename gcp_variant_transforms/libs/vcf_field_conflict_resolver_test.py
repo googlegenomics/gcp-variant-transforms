@@ -16,6 +16,8 @@
 
 import unittest
 
+from collections import namedtuple
+
 import vcf
 
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
@@ -23,6 +25,10 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
+
+SchemaTestConfig = namedtuple('SchemaTestConfig',
+                              ['schema_type', 'schema_mode', 'field_data',
+                               'expected_resolved_field_data'])
 
 class ConflictResolverTest(unittest.TestCase):
   """Test case for :class:`FieldConflictResolver`."""
@@ -39,60 +45,78 @@ class ConflictResolverTest(unittest.TestCase):
     # symbol = {'A', 'G', 'R'}.
     return vcf.parser.field_counts[symbol]
 
-  def test_resolving_schema_conflict_type(self):
-    test_data_configs = [
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': 1, 'resolved_field_data': True},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': ['1', '2'], 'resolved_field_data': [True, True]},
-        {'schema_type': TableFieldConstants.TYPE_INTEGER,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': '1', 'resolved_field_data': 1},
-        {'schema_type': TableFieldConstants.TYPE_INTEGER,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': ['1', '2'], 'resolved_field_data': [1, 2]},
-        {'schema_type': TableFieldConstants.TYPE_FLOAT,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': 1, 'resolved_field_data': float(1)},
-        {'schema_type': TableFieldConstants.TYPE_FLOAT,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': [1, 2], 'resolved_field_data': [float(1), float(2)]},
-        {'schema_type': TableFieldConstants.TYPE_STRING,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': 1, 'resolved_field_data': '1'},
-        {'schema_type': TableFieldConstants.TYPE_STRING,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': [1, 2], 'resolved_field_data': ['1', '2']},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': '', 'resolved_field_data': False},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': ['', ''], 'resolved_field_data': [False, False]},
-        {'schema_type': TableFieldConstants.TYPE_STRING,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': [], 'resolved_field_data': None},
-        {'schema_type': TableFieldConstants.TYPE_STRING,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': [], 'resolved_field_data': []},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': [], 'resolved_field_data': False},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': [], 'resolved_field_data': []},
-    ]
-
+  def _run_resolve_schema_conflict_tests(self, test_data_configs):
     for config in test_data_configs:
       self.assertEqual(
           self._resolver.resolve_schema_conflict(
               bigquery_schema_descriptor.FieldDescriptor(
-                  type=config['schema_type'],
-                  mode=config['schema_mode']),
-              config['field_data']),
-          config['resolved_field_data'])
+                  type=config.schema_type,
+                  mode=config.schema_mode),
+              config.field_data),
+          config.expected_resolved_field_data)
+
+
+  def test_resolving_schema_conflict_type(self):
+    test_data_configs = [
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data=True),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=[True, True]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data='1',
+                         expected_resolved_field_data=1),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=[1, 2]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data=float(1)),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1, 2],
+                         expected_resolved_field_data=[float(1), float(2)]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data='1'),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1, 2],
+                         expected_resolved_field_data=['1', '2']),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data='',
+                         expected_resolved_field_data=False),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['', ''],
+                         expected_resolved_field_data=[False, False]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[],
+                         expected_resolved_field_data=None),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[],
+                         expected_resolved_field_data=[]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[],
+                         expected_resolved_field_data=False),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[],
+                         expected_resolved_field_data=[]),
+    ]
+
+    self._run_resolve_schema_conflict_tests(test_data_configs)
 
     with self.assertRaises(ValueError):
       self._resolver.resolve_schema_conflict(
@@ -103,52 +127,44 @@ class ConflictResolverTest(unittest.TestCase):
       self.fail('Should raise exception for converting str to int')
 
   def test_resolving_schema_conflict_number(self):
-
     test_data_configs = [
-        {'schema_type': TableFieldConstants.TYPE_INTEGER,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': [1, 2, 3], 'resolved_field_data': 1},
-        {'schema_type': TableFieldConstants.TYPE_INTEGER,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': [1], 'resolved_field_data': [1]},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': ['1', '2'], 'resolved_field_data': True},
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[1, 2, 3],
+                         expected_resolved_field_data=1),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1],
+                         expected_resolved_field_data=[1]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=True),
     ]
 
-    for config in test_data_configs:
-      self.assertEqual(
-          self._resolver.resolve_schema_conflict(
-              bigquery_schema_descriptor.FieldDescriptor(
-                  type=config['schema_type'],
-                  mode=config['schema_mode']),
-              config['field_data']),
-          config['resolved_field_data'])
+    self._run_resolve_schema_conflict_tests(test_data_configs)
 
   def test_resolving_schema_conflict_type_and_number(self):
     test_data_configs = [
-        {'schema_type': TableFieldConstants.TYPE_FLOAT,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': [1, 2, 3], 'resolved_field_data': float(1)},
-        {'schema_type': TableFieldConstants.TYPE_STRING,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': 1, 'resolved_field_data': [str(1)]},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_NULLABLE,
-         'field_data': ['1', '2'], 'resolved_field_data': True},
-        {'schema_type': TableFieldConstants.TYPE_BOOLEAN,
-         'schema_mode': TableFieldConstants.MODE_REPEATED,
-         'field_data': '1', 'resolved_field_data': [True]},
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[1, 2, 3],
+                         expected_resolved_field_data=float(1)),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=1,
+                         expected_resolved_field_data=[str(1)]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=True),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data='1',
+                         expected_resolved_field_data=[True]),
     ]
 
-    for config in test_data_configs:
-      self.assertEqual(
-          self._resolver.resolve_schema_conflict(
-              bigquery_schema_descriptor.FieldDescriptor(
-                  type=config['schema_type'],
-                  mode=config['schema_mode']),
-              config['field_data']),
-          config['resolved_field_data'])
+    self._run_resolve_schema_conflict_tests(test_data_configs)
 
   def test_resolving_attribute_conflict_type(self):
     self.assertEqual(

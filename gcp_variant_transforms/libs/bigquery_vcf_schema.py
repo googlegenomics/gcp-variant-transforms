@@ -178,7 +178,7 @@ def get_rows_from_variant(
     conflict_resolver: Used to resolve conflicts between schema and variant data
       (if any).
     allow_incompatible_records: If true, field values are casted to Bigquery
-      schema if there is a mistmatch.
+      schema if there is a mismatch.
     omit_empty_sample_calls: If true, samples that don't have a given
       call will be omitted.
   Yields:
@@ -230,7 +230,7 @@ def _get_call_record(
     conflict_resolver: Used to resolve conflicts between schema and variant
       data (if any).
     allow_incompatible_records: If true, field values are casted to Bigquery
-      schema if there is a mistmatch.
+      schema if there is a mismatch.
 
   Returns:
     BigQuery call value (dict).
@@ -245,42 +245,12 @@ def _get_call_record(
               set(call.genotype) == set((vcfio.MISSING_GENOTYPE_VALUE,)))
   for key, data in call.info.iteritems():
     if data is not None:
-      field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
-      if not schema_descriptor.has_simple_field(field_name):
-        raise ValueError('BigQuery schema has no such field: {}.\n'
-                         'This can happen if the field is not defined in '
-                         'the VCF headers, or is not inferred automatically. '
-                         'Retry pipeline with --infer_undefined_headers.'
-                         .format(field_name))
-      sanitized_field_data = bigquery_util.get_bigquery_sanitized_field(data)
-      field_schema = schema_descriptor.get_field_descriptor(field_name)
-      field_data, is_compatible = _check_and_resolve_schema_compatibility(
-          field_schema, sanitized_field_data, conflict_resolver)
-      if is_compatible or allow_incompatible_records:
-        call_record[field_name] = field_data
-        is_empty = is_empty and _is_empty_field(field_data)
-      else:
-        raise ValueError('Value and schema do not match for field {}. '
-                         'Value: {} Schema: {}.'.format(
-                             field_name, sanitized_field_data, field_schema))
+      field_name, field_data = _get_bigquery_field_entry(
+          key, data, schema_descriptor, conflict_resolver,
+          allow_incompatible_records)
+      call_record[field_name] = field_data
+      is_empty = is_empty and _is_empty_field(field_data)
   return call_record, is_empty
-
-def _check_and_resolve_schema_compatibility(field_schema,
-                                            field_data,
-                                            conflict_resolver):
-  resolved_field_data = conflict_resolver.resolve_schema_conflict(
-      field_schema, field_data)
-  return resolved_field_data, resolved_field_data == field_data
-
-
-def _make_field_data_compatible_with_schema(field_name,
-                                            field_data,
-                                            schema_descriptor,
-                                            conflict_resolver):
-  # Check for conflict between field data and schema. Resolve it if any.
-  field_data = conflict_resolver.resolve_schema_conflict(
-      schema_descriptor.get_field_descriptor(field_name), field_data)
-  return field_data
 
 
 def _get_base_row_from_variant(
@@ -317,15 +287,53 @@ def _get_base_row_from_variant(
   # Add info.
   for key, data in variant.non_alt_info.iteritems():
     if data is not None:
-      field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
-      field_data = bigquery_util.get_bigquery_sanitized_field(data)
-      if allow_incompatible_records:
-        field_data = _make_field_data_compatible_with_schema(
-            field_name, field_data, schema_descriptor, conflict_resolver)
+      field_name, field_data = _get_bigquery_field_entry(
+          key, data, schema_descriptor, conflict_resolver,
+          allow_incompatible_records)
       row[field_name] = field_data
+
   # Set calls to empty for now (will be filled later).
   row[bigquery_util.ColumnKeyConstants.CALLS] = []
   return row
+
+
+def _check_and_resolve_schema_compatibility(field_schema,
+                                            field_data,
+                                            conflict_resolver):
+  resolved_field_data = conflict_resolver.resolve_schema_conflict(
+      field_schema, field_data)
+  return resolved_field_data, resolved_field_data == field_data
+
+
+def _get_bigquery_field_entry(
+    key,  # type: str
+    data, # type: Union[Any, List[Any]]
+    schema_descriptor,
+    # type: bigquery_schema_descriptor.SchemaDescriptor
+    conflict_resolver,
+    # type: vcf_field_conflict_resolver.ConflictResolver
+    allow_incompatible_records # type: bool
+    ):
+  # type: (...) -> (str, Any)
+  if data is None:
+    return None, None
+  field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
+  if not schema_descriptor.has_simple_field(field_name):
+    raise ValueError('BigQuery schema has no such field: {}.\n'
+                     'This can happen if the field is not defined in '
+                     'the VCF headers, or is not inferred automatically. '
+                     'Retry pipeline with --infer_undefined_headers.'
+                     .format(field_name))
+  sanitized_field_data = bigquery_util.get_bigquery_sanitized_field(data)
+  field_schema = schema_descriptor.get_field_descriptor(field_name)
+  field_data, is_compatible = _check_and_resolve_schema_compatibility(
+      field_schema, sanitized_field_data, conflict_resolver)
+  if is_compatible or allow_incompatible_records:
+    return field_name, field_data
+  else:
+    raise ValueError('Value and schema do not match for field {}. '
+                     'Value: {} Schema: {}.'.format(
+                         field_name, sanitized_field_data, field_schema))
 
 
 def _get_bigquery_mode_from_vcf_num(vcf_num):

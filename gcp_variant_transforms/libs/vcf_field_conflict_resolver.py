@@ -33,9 +33,9 @@ class VcfParserConstants(object):
 
 
 class FieldConflictResolver(object):
-  """A class for resolving all VCF field related mistmatches.
+  """A class for resolving all VCF field related mismatches.
 
-  Example mistmatch: conflict in definition of a VCF field (INFO, FORMAT, etc),
+  Example mismatch: conflict in definition of a VCF field (INFO, FORMAT, etc),
     or conflict between schema definition and parsed value for a VCF field.
   """
 
@@ -65,7 +65,7 @@ class FieldConflictResolver(object):
       schema_field_descriptor: BigQuery field schema.
       vcf_field_value: field value parsed from VCF file.
     Returns:
-      a copy of the given field value that matches the schema if there is
+      A copy of the given field value that matches the schema if there is
       a mismatch, otherwise the same given field value is returned.
     """
     if not schema_field_descriptor:
@@ -85,7 +85,6 @@ class FieldConflictResolver(object):
       vcf_field_value = [vcf_field_value]
 
     # Return if there is no type conflict.
-    #
     # For a list, we only check the first element. All elements of the list
     # have the same type (unless there is a bug in parser).
     schema_field_type = bigquery_util.get_python_type_from_bigquery_type(

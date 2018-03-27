@@ -20,7 +20,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 
 
-# TODO(nmousavi): consider using mock.patch once pickling issue is solve.
+# TODO(nmousavi): consider using mock.patch once pickling issue is solved.
 # https://bugs.python.org/issue14577
 class MockSchemaDescriptor(bigquery_schema_descriptor.SchemaDescriptor):
   """Mock schema descriptor that returns default value to an API call."""
@@ -35,8 +35,10 @@ class MockSchemaDescriptor(bigquery_schema_descriptor.SchemaDescriptor):
 
   def get_field_descriptor(self, field_name):
     #pylint: disable=unused-argument
+
     return None
 
   def get_record_schema_descriptor(self, record_name):
     #pylint: disable=unused-argument
+
     return self

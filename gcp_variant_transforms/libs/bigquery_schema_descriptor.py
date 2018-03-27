@@ -60,8 +60,8 @@ class SchemaDescriptor(object):
     Note: Records and their fields are ignored.
 
     Args:
-        field_name: name of a field in the schema.
-   """
+      field_name: name of a field in the schema.
+    """
     return field_name in self._field_descriptor_dict
 
   def get_field_descriptor(self, field_name):
