@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Class for resolving conflicts in VCF field definitions."""
+
 import vcf
+
+from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_util
 
 
 class VcfParserConstants(object):
@@ -23,12 +28,16 @@ class VcfParserConstants(object):
   FLAG = 'Flag'
   CHARACTER = 'Character'
   NUM = 'num'
+  STRING = 'String'
   TYPE = 'type'
 
 
 class FieldConflictResolver(object):
-  """A class for resolving all VCF field related mismatches."""
-  # TODO(nmousavi): explain this class more.
+  """A class for resolving all VCF field related mismatches.
+
+  Example mismatch: conflict in definition of a VCF field (INFO, FORMAT, etc),
+    or conflict between schema definition and parsed value for a VCF field.
+  """
 
   def __init__(self,
                split_alternate_allele_info_fields=True,
@@ -39,33 +48,81 @@ class FieldConflictResolver(object):
     Args:
       split_alternate_allele_info_fields: Whether INFO fields with `Number=A`
         are stored under the alternate_bases record.
-      resolve_always: Always find a solution for the conflicts. When the
-        conflicts are incompatible, convert all type conflicts to `String` and
-        number conflicts to `.`.
+     split_alternate_allele_info_fields: Whether INFO fields with
+       `Number=A` are stored under the alternate_bases record.
     """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
     self._resolve_always = resolve_always
 
-  def resolve(self, vcf_field_key, first_vcf_field_value,
-              second_vcf_field_value):
-    # type: (str, Union[str, int], Union[str, int]) -> Union[str, int]
-    """Returns resolution for the conflicting field values.
+  def resolve_schema_conflict(self,
+                              schema_field_descriptor,
+                              vcf_field_value):
+    # type: (bigquery_schema_descriptor.FieldDescriptor, Any) -> Any
+    """Resolves conflict between schema and field value.
 
     Args:
-      vcf_field_key: field key in VCF header.
-      first_vcf_field_value: first field value.
-      second_vcf_field_value: second field value.
+      schema_field_descriptor: BigQuery field schema.
+      vcf_field_value: field value parsed from VCF file.
+    Returns:
+      A copy of the given field value that matches the schema if there is
+      a mismatch, otherwise the same given field value is returned.
+    """
+    if not schema_field_descriptor:
+      # Nothing to resolve.
+      return vcf_field_value
+
+    # Resolve size conflict.
+    is_schema_repeated = (schema_field_descriptor.mode ==
+                          bigquery_util.TableFieldConstants.MODE_REPEATED)
+    if isinstance(vcf_field_value, list) and not is_schema_repeated:
+      if (schema_field_descriptor.type ==
+          bigquery_util.TableFieldConstants.TYPE_BOOLEAN):
+        vcf_field_value = bool(vcf_field_value)
+      else:
+        vcf_field_value = vcf_field_value[0] if vcf_field_value else None
+    elif not isinstance(vcf_field_value, list) and is_schema_repeated:
+      vcf_field_value = [vcf_field_value]
+
+    # Return if there is no type conflict.
+    # For a list, we only check the first element. All elements of the list
+    # have the same type (unless there is a bug in parser).
+    schema_field_type = bigquery_util.get_python_type_from_bigquery_type(
+        schema_field_descriptor.type)
+    if (vcf_field_value is None or
+        isinstance(vcf_field_value, schema_field_type) or
+        (isinstance(vcf_field_value, list) and
+         (not vcf_field_value or
+          isinstance(vcf_field_value[0], schema_field_type)))):
+      return vcf_field_value
+
+    # There is a type conflict. Resolve it.
+    if not isinstance(vcf_field_value, list):
+      return schema_field_type(vcf_field_value)
+    return [schema_field_type(v) for v in vcf_field_value]
+
+  def resolve_attribute_conflict(self, attribute_name, first_attribute_value,
+                                 second_attribute_value):
+    # type: (str, Union[str, int], Union[str, int]) -> Union[str, int]
+    """Returns resolution for the conflicting field attributes.
+
+    Args:
+      attribute_name: A field definition in VCF header consists of attributes
+        e.g. Type, Number, each has a value. E.g, Type='String'.
+      first_attribute_value: first attribute value.
+      second_attribute_value: second attribute value.
     Raises:
       ValueError: if the conflict cannot be resolved.
     """
-    if vcf_field_key == VcfParserConstants.TYPE:
-      return self._resolve_type(first_vcf_field_value, second_vcf_field_value)
-    elif vcf_field_key == VcfParserConstants.NUM:
-      return self._resolve_number(first_vcf_field_value, second_vcf_field_value)
+    if attribute_name == VcfParserConstants.TYPE:
+      return self._resolve_type(first_attribute_value, second_attribute_value)
+    elif attribute_name == VcfParserConstants.NUM:
+      return self._resolve_number(first_attribute_value, second_attribute_value)
     else:
-      # We only care about conflicts in 'num' and 'type' fields.
-      return first_vcf_field_value
+      # We only care about conflicts in 'num' and 'type' attributes.
+      # TODO(bashir2): add check for he desc for annotation_fields
+      # (the desc must be equal).
+      return first_attribute_value
 
   def _resolve_type(self, first, second):
     if first == second:
