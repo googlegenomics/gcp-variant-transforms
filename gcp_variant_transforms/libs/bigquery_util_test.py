@@ -48,8 +48,9 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.TableFieldConstants.TYPE_INTEGER))
     self.assertEqual(float, bigquery_util.get_python_type_from_bigquery_type(
         bigquery_util.TableFieldConstants.TYPE_FLOAT))
-    self.assertEqual(str, bigquery_util.get_python_type_from_bigquery_type(
-        bigquery_util.TableFieldConstants.TYPE_STRING))
+    self.assertEqual(unicode,
+                     bigquery_util.get_python_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_STRING))
     self.assertEqual(bool, bigquery_util.get_python_type_from_bigquery_type(
         bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
     self.assertRaises(
