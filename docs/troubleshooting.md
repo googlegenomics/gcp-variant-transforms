@@ -36,7 +36,12 @@ See [handling large inputs](./large_inputs.md) for more details.
 Try increasing the disk size allocated to each worker by specifying
 `--disk_size_gb <disk_size>` and/or increasing the number of workers by
 specifying `--max_num_workers <num_workers>`. By default, each worker gets 250GB
-of disk, which may not be enough to read the entire dataset.
+of disk, and the aggregate disk size available to all workers should be at least
+as large as the uncompressed size of the VCF files being loaded. However, to
+accomoddate for intermediate stages of the pipeline and also to account for
+the additional overhead introduced by the transforms, the aggregate disk size
+among all workers should be at least 3 to 4 times the total size of raw VCF
+files.
 
 See [handling large inputs](./large_inputs.md) for more details.
 
@@ -75,7 +80,7 @@ You can fix this by:
   header file. However, running with this option adds ~30% more compute to the
   pipeline.
 
-# Error: "BigQuery schema has no such field"
+## Error: "BigQuery schema has no such field"
 
 Same as [above](#error-json-parsing-error--no-such-field-field_name).
 
