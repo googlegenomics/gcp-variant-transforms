@@ -118,8 +118,6 @@ source venv/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
 pip install --upgrade .
-# Workaround needed until Beam 2.3.0 is released. See Issue #65.
-pip install --upgrade apache_beam[gcp]
 ```
 
 You may use the
