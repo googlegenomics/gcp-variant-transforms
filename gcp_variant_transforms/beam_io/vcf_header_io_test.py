@@ -36,16 +36,17 @@ from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 
 
-def _get_header_from_reader(vcf_reader):
+def _get_header_from_reader(vcf_reader, file_name=None):
   return VcfHeader(infos=vcf_reader.infos,
                    filters=vcf_reader.filters,
                    alts=vcf_reader.alts,
                    formats=vcf_reader.formats,
-                   contigs=vcf_reader.contigs)
+                   contigs=vcf_reader.contigs,
+                   file_name=file_name)
 
 
-def _get_vcf_header_from_lines(lines):
-  return _get_header_from_reader(vcf.Reader(iter(lines)))
+def _get_vcf_header_from_lines(lines, file_name=None):
+  return _get_header_from_reader(vcf.Reader(iter(lines)), file_name)
 
 
 class VcfHeaderSourceTest(unittest.TestCase):
@@ -102,16 +103,17 @@ class VcfHeaderSourceTest(unittest.TestCase):
       headers_1 = [self.lines[1], self.lines[-1]]
       headers_2 = [self.lines[2], self.lines[3], self.lines[-1]]
       headers_3 = [self.lines[4], self.lines[-1]]
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
+      file_name1 = tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
+      file_name2 = tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
+      file_name3 = tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
 
       actual = source_test_utils.read_from_source(VcfHeaderSource(
           os.path.join(tempdir.get_path(), '*.vcf')))
 
-      expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
-                                                          headers_2,
-                                                          headers_3]]
+      expected = [_get_vcf_header_from_lines(h, file_name=file_name)
+                  for h, file_name in [[headers_1, file_name1],
+                                       [headers_2, file_name2],
+                                       [headers_3, file_name3]]]
 
       asserts.header_vars_equal(expected)(actual)
 
@@ -164,17 +166,18 @@ class VcfHeaderSourceTest(unittest.TestCase):
       headers_2 = [self.lines[2], self.lines[3], self.lines[-1]]
       headers_3 = [self.lines[4], self.lines[-1]]
 
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
+      file_name1 = tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
+      file_name2 = tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
+      file_name3 = tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
 
       pipeline = TestPipeline()
       pcoll = pipeline | 'ReadHeaders' >> ReadVcfHeaders(
           os.path.join(tempdir.get_path(), '*.vcf'))
 
-      expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
-                                                          headers_2,
-                                                          headers_3]]
+      expected = [_get_vcf_header_from_lines(h, file_name=file_name)
+                  for h, file_name in [[headers_1, file_name1],
+                                       [headers_2, file_name2],
+                                       [headers_3, file_name3]]]
       assert_that(pcoll, asserts.header_vars_equal(expected))
       pipeline.run()
 
@@ -184,9 +187,9 @@ class VcfHeaderSourceTest(unittest.TestCase):
       headers_2 = [self.lines[2], self.lines[3], self.lines[-1]]
       headers_3 = [self.lines[4], self.lines[-1]]
 
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
-      tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
+      file_name1 = tempdir.create_temp_file(suffix='.vcf', lines=headers_1)
+      file_name2 = tempdir.create_temp_file(suffix='.vcf', lines=headers_2)
+      file_name3 = tempdir.create_temp_file(suffix='.vcf', lines=headers_3)
 
       pipeline = TestPipeline()
       pcoll = (pipeline
@@ -194,9 +197,10 @@ class VcfHeaderSourceTest(unittest.TestCase):
                    [os.path.join(tempdir.get_path(), '*.vcf')])
                | 'ReadHeaders' >> ReadAllVcfHeaders())
 
-      expected = [_get_vcf_header_from_lines(h) for h in [headers_1,
-                                                          headers_2,
-                                                          headers_3]]
+      expected = [_get_vcf_header_from_lines(h, file_name=file_name)
+                  for h, file_name in [[headers_1, file_name1],
+                                       [headers_2, file_name2],
+                                       [headers_3, file_name3]]]
       assert_that(pcoll, asserts.header_vars_equal(expected))
       pipeline.run()
 
