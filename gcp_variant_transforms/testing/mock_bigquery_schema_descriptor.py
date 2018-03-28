@@ -30,15 +30,13 @@ class MockSchemaDescriptor(bigquery_schema_descriptor.SchemaDescriptor):
     super(MockSchemaDescriptor, self).__init__(empty_schema)
 
   def has_simple_field(self, field_name):
-    #pylint: disable=unused-argument
+    # pylint: disable=unused-argument
     return True
 
   def get_field_descriptor(self, field_name):
-    #pylint: disable=unused-argument
-
+    # pylint: disable=unused-argument
     return None
 
   def get_record_schema_descriptor(self, record_name):
-    #pylint: disable=unused-argument
-
+    # pylint: disable=unused-argument
     return self

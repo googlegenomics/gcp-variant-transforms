@@ -61,7 +61,8 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
 # A map to convert from BigQuery types to Python types.
 _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
     TableFieldConstants.TYPE_INTEGER: int,
-    TableFieldConstants.TYPE_STRING: str,
+    # Bigquery accepts unicode for strings.
+    TableFieldConstants.TYPE_STRING: unicode,
     TableFieldConstants.TYPE_FLOAT: float,
     TableFieldConstants.TYPE_BOOLEAN: bool,
 }
