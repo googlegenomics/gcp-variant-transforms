@@ -22,17 +22,21 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 # TODO(nmousavi): Consider moving this into a separate file.
+
+
 class _HeaderMerger(object):
   """Class for merging two :class:`VcfHeader`s."""
 
-  def __init__(self, resolver):
-    # type: (vcf_field_cnflict_resolver.FieldConflictResolver) -> None
+  def __init__(self, resolver, save_conflicts=False):
+    # type: (vcf_field_cnflict_resolver.FieldConflictResolver, bool) -> None
     """Initialize :class:`VcfHeader` object.
 
     Args:
       resolver: Auxiliary class for resolving possible header value mismatches.
+      save_conflicts: save all conflicts when merging headers.
     """
     self._resolver = resolver
+    self._save_conflicts = save_conflicts
 
   def merge(self, first, second):
     """Updates ``first``'s headers with values from ``second``.
@@ -50,35 +54,49 @@ class _HeaderMerger(object):
     if (not isinstance(first, vcf_header_io.VcfHeader) or
         not isinstance(first, vcf_header_io.VcfHeader)):
       raise NotImplementedError
-    self._merge_header_fields(first.infos, second.infos)
-    self._merge_header_fields(first.filters, second.filters)
-    self._merge_header_fields(first.alts, second.alts)
-    self._merge_header_fields(first.formats, second.formats)
-    self._merge_header_fields(first.contigs, second.contigs)
+    self._merge_header_fields(first.infos, second.infos, first.conflicts,
+                              second.conflicts)
+    self._merge_header_fields(first.filters, second.filters, first.conflicts,
+                              second.conflicts)
+    self._merge_header_fields(first.alts, second.alts, first.conflicts,
+                              second.conflicts)
+    self._merge_header_fields(first.formats, second.formats, first.conflicts,
+                              second.conflicts)
+    self._merge_header_fields(first.contigs, second.contigs, first.conflicts,
+                              second.conflicts)
 
-  def _merge_header_fields(self, first, second):
-    #type: (Dict[str, OrderedDict[str, Union[str, int]]],
-    #       Dict[str, OrderedDict[str, Union[str, int]]]) -> None
+  def _merge_header_fields(self, first_headers, second_headers,
+                           first_conflicts, second_conflicts):
+    # type: (Dict[str, OrderedDict[str, Union[str, int]]],
+    #        Dict[str, OrderedDict[str, Union[str, int]]],
+    #        Dict[str, Set[str]],
+    #        Dict[str, Set[str]]) -> None
     """Modifies ``first`` to add any keys from ``second`` not in ``first``.
 
     Args:
-      first (dict): first header fields.
-      second (dict): second header fields.
+      first_headers (dict): first header fields.
+      second_headers (dict): second header fields.
+      first_conflicts (dict): first header related conflicts.
+      second_conflicts (dict): second header related conflicts.
     Raises:
       ValueError: If the header fields are incompatible (e.g. same key with
         different types or numbers).
     """
-    for second_key, second_value in second.iteritems():
-      if second_key not in first:
-        first[second_key] = second_value
+    for second_key, second_value in second_headers.iteritems():
+      if second_key not in first_headers:
+        first_headers[second_key] = second_value
+        self._merge_conflicts(second_key, second_value,
+                              first_conflicts, second_conflicts)
         continue
-      first_value = first[second_key]
+      first_value = first_headers[second_key]
       if first_value.keys() != second_value.keys():
         raise ValueError('Incompatible header fields: {}, {}'.format(
             first_value, second_value))
       merged_value = OrderedDict()
       for first_field_key, first_field_value in first_value.iteritems():
         second_field_value = second_value[first_field_key]
+        self._merge_conflicts(second_key, second_value,
+                              first_conflicts, second_conflicts)
         try:
           resolution_field_value = self._resolver.resolve_attribute_conflict(
               first_field_key,
@@ -90,7 +108,43 @@ class _HeaderMerger(object):
                            '{}, {} \n. Error: {}'.format(
                                first_value, second_value, str(e)))
 
-      first[second_key] = merged_value
+      first_headers[second_key] = merged_value
+
+  def _merge_conflicts(self, key, value, first_conflicts, second_conflicts):
+    # type: (str,
+    #        OrderedDict[str, Union[str, int]],
+    #        Dict[str, Set[str]],
+    #        Dict[str, Set[str]])-> None
+    """Updates ``first_conflicts``'s value of ``key`` by merging values from
+    ``first_conflicts`` and ``second_conflicts``.
+
+    If ``key`` does not already exist in ``first_conflicts``, then ``key`` is
+    not defined in the first headers.
+    If ``key`` does not already exist in ``second_conflicts``, it means that
+    ``value`` is the only definition for this key. Simply add ``value`` into the
+    ``second_conflicts``.
+    """
+    if not self._save_conflicts:
+      return
+    if key not in first_conflicts:
+      first_conflicts.update({key: set()})
+    if key not in second_conflicts:
+      second_conflicts.update({key: {self._format_conflict(value)}})
+    first_conflicts[key].update(second_conflicts[key])
+
+  def _format_conflict(self, field_definition):
+    # type: (OrderedDict[str, Union[str, int]]) -> str
+    """Formats the conflict string given one field definition.
+
+    Only num and type is considered for the conflicts, and the definition forms
+    a string in the format of `num={value} type={value}`.
+    """
+    conflict_keys = ['num', 'type']
+    formatted_conflict = []
+    for key in conflict_keys:
+      formatted_conflict.append(key + '=' + str(field_definition[key]))
+    return ' '.join(formatted_conflict)
+
 
 class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""

@@ -56,10 +56,14 @@ class MergeHeadersTest(unittest.TestCase):
         formats=reader.formats,
         contigs=reader.contigs)
 
-  def _get_combiner_fn(self, split_alternate_allele_info_fields=True):
+  def _get_combiner_fn(self,
+                       split_alternate_allele_info_fields=True,
+                       save_conflicts=False):
+    # TODO(yifangchen): when save_conflicts = True, use this flag to resolve all
+    # incompatible conflicts (code in another pull request)
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
         split_alternate_allele_info_fields)
-    header_merger = HeaderMerger(resolver)
+    header_merger = HeaderMerger(resolver, save_conflicts)
     combiner_fn = merge_headers._MergeHeadersFn(header_merger)
     return combiner_fn
 
@@ -299,6 +303,104 @@ class MergeHeadersTest(unittest.TestCase):
       merged_headers = combiner_fn.add_input(merged_headers, headers_1)
       merged_headers = combiner_fn.add_input(merged_headers, headers_2)
       merged_headers = combiner_fn.extract_output(merged_headers)
+
+  def test_merge_and_save_conflicts_two_conflicting_headers(self):
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    combiner_fn = self._get_combiner_fn(save_conflicts=True)
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', 1),
+                                       ('type', 'Float'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+    self.assertItemsEqual(merged_headers.conflicts['NS'],
+                          set(['num=1 type=Float', 'num=1 type=Integer']))
+
+  def test_merge_and_save_conflicts_no_conflicting_headers(self):
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    combiner_fn = self._get_combiner_fn(save_conflicts=True)
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.conflicts['NS'],
+                          set(['num=1 type=Float']))
+    self.assertItemsEqual(merged_headers.conflicts['DP'],
+                          set(['num=1 type=Integer']))
+
+  def test_merge_and_save_conflicts_three_conflicting_headers(self):
+    lines_1 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=2,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+    lines_2 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=2,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+    lines_3 = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=.,Type=Float,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
+
+    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
+    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
+    vcf_reader_3 = vcf.Reader(fsock=iter(lines_3))
+    headers_1 = self._get_header_from_reader(vcf_reader_1)
+    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_3 = self._get_header_from_reader(vcf_reader_3)
+    combiner_fn = self._get_combiner_fn(save_conflicts=True)
+
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers_1)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_2)
+    merged_headers = combiner_fn.add_input(merged_headers, headers_3)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', None),
+                                       ('type', 'Float'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+    self.assertItemsEqual(merged_headers.conflicts['NS'],
+                          set(['num=2 type=Float', 'num=2 type=Integer',
+                               'num=None type=Float']))
 
   def test_combine_pipeline(self):
     vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))
