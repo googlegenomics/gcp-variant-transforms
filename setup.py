@@ -17,6 +17,7 @@
 import setuptools
 
 REQUIRED_PACKAGES = [
+    'cython>=0.28.1',
     'apache-beam[gcp]>=2.3',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
