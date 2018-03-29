@@ -199,6 +199,13 @@ class VcfSourceTest(unittest.TestCase):
             '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
             '1    1  '
         ],
+        # Depending on whether pyvcf uses cython this case fails, this is a
+        # known problem: https://github.com/apache/beam/pull/4221
+        # Missing "GT:GQ" format, but GQ is provided.
+        #[
+        #    '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+        #    '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT\t1|0:48'
+        #],
         # GT is not an integer.
         [
             '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
