@@ -33,9 +33,9 @@ that source. By default, it uses version 91 of VEP. This can be changed by
 `docker build . -t [IMAGE_TAG] --build-arg ENSEMBL_RELEASE=90`
 
 Let's say we want to push this image to the
-[Container Registry](https://cloud.google.com/container-registry/) of `my-project`
-on Google Cloud, se we can pick `[IMAGE_TAG]` as `gcr.io/my-project/vep_91`.
-Then push this image by:
+[Container Registry](https://cloud.google.com/container-registry/) of
+`my-project` on Google Cloud, se we can pick `[IMAGE_TAG]` as
+`gcr.io/my-project/vep_91`. Then push this image by:
 
 `gcloud docker -- push gcr.io/my-project/vep_91`
 
