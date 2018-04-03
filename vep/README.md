@@ -67,10 +67,10 @@ sample `yaml` job description check
 Here is a sample `gcloud` command that uses that file:
 
 ```
-gcloud alpha genomics pipelines run
-  --project my-project
-  --pipeline-file sample_pipeline.yaml
-  --logging gs://my_bucket/logs
+gcloud alpha genomics pipelines run \
+  --project my-project \
+  --pipeline-file sample_pipeline.yaml \
+  --logging gs://my_bucket/logs \
   --inputs VCF_INFO_FILED=CSQ_RERUN
 ```
 
@@ -107,5 +107,3 @@ step, is located.
 (`.gz` or `.bgz`). If it is a compressed file, the `run_vep.sh` script will
 decompress it before sending it to VEP.
 * `OUTPUT_VCF`: The name of the output file which is always a VCF file.
-
-
