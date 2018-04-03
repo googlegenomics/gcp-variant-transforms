@@ -80,7 +80,7 @@ class _HeaderMerger(object):
       for first_field_key, first_field_value in first_value.iteritems():
         second_field_value = second_value[first_field_key]
         try:
-          resolution_field_value = self._resolver.resolve(
+          resolution_field_value = self._resolver.resolve_attribute_conflict(
               first_field_key,
               first_field_value,
               second_field_value)

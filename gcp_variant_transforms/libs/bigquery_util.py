@@ -58,6 +58,14 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
     'flag': TableFieldConstants.TYPE_BOOLEAN,
 }
 
+# A map to convert from BigQuery types to Python types.
+_BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
+    TableFieldConstants.TYPE_INTEGER: int,
+    # Bigquery accepts unicode for strings.
+    TableFieldConstants.TYPE_STRING: unicode,
+    TableFieldConstants.TYPE_FLOAT: float,
+    TableFieldConstants.TYPE_BOOLEAN: bool,
+}
 
 # Prefix to use when the first character of the field name is not [a-zA-Z]
 # as required by BigQuery.
@@ -90,6 +98,11 @@ def get_bigquery_type_from_vcf_type(vcf_type):
     raise ValueError('Invalid VCF type: %s' % vcf_type)
   return _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP[vcf_type]
 
+def get_python_type_from_bigquery_type(bigquery_type):
+  # type: (str) -> Union[str, int, bool, float]
+  if bigquery_type not in _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP:
+    raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
+  return _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP[bigquery_type]
 
 def get_bigquery_sanitized_field(
     field, null_numeric_value_replacement=-sys.maxint):

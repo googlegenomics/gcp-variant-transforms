@@ -60,17 +60,27 @@ class SchemaDescriptorTest(unittest.TestCase):
     return bigquery_schema_descriptor.SchemaDescriptor(
         self._get_table_schema())
 
-  def test_non_existence_field(self):
+  def test_field_existence(self):
     schema = self._get_schema_descriptor()
-    with self.assertRaises(ValueError):
-      schema.get_field_descriptor('non_existence_field')
-      self.fail('Non existence field should throw an exceprion')
+    self.assertTrue(schema.has_simple_field('field_1'))
+    self.assertTrue(schema.has_simple_field('field_1'))
+    self.assertTrue(schema.has_simple_field('field_1'))
 
-  def test_non_existence_record(self):
+    self.assertFalse(schema.has_simple_field('non_existent_field'))
+    self.assertFalse(schema.has_simple_field('record_1'))
+    self.assertFalse(schema.has_simple_field('record_1_field_1'))
+
+  def test_non_existent_field(self):
     schema = self._get_schema_descriptor()
     with self.assertRaises(ValueError):
-      schema.get_record_schema_descriptor('non_existence_record')
-      self.fail('Non existence field should throw an exceprion')
+      schema.get_field_descriptor('non_existent_field')
+      self.fail('Non existent field should throw an exception')
+
+  def test_non_existent_record(self):
+    schema = self._get_schema_descriptor()
+    with self.assertRaises(ValueError):
+      schema.get_record_schema_descriptor('non_existent_record')
+      self.fail('Non existent field should throw an exception')
 
   def test_field_descriptor_at_first_level(self):
     schema = self._get_schema_descriptor()

@@ -15,59 +15,233 @@
 """Test cases for get_merged_headers module."""
 
 import unittest
+
+from collections import namedtuple
+
 import vcf
 
+from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
 
+SchemaTestConfig = namedtuple('SchemaTestConfig',
+                              ['schema_type', 'schema_mode', 'field_data',
+                               'expected_resolved_field_data'])
+
 class ConflictResolverTest(unittest.TestCase):
-  """Test case for :class:`FieldConflictResolver`"""
+  """Test case for :class:`FieldConflictResolver`."""
 
   def setUp(self):
     self._resolver = vcf_field_conflict_resolver.FieldConflictResolver()
     self._resolver_allele = vcf_field_conflict_resolver.FieldConflictResolver(
         split_alternate_allele_info_fields=True)
+    self._resolver_always = vcf_field_conflict_resolver.FieldConflictResolver(
+        resolve_always=True)
 
   def _field_count(self, symbol):
     # type: (str) -> int
     # symbol = {'A', 'G', 'R'}.
     return vcf.parser.field_counts[symbol]
 
-  def test_resolving_field_definition_conflict_in_type(self):
+  def _run_resolve_schema_conflict_tests(self, test_data_configs):
+    for config in test_data_configs:
+      self.assertEqual(
+          self._resolver.resolve_schema_conflict(
+              bigquery_schema_descriptor.FieldDescriptor(
+                  type=config.schema_type,
+                  mode=config.schema_mode),
+              config.field_data),
+          config.expected_resolved_field_data)
+
+
+  def test_resolving_schema_conflict_type(self):
+    test_data_configs = [
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data=True),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=[True, True]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data='1',
+                         expected_resolved_field_data=1),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=[1, 2]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data=float(1)),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1, 2],
+                         expected_resolved_field_data=[float(1), float(2)]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=1,
+                         expected_resolved_field_data='1'),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1, 2],
+                         expected_resolved_field_data=['1', '2']),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data='',
+                         expected_resolved_field_data=False),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=['', ''],
+                         expected_resolved_field_data=[False, False]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[],
+                         expected_resolved_field_data=None),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[],
+                         expected_resolved_field_data=[]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[],
+                         expected_resolved_field_data=False),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[],
+                         expected_resolved_field_data=[]),
+    ]
+
+    self._run_resolve_schema_conflict_tests(test_data_configs)
+
+    with self.assertRaises(ValueError):
+      self._resolver.resolve_schema_conflict(
+          bigquery_schema_descriptor.FieldDescriptor(
+              type=TableFieldConstants.TYPE_INTEGER,
+              mode=TableFieldConstants.MODE_NULLABLE),
+          'foo')
+      self.fail('Should raise exception for converting str to int')
+
+  def test_resolving_schema_conflict_number(self):
+    test_data_configs = [
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[1, 2, 3],
+                         expected_resolved_field_data=1),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_INTEGER,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=[1],
+                         expected_resolved_field_data=[1]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=True),
+    ]
+
+    self._run_resolve_schema_conflict_tests(test_data_configs)
+
+  def test_resolving_schema_conflict_type_and_number(self):
+    test_data_configs = [
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_FLOAT,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=[1, 2, 3],
+                         expected_resolved_field_data=float(1)),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_STRING,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data=1,
+                         expected_resolved_field_data=[str(1)]),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_NULLABLE,
+                         field_data=['1', '2'],
+                         expected_resolved_field_data=True),
+        SchemaTestConfig(schema_type=TableFieldConstants.TYPE_BOOLEAN,
+                         schema_mode=TableFieldConstants.MODE_REPEATED,
+                         field_data='1',
+                         expected_resolved_field_data=[True]),
+    ]
+
+    self._run_resolve_schema_conflict_tests(test_data_configs)
+
+  def test_resolving_attribute_conflict_type(self):
     self.assertEqual(
-        self._resolver.resolve(VcfParserConstants.TYPE,
-                               VcfParserConstants.INTEGER,
-                               VcfParserConstants.FLOAT),
+        self._resolver.resolve_attribute_conflict(
+            VcfParserConstants.TYPE,
+            VcfParserConstants.INTEGER,
+            VcfParserConstants.FLOAT),
         VcfParserConstants.FLOAT)
     with self.assertRaises(ValueError):
-      self._resolver.resolve(VcfParserConstants.TYPE,
-                             VcfParserConstants.INTEGER, 'String')
+      self._resolver.resolve_attribute_conflict(
+          VcfParserConstants.TYPE,
+          VcfParserConstants.INTEGER,
+          VcfParserConstants.STRING)
       self.fail('Should raise exception for unresolvable types')
 
-  def test_resolving_field_definition_conflict_in_number(self):
+  def test_resolving_attribute_conflict_number(self):
     self.assertEqual(
-        self._resolver.resolve(VcfParserConstants.NUM, 2, 3), None)
+        self._resolver.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, 3),
+        None)
     self.assertEqual(
-        self._resolver.resolve(VcfParserConstants.NUM, 2, None), None)
+        self._resolver.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, None),
+        None)
     # Unresolvable cases.
     for i in [0, 1]:
       for j in [self._field_count('R'), self._field_count('G'),
                 self._field_count('A'), 2, None]:
         with self.assertRaises(ValueError):
-          self._resolver.resolve(VcfParserConstants.NUM, i, j)
+          self._resolver.resolve_attribute_conflict(
+              VcfParserConstants.NUM, i, j)
           self.fail(
               'Should raise exception for unresolvable number: %d vs %d'%(i, j))
 
-  def test_resolving_field_definition_conflict_in_number_allele(self):
+  def test_resolving_attribute_conflict_in_number_allele(self):
     self.assertEqual(
-        self._resolver_allele.resolve(VcfParserConstants.NUM, 2, 3), None)
+        self._resolver_allele.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, 3),
+        None)
     self.assertEqual(
-        self._resolver_allele.resolve(VcfParserConstants.NUM, 2, None), None)
+        self._resolver_allele.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, None),
+        None)
     # Unresolvable cases.
     for i in [self._field_count('A')]:
       for j in [self._field_count('R'), self._field_count('G'), 0, 1, 2, None]:
         with self.assertRaises(ValueError):
-          self._resolver.resolve(VcfParserConstants.NUM, i, j)
+          self._resolver_allele.resolve_attribute_conflict(
+              VcfParserConstants.NUM, i, j)
           self.fail(
               'Should raise exception for unresolvable number: %d vs %d'%(i, j))
+
+  def test_resolving_all_field_definition_conflict_in_type(self):
+    self.assertEqual(
+        self._resolver_always.resolve_attribute_conflict(
+            VcfParserConstants.TYPE, VcfParserConstants.INTEGER,
+            VcfParserConstants.FLOAT),
+        VcfParserConstants.FLOAT)
+    for i in [VcfParserConstants.FLOAT, VcfParserConstants.INTEGER,
+              VcfParserConstants.STRING, VcfParserConstants.CHARACTER]:
+      for j in [VcfParserConstants.FLAG, VcfParserConstants.STRING]:
+        self.assertEqual(
+            self._resolver_always.resolve_attribute_conflict(
+                VcfParserConstants.TYPE, i, j),
+            VcfParserConstants.STRING)
+
+  def test_resolving_all_field_definition_conflict_in_number(self):
+    self.assertEqual(
+        self._resolver_always.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, 3), None)
+    self.assertEqual(
+        self._resolver_always.resolve_attribute_conflict(
+            VcfParserConstants.NUM, 2, None), None)
+
+    for i in [0, 1]:
+      for j in [self._field_count('R'), self._field_count('G'),
+                self._field_count('A'), 2, None]:
+        self.assertEqual(
+            self._resolver_always.resolve_attribute_conflict(
+                VcfParserConstants.NUM, i, j), None)

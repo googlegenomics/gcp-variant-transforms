@@ -43,6 +43,20 @@ class BigqueryUtilTest(unittest.TestCase):
         ValueError,
         bigquery_util.get_bigquery_type_from_vcf_type, 'DUMMY')
 
+  def test_get_python_from_bigquery_type(self):
+    self.assertEqual(int, bigquery_util.get_python_type_from_bigquery_type(
+        bigquery_util.TableFieldConstants.TYPE_INTEGER))
+    self.assertEqual(float, bigquery_util.get_python_type_from_bigquery_type(
+        bigquery_util.TableFieldConstants.TYPE_FLOAT))
+    self.assertEqual(unicode,
+                     bigquery_util.get_python_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_STRING))
+    self.assertEqual(bool, bigquery_util.get_python_type_from_bigquery_type(
+        bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
+    self.assertRaises(
+        ValueError,
+        bigquery_util.get_python_type_from_bigquery_type, 'DUMMY')
+
   def test_get_bigquery_sanitized_field(self):
     self.assertEqual(u'valid',
                      bigquery_util.get_bigquery_sanitized_field('valid'))
