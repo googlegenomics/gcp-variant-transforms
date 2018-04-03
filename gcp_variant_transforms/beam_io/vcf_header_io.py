@@ -54,7 +54,7 @@ class VcfHeader(object):
         metadata values (:class:`~vcf.parser._Format`).
       contigs (dict): A dictionary mapping contig keys (str) to vcf contig
         metadata values (:class:`~vcf.parser._Contig`).
-      file_name (str): A str representing the file name of the vcf file
+      file_name (str): A str representing the file name of the vcf file.
     """
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
