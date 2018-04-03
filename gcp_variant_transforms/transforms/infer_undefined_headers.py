@@ -23,16 +23,11 @@ from vcf.parser import _Info as Info
 from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.transforms import merge_headers
 
 
 __all__ = ['InferUndefinedHeaderFields']
-
-
-class VcfFieldType(object):
-  """Constants for VCF field types."""
-  FLAG = 'Flag'
-  STRING = 'String'
 
 
 class _InferUndefinedHeaderFields(beam.DoFn):
@@ -59,10 +54,18 @@ class _InferUndefinedHeaderFields(beam.DoFn):
         returned by PyVCF. E.g. [0.33, 0.66] is a field value for Allele
         frequency (AF) field.
     """
+    if isinstance(field_value, list):
+      return (self._get_field_type(field_value[0]) if field_value else
+              vcf_field_conflict_resolver.VcfParserConstants.STRING)
+
     if isinstance(field_value, bool):
-      return VcfFieldType.FLAG
+      return vcf_field_conflict_resolver.VcfParserConstants.FLAG
+    elif isinstance(field_value, int):
+      return vcf_field_conflict_resolver.VcfParserConstants.INTEGER
+    elif isinstance(field_value, float):
+      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
     else:
-      return VcfFieldType.STRING
+      return vcf_field_conflict_resolver.VcfParserConstants.STRING
 
   def _infer_undefined_info_fields(self, variant, defined_headers):
     """Returns info fields not defined in the headers.
@@ -88,7 +91,7 @@ class _InferUndefinedHeaderFields(beam.DoFn):
                                      self._get_field_type(info_field_value),
                                      '',  # NO_DESCRIPTION
                                      '',  # UNKNOWN_SOURCE
-                                     '')   # UNKNOWN_VERSION
+                                     '')  # UNKNOWN_VERSION
     return infos
 
   def _infer_undefined_format_fields(self, variant, defined_headers):
