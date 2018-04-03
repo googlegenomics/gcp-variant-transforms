@@ -104,6 +104,6 @@ locations:
 * `VEP_CACHE`: Where the tar.gz file, created in the above database creation
 step, is located.
 * `INPUT_FILE`: Note this can be either a VCF file or a compressed VCF file
-(`.gz` or `.bgz`). If it is a compressed file, the `run_vep.sh` script will
-decompress it before sending it to VEP.
+(`.gz` or `.bgz`). Treatment of compressed and uncompressed files is the same,
+i.e., the input file is directly fed into VEP.
 * `OUTPUT_VCF`: The name of the output file which is always a VCF file.

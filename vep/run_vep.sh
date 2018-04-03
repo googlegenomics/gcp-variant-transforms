@@ -51,22 +51,8 @@ fi
 
 # TODO(bashir2): Add support for multiple input and output files.
 
-# Check if the input is .gz or .bgz and uncompress it if needed. Note that
-# gzip is supposed to be able to decompress .bgz files as well.
-echo "Checking if ${INPUT_FILE} needs to be decompressed, started at $(date)"
-input_vcf="${INPUT_FILE%.bgz}"
-if [[ "${input_vcf}" != "${INPUT_FILE}" ]]; then
-  gzip -d -S .bgz "${INPUT_FILE}"
-else
-  input_vcf="${INPUT_FILE%.gz}"
-  if [[ "${input_vcf}" != "${INPUT_FILE}" ]]; then
-    gzip -d "${INPUT_FILE}"
-  else
-    input_vcf=${INPUT_FILE}
-  fi
-fi
-echo "Input VCF is ready at $(date)"
-ls -l "${input_vcf}"
+echo "Checking input file at $(date)"
+ls -l "${INPUT_FILE}"
 
 # Make sure output file does not exist and can be written.
 if [[ -e ${OUTPUT_VCF:?OUTPUT_VCF is not set!} ]]; then
@@ -87,7 +73,7 @@ if [[ ! -d "${species}" ]]; then
 fi
 popd
 
-readonly vep_command="./vep -i ${input_vcf} -o ${OUTPUT_VCF} \
+readonly vep_command="./vep -i ${INPUT_FILE} -o ${OUTPUT_VCF} \
   --dir ${vep_cache_dir} --offline --species ${species} --assembly ${assembly} \
   --vcf --allele_number --vcf_info_field ${annotation_field_name} ${fork_opt} \
   ${other_vep_opts}"
