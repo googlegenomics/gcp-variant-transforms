@@ -14,51 +14,15 @@
 
 """Beam combiner function for merging VCF file header definitions."""
 
-from collections import OrderedDict  # pylint: disable=unused-import
 from collections import namedtuple
-from typing import Dict, Union  # pylint: disable=unused-import
+from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
-from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader   # pylint: disable=unused-import
+from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
 from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
-HeaderFields = namedtuple('HeaderFields', [VcfParserConstants.NUM,
-                                           VcfParserConstants.TYPE])
-
-
-class DefinitionDetails(object):
-  """Container for conflict details for one field ID."""
-
-  # For the same field definition, save at most `_MAX_NUM_FILE_NAMES` names.
-  _MAX_NUM_FILE_NAMES = 5
-
-  def __init__(self, definition, file_name):
-    # type: (OrderedDict[str, Union[str, int]], str) -> None
-    """Initializes a _DefinitionDetails object.
-
-    Creates a dictionary that maps field definition to a list of file names.
-    Upon initialization, add ``definition`` and ``file_name`` to the dictionary.
-    """
-    self._definitions_to_files = {
-        HeaderFields(definition[VcfParserConstants.NUM],
-                     definition[VcfParserConstants.TYPE]): [file_name]}
-
-  def __eq__(self, other):
-    return self._definitions_to_files == other.definitions_to_files
-
-  def _add_details(self, other):
-    # type: (DefinitionDetails) -> None
-    for definition, file_names in other._definitions_to_files.iteritems():
-      if definition not in self._definitions_to_files.keys():
-        self._definitions_to_files[definition] = file_names
-      else:
-        self._definitions_to_files[definition].extend(file_names)
-        self._definitions_to_files[definition] = \
-          self._definitions_to_files[definition][:self._MAX_NUM_FILE_NAMES]
-
-  @property
-  def definitions_to_files(self):
-    return self._definitions_to_files
+Definition = namedtuple('Definition', [VcfParserConstants.NUM,
+                                       VcfParserConstants.TYPE])
 
 
 class VcfHeaderDefinitions(object):
@@ -68,33 +32,39 @@ class VcfHeaderDefinitions(object):
     # type: (VcfHeader) -> None
     """Initializes a VcfHeaderDefinitions object.
 
-    Creates two dictionaries that map info and format field id/key to
-    _ConflictDefinitions respectively.
+    Creates two dictionaries (for infos and formats respectively) that map field
+    id to a dictionary which maps Definition to a list of file names.
     """
-    self._info = {}
-    self._format = {}
+    self._infos = {}
+    self._formats = {}
     if not vcf_header:
       return
-    file_name = vcf_header.file_name
     for key, val in vcf_header.infos.iteritems():
-      self._info[key] = DefinitionDetails(val, file_name)
+      self._infos[key] = {
+          Definition(val[VcfParserConstants.NUM], val[VcfParserConstants.TYPE]):
+          [vcf_header.file_name]}
     for key, val in vcf_header.formats.iteritems():
-      self._format[key] = DefinitionDetails(val, file_name)
+      self._formats[key] = {
+          Definition(val[VcfParserConstants.NUM], val[VcfParserConstants.TYPE]):
+          [vcf_header.file_name]}
 
   def __eq__(self, other):
-    return self._info == other._info and self._format == other._format
+    return self._infos == other._infos and self._formats == other._formats
 
   @property
-  def info(self):
-    return self._info
+  def infos(self):
+    return self._infos
 
   @property
-  def format(self):
-    return self._format
+  def formats(self):
+    return self._formats
 
 
 class _DefinitionsMerger(object):
   """Class for merging two :class:`VcfHeaderDefinitions`s."""
+
+  # For the same field definition, save at most `_MAX_NUM_FILE_NAMES` names.
+  _MAX_NUM_FILE_NAMES = 5
 
   def merge(self, first, second):
     # type: (VcfHeaderDefinitions, VcfHeaderDefinitions) -> None
@@ -102,17 +72,38 @@ class _DefinitionsMerger(object):
     if (not isinstance(first, VcfHeaderDefinitions) or
         not isinstance(first, VcfHeaderDefinitions)):
       raise NotImplementedError
-    self._merge_definitions(first.info, second.info)
-    self._merge_definitions(first.format, second.format)
+    self._merge_definitions(first.infos, second.infos)
+    self._merge_definitions(first.formats, second.formats)
 
-  def _merge_definitions(self, first, second):
-    # type: (Dict[str, DefinitionDetails], Dict[str, DefinitionDetails]) -> None
+  def _merge_definitions(
+      self,
+      first,  # type: Dict[str, Dict[Definition, List[str]]]
+      second  # type: Dict[str, Dict[Definition, List[str]]]
+      ):
+    # type: (...) -> None
     """Updates ``first`` by merging values from ``first`` and ``second``."""
-    for key, definition_details in second.iteritems():
+    for key, definitions_to_files in second.iteritems():
       if key in first:
-        first[key]._add_details(definition_details)
+        self._merge_definitions_to_files_dict(first[key], definitions_to_files)
       else:
-        first[key] = definition_details
+        first[key] = definitions_to_files
+
+  def _merge_definitions_to_files_dict(
+      self,
+      first_definitions_to_files,  # type: Dict[Definition, List[str]]
+      second_definitions_to_files  # type: Dict[Definition, List[str]]
+      ):
+    """Updates ``first_definitions_to_files`` by merging definitions and
+    corresponding file names from ``first_definitions_to_files`` and
+    ``second_definitions_to_files``."""
+    # type: (...) -> None
+    for definition, file_names in second_definitions_to_files.iteritems():
+      if definition not in first_definitions_to_files.keys():
+        first_definitions_to_files[definition] = file_names
+      else:
+        first_definitions_to_files[definition].extend(file_names)
+        first_definitions_to_files[definition] = \
+          first_definitions_to_files[definition][:self._MAX_NUM_FILE_NAMES]
 
 
 class _MergeDefinitionsFn(beam.CombineFn):
@@ -144,10 +135,14 @@ class _MergeDefinitionsFn(beam.CombineFn):
 
 
 class MergeDefinitions(beam.PTransform):
-  """A PTransform to merge header definitions."""
+  """A PTransform to merge header definitions.
+
+  Reads a PCollection of VcfHeader and produces a PCollection of
+  VcfHeaderDefinitions.
+  """
 
   def __init__(self):
-    """Initializes :class:`MergeConflicts` object."""
+    """Initializes :class:`MergeDefinitions` object."""
     super(MergeDefinitions, self).__init__()
     self._definitions_merger = _DefinitionsMerger()
 

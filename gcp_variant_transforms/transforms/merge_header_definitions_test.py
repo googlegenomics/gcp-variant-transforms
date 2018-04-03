@@ -24,7 +24,7 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_header_definitions
-from gcp_variant_transforms.transforms.merge_header_definitions import HeaderFields
+from gcp_variant_transforms.transforms.merge_header_definitions import Definition
 
 FILE_1_LINES = [
     '##fileformat=VCFv4.2\n',
@@ -72,10 +72,10 @@ class MergeHeadersTest(unittest.TestCase):
 
     definitions = combiner_fn.extract_output(merged_definitions)
 
-    info_definitions = definitions.info
-    format_definitions = definitions.format
+    info_definitions = definitions.infos
+    format_definitions = definitions.formats
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Integer')],
+        info_definitions['NS'][Definition(1, 'Integer')],
         list(['file1']))
     self.assertEqual(len(format_definitions), 0)
 
@@ -100,13 +100,13 @@ class MergeHeadersTest(unittest.TestCase):
     merged_definitions = combiner_fn.add_input(merged_definitions, headers_2)
     definitions = combiner_fn.extract_output(merged_definitions)
 
-    info_definitions = definitions.info
-    format_definitions = definitions.format
+    info_definitions = definitions.infos
+    format_definitions = definitions.formats
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Integer')],
+        info_definitions['NS'][Definition(1, 'Integer')],
         list(['file1']))
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Float')],
+        info_definitions['NS'][Definition(1, 'Float')],
         list(['file2']))
     self.assertEqual(len(format_definitions), 0)
 
@@ -130,14 +130,14 @@ class MergeHeadersTest(unittest.TestCase):
     merged_definitions = combiner_fn.add_input(merged_definitions, headers_1)
     merged_definitions = combiner_fn.add_input(merged_definitions, headers_2)
     definitions = combiner_fn.extract_output(merged_definitions)
-    info_definitions = definitions.info
-    format_definitions = definitions.format
+    info_definitions = definitions.infos
+    format_definitions = definitions.formats
 
     self.assertEqual(
-        format_definitions['NS'].definitions_to_files[HeaderFields(1, 'Float')],
+        format_definitions['NS'][Definition(1, 'Float')],
         list(['file1']))
     self.assertEqual(
-        format_definitions['DP'].definitions_to_files[HeaderFields(2, 'Float')],
+        format_definitions['DP'][Definition(2, 'Float')],
         list(['file2']))
     self.assertEqual(len(info_definitions), 0)
 
@@ -161,14 +161,14 @@ class MergeHeadersTest(unittest.TestCase):
     merged_definitions = combiner_fn.add_input(merged_definitions, headers_1)
     merged_definitions = combiner_fn.add_input(merged_definitions, headers_2)
     definitions = combiner_fn.extract_output(merged_definitions)
-    info_definitions = definitions.info
-    format_definitions = definitions.format
+    info_definitions = definitions.infos
+    format_definitions = definitions.formats
 
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Integer')],
+        info_definitions['NS'][Definition(1, 'Integer')],
         list(['file1']))
     self.assertEqual(
-        format_definitions['NS'].definitions_to_files[HeaderFields(1, 'Float')],
+        format_definitions['NS'][Definition(1, 'Float')],
         list(['file2']))
 
   def test_merge_header_definitions_save_five_copies(self):
@@ -202,14 +202,14 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_7)
 
     definitions = combiner_fn.extract_output(merged_headers)
-    info_definitions = definitions.info
-    format_definitions = definitions.format
+    info_definitions = definitions.infos
+    format_definitions = definitions.formats
     self.assertEqual(info_definitions.keys(), ['NS'])
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Float')],
+        info_definitions['NS'][Definition(1, 'Float')],
         list(['file1', 'file2', 'file3', 'file4', 'file5']))
     self.assertEqual(
-        info_definitions['NS'].definitions_to_files[HeaderFields(1, 'Integer')],
+        info_definitions['NS'][Definition(1, 'Integer')],
         list(['file7']))
     self.assertEqual(len(format_definitions), 0)
 
