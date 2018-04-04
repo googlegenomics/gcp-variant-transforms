@@ -29,6 +29,13 @@ The process is as follows:
    step.
 
    ```bash
+   # To create a clean branch. Skip if you already have one.
+   temp_dir="$(mktemp -d)"
+   cd "${temp_dir}"
+   git clone https://github.com/googlegenomics/gcp-variant-transforms.git
+   cd gcp-variant-transforms
+   git checkout "${COMMIT_SHA}"
+   # Run tests.
    ./deploy_and_run_tests.sh --image_tag ${COMMIT_SHA} \
        --keep_image --skip_build --run_all_tests \
        --project gcp-variant-transforms-test
