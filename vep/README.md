@@ -10,7 +10,7 @@ of [Variant Transforms](../README.md).
 With tools provided in this directory, one can:
 * Create a docker image of VEP.
 * Download and package VEP's database (a.k.a.
-[cache](https://.ensembl.org/info/docs/tools/vep/script/vep_cache.html)) for
+[cache](https://ensembl.org/info/docs/tools/vep/script/vep_cache.html)) for
 different species, reference sequences and versions of VEP.
 * Run VEP on VCF input files and create output VCF files that are annotated.
 
@@ -34,7 +34,7 @@ that source. By default, it uses version 91 of VEP. This can be changed by
 
 Let's say we want to push this image to the
 [Container Registry](https://cloud.google.com/container-registry/) of
-`my-project` on Google Cloud, se we can pick `[IMAGE_TAG]` as
+`my-project` on Google Cloud, so we can pick `[IMAGE_TAG]` as
 `gcr.io/my-project/vep_91`. Then push this image by:
 
 `gcloud docker -- push gcr.io/my-project/vep_91`
@@ -88,7 +88,7 @@ This is the full list of supported environment variables:
 * `GENOME_ASSEMBLY`: default is `GRCh38`
 * `NUM_FORKS`: The value to be set for
 [`--fork` option of VEP](
-http://.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_fork).
+http://ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_fork).
 default is 1.
 * `OTHER_VEP_OPTS`: Other options to be set for the VEP invocation, default is
 [`--everything`](
