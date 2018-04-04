@@ -3,35 +3,51 @@
   "table_name": "infer_undefined_header_fields",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
   "infer_undefined_headers": "True",
-  "runner": "DirectRunner",
+  "runner": "DataflowRunner",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
       "expected_result": {"num_rows": 1}
     },
     {
-      "query": ["COUNT_AA_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(AA) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["COUNT_AF_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(AF) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["COUNT_DB_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["COUNT_DP_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(DP) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["COUNT_H2_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(H2) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["COUNT_NS_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(NS) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
+    },
+    {
+      "query": ["SELECT SUM(HQ) AS sum FROM {TABLE_NAME} t, t.call as call,",
+	        "call.HQ as HQ"
+      ],
+      "expected_result": {"sum": 204}
+    },
+    {
+      "query": ["SELECT SUM(call.GQ) AS sum FROM {TABLE_NAME} t, t.call as call"
+      ],
+      "expected_result": {"sum": 139}
+    },
+    {
+      "query": ["SELECT SUM(call.DP) AS sum FROM {TABLE_NAME} t, t.call as call"
+      ],
+      "expected_result": {"sum": 14}
     }
   ]
 }

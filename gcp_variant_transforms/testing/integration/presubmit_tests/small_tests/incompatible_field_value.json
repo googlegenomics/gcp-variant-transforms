@@ -3,18 +3,18 @@
   "table_name": "incompatible_field_value",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/incompatible-field-value.vcf",
   "allow_incompatible_records": "True",
-  "runner": "DirectRunner",
+  "runner": "DataflowRunner",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
       "expected_result": {"num_rows": 1}
     },
     {
-      "query": ["SUM_NS_INFO_FIELD_QUERY"],
+      "query": ["SELECT SUM(NS) AS sum FROM {TABLE_NAME}"],
       "expected_result": {"sum": 3}
     },
     {
-      "query": ["COUNT_DB_INFO_FIELD_QUERY"],
+      "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
       "expected_result": {"cnt": 1}
     }
   ]
