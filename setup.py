@@ -38,7 +38,7 @@ REQUIRED_SETUP_PACKAGES = [
 
 setuptools.setup(
     name='gcp_variant_transforms',
-    version='0.0.0',
+    version='0.2.0',
     description=('Tool for transforming and processing VCF files in a '
                  'scalable manner based on Apache Beam'),
     author='Google',
@@ -47,7 +47,7 @@ setuptools.setup(
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers for the list
     # of values.
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         'Topic :: Scientific/Engineering :: Information Analysis',
