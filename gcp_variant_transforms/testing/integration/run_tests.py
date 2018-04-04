@@ -169,7 +169,6 @@ class QueryAssertion(object):
 
   def run_assertion(self):
     query_job = self._client.query(self._query)
-    assert query_job.state == 'RUNNING'
     iterator = query_job.result(timeout=60)
     rows = list(iterator)
     if len(rows) != 1:
