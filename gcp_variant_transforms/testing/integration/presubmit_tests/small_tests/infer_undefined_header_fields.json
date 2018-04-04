@@ -34,18 +34,21 @@
       "expected_result": {"cnt": 1}
     },
     {
-      "query": ["SELECT SUM(HQ) AS sum FROM {TABLE_NAME} t, t.call as call,",
-	        "call.HQ as HQ"
+      "query": [
+        "SELECT SUM(HQ) AS sum FROM {TABLE_NAME} t, t.call as call,",
+        "call.HQ as HQ"
       ],
       "expected_result": {"sum": 204}
     },
     {
-      "query": ["SELECT SUM(call.GQ) AS sum FROM {TABLE_NAME} t, t.call as call"
+      "query": [
+        "SELECT SUM(call.GQ) AS sum FROM {TABLE_NAME} t, t.call as call"
       ],
       "expected_result": {"sum": 139}
     },
     {
-      "query": ["SELECT SUM(call.DP) AS sum FROM {TABLE_NAME} t, t.call as call"
+      "query": [
+        "SELECT SUM(call.DP) AS sum FROM {TABLE_NAME} t, t.call as call"
       ],
       "expected_result": {"sum": 14}
     }
