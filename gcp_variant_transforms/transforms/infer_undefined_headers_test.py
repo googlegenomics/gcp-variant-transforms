@@ -84,9 +84,9 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
                         'IF': Info('IF', 0, 'Flag', '', '', ''),
-                        'IA': Info('IA', None, 'Float', '', '', '')}
-      expected_formats = {'FI': Format('FI', 1, 'Integer', ''),
-                          'FU': Format('FU', None, 'Float', '')}
+                        'IA': Info('IA', None, 'String', '', '', '')}
+      expected_formats = {'FI': Format('FI', 1, 'String', ''),
+                          'FU': Format('FU', None, 'String', '')}
 
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
@@ -123,11 +123,11 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
                         'IF': Info('IF', 0, 'Flag', '', '', ''),
-                        'IA': Info('IA', None, 'Float', '', '', ''),
+                        'IA': Info('IA', None, 'String', '', '', ''),
                         'IS_2': Info('IS_2', 1, 'String', '', '', '')}
-      expected_formats = {'FI': Format('FI', 1, 'Integer', ''),
-                          'FU': Format('FU', None, 'Float', ''),
-                          'FI_2': Format('FI_2', 1, 'Integer', '')}
+      expected_formats = {'FI': Format('FI', 1, 'String', ''),
+                          'FU': Format('FU', None, 'String', ''),
+                          'FI_2': Format('FI_2', 1, 'String', '')}
 
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
@@ -150,7 +150,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
               pvalue.AsSingleton(vcf_headers_side_input)))
 
       expected_infos = {'IS_2': Info('IS_2', 1, 'String', '', '', '')}
-      expected_formats = {'FI_2': Format('FI_2', 1, 'Integer', '')}
+      expected_formats = {'FI_2': Format('FI_2', 1, 'String', '')}
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
       assert_that(inferred_headers, equal_to([expected]))

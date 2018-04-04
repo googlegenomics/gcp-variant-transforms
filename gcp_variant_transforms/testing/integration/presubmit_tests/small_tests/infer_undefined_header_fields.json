@@ -7,15 +7,31 @@
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 2}
+      "expected_result": {"num_rows": 1}
     },
     {
-      "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 5248937}
+      "query": ["COUNT_AA_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
     },
     {
-      "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 5248939}
+      "query": ["COUNT_AF_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
+    },
+    {
+      "query": ["COUNT_DB_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
+    },
+    {
+      "query": ["COUNT_DP_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
+    },
+    {
+      "query": ["COUNT_H2_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
+    },
+    {
+      "query": ["COUNT_NS_INFO_FIELD_QUERY"],
+      "expected_result": {"cnt": 1}
     }
   ]
 }
