@@ -28,3 +28,9 @@ contain one other sample, respectively. When MERGE_TO_CALLS is selected, the
 variant call with `POS = 14370` is meant to merge across three files, while the
 call with `POS = 1234567` is designed to be merged for `merge1.vcf` and
 `merge2.vcf`.
+
+`infer-undefined-header-fields.vcf` is used to test the case where INFO and
+FORMAT field are not defined in VCF header.
+
+`incompatible-field-value.vcf` is used to test the case where values provided
+for the fields does not match the definition. Checkout fields `NS` and `DB`.

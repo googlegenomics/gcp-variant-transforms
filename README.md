@@ -15,6 +15,11 @@ It can be used to directly load VCF files to
 [BigQuery](https://cloud.google.com/bigquery/) supporting hundreds of thousands
 of files, millions of samples, and billions of records.
 
+Please see
+[this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
+for a high level overview of BigQuery and how to effectively use Variant
+Transforms and BigQuery.
+
 ### Prerequisites
 
 1.  Setup a [Google Cloud account](https://cloud.google.com/) and
@@ -118,8 +123,6 @@ source venv/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
 pip install --upgrade .
-# Workaround needed until Beam 2.3.0 is released. See Issue #65.
-pip install --upgrade apache_beam[gcp]
 ```
 
 You may use the
