@@ -17,10 +17,8 @@
 import setuptools
 
 REQUIRED_PACKAGES = [
-    # TODO(arostamianfar): Remove once Beam 2.3.0 pip package is launched.
-    # This is needed due to https://issues.apache.org/jira/browse/BEAM-3357.
-    'grpcio>=1.3.5,<=1.7.3',
-    'apache-beam[gcp]>=2.2',
+    'cython>=0.28.1',
+    'apache-beam[gcp]>=2.3',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
