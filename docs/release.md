@@ -1,4 +1,4 @@
-## Release process
+# Release process
 
 To release a new version, you need to be a member of `gcp-variant-transforms`,
 and `gcp-variant-transforms-test` projects and have write access to the GitHub
@@ -40,7 +40,6 @@ The process is as follows:
        --keep_image --skip_build --run_all_tests \
        --project gcp-variant-transforms-test
    ```
-   TODO(arostami): Automate this step through cloudbuild!
 1. Wait until the test is done. It will take about 2 hours. Ensure that there
    are no failures. In case of failures, rollback the version change in
    `setup.py` and continue from Step #1 once the errors are fixed.
@@ -63,7 +62,6 @@ The process is as follows:
    released image by running:
 
    ```bash
-   # TODO(arostami): modify deploy_and_run_tests.sh to use custom image.
    temp_dir="$(mktemp -d)"
    virtualenv "${temp_dir}"
    source ${temp_dir}/bin/activate
