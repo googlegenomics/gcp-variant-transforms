@@ -28,7 +28,7 @@ from gcp_variant_transforms.transforms import filter_variants
 
 
 # A sample MalformedVcfRecord.
-MALFORMED_RECORD = vcfio.MalformedVcfRecord('FILE', 'LINE')
+MALFORMED_RECORD = vcfio.MalformedVcfRecord('FILE', 'LINE', 'ERROR')
 
 
 class FilterVariantsTest(unittest.TestCase):

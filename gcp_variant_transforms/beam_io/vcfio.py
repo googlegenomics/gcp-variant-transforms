@@ -54,7 +54,8 @@ VariantInfo = namedtuple('VariantInfo', ['data', 'field_count'])
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
 # failed in.
-MalformedVcfRecord = namedtuple('MalformedVcfRecord', ['file_name', 'line'])
+MalformedVcfRecord = namedtuple('MalformedVcfRecord',
+                                ['file_name', 'line', 'error'])
 MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
 PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
 END_INFO_KEY = 'END'  # The info key that explicitly specifies end of a record.
@@ -741,7 +742,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         if self._allow_malformed_records:
           logging.warning('VCF record read failed in %s for line %s: %s',
                           self._file_name, self._last_record, str(e))
-          return MalformedVcfRecord(self._file_name, self._last_record)
+          return MalformedVcfRecord(self._file_name, self._last_record, str(e))
 
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
