@@ -40,38 +40,22 @@ The process is as follows:
        --keep_image --skip_build --run_all_tests \
        --project gcp-variant-transforms-test
    ```
+   TODO(arostami): Automate this step through cloudbuild!
 1. Wait until the test is done. It will take about 2 hours. Ensure that there
    are no failures. In case of failures, rollback the version change in
    `setup.py` and continue from Step #1 once the errors are fixed.
-1. To update the docker image, you can either:
-   * (**Preferred**) Copy the verified image to the main project by running the
-     following on your workstation. Note that you require
-     [docker](https://www.docker.com/) to be installed.
+1. To update the docker image, copy the verified image to the main project by
+   running the following on your workstation. Note that you require
+   [docker](https://www.docker.com/) to be installed.
 
-     ```bash
-     gcloud auth configure-docker
-     SOURCE_IMAGE=gcr.io/gcp-variant-transforms-test/gcp-variant-transforms:"${COMMIT_SHA}"
-     TARGET_IMAGE=gcr.io/gcp-variant-transforms/gcp-variant-transforms:"${COMMIT_SHA}"
-     docker pull "${SOURCE_IMAGE}"
-     docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"
-     docker push "${TARGET_IMAGE}"
-     ```
-
-   * Push a new image from source by running:
-
-     ```bash
-     VERSION_TAG=v.X.X.X  # Replace with correct version tag!
-     RELEASE_FOLDER=$(mktemp -d)
-     mkdir -p "${RELEASE_FOLDER}"
-     cd "${RELEASE_FOLDER}"
-     git clone https://github.com/googlegenomics/gcp-variant-transforms.git
-     cd gcp-variant-transforms/
-     git checkout "${VERSION_TAG}"
-     gcloud container builds submit \
-         --config cloudbuild.yaml \
-         --project gcp-variant-transforms \
-         --substitutions _CUSTOM_TAG_NAME="${COMMIT_SHA}" .
-     ```
+   ```bash
+   gcloud auth configure-docker
+   SOURCE_IMAGE=gcr.io/gcp-variant-transforms-test/gcp-variant-transforms:"${COMMIT_SHA}"
+   TARGET_IMAGE=gcr.io/gcp-variant-transforms/gcp-variant-transforms:"${COMMIT_SHA}"
+   docker pull "${SOURCE_IMAGE}"
+   docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"
+   docker push "${TARGET_IMAGE}"
+   ```
 1. Once the new image is published, navigate to the
    [Container registry](https://console.cloud.google.com/gcr/images/gcp-variant-transforms/GLOBAL/gcp-variant-transforms?project=gcp-variant-transforms)
    page and update the published image to have the labels `latest` and `X.X.X`
