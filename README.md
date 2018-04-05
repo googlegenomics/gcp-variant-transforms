@@ -165,4 +165,6 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 ## Development
 
-[Development Guide](docs/development_guide.md)
+* [Development Guide](docs/development_guide.md)
+* [Release process](docs/release.md)
+
