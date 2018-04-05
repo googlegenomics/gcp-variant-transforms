@@ -250,10 +250,11 @@ class TestContextManager(object):
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
       dataset = bigquery.Dataset(dataset_ref)
-      _ = client.create_dataset(dataset)
+      _ = client.create_dataset(dataset)  # See #171, pylint: disable=no-member
     return self
 
   def __exit__(self, *args):
+    # See #171 for why we need: pylint: disable=no-member
     if not self._keep_tables:
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
