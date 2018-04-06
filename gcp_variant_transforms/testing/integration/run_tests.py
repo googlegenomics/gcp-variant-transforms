@@ -263,11 +263,10 @@ class TestContextManager(object):
       # Delete tables, otherwise dataset deletion will fail because it is still
       # "in use".
       for table in tables:
-        # The returned tables are of type TableListItem which has similar
-        # properties like Table with the exception of a few missing ones.
-        # This seems to be the easiest (but not cleanest) way of creating a
-        # Table instance from a TableListItem.
-        client.delete_table(bigquery.Table(table))
+        # The returned tables are of type TableListItem, but delete_table
+        # needs Table or TableReference.
+        client.delete_table(
+            bigquery.TableReference(dataset_ref, table.table_id))
       client.delete_dataset(dataset)
 
 
