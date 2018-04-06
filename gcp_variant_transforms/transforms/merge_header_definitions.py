@@ -23,7 +23,7 @@ from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: di
 from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
 # ``Definition`` cherry-picks the attributes from vcf header definitions that
-# are critical when parsing the vcf files.
+# are critical for checking field compatibilities across VCF files.
 Definition = namedtuple('Definition', [VcfParserConstants.NUM,
                                        VcfParserConstants.TYPE])
 
@@ -89,8 +89,8 @@ class _DefinitionsMerger(object):
       for definition, file_names in definitions_to_files_map.iteritems():
         first[key].setdefault(definition, [])
         first[key][definition].extend(file_names)
-        first[key][definition] = \
-            first[key][definition][:self._MAX_NUM_FILE_NAMES]
+        first[key][definition] = (
+            first[key][definition][:self._MAX_NUM_FILE_NAMES])
 
 
 class _MergeDefinitionsFn(beam.CombineFn):
