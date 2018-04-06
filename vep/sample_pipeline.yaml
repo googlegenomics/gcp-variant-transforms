@@ -1,0 +1,33 @@
+# TODO(bashir2): Update this example with v2alpha1 required changes.
+name: run-vep
+resources:
+  disks:
+    - name: datadisk
+      mountPoint: /mnt/data
+      type: PERSISTENT_HDD
+      sizeGb: 300
+  minimumCpuCores: 12
+inputParameters:
+  - name: VEP_CACHE
+    defaultValue: gs://my_bucket/vep_cache_homo_sapiens_GRCh38_91.tar.gz
+    localCopy:
+      disk: datadisk
+      path: vep_cache_91.tar.gz
+  - name: INPUT_FILE
+    defaultValue: gs://my_bucket/input.vcf
+    localCopy:
+      disk: datadisk
+      path: input.vcf
+  - name: VCF_INFO_FILED
+    defaultValue: CSQ_VT
+  - name: NUM_FORKS
+    defaultValue: "12"
+outputParameters:
+  - name: OUTPUT_VCF
+    defaultValue: gs://my_bucket/output.vcf
+    localCopy:
+      disk: datadisk
+      path: output.vcf
+docker:
+  imageName: gcr.io/my-project/vep_91
+  cmd: /opt/variant_effect_predictor/run_vep.sh
