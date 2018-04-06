@@ -42,8 +42,8 @@ class FilterVariants(beam.PTransform):
     if isinstance(variant, vcfio.Variant):
       return True
     elif isinstance(variant, vcfio.MalformedVcfRecord):
-      logging.warning('VCF record read failed in %s for line %s.',
-                      variant.file_name, variant.line)
+      logging.warning('VCF record read failed in %s for line %s with error %s',
+                      variant.file_name, variant.line, variant.error)
       return False
     else:
       raise ValueError(
