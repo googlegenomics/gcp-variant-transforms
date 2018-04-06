@@ -39,7 +39,8 @@ class VcfHeader(object):
                filters=None,
                alts=None,
                formats=None,
-               contigs=None):
+               contigs=None,
+               file_name=None):
     """Initializes a VcfHeader object.
 
     Args:
@@ -53,12 +54,14 @@ class VcfHeader(object):
         metadata values (:class:`~vcf.parser._Format`).
       contigs (dict): A dictionary mapping contig keys (str) to vcf contig
         metadata values (:class:`~vcf.parser._Contig`).
+      file_name (str): A str representing the file name of the vcf file.
     """
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
     self.alts = self._values_asdict(alts or {})
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
+    self.file_name = file_name
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -108,7 +111,8 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                     filters=vcf_reader.filters,
                     alts=vcf_reader.alts,
                     formats=vcf_reader.formats,
-                    contigs=vcf_reader.contigs)
+                    contigs=vcf_reader.contigs,
+                    file_name=file_name)
 
   def _read_headers(self, file_name):
     with FileSystems.open(
