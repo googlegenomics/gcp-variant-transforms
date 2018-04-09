@@ -28,8 +28,27 @@ from apache_beam.transforms import PTransform
 
 from gcp_variant_transforms.beam_io import vcfio
 
-_all__ = ['VcfHeader', 'VcfHeaderSource', 'ReadAllVcfHeaders',
-          'ReadVcfHeaders', 'WriteVcfHeaders']
+
+class VcfHeaderFieldTypeConstants(object):
+  """Constants for types from VCF header."""
+  FLOAT = 'Float'
+  INTEGER = 'Integer'
+  STRING = 'String'
+  FLAG = 'Flag'
+  CHARACTER = 'Character'
+  STRING = 'String'
+
+
+class VcfParserHeaderKeyConstants(object):
+  """Constants for header fields from the parser (currently PyVCF)."""
+  ID = 'id'
+  NUM = 'num'
+  TYPE = 'type'
+  DESC = 'desc'
+  SOURCE = 'source'
+  VERSION = 'version'
+  LENGTH = 'length'
+
 
 class VcfHeader(object):
   """Container for header data."""
@@ -310,19 +329,19 @@ class _WriteVcfHeaderFn(beam.DoFn):
     return '{}={}'.format(key, value)
 
   def _format_header_key(self, key):
-    if key == 'id':
+    if key == VcfParserHeaderKeyConstants.ID:
       return _HeaderFieldKeyConstants.ID
-    elif key == 'num':
+    elif key == VcfParserHeaderKeyConstants.NUM:
       return _HeaderFieldKeyConstants.NUMBER
-    elif key == 'desc':
+    elif key == VcfParserHeaderKeyConstants.DESC:
       return _HeaderFieldKeyConstants.DESCRIPTION
-    elif key == 'type':
+    elif key == VcfParserHeaderKeyConstants.TYPE:
       return _HeaderFieldKeyConstants.TYPE
-    elif key == 'source':
+    elif key == VcfParserHeaderKeyConstants.SOURCE:
       return _HeaderFieldKeyConstants.SOURCE
-    elif key == 'version':
+    elif key == VcfParserHeaderKeyConstants.VERSION:
       return _HeaderFieldKeyConstants.VERSION
-    elif key == 'length':
+    elif key == VcfParserHeaderKeyConstants.LENGTH:
       return _HeaderFieldKeyConstants.LENGTH
     else:
       raise ValueError('Invalid VCF header key {}.'.format(key))
