@@ -16,20 +16,9 @@
 
 import vcf
 
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
-
-
-class VcfParserConstants(object):
-  """Constants for type and number from VCF parser."""
-  FLOAT = 'Float'
-  INTEGER = 'Integer'
-  STRING = 'String'
-  FLAG = 'Flag'
-  CHARACTER = 'Character'
-  NUM = 'num'
-  STRING = 'String'
-  TYPE = 'type'
 
 
 class FieldConflictResolver(object):
@@ -114,9 +103,9 @@ class FieldConflictResolver(object):
     Raises:
       ValueError: if the conflict cannot be resolved.
     """
-    if attribute_name == VcfParserConstants.TYPE:
+    if attribute_name == vcf_header_io.VcfParserHeaderKeyConstants.TYPE:
       return self._resolve_type(first_attribute_value, second_attribute_value)
-    elif attribute_name == VcfParserConstants.NUM:
+    elif attribute_name == vcf_header_io.VcfParserHeaderKeyConstants.NUM:
       return self._resolve_number(first_attribute_value, second_attribute_value)
     else:
       # We only care about conflicts in 'num' and 'type' attributes.
@@ -125,13 +114,14 @@ class FieldConflictResolver(object):
       return first_attribute_value
 
   def _resolve_type(self, first, second):
+    type_constants = vcf_header_io.VcfHeaderFieldTypeConstants
     if first == second:
       return first
-    elif (first in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT) and
-          second in (VcfParserConstants.INTEGER, VcfParserConstants.FLOAT)):
-      return VcfParserConstants.FLOAT
+    elif (first in (type_constants.INTEGER, type_constants.FLOAT) and
+          second in (type_constants.INTEGER, type_constants.FLOAT)):
+      return type_constants.FLOAT
     elif self._resolve_always:
-      return VcfParserConstants.STRING
+      return type_constants.STRING
     else:
       raise ValueError('Incompatible values cannot be resolved: '
                        '{}, {}'.format(first, second))

@@ -19,13 +19,14 @@ from collections import namedtuple
 from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
-from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
 
 # ``Definition`` cherry-picks the attributes from vcf header definitions that
 # are critical for checking field compatibilities across VCF files.
-Definition = namedtuple('Definition', [VcfParserConstants.NUM,
-                                       VcfParserConstants.TYPE])
+Definition = namedtuple('Definition',
+                        [vcf_header_io.VcfParserHeaderKeyConstants.NUM,
+                         vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
 
 
 class VcfHeaderDefinitions(object):
@@ -43,12 +44,14 @@ class VcfHeaderDefinitions(object):
     if not vcf_header:
       return
     for key, val in vcf_header.infos.iteritems():
-      definition = Definition(val[VcfParserConstants.NUM],
-                              val[VcfParserConstants.TYPE])
+      definition = Definition(
+          val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
+          val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
       self._infos[key][definition] = [vcf_header.file_name]
     for key, val in vcf_header.formats.iteritems():
-      definition = Definition(val[VcfParserConstants.NUM],
-                              val[VcfParserConstants.TYPE])
+      definition = Definition(
+          val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
+          val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
       self._formats[key][definition] = [vcf_header.file_name]
 
   def __eq__(self, other):
