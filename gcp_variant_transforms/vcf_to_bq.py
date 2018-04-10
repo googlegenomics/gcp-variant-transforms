@@ -57,6 +57,7 @@ from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
+from gcp_variant_transforms.transforms import partition_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
 
 _COMMAND_LINE_OPTIONS = [
@@ -69,7 +70,10 @@ _COMMAND_LINE_OPTIONS = [
 
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
-
+# The first 22 partitions [0, 21] are reserved for standard reference_name
+# formated as RegExp '^(c|ch|chr)?([0-9][0-9]?)$'.
+# Every other identifers will be matched to next available partitions [22, 26].
+_DEFAULT_PARTITION_NO = 22 + 5
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
                                ):
@@ -191,8 +195,15 @@ def run(argv=None):
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if variant_merger:
-    variants |= (
-        'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
+    if known_args.optimize_for_large_inputs:
+      partitions = variants | 'PartitionVariants' >> beam.Partition(
+          partition_variants.PartitionVariants(), _DEFAULT_PARTITION_NO)
+      merged = [(partitions[i] | 'MergeVariants'+str(i) >>
+                 merge_variants.MergeVariants(variant_merger))
+                for i in xrange(_DEFAULT_PARTITION_NO)]
+      variants = merged | 'FlattenPartitions' >> beam.Flatten()
+    else:
+      variants |= ('MergeVariants' >> merge_variants.MergeVariants(variant_merger))
   proc_variants = variants | 'ProcessVaraints' >> beam.Map(
       processed_variant_factory.create_processed_variant).\
     with_output_types(processed_variant.ProcessedVariant)
