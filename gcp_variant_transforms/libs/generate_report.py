@@ -19,7 +19,7 @@ import os
 from typing import Dict, List, Union  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
-from gcp_variant_transforms.libs.vcf_field_conflict_resolver import VcfParserConstants
+from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
 from gcp_variant_transforms.transforms.merge_header_definitions import Definition  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeaderDefinitions  # pylint: disable=unused-import
 
@@ -34,21 +34,25 @@ class ConflictsReporter(object):
 
   def __init__(self, directory=''):
     # type: (str) -> None
-    self.directory = directory
+    """Initializes ``ConflictsReporter`` object.
 
-  def report_conflicts(self, header_definitions, representative_header=None):
+    Args:
+      directory: The location where the conflicts report is saved.
+    """
+    self._directory = directory
+
+  def report_conflicts(self, header_definitions, resolved_header=None):
     # type: (VcfHeaderDefinitions, VcfHeader) -> None
     """Generates a report.
 
-    Combines the conflicts extracted from ``header_definitions`` and the
-    solution from `representative_header`` to generate a conflicts report in
-    ``self.directory``.
+    Combines the conflicts extracted from ``header_definitions`` and their
+    resolutions from ``resolved_header`` to generate a conflicts report.
     """
-    representative_header = representative_header or VcfHeader()
+    resolved_header = resolved_header or VcfHeader()
     format_conflicts = self._extract_conflicts(header_definitions.formats)
     info_conflicts = self._extract_conflicts(header_definitions.infos)
-    format_headers = representative_header.formats
-    info_headers = representative_header.infos
+    format_headers = resolved_header.formats
+    info_headers = resolved_header.infos
     contents = list()
     contents.extend(self._generate_contents(format_conflicts, format_headers))
     contents.extend(self._generate_contents(info_conflicts, info_headers))
@@ -60,6 +64,7 @@ class ConflictsReporter(object):
       ):
     # type: (...) -> Dict[str, Dict[Definition, List[str]]]
     """Extracts the fields that have conflicted definitions."""
+    # len(v) > 1 means there are conflicted definitions for this field.
     return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
 
   def _generate_contents(
@@ -68,17 +73,22 @@ class ConflictsReporter(object):
       headers  # type: Dict[str, Dict[str, Union[str, int]]
       ):
     # type: (...) -> List[str]
+    """Generates the report contents.
+
+    The conflicted definitions, the file names and the resolutions are included
+    in the contents.
+    """
     contents = list()
     for field_id, definitions_to_files_map in conflicts.iteritems():
       row = [
           field_id,
-          self._generate_conflicts(definitions_to_files_map),
-          self._generate_solution(headers, field_id)
+          self._extract_definitions_and_file_names(definitions_to_files_map),
+          self._extract_resolution(headers, field_id)
       ]
       contents.append(row)
     return contents
 
-  def _generate_conflicts(self, definition_to_files_map):
+  def _extract_definitions_and_file_names(self, definition_to_files_map):
     # type: (Dict[Definition, List[str]]) -> str
     conflict_definitions = []
     for definition, file_names in definition_to_files_map.iteritems():
@@ -86,26 +96,27 @@ class ConflictsReporter(object):
       conflict_definitions.append(definition + ' in ' + str(file_names))
     return ' '.join(conflict_definitions)
 
-  def _generate_solution(self, header, filed_id):
+  def _extract_resolution(self, header, filed_id):
     # type: (Dict[str, Dict[str, Union[str, int]]], str) -> str
     if filed_id not in header:
       return self._NO_SOLUTION_MESSAGE
-    return self._format_definition(header[filed_id][VcfParserConstants.NUM],
-                                   header[filed_id][VcfParserConstants.TYPE])
+    return self._format_definition(
+        header[filed_id][VcfParserHeaderKeyConstants.NUM],
+        header[filed_id][VcfParserHeaderKeyConstants.TYPE])
 
   def _format_definition(self, num_value, type_value):
     # type: (Union[str, int], str) -> str
     formatted_definition = [
-        VcfParserConstants.NUM + '=' + str(num_value),
-        VcfParserConstants.TYPE + '=' + str(type_value)
+        VcfParserHeaderKeyConstants.NUM + '=' + str(num_value),
+        VcfParserHeaderKeyConstants.TYPE + '=' + str(type_value)
     ]
     return ' '.join(formatted_definition)
 
   def _write_to_report(self, contents):
-    # type: (List[str], str) -> None
-    if self.directory and not os.path.exists(self.directory):
-      os.makedirs(self.directory)
-    file_path = os.path.join(self.directory, self._REPORT_NAME)
+    # type: (List[str]) -> None
+    if self._directory and not os.path.exists(self._directory):
+      os.makedirs(self._directory)
+    file_path = os.path.join(self._directory, self._REPORT_NAME)
     with open(file_path, 'w') as file_to_write:
       writer = csv.writer(file_to_write)
       if not contents:
