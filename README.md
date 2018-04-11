@@ -94,7 +94,7 @@ status of your operation by running:
 gcloud alpha genomics operations describe <operation-id>
 ```
 
-The returned data will have `done: true` when the operation is done. 
+The returned data will have `done: true` when the operation is done.
 A detailed description of the Operation resource can be found in the
 [API documentation](https://cloud.google.com/genomics/reference/rest/v1/operations)
 
@@ -154,6 +154,64 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 ```
 
+### Security and Compliance
+
+You may need to constrain Cloud Dataflow job processing to a specific
+geographic region in support of yourproject’s security and compliance needs.
+For example, the [European Union Data Protection Directive](https://cloud.google.com/security/compliance/eu-data-protection-directive/).
+
+For this, you need to specify zone and region in Dataflow API (as well as
+Pipeline API if you are using Docker). For example, in order to restrict
+job processing to Europe. First update `vcf_to_bigquery.yaml` to use zone and
+region in Europe
+
+```yaml
+name: vcf-to-bigquery-pipeline
+docker:
+  imageName: gcr.io/gcp-variant-transforms/gcp-variant-transforms
+  cmd: |
+    ./opt/gcp_variant_transforms/bin/vcf_to_bq \
+      --project my_project \
+      --input_pattern gs://my_bucket/vcffiles/*.vcf \
+      --output_table my_project:my_bigquery_dataset.my_bigquery_table \
+      --staging_location gs://my_bucket/staging \
+      --temp_location gs://my_bucket/temp \
+      --job_name vcf-to-bigquery \
+      --runner DataflowRunner
+      --region europe-west1 \
+      --zone europe-west1-b
+
+```
+
+Then specify zone and region in Pipelines API.
+
+```bash
+gcloud alpha genomics pipelines run \
+    --project my_project \
+    --pipeline-file vcf_to_bigquery.yaml \
+    --logging gs://my_bucket/temp/runner_logs \
+    --regions europe-west1 \
+    --zones europe-west1-b \
+    --service-account-scopes https://www.googleapis.com/auth/bigquery
+```
+
+If running from github, you just need to specify zone and region for Dataflow
+API as below.
+
+```bash
+python -m gcp_variant_transforms.vcf_to_bq \
+  --input_pattern gs://my_bucket/vcffiles/*.vcf \
+  --output_table my_project:my_bigquery_dataset.my_bigquery_table \
+  --project my_project \
+  --staging_location gs://my_bucket/staging \
+  --temp_location gs://my_bucket/temp \
+  --job_name vcf-to-bigquery \
+  --setup_file ./setup.py \
+  --runner DataflowRunner
+  --region europe-west1 \
+  --zone europe-west1-b
+```
+
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table Schema](docs/bigquery_schema.md)
@@ -167,4 +225,4 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 * [Development Guide](docs/development_guide.md)
 * [Release process](docs/release.md)
-
+ 
