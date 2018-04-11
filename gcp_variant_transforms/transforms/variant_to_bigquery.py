@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import apache_beam as beam
 
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  #pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
@@ -31,25 +32,18 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
   """Converts a ``Variant`` record to a BigQuery row."""
 
   def __init__(self,
-               schema_descriptor,
+               row_generator,
                allow_incompatible_records=False,
                omit_empty_sample_calls=False):
-    # type: (bigquery_schema_descriptor.SchemaDescriptor, bool, bool) -> None
+    # type: (bigquery_row_generator.BigQueryRowGenerator, bool, bool) -> None
     super(_ConvertToBigQueryTableRow, self).__init__()
-    self._schema_descriptor = schema_descriptor
-    # Resolver makes extra effort to resolve conflict when flag
-    # allow_incompatible_records is set.
-    self._conflict_resolver = (
-        vcf_field_conflict_resolver.FieldConflictResolver(
-            resolve_always=allow_incompatible_records))
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
+    self._bigquery_row_generator = row_generator
 
   def process(self, record):
-    return bigquery_vcf_schema.get_rows_from_variant(
-        record, self._schema_descriptor, self._conflict_resolver,
-        self._allow_incompatible_records, self._omit_empty_sample_calls)
-
+    return self._bigquery_row_generator.get_rows(
+        record, self._allow_incompatible_records, self._omit_empty_sample_calls)
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class VariantToBigQuery(beam.PTransform):
@@ -89,16 +83,20 @@ class VariantToBigQuery(beam.PTransform):
     self._append = append
     self._schema = bigquery_vcf_schema.generate_schema_from_header_fields(
         self._header_fields, self._proc_var_factory, self._variant_merger)
-    self._schema_descriptor = bigquery_schema_descriptor.SchemaDescriptor(
-        self._schema)
+    # Resolver makes extra effort to resolve conflict when flag
+    # allow_incompatible_records is set.
+    self._bigquery_row_generator = bigquery_row_generator.BigQueryRowGenerator(
+        bigquery_schema_descriptor.SchemaDescriptor(self._schema),
+        vcf_field_conflict_resolver.FieldConflictResolver(
+            resolve_always=allow_incompatible_records))
+
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
-
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertToBigQueryTableRow' >> beam.ParDo(
                 _ConvertToBigQueryTableRow(
-                    self._schema_descriptor,
+                    self._bigquery_row_generator,
                     self._allow_incompatible_records,
                     self._omit_empty_sample_calls))
             | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(

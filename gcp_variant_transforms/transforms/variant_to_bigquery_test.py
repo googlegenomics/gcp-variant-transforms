@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import unittest
 
+from apache_beam.io.gcp.internal.clients import bigquery
 from apache_beam import ParDo
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
@@ -26,32 +27,98 @@ from apache_beam.transforms import Create
 
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_schema_descriptor
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
-from gcp_variant_transforms.testing import mock_bigquery_schema_descriptor
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
+
+
 
 
 class ConvertToBigQueryTableRowTest(unittest.TestCase):
   """Test cases for the ``ConvertToBigQueryTableRow`` DoFn."""
+
+  def setUp(self):
+    self._schema_descriptor = bigquery_schema_descriptor.SchemaDescriptor(
+        self._get_table_schema())
+    self._conflict_resolver = (
+        vcf_field_conflict_resolver.FieldConflictResolver())
+
+    self._row_generator = bigquery_row_generator.BigQueryRowGenerator(
+        self._schema_descriptor, self._conflict_resolver)
+
+  def _get_table_schema(self):
+    # type (None) -> bigquery.TableSchema
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='II',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IFR',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IFR2',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IS',
+        type=TableFieldConstants.TYPE_STRING,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='ISR',
+        type=TableFieldConstants.TYPE_STRING,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    # Call record.
+    call_record = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    call_record.fields.append(bigquery.TableFieldSchema(
+        name='FIR',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    schema.fields.append(call_record)
+    return schema
 
   def _get_sample_variant_1(self, split_alternate_allele_info_fields=True):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'AF': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'AF2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'IFR': vcfio.VariantInfo([0.1, 0.2], 'A'),
+              'IFR2': vcfio.VariantInfo([0.2, 0.3], 'A'),
+              'IS': vcfio.VariantInfo('some data', '1'),
+              'ISR': vcfio.VariantInfo(['data1', 'data2'], '2')},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
-                info={'GQ': 20, 'HQ': [10, 20]}),
+                info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
-                info={'GQ': 10, 'FLAG1': True}),
+                info={'GQ': 10, 'FB': True}),
         ]
     )
     row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -65,30 +132,32 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
                {ColumnKeyConstants.CALLS_NAME: 'Sample1',
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
-                'GQ': 20, 'HQ': [10, 20]},
+                'GQ': 20, 'FIR': [10, 20]},
                {ColumnKeyConstants.CALLS_NAME: 'Sample2',
                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
                 ColumnKeyConstants.CALLS_PHASESET: None,
-                'GQ': 10, 'FLAG1': True}],
-           'A1': 'some data',
-           'A2': ['data1', 'data2']}
+                'GQ': 10, 'FB': True}],
+           'IS': 'some data',
+           'ISR': ['data1', 'data2']}
     if split_alternate_allele_info_fields:
       row[ColumnKeyConstants.ALTERNATE_BASES] = [
-          {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A', 'AF': 0.1, 'AF2': 0.2},
-          {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT', 'AF': 0.2, 'AF2': 0.3}]
+          {ColumnKeyConstants.ALTERNATE_BASES_ALT:
+           'A', 'IFR': 0.1, 'IFR2': 0.2},
+          {ColumnKeyConstants.ALTERNATE_BASES_ALT:
+           'TT', 'IFR': 0.2, 'IFR2': 0.3}]
     else:
       row[ColumnKeyConstants.ALTERNATE_BASES] = [
           {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A'},
           {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT'}]
-      row['AF'] = [0.1, 0.2]
-      row['AF2'] = [0.2, 0.3]
+      row['IFR'] = [0.1, 0.2]
+      row['IFR2'] = [0.2, 0.3]
     return variant, row
 
   def _get_sample_variant_2(self):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'INTINFO': vcfio.VariantInfo(1234, '1')})
+        info={'II': vcfio.VariantInfo(1234, '1')})
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -96,7 +165,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.ALTERNATE_BASES: [],
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
-           'INTINFO': 1234}
+           'II': 1234}
     return variant, row
 
   def _get_sample_variant_3(self):
@@ -121,11 +190,11 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         header_fields).create_processed_variant(variant_2)
     proc_var_3 = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant_3)
-    pipeline = TestPipeline()
+    pipeline = TestPipeline(blocking=True)
     bigquery_rows = (
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
         | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
-            mock_bigquery_schema_descriptor.MockSchemaDescriptor())))
+            self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
