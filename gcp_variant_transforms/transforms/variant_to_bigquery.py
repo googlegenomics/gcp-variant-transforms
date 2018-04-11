@@ -37,8 +37,11 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
     # type: (bigquery_schema_descriptor.SchemaDescriptor, bool, bool) -> None
     super(_ConvertToBigQueryTableRow, self).__init__()
     self._schema_descriptor = schema_descriptor
+    # Resolver makes extra effort to resolve conflict when flag
+    # allow_incompatible_records is set.
     self._conflict_resolver = (
-        vcf_field_conflict_resolver.FieldConflictResolver())
+        vcf_field_conflict_resolver.FieldConflictResolver(
+            resolve_always=allow_incompatible_records))
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
 
