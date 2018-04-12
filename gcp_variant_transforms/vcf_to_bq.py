@@ -192,7 +192,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
 
     merged_header = (headers
                      | 'MergeHeaders' >> merge_headers.MergeHeaders(
-                         known_args.split_alternate_allele_info_fields))
+                         known_args.split_alternate_allele_info_fields,
+                         known_args.allow_incompatible_records))
 
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)

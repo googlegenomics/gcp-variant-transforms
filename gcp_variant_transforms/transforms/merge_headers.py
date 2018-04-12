@@ -118,19 +118,27 @@ class _MergeHeadersFn(beam.CombineFn):
 class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
-  def __init__(self, split_alternate_allele_info_fields=True):
-    # type: (bool) -> None
+  def __init__(self,
+               split_alternate_allele_info_fields=True,
+               allow_incompatible_records=False):
+    # type: (bool, bool) -> None
     """Initializes :class:`MergeHeaders` object.
 
     Args:
       split_alternate_allele_info_fields: Whether INFO fields with
         `Number=A` are store under the alternate_bases record. This is relevant
         as it changes the header compatibility rules as it changes the schema.
+      allow_incompatible_records: If true, header definition with type mismatch
+        (e.g., string vs float) are always resolved.
     """
     super(MergeHeaders, self).__init__()
+    # Resolver makes extra efforts to resolve conflict in header definitions
+    # when flag allow_incompatible_records is set. For example, it resolves
+    # type conflict of string and float into string.
     self._header_merger = _HeaderMerger(
         vcf_field_conflict_resolver.FieldConflictResolver(
-            split_alternate_allele_info_fields))
+            split_alternate_allele_info_fields,
+            resolve_always=allow_incompatible_records))
 
   def expand(self, pcoll):
     return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
