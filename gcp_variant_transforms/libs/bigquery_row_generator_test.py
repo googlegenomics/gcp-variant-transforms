@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for bigquery_vcf_schema module."""
+"""Tests for bigquery_row_generator module."""
 
 from __future__ import absolute_import
 
@@ -27,7 +27,6 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
-#from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs import vcf_header_parser

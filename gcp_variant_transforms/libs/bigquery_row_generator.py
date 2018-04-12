@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handles generating bigquery row from variants."""
+"""Handles generating BigQuery row from variants."""
 
 from __future__ import absolute_import
 
@@ -39,7 +39,7 @@ _JSON_CONCATENATION_OVERHEAD_BYTES = 5
 
 
 class BigQueryRowGenerator(object):
-  """Class to generate bigquery row from a variant."""
+  """Class to generate BigQuery row from a variant."""
 
   def __init__(
       self,
@@ -113,7 +113,7 @@ class BigQueryRowGenerator(object):
       allow_incompatible_records,  # type: bool
       ):
     # type: (...) -> Dict[str, Any], bool
-    """A helper method for ``get_rows_from_variant`` to get a call as JSON.
+    """A helper method for ``get_rows`` to get a call as JSON.
 
     Args:
       call: Variant call to convert.

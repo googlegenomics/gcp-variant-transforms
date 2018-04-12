@@ -44,6 +44,10 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
   def process(self, record):
     return self._bigquery_row_generator.get_rows(
         record, self._allow_incompatible_records, self._omit_empty_sample_calls)
+<<<<<<< HEAD
+=======
+
+>>>>>>> Address comments 1
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class VariantToBigQuery(beam.PTransform):
@@ -58,7 +62,7 @@ class VariantToBigQuery(beam.PTransform):
       append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False  # type: bool
-  ):
+      ):
     """Initializes the transform.
 
     Args:
@@ -73,6 +77,8 @@ class VariantToBigQuery(beam.PTransform):
         The latter functionality is what is needed here.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
+      allow_incompatible_records: If true, field values are casted to Bigquery
++        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
     """

@@ -37,8 +37,6 @@ from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
 
-
-
 class ConvertToBigQueryTableRowTest(unittest.TestCase):
   """Test cases for the ``ConvertToBigQueryTableRow`` DoFn."""
 
@@ -179,6 +177,55 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.CALLS: []}
     return variant, row
 
+  def _get_sample_variant_with_empty_calls(self):
+    variant = vcfio.Variant(
+        reference_name='20', start=123, end=125, reference_bases='CT',
+        alternate_bases=[], filters=['q10', 's10'],
+        info={'II': vcfio.VariantInfo(1234, '1')},
+        calls=[
+            vcfio.VariantCall(
+                name='EmptySample', genotype=[], phaseset='*',
+                info={}),
+        ])
+    row = {ColumnKeyConstants.REFERENCE_NAME: '20',
+           ColumnKeyConstants.START_POSITION: 123,
+           ColumnKeyConstants.END_POSITION: 125,
+           ColumnKeyConstants.REFERENCE_BASES: 'CT',
+           ColumnKeyConstants.ALTERNATE_BASES: [],
+           ColumnKeyConstants.FILTER: ['q10', 's10'],
+           ColumnKeyConstants.CALLS: [],
+           'II': 1234}
+    return variant, row
+
+  def _get_sample_variant_with_incompatible_records(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='C',
+        alternate_bases=[], filters=['PASS'],
+        info={'IFR': vcfio.VariantInfo(['0.1', '0.2'], '2'),
+              'IS': vcfio.VariantInfo(1, '1'),
+              'ISR': vcfio.VariantInfo(1, '1')},
+        calls=[
+            vcfio.VariantCall(
+                name='Sample1', genotype=[0, 1], phaseset='*',
+                info={'GQ': 20, 'FIR': [10.0, 20.0]}),
+        ]
+    )
+    row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+           ColumnKeyConstants.START_POSITION: 11,
+           ColumnKeyConstants.END_POSITION: 12,
+           ColumnKeyConstants.REFERENCE_BASES: 'C',
+           ColumnKeyConstants.ALTERNATE_BASES: [],
+           ColumnKeyConstants.FILTER: ['PASS'],
+           ColumnKeyConstants.CALLS: [
+               {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+                ColumnKeyConstants.CALLS_PHASESET: '*',
+                'GQ': 20, 'FIR': [10, 20]}],
+           'IFR': [0.1, 0.2],
+           'IS': '1',
+           'ISR': ['1']}
+    return variant, row
+
   def test_convert_variant_to_bigquery_row(self):
     variant_1, row_1 = self._get_sample_variant_1()
     variant_2, row_2 = self._get_sample_variant_2()
@@ -198,3 +245,34 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
             self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
+
+  def test_convert_variant_to_bigquery_row_omit_empty_calls(self):
+    variant, row = self._get_sample_variant_with_empty_calls()
+    header_fields = vcf_header_parser.HeaderFields({}, {})
+    proc_var = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant)
+    pipeline = TestPipeline(blocking=True)
+    bigquery_rows = (
+        pipeline
+        | Create([proc_var])
+        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+            self._row_generator, omit_empty_sample_calls=True)))
+    assert_that(bigquery_rows, equal_to([row]))
+    pipeline.run()
+
+  def test_convert_variant_to_bigquery_row_allow_incompatible_recoreds(self):
+    variant, row = self._get_sample_variant_with_incompatible_records()
+    header_fields = vcf_header_parser.HeaderFields({}, {})
+    proc_var = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant)
+    pipeline = TestPipeline(blocking=True)
+    bigquery_rows = (
+        pipeline
+        | Create([proc_var])
+        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+            self._row_generator, allow_incompatible_records=True)))
+    assert_that(bigquery_rows, equal_to([row]))
+    pipeline.run()
+
+
+#_get_sample_variant_with_incompatible_records
