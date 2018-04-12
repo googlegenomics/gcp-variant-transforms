@@ -23,7 +23,6 @@ from vcf.parser import _Info as Info
 from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.transforms import merge_headers
 
 
@@ -56,16 +55,16 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     """
     if isinstance(field_value, list):
       return (self._get_field_type(field_value[0]) if field_value else
-              vcf_field_conflict_resolver.VcfParserConstants.STRING)
+              vcf_header_io.VcfHeaderFieldTypeConstants.STRING)
 
     if isinstance(field_value, bool):
-      return vcf_field_conflict_resolver.VcfParserConstants.FLAG
+      return vcf_header_io.VcfHeaderFieldTypeConstants.FLAG
     elif isinstance(field_value, int):
-      return vcf_field_conflict_resolver.VcfParserConstants.INTEGER
+      return vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
     elif isinstance(field_value, float):
-      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
+      return vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT
     else:
-      return vcf_field_conflict_resolver.VcfParserConstants.STRING
+      return vcf_header_io.VcfHeaderFieldTypeConstants.STRING
 
   def _infer_undefined_info_fields(self, variant, defined_headers):
     """Returns info fields not defined in the headers.
