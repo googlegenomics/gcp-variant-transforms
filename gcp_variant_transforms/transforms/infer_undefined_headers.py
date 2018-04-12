@@ -73,7 +73,7 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     try:
       _ = cast_type(value)
       return True
-    except Exception:
+    except ValueError:
       return False
 
   def _infer_undefined_info_fields(self, variant, defined_headers):
