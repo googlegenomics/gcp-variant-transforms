@@ -121,13 +121,15 @@ class MergeHeaders(beam.PTransform):
   def __init__(self,
                split_alternate_allele_info_fields=True,
                allow_incompatible_records=False):
-    # type: (bool) -> None
+    # type: (bool, bool) -> None
     """Initializes :class:`MergeHeaders` object.
 
     Args:
       split_alternate_allele_info_fields: Whether INFO fields with
         `Number=A` are store under the alternate_bases record. This is relevant
         as it changes the header compatibility rules as it changes the schema.
+      allow_incompatible_records: If true, header definition with type mismatch
+        (e.g., string vs float) are always resolved.
     """
     super(MergeHeaders, self).__init__()
     # Resolver makes extra efforts to resolve conflict in header definitions
