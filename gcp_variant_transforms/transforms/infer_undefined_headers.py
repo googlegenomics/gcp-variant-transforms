@@ -60,11 +60,11 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     elif isinstance(field_value, int):
       return vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
     elif isinstance(field_value, float):
-      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
+      return vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT
     elif self._can_cast_to(field_value, int):
-      return vcf_field_conflict_resolver.VcfParserConstants.INTEGER
+      return vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
     elif self._can_cast_to(field_value, float):
-      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
+      return vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT
     else:
       return vcf_header_io.VcfHeaderFieldTypeConstants.STRING
 
