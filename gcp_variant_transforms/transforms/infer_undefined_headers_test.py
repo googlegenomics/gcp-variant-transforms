@@ -38,6 +38,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
   def _get_sample_header_fields(self):
     infos = OrderedDict([
         ('IS', Info('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('ISI', Info('ISI', 1, 'Int', 'desc', 'src', 'v')),
+        ('ISF', Info('ISF', 1, 'Float', 'desc', 'src', 'v')),
         ('IF', Info('I1', 1, 'Flag', 'desc', 'src', 'v')),
         ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
     formats = OrderedDict([
@@ -54,6 +56,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
         info={'IS': vcfio.VariantInfo('some data', '1'),
+              'ISI': vcfio.VariantInfo('1', '1'),
+              'ISF': vcfio.VariantInfo('1.0', '1'),
               'IF': vcfio.VariantInfo(True, '0'),
               'IA': vcfio.VariantInfo([0.1, 0.2], '2')},
         calls=[vcfio.VariantCall(
@@ -83,6 +87,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
               defined_headers=None))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
+                        'ISI': Info('ISI', 1, 'Integer', '', '', ''),
+                        'ISF': Info('ISF', 1, 'Float', '', '', ''),
                         'IF': Info('IF', 0, 'Flag', '', '', ''),
                         'IA': Info('IA', None, 'Float', '', '', '')}
       expected_formats = {'FI': Format('FI', 1, 'Integer', ''),
@@ -122,6 +128,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
               defined_headers=None))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
+                        'ISI': Info('ISI', 1, 'Integer', '', '', ''),
+                        'ISF': Info('ISF', 1, 'Float', '', '', ''),
                         'IF': Info('IF', 0, 'Flag', '', '', ''),
                         'IA': Info('IA', None, 'Float', '', '', ''),
                         'IS_2': Info('IS_2', 1, 'String', '', '', '')}

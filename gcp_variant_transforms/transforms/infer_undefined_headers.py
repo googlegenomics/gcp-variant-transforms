@@ -26,8 +26,6 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
 
 
-__all__ = ['InferUndefinedHeaderFields']
-
 
 class _InferUndefinedHeaderFields(beam.DoFn):
   """Extracts undefined header fields from ``Variant`` record."""
@@ -62,9 +60,21 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     elif isinstance(field_value, int):
       return vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
     elif isinstance(field_value, float):
-      return vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT
+      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
+    elif self._can_cast_to(field_value, int):
+      return vcf_field_conflict_resolver.VcfParserConstants.INTEGER
+    elif self._can_cast_to(field_value, float):
+      return vcf_field_conflict_resolver.VcfParserConstants.FLOAT
     else:
       return vcf_header_io.VcfHeaderFieldTypeConstants.STRING
+
+  def _can_cast_to(self, value, cast_type):
+    """Returns true if `value` can be casted to type `type`"""
+    try:
+      _ = cast_type(value)
+      return True
+    except Exception:
+      return False
 
   def _infer_undefined_info_fields(self, variant, defined_headers):
     """Returns info fields not defined in the headers.
