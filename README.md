@@ -94,7 +94,7 @@ status of your operation by running:
 gcloud alpha genomics operations describe <operation-id>
 ```
 
-The returned data will have `done: true` when the operation is done. 
+The returned data will have `done: true` when the operation is done.
 A detailed description of the Operation resource can be found in the
 [API documentation](https://cloud.google.com/genomics/reference/rest/v1/operations)
 
@@ -154,6 +154,13 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 ```
 
+### Running jobs in a particular region/zone
+
+You may need to constrain Cloud Dataflow job processing to a specific
+geographic region in support of yourproject’s security and compliance needs.
+See [Running in particular zone/region doc](docs/running_in_particular_zone_region.md)
+
+
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table Schema](docs/bigquery_schema.md)
@@ -167,4 +174,4 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 * [Development Guide](docs/development_guide.md)
 * [Release process](docs/release.md)
-
+ 
