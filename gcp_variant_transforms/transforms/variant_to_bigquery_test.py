@@ -25,7 +25,6 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
-
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
@@ -273,6 +272,3 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
             self._row_generator, allow_incompatible_records=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
-
-
-#_get_sample_variant_with_incompatible_records

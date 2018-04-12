@@ -44,10 +44,7 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
   def process(self, record):
     return self._bigquery_row_generator.get_rows(
         record, self._allow_incompatible_records, self._omit_empty_sample_calls)
-<<<<<<< HEAD
-=======
 
->>>>>>> Address comments 1
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class VariantToBigQuery(beam.PTransform):

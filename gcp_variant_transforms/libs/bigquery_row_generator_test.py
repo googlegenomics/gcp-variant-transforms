@@ -23,7 +23,6 @@ import mock
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
-
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
