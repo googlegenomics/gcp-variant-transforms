@@ -76,7 +76,7 @@ class ConflictsReporterTest(unittest.TestCase):
     expected = [
         conflicts_reporter._HEADER_LINE,
         ('NS;'
-         'num=1 type=Float in [\'file2\'] num=1 type=Integer in [\'file1\'];'
+         'num=1 type=Float in [\'file2\'], num=1 type=Integer in [\'file1\'];'
          'num=1 type=Float')
     ]
     self._generate_report_and_assert_contents_equal(expected,
@@ -97,7 +97,7 @@ class ConflictsReporterTest(unittest.TestCase):
     expected = [
         conflicts_reporter._HEADER_LINE,
         ('NS;'
-         'num=1 type=Float in [\'file1\', \'file2\'] '
+         'num=1 type=Float in [\'file1\', \'file2\'], '
          'num=1 type=Integer in [\'file3\'];'
          'num=1 type=Float')
     ]
@@ -121,10 +121,10 @@ class ConflictsReporterTest(unittest.TestCase):
     expected = [
         conflicts_reporter._HEADER_LINE,
         ('DP;'
-         'num=2 type=Float in [\'file3\'] num=2 type=Integer in [\'file4\'];'
+         'num=2 type=Float in [\'file3\'], num=2 type=Integer in [\'file4\'];'
          'num=2 type=Float\n'),
         ('NS;'
-         'num=1 type=Float in [\'file1\'] num=1 type=Integer in [\'file2\'];'
+         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
          'num=1 type=Float'),
     ]
     self._generate_report_and_assert_contents_equal(expected,
@@ -139,8 +139,8 @@ class ConflictsReporterTest(unittest.TestCase):
     expected = [
         conflicts_reporter._HEADER_LINE,
         ('NS;'
-         'num=1 type=Float in [\'file1\'] num=1 type=Integer in [\'file2\'];'
-         'Not resolved')
+         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
+         'Not resolved.')
     ]
 
     self._generate_report_and_assert_contents_equal(expected,

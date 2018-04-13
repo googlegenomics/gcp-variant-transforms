@@ -33,7 +33,7 @@ from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeader
 
 _HEADER_LINE = 'ID;Conflicts;Proposed Resolution\n'
 _NO_CONFLICTS_MESSAGE = 'No conflicts found.'
-_NO_SOLUTION_MESSAGE = 'Not resolved'
+_NO_SOLUTION_MESSAGE = 'Not resolved.'
 
 
 def generate_conflicts_report(file_path,
@@ -57,7 +57,7 @@ def generate_conflicts_report(file_path,
 
 def _extract_conflicts(
     definitions  # type: Dict[str, Dict[Definition, List[str]]]
-):
+    ):
   # type: (...) -> Dict[str, Dict[Definition, List[str]]]
   """Extracts the fields that have conflicted definitions.
 
@@ -72,14 +72,14 @@ def _extract_conflicts(
 def _generate_contents(
     conflicts,  # type: Dict[str, Dict[Definition, List[str]]]
     resolved_headers  # type: Dict[str, Dict[str, Union[str, int]]
-):
+    ):
   # type: (...) -> List[str]
   """Generates the report contents.
 
   The conflicted definitions, the file names and the resolutions are included
   in the contents.
   Output example:
-  (NS; num=1 type=Float in ['file1','file2'] num=1 type=Integer in ['file3'];
+  (NS;num=1 type=Float in ['file1','file2'], num=1 type=Integer in ['file3'];
   num=1 type=Float)
   """
   contents = []
@@ -104,7 +104,7 @@ def _extract_definitions_and_file_names(definition_to_files_map):
   for definition, file_names in definition_to_files_map.iteritems():
     definition = _format_definition(definition.num, definition.type)
     conflict_definitions.append(definition + ' in ' + str(file_names))
-  return ' '.join(conflict_definitions)
+  return ', '.join(conflict_definitions)
 
 
 def _extract_resolution(header, filed_id):
@@ -131,6 +131,13 @@ def _format_definition(num_value, type_value):
 
 def _write_to_report(contents, file_path):
   # type: (List[str], str) -> None
+  """Generates the report in ``file_path``.
+
+  Output example:
+  ID;Conflicts;Proposed Resolution
+  (NS;num=1 type=Float in ['file1','file2'], num=1 type=Integer in ['file3'];
+  num=1 type=Float)
+  """
   with FileSystems.create(file_path) as file_to_write:
     if not contents:
       file_to_write.write(_NO_CONFLICTS_MESSAGE)
