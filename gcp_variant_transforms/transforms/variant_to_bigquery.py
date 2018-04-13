@@ -95,6 +95,7 @@ class VariantToBigQuery(beam.PTransform):
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
+
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertToBigQueryTableRow' >> beam.ParDo(
