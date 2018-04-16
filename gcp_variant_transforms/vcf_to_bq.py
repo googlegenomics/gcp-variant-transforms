@@ -50,6 +50,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs.annotation import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs import processed_variant
@@ -220,6 +221,18 @@ def run(argv=None):
   _add_parser_arguments(command_line_options, parser)
   known_args, pipeline_args = parser.parse_known_args(argv)
   _validate_args(command_line_options, known_args)
+
+  # Note VepRunner cretes new input files, so it should be run before any
+  # other access to known_args.input_pattern.
+  if known_args.run_vep:
+    runner = vep_runner.VepRunner(
+        known_args.input_pattern, known_args.vep_output_dir,
+        known_args.vep_image_uri, known_args.vep_cache_path,
+        known_args.vep_num_fork, pipeline_args)
+    runner.run_on_all_files()
+    runner.wait_until_done()
+    known_args.input_pattern = runner.get_output_pattern()
+    logging.info('Using VEP processed files: %s', known_args.input_pattern)
 
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = _get_pipeline_mode(known_args)

@@ -177,6 +177,36 @@ class AnnotationOptions(VariantTransformsOptions):
               'See the "Complext VCF Entries" of this doc for details:'
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
+    parser.add_argument(
+        '--run_vep',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, runs VEP on input VCFs before loading toi BigQuery.'))
+    parser.add_argument(
+        '--vep_image_uri',
+        default="",
+        help=('The URI of the docker image for VEP.'))
+    parser.add_argument(
+        '--vep_cache_path',
+        default="",
+        help=('The path for VEP cache on Google Cloud Storage.'))
+    parser.add_argument(
+        '--vep_output_dir',
+        default="",
+        help=('The path on Google Cloud Storage to store VEP output VCFs.'))
+    parser.add_argument(
+        '--vep_num_machines',
+        type=int, default=1,
+        help=('Number of machines to use simultaneously for running vep.'))
+    parser.add_argument(
+        '--vep_num_fork',
+        type=int, default=2,
+        help=('Number of local processes to use when running vep for a single '
+              'file. The default is chosen to be 2 because even on a single '
+              'core machine using two processes should help interleaving I/O '
+              'vs CPU bound work.'))
+
+    # TODO(bashir2): Add validate() to check --vep_* arguments are sound when
+    # --run_vep is set (for example --vep_output_dir should start with gs://).
 
 
 class FilterOptions(VariantTransformsOptions):
