@@ -14,15 +14,9 @@
 
 """Tests for vcf_to_bq script."""
 
+import collections
 import unittest
 
-import collections
-import mock
-
-from apache_beam.io.filesystems import FileSystems
-
-from gcp_variant_transforms.vcf_to_bq import _get_pipeline_mode
-from gcp_variant_transforms.vcf_to_bq import PipelineModes
 from gcp_variant_transforms.options.variant_transform_options import MergeOptions
 from gcp_variant_transforms.vcf_to_bq import _get_variant_merge_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
@@ -33,51 +27,6 @@ class VcfToBqTest(unittest.TestCase):
 
   def _create_mock_args(self, **args):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
-
-  def test_get_mode_raises_error_for_no_match(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
-
-    with mock.patch.object(FileSystems, 'match', return_value=None), \
-         self.assertRaises(ValueError):
-      _get_pipeline_mode(args)
-
-  def test_get_mode_optimize_set(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=True)
-
-    self.assertEqual(_get_pipeline_mode(args), PipelineModes.LARGE)
-
-  def test_get_mode_small(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-    match = match_result([None for _ in range(100)])
-
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(_get_pipeline_mode(args), PipelineModes.SMALL)
-
-  def test_get_mode_medium(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-
-    match = match_result(range(101))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(_get_pipeline_mode(args), PipelineModes.MEDIUM)
-
-    match = match_result(range(50000))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(_get_pipeline_mode(args), PipelineModes.MEDIUM)
-
-  def test_get_mode_large(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-
-    match = match_result(range(50001))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(_get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_no_merge_strategy(self):
     args = self._create_mock_args(
