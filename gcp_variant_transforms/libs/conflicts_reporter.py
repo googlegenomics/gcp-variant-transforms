@@ -16,8 +16,8 @@
 
 The report is aimed to help the user to easily import the malformed/incompatible
 VCF files. It contains two parts. The first part reports the header fields that
-have conflicted definitions across multiple VCF files, by providing the
-conflicted definitions, the corresponding file paths, and the suggested
+have conflicting definitions across multiple VCF files, by providing the
+conflicting definitions, the corresponding file paths, and the suggested
 resolutions. The second part contains the undefined header fields and the
 inferred definitions.
 TODO(yifangchen): Eventually, it also contains the malformed records.
@@ -51,16 +51,16 @@ def generate_conflicts_report(file_path,
     header_definitions: The container which contains all header definitions and
       the corresponding file names.
     resolved_headers: The ``VcfHeader`` that provides the resolutions for the
-      fields that have conflicted definitions.
+      fields that have conflicting definitions.
     inferred_headers: The ``VcfHeader`` that contains the inferred header
       definitions of the undefined header fields.
   """
   resolved_headers = resolved_headers or VcfHeader()
   inferred_headers = inferred_headers or VcfHeader()
   content_lines = []
-  content_lines.extend(_generate_conflicted_headers_lines(
+  content_lines.extend(_generate_conflicting_headers_lines(
       _extract_conflicts(header_definitions.formats), resolved_headers.formats))
-  content_lines.extend(_generate_conflicted_headers_lines(
+  content_lines.extend(_generate_conflicting_headers_lines(
       _extract_conflicts(header_definitions.infos), resolved_headers.infos))
   content_lines.extend(_generate_inferred_headers_lines(inferred_headers.infos))
   content_lines.extend(_generate_inferred_headers_lines(
@@ -72,24 +72,24 @@ def _extract_conflicts(
     definitions  # type: Dict[str, Dict[Definition, List[str]]]
     ):
   # type: (...) -> Dict[str, Dict[Definition, List[str]]]
-  """Extracts the fields that have conflicted definitions.
+  """Extracts the fields that have conflicting definitions.
 
   Returns:
-    A dictionary that maps field id with conflicted definitions to a dictionary
+    A dictionary that maps field id with conflicting definitions to a dictionary
     which maps ``Definition`` to a list of file names.
   """
-  # len(v) > 1 means there are conflicted definitions for this field.
+  # len(v) > 1 means there are conflicting definitions for this field.
   return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
 
 
-def _generate_conflicted_headers_lines(
+def _generate_conflicting_headers_lines(
     conflicts,  # type: Dict[str, Dict[Definition, List[str]]]
     resolved_headers  # type: Dict[str, Dict[str, Union[str, int]]
     ):
   # type: (...) -> List[str]
-  """Returns the conflicted headers lines for the report.
+  """Returns the conflicting headers lines for the report.
 
-  The conflicted definitions, the file names and the resolutions are included
+  The conflicting definitions, the file names and the resolutions are included
   in the contents.
   Output example:
   (NS;num=1 type=Float in ['file1','file2'], num=1 type=Integer in ['file3'];
@@ -97,11 +97,9 @@ def _generate_conflicted_headers_lines(
   """
   content_lines = []
   for field_id, definitions_to_files_map in conflicts.iteritems():
-    row = [
-        field_id,
-        _extract_definitions_and_file_names(definitions_to_files_map),
-        _extract_resolution(resolved_headers, field_id)
-    ]
+    row = [field_id,
+           _extract_definitions_and_file_names(definitions_to_files_map),
+           _extract_resolution(resolved_headers, field_id)]
     content_lines.append(';'.join(row))
   return content_lines
 
@@ -116,11 +114,9 @@ def _generate_inferred_headers_lines(inferred_headers):
   """
   content_lines = []
   for field_id in inferred_headers.keys():
-    row = [
-        field_id,
-        _UNDEFINED_HEADER_MESSAGE,
-        _extract_resolution(inferred_headers, field_id)
-    ]
+    row = [field_id,
+           _UNDEFINED_HEADER_MESSAGE,
+           _extract_resolution(inferred_headers, field_id)]
     content_lines.append(';'.join(row))
   return content_lines
 
