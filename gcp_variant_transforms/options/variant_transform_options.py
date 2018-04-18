@@ -180,7 +180,7 @@ class AnnotationOptions(VariantTransformsOptions):
     parser.add_argument(
         '--run_vep',
         type='bool', default=False, nargs='?', const=True,
-        help=('If true, runs VEP on input VCFs before loading toi BigQuery.'))
+        help=('If true, runs VEP on input VCFs before loading to BigQuery.'))
     parser.add_argument(
         '--vep_image_uri',
         default="",
@@ -194,9 +194,9 @@ class AnnotationOptions(VariantTransformsOptions):
         default="",
         help=('The path on Google Cloud Storage to store VEP output VCFs.'))
     parser.add_argument(
-        '--vep_num_machines',
-        type=int, default=1,
-        help=('Number of machines to use simultaneously for running vep.'))
+        '--vep_info_field',
+        default="CSQ_VT",
+        help=('The name of the new INFO field for annotaitons.'))
     parser.add_argument(
         '--vep_num_fork',
         type=int, default=2,
