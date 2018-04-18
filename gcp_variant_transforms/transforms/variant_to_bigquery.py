@@ -25,7 +25,13 @@ from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  #pylint: disable=unused-import
+from gcp_variant_transforms.transforms import limit_write
 
+
+# This has to be less than 10000.
+# TODO(samanvp): remove this hack when BQ custom sink is added to Python SDK,
+# see: https://issues.apache.org/jira/browse/BEAM-2801
+_WRITE_SHARDS_LIMIT = 4500
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class _ConvertToBigQueryTableRow(beam.DoFn):
@@ -58,7 +64,8 @@ class VariantToBigQuery(beam.PTransform):
       proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
       append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
-      omit_empty_sample_calls=False  # type: bool
+      omit_empty_sample_calls=False,  # type: bool
+      limited_write=False  # type: bool
       ):
     """Initializes the transform.
 
@@ -78,6 +85,8 @@ class VariantToBigQuery(beam.PTransform):
 +        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
+      limited_write: If true, we will limit number of sources which are used
+        for writing to the output BigQuery table.
     """
     self._output_table = output_table
     self._header_fields = header_fields
@@ -95,14 +104,17 @@ class VariantToBigQuery(beam.PTransform):
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
+    self._limited_write = limited_write
 
   def expand(self, pcoll):
-    return (pcoll
-            | 'ConvertToBigQueryTableRow' >> beam.ParDo(
-                _ConvertToBigQueryTableRow(
-                    self._bigquery_row_generator,
-                    self._allow_incompatible_records,
-                    self._omit_empty_sample_calls))
+    bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
+        _ConvertToBigQueryTableRow(
+            self._bigquery_row_generator,
+            self._allow_incompatible_records,
+            self._omit_empty_sample_calls))
+    if self._limited_write:
+      bq_rows |= 'LimitWrite' >> limit_write.LimitWrite(_WRITE_SHARDS_LIMIT)
+    return (bq_rows
             | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,
                 schema=self._schema,
