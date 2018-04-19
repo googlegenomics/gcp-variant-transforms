@@ -33,29 +33,26 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 from __future__ import absolute_import
 
+import argparse  # pylint: disable=unused-import
 import datetime
 import logging
 import sys
 import tempfile
-from argparse import Namespace  # pylint: disable=unused-import
-from typing import List  # pylint: disable=unused-import
+from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
-from apache_beam import Pipeline  # pylint: disable=unused-import
-from apache_beam.io.filesystems import FileSystems
-from apache_beam.options.pipeline_options import GoogleCloudOptions
-from apache_beam.options.pipeline_options import PipelineOptions
-from apache_beam.options.pipeline_options import StandardOptions
-from apache_beam.pvalue import PCollection  # pylint: disable=unused-import
+from apache_beam import pvalue  # pylint: disable=unused-import
+from apache_beam.io import filesystems
+from apache_beam.options import pipeline_options
 
-from gcp_variant_transforms import general_process
+from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import metrics_util
+from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
-from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
-from gcp_variant_transforms.options.variant_transform_options import MergeOptions
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
@@ -73,18 +70,20 @@ _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 
 
-def _get_variant_merge_strategy(known_args):
-  # type: (Namespace) -> MergeOptions.VARIANT_MERGE_STRATEGIES
+def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
+                               ):
+  # type: (...) -> Optional(variant_merge_strategy.VariantMergeStrategy)
+  merge_options = variant_transform_options.MergeOptions
   if (not known_args.variant_merge_strategy or
-      known_args.variant_merge_strategy == MergeOptions.NONE):
+      known_args.variant_merge_strategy == merge_options.NONE):
     return None
-  elif known_args.variant_merge_strategy == MergeOptions.MOVE_TO_CALLS:
+  elif known_args.variant_merge_strategy == merge_options.MOVE_TO_CALLS:
     return move_to_calls_strategy.MoveToCallsStrategy(
         known_args.info_keys_to_move_to_calls_regex,
         known_args.copy_quality_to_calls,
         known_args.copy_filter_to_calls)
   elif (known_args.variant_merge_strategy ==
-        MergeOptions.MERGE_WITH_NON_VARIANTS):
+        merge_options.MERGE_WITH_NON_VARIANTS):
     return merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
         known_args.info_keys_to_move_to_calls_regex,
         known_args.copy_quality_to_calls,
@@ -93,10 +92,13 @@ def _get_variant_merge_strategy(known_args):
     raise ValueError('Merge strategy is not supported.')
 
 
-def _add_inferred_headers(pipeline, known_args, merged_header):
-  # type: (Pipeline, Namespace, PCollection) -> PCollection
-  inferred_headers = general_process.get_inferred_headers(pipeline, known_args,
-                                                          merged_header)
+def _add_inferred_headers(pipeline,  # type: beam.Pipeline
+                          known_args,  # type: argparse.Namespace
+                          merged_header  # type: pvalue.PCollection
+                         ):
+  # type: (...) -> pvalue.PCollection
+  inferred_headers = vcf_to_bq_common.get_inferred_headers(pipeline, known_args,
+                                                           merged_header)
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()
@@ -106,19 +108,19 @@ def _add_inferred_headers(pipeline, known_args, merged_header):
 
 
 def _merge_headers(known_args, pipeline_args, pipeline_mode):
-  # type: (Namespace, List[str], int) -> None
+  # type: (argparse.Namespace, List[str], int) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
   if known_args.representative_header_file:
     return
 
-  options = PipelineOptions(pipeline_args)
+  options = pipeline_options.PipelineOptions(pipeline_args)
 
   # Always run pipeline locally if data is small.
-  if (pipeline_mode == general_process.PipelineModes.SMALL and
+  if (pipeline_mode == vcf_to_bq_common.PipelineModes.SMALL and
       not known_args.infer_undefined_headers):
-    options.view_as(StandardOptions).runner = 'DirectRunner'
+    options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
-  google_cloud_options = options.view_as(GoogleCloudOptions)
+  google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   if google_cloud_options.job_name:
     google_cloud_options.job_name += '-' + _MERGE_HEADERS_JOB_NAME
   else:
@@ -131,26 +133,26 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
       google_cloud_options.job_name,
       _MERGE_HEADERS_FILE_NAME])
-  known_args.representative_header_file = FileSystems.join(
+  known_args.representative_header_file = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
-    headers = general_process.read_headers(p, pipeline_mode, known_args)
-    merged_header = general_process.get_merged_headers(headers, known_args)
+    headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
+    merged_header = vcf_to_bq_common.get_merged_headers(headers, known_args)
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
-    general_process.write_headers(merged_header,
-                                  known_args.representative_header_file)
+    vcf_to_bq_common.write_headers(merged_header,
+                                   known_args.representative_header_file)
 
 
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = general_process.parse_args(argv,
-                                                         _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
+                                                          _COMMAND_LINE_OPTIONS)
   variant_merger = _get_variant_merge_strategy(known_args)
-  pipeline_mode = general_process.get_pipeline_mode(known_args)
+  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args)
 
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
@@ -170,9 +172,9 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
-  pipeline_options = PipelineOptions(pipeline_args)
-  pipeline = beam.Pipeline(options=pipeline_options)
-  variants = general_process.read_variants(pipeline, known_args)
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  pipeline = beam.Pipeline(options=beam_pipeline_options)
+  variants = vcf_to_bq_common.read_variants(pipeline, known_args)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if variant_merger:

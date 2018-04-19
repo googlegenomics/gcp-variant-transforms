@@ -17,5 +17,20 @@
     </inspection_tool>
     <inspection_tool class="PyProtectedMemberInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
     <inspection_tool class="PyRedundantParenthesesInspection" enabled="false" level="WEAK WARNING" enabled_by_default="false" />
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="false" level="WARNING" enabled_by_default="false">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="argparse.Namespace.allow_malformed_records"/>
+          <option value="argparse.Namespace.copy_filter_to_calls"/>
+          <option value="argparse.Namespace.copy_quality_to_calls"/>
+          <option value="argparse.Namespace.info_keys_to_move_to_calls_regex"/>
+          <option value="argparse.Namespace.input_pattern" />
+          <option value="argparse.Namespace.optimize_for_large_inputs"/>
+          <option value="argparse.Namespace.reference_names"/>
+          <option value="argparse.Namespace.split_alternate_allele_info_fields"/>
+          <option value="argparse.Namespace.variant_merge_strategy"/>
+        </list>
+      </option>
+    </inspection_tool>
   </profile>
 </component>

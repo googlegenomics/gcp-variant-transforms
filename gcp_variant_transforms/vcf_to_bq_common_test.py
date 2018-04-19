@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for general_process script."""
+"""Tests for vcf_to_bq_common script."""
 
 import collections
 import unittest
@@ -20,8 +20,8 @@ import unittest
 from apache_beam.io.filesystems import FileSystems
 import mock
 
-from gcp_variant_transforms.general_process import get_pipeline_mode
-from gcp_variant_transforms.general_process import PipelineModes
+from gcp_variant_transforms.vcf_to_bq_common import get_pipeline_mode
+from gcp_variant_transforms.vcf_to_bq_common import PipelineModes
 
 
 class DataProcessorTest(unittest.TestCase):
