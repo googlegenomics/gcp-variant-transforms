@@ -191,7 +191,8 @@ def run(argv=None):
            processed_variant_factory,
            append=known_args.append,
            allow_incompatible_records=known_args.allow_incompatible_records,
-           omit_empty_sample_calls=known_args.omit_empty_sample_calls))
+           omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+           limited_write=known_args.optimize_for_large_inputs))
   result = pipeline.run()
   result.wait_until_finish()
 
