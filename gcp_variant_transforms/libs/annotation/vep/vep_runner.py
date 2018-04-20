@@ -36,7 +36,7 @@ _MINIMUM_DISK_SIZE_GB = 200
 
 # The name of the file placed at the root of output_dir that includes
 # information on how the pipelines were run, input files, etc.
-_GLOBAL_LOG_FILE = 'VEP_run_info.txt'
+_GLOBAL_LOG_FILE = 'VEP_run_info.log'
 
 # TODO(bashir2): Check if instead of raw strings, we can use a protocol
 # buffer describing the parameters of the Pipelines API or some other way
@@ -177,9 +177,7 @@ class VepRunner(object):
                             'devstorage.read_write']
                     }
                 },
-                'regions': [
-                    self._region
-                ]
+                'regions': [self._region]
             }
         }
     }
@@ -190,12 +188,7 @@ class VepRunner(object):
     action = {
         'commands': command_args,
         'imageUri': self._vep_image_uri,
-        'mounts': [
-            {
-                'disk': 'vep',
-                'path': '/mnt/vep'
-            },
-        ]
+        'mounts': [{'disk': 'vep', 'path': '/mnt/vep'}]
     }
     action.update(kwargs)
     # TODO(bashir2): Add a proper `label` based on command arguments.
@@ -310,7 +303,7 @@ class VepRunner(object):
 
   def _get_output_log_path(self, output_dir, vm_index):
     # type: (str, int) -> str
-    return '{}/logs/output_VM_{}'.format(output_dir, vm_index)
+    return '{}/logs/output_VM_{}.log'.format(output_dir, vm_index)
 
   def _create_actions(self, input_file, output_file):
     # type: (str, str) -> List
