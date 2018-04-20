@@ -22,7 +22,7 @@ from oauth2client.client import GoogleCredentials
 
 
 __all__ = ['VariantTransformsOptions', 'VcfReadOptions', 'BigQueryWriteOptions',
-           'FilterOptions', 'MergeOptions']
+           'FilterOptions', 'MergeOptions', 'PreprocessOptions']
 
 
 class VariantTransformsOptions(object):
@@ -296,3 +296,39 @@ class MergeOptions(VariantTransformsOptions):
             '--variant_merge_strategy {}|{}'.format(
                 MergeOptions.MOVE_TO_CALLS,
                 MergeOptions.MERGE_WITH_NON_VARIANTS))
+
+
+class PreprocessOptions(VariantTransformsOptions):
+  """Options for preprocess."""
+  _REPORT_NAME = 'conflicts_report.csv'
+  _RESOLVED_HEADERS_FILE_NAME = 'resolved_headers.vcf'
+
+  def add_arguments(self, parser):
+    parser.add_argument(
+        '--report_all',
+        type='bool', default=True, nargs='?', const=False,
+        help=('By default, only the incompatible VCF headers will be reported. '
+              'If true, it also reports the undefined headers and malformed '
+              'recorded.'))
+    parser.add_argument(
+        '--split_alternate_allele_info_fields',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If true, all INFO fields with Number=A (i.e. one value for each '
+              'alternate allele) will be stored under the alternate_bases '
+              'record. If false, they will be stored with the rest of the INFO '
+              'fields. Setting this option to true makes querying the data '
+              'easier, because it avoids having to map each field with the '
+              'corresponding alternate record while querying.'))
+    parser.add_argument(
+        '--directory',
+        default='',
+        help=('The directory where the conflicts report and the resolved '
+              'headers are saved if running locally.'))
+    parser.add_argument(
+        '--report_name',
+        default=self._REPORT_NAME,
+        help=('The file name for the conflicts report.'))
+    parser.add_argument(
+        '--resolved_headers_name',
+        default=self._RESOLVED_HEADERS_FILE_NAME,
+        help=('The file name for the resolved headers.'))

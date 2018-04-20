@@ -20,6 +20,7 @@ PTransforms and writing the output.
 
 from typing import List  # pylint: disable=unused-import
 import argparse
+import datetime
 import enum
 
 import apache_beam as beam
@@ -84,6 +85,17 @@ def get_pipeline_mode(known_args):
   return PipelineModes.SMALL
 
 
+def form_absolute_file_name(directory, job_name, file_name):
+  # type: (str, str, str) -> str
+  """Returns the absolute file name."""
+  # Adds a time prefix to ensure files are unique in case multiple pipelines are
+  # run at the same time.
+  file_name = '-'.join([datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
+                        job_name,
+                        file_name])
+  return filesystems.FileSystems.join(directory, file_name)
+
+
 def read_variants(pipeline, known_args):
   # type: (beam.Pipeline, argparse.Namespace) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -100,18 +112,24 @@ def read_variants(pipeline, known_args):
   return variants
 
 
-def get_inferred_headers(pipeline,  # type: beam.Pipeline
+def add_inferred_headers(pipeline,  # type: beam.Pipeline
                          known_args,  # type: argparse.Namespace
-                         merged_header  # type: pvalue.PCollection
+                         merged_headers  # type: pvalue.PCollection
                         ):
-  # type: (...) -> pvalue.PCollection
-  """Infers the missing headers."""
-  return (read_variants(pipeline, known_args)
-          | 'FilterVariants' >> filter_variants.FilterVariants(
-              reference_names=known_args.reference_names)
-          | ' InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
-              pvalue.AsSingleton(merged_header)))
+  # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
+  """Returns the inferred headers and the merged headers."""
+  inferred_headers = (read_variants(pipeline, known_args)
+                      | 'FilterVariants' >> filter_variants.FilterVariants(
+                          reference_names=known_args.reference_names)
+                      | ' InferUndefinedHeaderFields' >>
+                      infer_undefined_headers.InferUndefinedHeaderFields(
+                          pvalue.AsSingleton(merged_headers)))
+  merged_headers = (
+      (inferred_headers, merged_headers)
+      | beam.Flatten()
+      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields))
+  return inferred_headers, merged_headers
 
 
 def read_headers(pipeline, pipeline_mode, known_args):
@@ -126,12 +144,12 @@ def read_headers(pipeline, pipeline_mode, known_args):
   return headers
 
 
-def get_merged_headers(headers, known_args):
-  # type: (pvalue.PCollection, argparse.Namespace) -> pvalue.PCollection
+def get_merged_headers(headers, known_args, allow_incompatible_records):
+  # type: (pvalue.PCollection, argparse.Namespace, bool) -> pvalue.PCollection
   """Applies the ``MergeHeaders`` PTransform on PCollection of ``VcfHeader``."""
   return (headers | 'MergeHeaders' >> merge_headers.MergeHeaders(
       known_args.split_alternate_allele_info_fields,
-      known_args.allow_incompatible_records))
+      allow_incompatible_records))
 
 
 def write_headers(merged_header, file_path):
