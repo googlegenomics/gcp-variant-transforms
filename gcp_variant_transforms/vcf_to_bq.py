@@ -224,7 +224,7 @@ def run(argv=None):
 
   # Note VepRunner cretes new input files, so it should be run before any
   # other access to known_args.input_pattern.
-  if known_args.run_vep:
+  if known_args.run_annotation_pipeline:
     runner = vep_runner.create_runner_and_update_args(known_args, pipeline_args)
     runner.run_on_all_files()
     runner.wait_until_done()

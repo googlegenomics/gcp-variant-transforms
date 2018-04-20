@@ -178,9 +178,10 @@ class AnnotationOptions(VariantTransformsOptions):
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
     parser.add_argument(
-        '--run_vep',
+        '--run_annotation_pipeline',
         type='bool', default=False, nargs='?', const=True,
-        help=('If true, runs VEP on input VCFs before loading to BigQuery.'))
+        help=('If true, runs annotation tools (currently only VEP) on input '
+              'VCFs before loading to BigQuery.'))
     parser.add_argument(
         '--vep_image_uri',
         default="",
@@ -190,9 +191,11 @@ class AnnotationOptions(VariantTransformsOptions):
         default="",
         help=('The path for VEP cache on Google Cloud Storage.'))
     parser.add_argument(
-        '--vep_output_dir',
+        '--annotation_output_dir',
         default="",
-        help=('The path on Google Cloud Storage to store VEP output VCFs.'))
+        help=('The path on Google Cloud Storage to store annotated outputs. '
+              'The output files are VCF and follow the same directory '
+              'structure as input files with a suffix added to them.'))
     parser.add_argument(
         '--vep_info_field',
         default="CSQ_VT",
@@ -206,7 +209,8 @@ class AnnotationOptions(VariantTransformsOptions):
               'vs CPU bound work.'))
 
     # TODO(bashir2): Add validate() to check --vep_* arguments are sound when
-    # --run_vep is set (for example --vep_output_dir should start with gs://).
+    # --run_annotation_pipeline is set (for example --annotation_output_dir
+    # should start with gs://).
 
 
 class FilterOptions(VariantTransformsOptions):

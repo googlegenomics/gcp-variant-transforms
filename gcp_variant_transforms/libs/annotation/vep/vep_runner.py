@@ -14,17 +14,18 @@
 
 from __future__ import absolute_import
 
-from typing import Dict, List, Any  # pylint: disable=unused-import
-
 import argparse  # pylint: disable=unused-import
 import logging
 import time
 
-from apache_beam.io import filesystems
+from typing import Dict, List, Any  # pylint: disable=unused-import
+
 from apache_beam.io import filesystem  # pylint: disable=unused-import
+from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 from googleapiclient import discovery
 from oauth2client import client
+from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 
 
 # Minimum size of virtual machine disks to account for cache files.
@@ -48,14 +49,6 @@ _API_ACTIONS = 'actions'
 # The expected path of the run_vep.sh script in the docker container.
 _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 
-# The siffux that is added to output files (the output is always a VCF).
-_VEP_OUTPUT_SUFFIX = '_vep_output.vcf'
-
-# This is used for matching all files under the output directory structure.
-# It is okay for it to be Google Cloud Storage (GCS) specific because the
-# assumption of using GCS as the remote file systems is baked into VepRunner.
-_GCS_RECURSIVE_WILDCARD = '**'
-
 # The local name of the output file and directory for VEP runs.
 _LOCAL_OUTPUT_DIR = '/mnt/vep/output_files'
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + '/output.vcf'
@@ -66,7 +59,7 @@ _POLLING_INTERVAL_SECONDS = 30
 
 def create_runner_and_update_args(known_args, pipeline_args):
   # type: (argparse.Namespace, List[str]) -> VepRunner
-  """Creates an instance of VepRunner using the provided args and upate them.
+  """Creates an instance of VepRunner using the provided args and updates them.
 
   In particular, the two arguments that are updated are `input_pattern` and
   `annotation_fields`.
@@ -80,9 +73,10 @@ def create_runner_and_update_args(known_args, pipeline_args):
   pipeline_service = discovery.build(
       'genomics', 'v2alpha1', credentials=credentials)
   runner = VepRunner(
-      pipeline_service, known_args.input_pattern, known_args.vep_output_dir,
-      known_args.vep_info_field, known_args.vep_image_uri,
-      known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args)
+      pipeline_service, known_args.input_pattern,
+      known_args.annotation_output_dir, known_args.vep_info_field,
+      known_args.vep_image_uri, known_args.vep_cache_path,
+      known_args.vep_num_fork, pipeline_args)
   known_args.input_pattern = runner.get_output_pattern()
   if known_args.annotation_fields:
     known_args.annotation_fields.append(known_args.vep_info_field)
@@ -130,13 +124,11 @@ class VepRunner(object):
     self._output_dir = output_dir
     self._vep_info_field = vep_info_field
     self._process_pipeline_args(pipeline_args)
-    # _current_operations holds the list of operation names currently running.
     self._running_operation_ids = []  # type: List[str]
 
   def get_output_pattern(self):
     # type: () -> str
-    return (self._format_dir_path(self._output_dir) +
-            _GCS_RECURSIVE_WILDCARD + _VEP_OUTPUT_SUFFIX)
+    return vep_runner_util.get_output_pattern(self._output_dir)
 
   def _get_api_request_fixed_parts(self):
     # type: () -> Dict
@@ -155,7 +147,7 @@ class VepRunner(object):
             ],
             'environment': {
                 'VEP_CACHE': '/mnt/vep/vep_cache/{}'.format(
-                    _get_base_name(self._vep_cache_path)),
+                    vep_runner_util.get_base_name(self._vep_cache_path)),
                 'NUM_FORKS': str(self._vep_num_fork),
                 'VCF_INFO_FILED': self._vep_info_field,
                 # TODO(bashir2): Decide how to do proper reference validation,
@@ -243,8 +235,9 @@ class VepRunner(object):
 
   def _is_done(self, operation):
     # type: (str) -> bool
-    # TODO(bashir2): Silence the log messages of googleapiclient.discovery
-    # module for the next call of the API since they flood the log file.
+    # TODO(bashir2): Catch exceptions in the following call and also silence the
+    # log messages of googleapiclient.discovery module for the next call of the
+    # API since they flood the log file.
     # pylint: disable=no-member
     request = self._pipeline_service.projects().operations().get(name=operation)
     is_done = request.execute()['done']
@@ -265,16 +258,16 @@ class VepRunner(object):
       raise AssertionError('There are already {} operations running.'.format(
           len(self._running_operation_ids)))
     logging.info('Finding all files that match %s', self._input_pattern)
-    match_results = filesystems.FileSystems.match([
-        self._input_pattern])  # type: List[filesystem.MatchResult]
+    match_results = filesystems.FileSystems.match(
+        [self._input_pattern])  # type: List[filesystem.MatchResult]
     if not match_results:
       raise ValueError('No files matched input_pattern: {}'.format(
           self._input_pattern))
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
     self._check_and_write_to_output_dir(self._output_dir)
-    pipelines_data = _PipelinesExecutionInfo(
+    single_vm_actions_list = vep_runner_util.disribute_files_on_workers(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
-    for vm_index, actions in enumerate(pipelines_data.single_vm_actions_list):
+    for vm_index, actions in enumerate(single_vm_actions_list):
       operation_name = self._call_pipelines_api(
           actions, self._get_output_log_path(self._output_dir, vm_index))
       logging.info('Started operation %s on VM %d processing %d input files',
@@ -282,7 +275,7 @@ class VepRunner(object):
       self._running_operation_ids.append(operation_name)
 
   def _call_pipelines_api(self, single_vm_actions, output_log_path):
-    # type: (_SingleWorkerActions, str) -> str
+    # type: (vep_runner_util.SingleWorkerActions, str) -> str
     api_request = self._get_api_request_fixed_parts()
     size_gb = single_vm_actions.disk_size_bytes / (1 << 30)
     api_request[_API_PIPELINE]['resources'][
@@ -303,7 +296,7 @@ class VepRunner(object):
 
   def _check_and_write_to_output_dir(self, output_dir):
     # type: (str) -> None
-    real_dir = self._format_dir_path(output_dir)
+    real_dir = vep_runner_util.format_dir_path(output_dir)
     # NOTE(bashir2): We cannot use exists() because for example on GCS, the
     # directory names are only symbolic and are not physical files.
     match_results = filesystems.FileSystems.match(['{}*'.format(real_dir)])
@@ -315,18 +308,14 @@ class VepRunner(object):
     # information about how the VEP pipelines are executed.
     log_file.close()
 
-  def _format_dir_path(self, dir_path):
-    # type: (str) -> str
-    """Returns `dir_name` possibly with an added '/' if not already included."""
-    return filesystems.FileSystems.join(dir_path, '')
-
   def _get_output_log_path(self, output_dir, vm_index):
     # type: (str, int) -> str
     return '{}/logs/output_VM_{}'.format(output_dir, vm_index)
 
   def _create_actions(self, input_file, output_file):
     # type: (str, str) -> List
-    local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
+    local_input_file = '/mnt/vep/{}'.format(
+        vep_runner_util.get_base_name(input_file))
     return [
         self._make_action('gsutil', '-q', 'cp', input_file, local_input_file),
         self._make_action('rm', '-r', '-f', _LOCAL_OUTPUT_DIR),
@@ -336,129 +325,3 @@ class VepRunner(object):
         # structure should be created as well otherwise gsutil fails.
         self._make_action('gsutil', '-q', 'cp', _LOCAL_OUTPUT_FILE,
                           output_file)]
-
-
-class _SingleWorkerActions(object):
-  """Holds information about actions on a single virtual machine.
-
-  This is a pure data object and atributes can be accessed directly.
-  """
-
-  def __init__(self):
-    self.disk_size_bytes = 0
-    # `io_map` is a map from an input file to its corresponding output file.
-    self.io_map = {}  # type: Dict[str, str]
-
-  def __repr__(self):
-    return 'disk_size_bytes= {} , io_map= {}'.format(
-        self.disk_size_bytes, str(self.io_map))
-
-
-# TODO decide whether we want to unit-test this class in isolation and if so
-# move this and _SingleWorkerActions to a separate module.
-class _PipelinesExecutionInfo(object):
-  """This class determines actions to be done for running VEP on a set of files.
-
-  It also calculates some other configuration data for virtual machines running
-  these actions, like disk space.
-  """
-
-  # This is to account for the output file size plus some increate due to
-  # annotation fields.
-  _SIZE_FACTOR = 3
-
-  # The part of a path separating the file system scheme from the actual path.
-  _FILE_SYSTEM_SCHEME_SEPARATOR = '://'
-
-  # The expected suffix for .gz and .bgz files.
-  _GZ_SUFFIX = 'gz'
-
-  # This is used as a heuristic to account for the size of the unzipped file
-  # based on some anecdotal samples.
-  # TODO(bashir2): Revisit the file size calculation logic.
-  _GZ_FACTOR = 10
-
-  def __init__(self, file_metadata_list, output_dir, num_workers):
-    # type: (List[filesystem.FileMetadata], str, int) -> None
-    """
-    Args:
-      file_metadata_list: Information about input files, e.g., path, size, etc.
-      output_dir: The location of output files.
-      num_workers: Maximum number of workers to use.
-    """
-    self._single_vm_actions_list = []  # type: List[_SingleWorkerActions]
-    self._is_zip_input = False
-    self._output_dir = output_dir
-    self._num_workers = num_workers
-    self._input_size = len(file_metadata_list)
-
-    current_worker = _SingleWorkerActions()
-    for metadata in file_metadata_list:
-      if self._has_enough_jobs(current_worker):
-        self._single_vm_actions_list.append(current_worker)
-        current_worker = _SingleWorkerActions()
-      current_worker.io_map[metadata.path] = self._map_to_output_dir(
-          metadata.path)
-      if metadata.path.endswith(self._GZ_SUFFIX):
-        current_worker.disk_size_bytes += (
-            metadata.size_in_bytes * self._GZ_FACTOR)
-      else:
-        current_worker.disk_size_bytes += (
-            metadata.size_in_bytes * self._SIZE_FACTOR)
-      logging.info('Found input file %s with size %d',
-                   metadata.path, metadata.size_in_bytes)
-    if current_worker.io_map:
-      self._single_vm_actions_list.append(current_worker)
-    if len(self._single_vm_actions_list) > self._num_workers:
-      raise AssertionError(
-          'Number of VM action sets {} is greater than workers {}'.format(
-              len(self._single_vm_actions_list), self._num_workers))
-
-  def _has_enough_jobs(self, current_worker):
-    # type: (_SingleWorkerActions) -> bool
-    num_jobs = self._input_size / self._num_workers
-    if len(self._single_vm_actions_list) < self._input_size % self._num_workers:
-      # If number of input files is not dividable by number of workers, we give
-      # some of the workers one extra job.
-      num_jobs += 1
-    if len(current_worker.io_map) >= num_jobs:
-      return True
-    return False
-
-  def _map_to_output_dir(self, input_path):
-    # type: (str) -> (str)
-    """Maps an input path to its corresponding output path.
-
-    For example, for `input_path` being 'gs://my_bucket/input.vcf', it returns
-    'gs://output_bucket/out_dir/my_bucket/input.vcf' where `self._output_dir`
-    is equal to 'gs://output_bucket/out_dir'.
-    """
-    output_file = input_path
-    scheme = filesystems.FileSystems.get_scheme(input_path)
-    if scheme:
-      if not input_path.startswith(scheme + self._FILE_SYSTEM_SCHEME_SEPARATOR):
-        raise ValueError('Expected {}{} at the beginning of input {}'.format(
-            scheme, self._FILE_SYSTEM_SCHEME_SEPARATOR, input_path))
-      output_file = input_path[len(scheme) +
-                               len(self._FILE_SYSTEM_SCHEME_SEPARATOR):]
-    output_file += _VEP_OUTPUT_SUFFIX
-    return filesystems.FileSystems.join(self._output_dir, output_file)
-
-  @property
-  def single_vm_actions_list(self):
-    # type: () -> List[_SingleWorkerActions]
-    return self._single_vm_actions_list
-
-
-def _get_base_name(file_path):
-  # type: (str) -> str
-  """Used when we want to copy files to local machines.
-
-  Keeping the file names, gives more context to actions. For example if
-  `file_path` is 'gs://my_bucket/my_input.vcf', tis returns 'my_input.vcf'.
-  """
-  _, base_path = filesystems.FileSystems.split(file_path)
-  if not base_path:
-    raise ValueError('Cannot extract base path from the input path {}'.format(
-        file_path))
-  return base_path
