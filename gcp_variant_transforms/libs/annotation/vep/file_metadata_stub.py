@@ -12,21 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-
-
-# TODO(bashir2): Create tests with non local inputs as well.
-INPUT_PATTERN = 'some/input/pattern*'
-INPUT_FILES_WITH_SIZE = [
-    ('some/input/pattern/a', 100),
-    ('some/input/pattern/b', 100),
-    ('some/input/pattern/c', 100),
-    ('some/input/pattern/dir1/a', 100),
-    ('some/input/pattern/dir1/dir2/b', 100),
-    ('some/input/pattern/dir2/b', 100),
-    ('some/input/pattern/dir2/c', 100),
-]
-
 
 class FileMetadataStub(object):
   """This is an object to imitate apache_beam.io.filesystem.FileMetadata."""

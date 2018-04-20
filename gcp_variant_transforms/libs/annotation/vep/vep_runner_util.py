@@ -134,20 +134,3 @@ def format_dir_path(dir_path):
   # type: (str) -> str
   """Returns `dir_name` possibly with an added '/' if not already included."""
   return filesystems.FileSystems.join(dir_path, '')
-
-
-def get_base_name(file_path):
-  # type: (str) -> str
-  """Used when we want to copy files to local machines.
-
-  Keeping the file names, gives more context to actions. For example if
-  `file_path` is 'gs://my_bucket/my_input.vcf', tis returns 'my_input.vcf'.
-
-  Returns:
-    The basename of the input `file_path`.
-  """
-  _, base_path = filesystems.FileSystems.split(file_path)
-  if not base_path:
-    raise ValueError('Cannot extract base path from the input path {}'.format(
-        file_path))
-  return base_path

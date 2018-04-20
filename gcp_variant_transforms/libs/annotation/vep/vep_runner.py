@@ -147,7 +147,7 @@ class VepRunner(object):
             ],
             'environment': {
                 'VEP_CACHE': '/mnt/vep/vep_cache/{}'.format(
-                    vep_runner_util.get_base_name(self._vep_cache_path)),
+                    _get_base_name(self._vep_cache_path)),
                 'NUM_FORKS': str(self._vep_num_fork),
                 'VCF_INFO_FILED': self._vep_info_field,
                 # TODO(bashir2): Decide how to do proper reference validation,
@@ -307,8 +307,7 @@ class VepRunner(object):
 
   def _create_actions(self, input_file, output_file):
     # type: (str, str) -> List
-    local_input_file = '/mnt/vep/{}'.format(
-        vep_runner_util.get_base_name(input_file))
+    local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
     return [
         self._make_action('gsutil', '-q', 'cp', input_file, local_input_file),
         self._make_action('rm', '-r', '-f', _LOCAL_OUTPUT_DIR),
@@ -318,3 +317,20 @@ class VepRunner(object):
         # structure should be created as well otherwise gsutil fails.
         self._make_action('gsutil', '-q', 'cp', _LOCAL_OUTPUT_FILE,
                           output_file)]
+
+
+def _get_base_name(file_path):
+  # type: (str) -> str
+  """Used when we want to copy files to local machines.
+
+  Keeping the file names, gives more context to actions. For example if
+  `file_path` is 'gs://my_bucket/my_input.vcf', tis returns 'my_input.vcf'.
+
+  Returns:
+    The basename of the input `file_path`.
+  """
+  _, base_path = filesystems.FileSystems.split(file_path)
+  if not base_path:
+    raise ValueError('Cannot extract base path from the input path {}'.format(
+        file_path))
+  return base_path

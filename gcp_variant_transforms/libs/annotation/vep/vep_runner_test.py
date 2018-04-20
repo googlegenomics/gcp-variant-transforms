@@ -22,10 +22,20 @@ import mock
 from mock import patch
 
 from apache_beam.io import filesystems
-from gcp_variant_transforms.libs.annotation.vep import test_util
+from gcp_variant_transforms.libs.annotation.vep import file_metadata_stub
 from gcp_variant_transforms.libs.annotation.vep import vep_runner
 
 
+_INPUT_PATTERN = 'some/input/pattern*'
+_INPUT_FILES_WITH_SIZE = [
+    ('some/input/pattern/a', 100),
+    ('some/input/pattern/b', 100),
+    ('some/input/pattern/c', 100),
+    ('some/input/pattern/dir1/a', 100),
+    ('some/input/pattern/dir1/dir2/b', 100),
+    ('some/input/pattern/dir2/b', 100),
+    ('some/input/pattern/dir2/c', 100),
+]
 _OUTPUT_DIR = 'gs://output/dir'
 _VEP_INFO_FIELD = 'TEST_FIELD'
 _IMAGE = 'gcr.io/image'
@@ -40,10 +50,10 @@ class _MockFileSystems(filesystems.FileSystems):
 
   @staticmethod
   def match(patterns, limits=None):
-    if len(patterns) == 1 and patterns[0] == test_util.INPUT_PATTERN:
+    if len(patterns) == 1 and patterns[0] == _INPUT_PATTERN:
       return [mock.Mock(
-          metadata_list=[test_util.FileMetadataStub(path, size) for
-                         (path, size) in test_util.INPUT_FILES_WITH_SIZE])]
+          metadata_list=[file_metadata_stub.FileMetadataStub(path, size) for
+                         (path, size) in _INPUT_FILES_WITH_SIZE])]
     return []
 
   @staticmethod
@@ -54,15 +64,17 @@ class _MockFileSystems(filesystems.FileSystems):
 
 class VepRunnerTest(unittest.TestCase):
 
-  def _create_test_instance(self, pipeline_args=None):
-    self._mock_service = mock.Mock()  # pylint: disable=attribute-defined-outside-init
-    self._mock_pipelines = mock.Mock()  # pylint: disable=attribute-defined-outside-init
-    self._mock_request = mock.Mock()  # pylint: disable=attribute-defined-outside-init
+  def setUp(self):
+    self._mock_service = mock.Mock()
+    self._mock_pipelines = mock.Mock()
+    self._mock_request = mock.Mock()
     self._mock_service.pipelines = mock.Mock(return_value=self._mock_pipelines)
     self._mock_pipelines.run = mock.Mock(return_value=self._mock_request)
     self._mock_request.execute = mock.Mock(return_value={'name': 'operation'})
+
+  def _create_test_instance(self, pipeline_args=None):
     test_object = vep_runner.VepRunner(
-        self._mock_service, test_util.INPUT_PATTERN, _OUTPUT_DIR,
+        self._mock_service, _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
         pipeline_args or self._get_pipeline_args())
     return test_object
@@ -78,19 +90,24 @@ class VepRunnerTest(unittest.TestCase):
     """This is just to test object construction."""
     self._create_test_instance()
 
+  def test_instantiation_bad_pipeline_options(self):
+    """This is just to test object construction."""
+    with self.assertRaisesRegexp(ValueError, '.*project.*'):
+      self._create_test_instance(pipeline_args=['no_arguments'])
+
   def test_get_output_pattern(self):
     output_pattern = self._create_test_instance().get_output_pattern()
     self.assertEqual(output_pattern, _OUTPUT_DIR + '/**_vep_output.vcf')
 
   def _validate_run_for_all_files(self):
     matcher = _PartialCommandMatcher(
-        [f[0] for f in test_util.INPUT_FILES_WITH_SIZE])
+        [f[0] for f in _INPUT_FILES_WITH_SIZE])
     for args_list in self._mock_pipelines.run.call_args_list:
       self.assertEqual(args_list, mock.call(body=matcher))
     self.assertEqual(len(matcher.input_file_set), 0)
 
   def test_run_on_all_files(self):
-    num_workers = len(test_util.INPUT_FILES_WITH_SIZE) / 2 + 1
+    num_workers = len(_INPUT_FILES_WITH_SIZE) / 2 + 1
     test_instance = self._create_test_instance(
         self._get_pipeline_args(num_workers))
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
@@ -100,13 +117,13 @@ class VepRunnerTest(unittest.TestCase):
     self._validate_run_for_all_files()
 
   def test_run_on_all_files_with_more_workers(self):
-    num_workers = len(test_util.INPUT_FILES_WITH_SIZE) + 5
+    num_workers = len(_INPUT_FILES_WITH_SIZE) + 5
     test_instance = self._create_test_instance(
         self._get_pipeline_args(num_workers))
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
     all_call_args = self._mock_pipelines.run.call_args_list
-    self.assertEqual(len(all_call_args), len(test_util.INPUT_FILES_WITH_SIZE))
+    self.assertEqual(len(all_call_args), len(_INPUT_FILES_WITH_SIZE))
     self._validate_run_for_all_files()
 
 
@@ -116,7 +133,8 @@ class _PartialCommandMatcher(object):
   We need this matcher to avoid duplicating the whole JSON object created in
   the production code. Instead we just do a simple heuristic match by going
   through all `commands` and check if at least in one of them one of the
-  input files appear.
+  input files appear. Note that we dropped each matched input file becuase
+  if an input is repeated in two `actions` set, that's an error.
   """
 
   def __init__(self, input_file_list):
@@ -138,3 +156,11 @@ class _PartialCommandMatcher(object):
       logging.error('List of remaining files: %s', str(self.input_file_set))
       return False
     return True
+
+
+class GetBaseNameTest(unittest.TestCase):
+  def test_get_base_name(self):
+    self.assertEqual('t.vcf', vep_runner._get_base_name('a/b/t.vcf'))
+    self.assertEqual('t.vcf', vep_runner._get_base_name('/a/b/t.vcf'))
+    self.assertEqual('t.vcf', vep_runner._get_base_name('gs://a/b/t.vcf'))
+    self.assertEqual('t.vcf', vep_runner._get_base_name('a/b/t.vcf'))
