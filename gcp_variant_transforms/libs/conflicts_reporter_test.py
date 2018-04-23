@@ -38,13 +38,15 @@ class ConflictsReporterTest(unittest.TestCase):
   def _generate_report_and_assert_contents_equal(self,
                                                  expected_content,
                                                  header_definitions,
-                                                 resolved_headers=None):
-    # type: (List[str], VcfHeaderDefinitions, VcfHeader) -> None
+                                                 resolved_headers=None,
+                                                 inferred_headers=None):
+    # type: (List[str], VcfHeaderDefinitions, VcfHeader, VcfHeader) -> None
     with temp_dir.TempDir() as tempdir:
       file_path = FileSystems.join(tempdir.get_path(), self._REPORT_NAME)
       conflicts_reporter.generate_conflicts_report(file_path,
                                                    header_definitions,
-                                                   resolved_headers)
+                                                   resolved_headers,
+                                                   inferred_headers)
       with FileSystems.open(file_path) as f:
         reader = f.readlines()
         self.assertItemsEqual(reader, expected_content)
@@ -145,3 +147,40 @@ class ConflictsReporterTest(unittest.TestCase):
 
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions)
+
+  def test_report_inferred_headers_only(self):
+    header_definitions = VcfHeaderDefinitions()
+    formats = OrderedDict([('DP', Format('DP', 2, 'Float', 'Total Depth'))])
+
+    inferred_headers = VcfHeader(formats=formats)
+    expected = [
+        conflicts_reporter._HEADER_LINE,
+        ('DP;Undefined header.;num=2 type=Float')
+    ]
+    self._generate_report_and_assert_contents_equal(
+        expected, header_definitions, inferred_headers=inferred_headers)
+
+  def test_report_conflicted_and_inferred_headers(self):
+    header_definitions = VcfHeaderDefinitions()
+    header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1'],
+                                        Definition(1, 'Integer'): ['file2']}}
+
+    infos = OrderedDict([
+        ('NS', Info('NS', 1, 'Float', 'Number samples', None, None))])
+    formats = OrderedDict([
+        ('DP', Format('DP', 2, 'Float', 'Total Depth'))])
+    resolved_headers = VcfHeader(infos=infos, formats=formats)
+    inferred_headers = VcfHeader(formats=formats)
+    expected = [
+        conflicts_reporter._HEADER_LINE,
+        ('NS;'
+         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
+         'num=1 type=Float\n'),
+        ('DP;'
+         'Undefined header.;'
+         'num=2 type=Float')
+    ]
+    self._generate_report_and_assert_contents_equal(expected,
+                                                    header_definitions,
+                                                    resolved_headers,
+                                                    inferred_headers)
