@@ -21,10 +21,6 @@ from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 
-__all__ = ['VariantTransformsOptions', 'VcfReadOptions', 'BigQueryWriteOptions',
-           'FilterOptions', 'MergeOptions', 'PreprocessOptions']
-
-
 class VariantTransformsOptions(object):
   """Base class for defining groups of options for Variant Transforms.
 
@@ -311,18 +307,9 @@ class PreprocessOptions(VariantTransformsOptions):
               'If true, it also reports the undefined headers and malformed '
               'recorded.'))
     parser.add_argument(
-        '--split_alternate_allele_info_fields',
-        type='bool', default=True, nargs='?', const=True,
-        help=('If true, all INFO fields with Number=A (i.e. one value for each '
-              'alternate allele) will be stored under the alternate_bases '
-              'record. If false, they will be stored with the rest of the INFO '
-              'fields. Setting this option to true makes querying the data '
-              'easier, because it avoids having to map each field with the '
-              'corresponding alternate record while querying.'))
-    parser.add_argument(
         '--directory',
         default='',
-        help=('The directory where the conflicts report and the resolved '
+        help=('The local directory where the conflicts report and the resolved '
               'headers are saved if running locally.'))
     parser.add_argument(
         '--report_name',

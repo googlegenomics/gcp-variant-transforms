@@ -27,7 +27,8 @@ they will be saved in the ``directory``.
 
 Run locally:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
-  --input_pattern <path to VCF file(s)>
+  --input_pattern <path to VCF file(s)> \
+  --report_all True
 
 Run on Dataflow:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
@@ -50,6 +51,7 @@ from apache_beam.options import pipeline_options
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import conflicts_reporter
 from gcp_variant_transforms.options import variant_transform_options
+from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_header_definitions
 
 _COMMAND_LINE_OPTIONS = [
@@ -59,6 +61,21 @@ _COMMAND_LINE_OPTIONS = [
 ]
 
 _PREPROCESS_JOB_NAME = 'preprocess-vcf-files'
+
+
+def _add_inferred_headers(pipeline,  # type: beam.Pipeline
+                          known_args,  # type: argparse.Namespace
+                          merged_header  # type: pvalue.PCollection
+                         ):
+  # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
+  inferred_headers = vcf_to_bq_common.get_inferred_headers(pipeline, known_args,
+                                                           merged_header)
+  merged_header = (
+      (inferred_headers, merged_header)
+      | beam.Flatten()
+      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
+          allow_incompatible_records=True))
+  return inferred_headers, merged_header
 
 
 # TODO(yifangchen): Add an integration test for this pipeline.
@@ -89,13 +106,12 @@ def run(argv=None):
 
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_headers = vcf_to_bq_common.get_merged_headers(headers, known_args,
-                                                         True)
+    merged_headers = vcf_to_bq_common.get_merged_headers(headers)
     merged_definitions = (headers | 'MergeDefinitions'
                           >> merge_header_definitions.MergeDefinitions())
     inferred_headers_side_input = None
     if known_args.report_all:
-      inferred_headers, merged_headers = vcf_to_bq_common.add_inferred_headers(
+      inferred_headers, merged_headers = _add_inferred_headers(
           p, known_args, merged_headers)
       inferred_headers_side_input = beam.pvalue.AsSingleton(inferred_headers)
 

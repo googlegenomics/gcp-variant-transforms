@@ -112,24 +112,18 @@ def read_variants(pipeline, known_args):
   return variants
 
 
-def add_inferred_headers(pipeline,  # type: beam.Pipeline
+def get_inferred_headers(pipeline,  # type: beam.Pipeline
                          known_args,  # type: argparse.Namespace
-                         merged_headers  # type: pvalue.PCollection
+                         merged_header  # type: pvalue.PCollection
                         ):
-  # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
-  """Returns the inferred headers and the merged headers."""
-  inferred_headers = (read_variants(pipeline, known_args)
-                      | 'FilterVariants' >> filter_variants.FilterVariants(
-                          reference_names=known_args.reference_names)
-                      | ' InferUndefinedHeaderFields' >>
-                      infer_undefined_headers.InferUndefinedHeaderFields(
-                          pvalue.AsSingleton(merged_headers)))
-  merged_headers = (
-      (inferred_headers, merged_headers)
-      | beam.Flatten()
-      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
-          known_args.split_alternate_allele_info_fields))
-  return inferred_headers, merged_headers
+  # type: (...) -> pvalue.PCollection
+  """Infers the missing headers."""
+  return (read_variants(pipeline, known_args)
+          | 'FilterVariants' >> filter_variants.FilterVariants(
+              reference_names=known_args.reference_names)
+          | ' InferUndefinedHeaderFields' >>
+          infer_undefined_headers.InferUndefinedHeaderFields(
+              pvalue.AsSingleton(merged_header)))
 
 
 def read_headers(pipeline, pipeline_mode, known_args):
@@ -144,12 +138,22 @@ def read_headers(pipeline, pipeline_mode, known_args):
   return headers
 
 
-def get_merged_headers(headers, known_args, allow_incompatible_records):
-  # type: (pvalue.PCollection, argparse.Namespace, bool) -> pvalue.PCollection
-  """Applies the ``MergeHeaders`` PTransform on PCollection of ``VcfHeader``."""
+def get_merged_headers(headers,
+                       split_alternate_allele_info_fields=True,
+                       allow_incompatible_records=True):
+  # type: (pvalue.PCollection, bool, bool) -> pvalue.PCollection
+  """Applies the ``MergeHeaders`` PTransform on PCollection of ``VcfHeader``.
+
+  Args:
+    headers: The VCF headers.
+    split_alternate_allele_info_fields: If true, the INFO fields with `Number=A`
+      in BigQuery schema is not repeated. This is relevant as it changes the
+      header compatibility rules.
+    allow_incompatible_records: If true, always resolve the conflicts when
+      merging headers.
+  """
   return (headers | 'MergeHeaders' >> merge_headers.MergeHeaders(
-      known_args.split_alternate_allele_info_fields,
-      allow_incompatible_records))
+      split_alternate_allele_info_fields, allow_incompatible_records))
 
 
 def write_headers(merged_header, file_path):

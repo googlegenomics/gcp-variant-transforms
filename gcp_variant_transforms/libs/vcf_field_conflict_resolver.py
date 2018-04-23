@@ -37,8 +37,9 @@ class FieldConflictResolver(object):
     Args:
       split_alternate_allele_info_fields: Whether INFO fields with `Number=A`
         are stored under the alternate_bases record.
-     split_alternate_allele_info_fields: Whether INFO fields with
-       `Number=A` are stored under the alternate_bases record.
+      resolve_always: Always find a solution for the conflicts. When the
+        conflicts are incompatible, convert all type conflicts to `String` and
+        number conflicts to `.`.
     """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)

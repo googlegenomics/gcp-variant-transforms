@@ -29,10 +29,10 @@ class PreprocessTest(unittest.TestCase):
           '--input_pattern',
           'gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined'
           '-header-fields.vcf',
-          'directory',
+          '--directory',
           tempdir.get_path()
       ]
-    abs_report_name, abs_resolved_headers_name = vcf_to_bq_preprocess.run(argv)
-
-    assert filesystems.FileSystems.exists(abs_report_name)
-    assert filesystems.FileSystems.exists(abs_resolved_headers_name)
+      abs_report_name, abs_resolved_headers_name = (
+          vcf_to_bq_preprocess.run(argv))
+      assert filesystems.FileSystems.exists(abs_report_name)
+      assert filesystems.FileSystems.exists(abs_resolved_headers_name)

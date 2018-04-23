@@ -53,6 +53,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
+from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
 
@@ -90,6 +91,22 @@ def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
     raise ValueError('Merge strategy is not supported.')
 
 
+def _add_inferred_headers(pipeline,  # type: beam.Pipeline
+                          known_args,  # type: argparse.Namespace
+                          merged_header  # type: pvalue.PCollection
+                         ):
+  # type: (...) -> pvalue.PCollection
+  inferred_headers = vcf_to_bq_common.get_inferred_headers(pipeline, known_args,
+                                                           merged_header)
+  merged_header = (
+      (inferred_headers, merged_header)
+      | beam.Flatten()
+      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
+  return merged_header
+
+
 def _merge_headers(known_args, pipeline_args, pipeline_mode):
   # type: (argparse.Namespace, List[str], int) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
@@ -118,11 +135,11 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
     merged_header = vcf_to_bq_common.get_merged_headers(
-        headers, known_args, known_args.allow_incompatible_records)
+        headers,
+        known_args.split_alternate_allele_info_fields,
+        known_args.allow_incompatible_records)
     if known_args.infer_undefined_headers:
-      _, merged_header = vcf_to_bq_common.add_inferred_headers(p,
-                                                               known_args,
-                                                               merged_header)
+      merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header,
                                    known_args.representative_header_file)
 
