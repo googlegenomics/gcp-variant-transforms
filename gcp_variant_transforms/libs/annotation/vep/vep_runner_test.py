@@ -140,6 +140,10 @@ class _PartialCommandMatcher(object):
   def __init__(self, input_file_list):
     self.input_file_set = set(input_file_list)
 
+  # TODO(bashir2): This __eq__ not being idempotent is confusing. Replace this
+  # pattern with an Spy pattern where _mock_pipelines is replaced by a Spy
+  # object (instead of a Mock) and it captures the arguments passed to
+  # the run() function; with a separate validation function called at the end.
   def __eq__(self, other):
     if not isinstance(other, dict):
       return False

@@ -183,6 +183,12 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
+        '--annotation_output_dir',
+        default="",
+        help=('The path on Google Cloud Storage to store annotated outputs. '
+              'The output files are VCF and follow the same directory '
+              'structure as input files with a suffix added to them.'))
+    parser.add_argument(
         '--vep_image_uri',
         default="",
         help=('The URI of the docker image for VEP.'))
@@ -190,12 +196,6 @@ class AnnotationOptions(VariantTransformsOptions):
         '--vep_cache_path',
         default="",
         help=('The path for VEP cache on Google Cloud Storage.'))
-    parser.add_argument(
-        '--annotation_output_dir',
-        default="",
-        help=('The path on Google Cloud Storage to store annotated outputs. '
-              'The output files are VCF and follow the same directory '
-              'structure as input files with a suffix added to them.'))
     parser.add_argument(
         '--vep_info_field',
         default="CSQ_VT",
