@@ -18,7 +18,10 @@ of files, millions of samples, and billions of records.
 Please see
 [this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
 for a high level overview of BigQuery and how to effectively use Variant
-Transforms and BigQuery.
+Transforms and BigQuery. Please also read the
+[blog post](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery)
+about how a GCP customer used Variant Transforms for breakthrough clinical
+data science with BigQuery.
 
 ### Prerequisites
 
@@ -158,7 +161,7 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 You may need to constrain Cloud Dataflow job processing to a specific
 geographic region in support of yourproject’s security and compliance needs.
-See [Running in particular zone/region doc](docs/running_in_particular_zone_region.md)
+See [Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
 
 
 ## Additional topics
