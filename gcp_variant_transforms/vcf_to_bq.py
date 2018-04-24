@@ -104,7 +104,8 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
       (inferred_headers, merged_header)
       | beam.Flatten()
       | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
-          known_args.split_alternate_allele_info_fields))
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
   return merged_header
 
 
@@ -139,7 +140,10 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
 
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_header = vcf_to_bq_common.get_merged_headers(headers, known_args)
+    merged_header = vcf_to_bq_common.get_merged_headers(
+        headers,
+        known_args.split_alternate_allele_info_fields,
+        known_args.allow_incompatible_records)
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header,

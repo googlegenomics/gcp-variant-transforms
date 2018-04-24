@@ -126,12 +126,22 @@ def read_headers(pipeline, pipeline_mode, known_args):
   return headers
 
 
-def get_merged_headers(headers, known_args):
-  # type: (pvalue.PCollection, argparse.Namespace) -> pvalue.PCollection
-  """Applies the ``MergeHeaders`` PTransform on PCollection of ``VcfHeader``."""
+def get_merged_headers(headers,
+                       split_alternate_allele_info_fields=True,
+                       allow_incompatible_records=True):
+  # type: (pvalue.PCollection, bool, bool) -> pvalue.PCollection
+  """Applies the ``MergeHeaders`` PTransform on PCollection of ``VcfHeader``.
+
+  Args:
+    headers: The VCF headers.
+    split_alternate_allele_info_fields: If true, the INFO fields with `Number=A`
+      in BigQuery schema is not repeated. This is relevant as it changes the
+      header compatibility rules.
+    allow_incompatible_records: If true, always resolve the conflicts when
+      merging headers.
+  """
   return (headers | 'MergeHeaders' >> merge_headers.MergeHeaders(
-      known_args.split_alternate_allele_info_fields,
-      known_args.allow_incompatible_records))
+      split_alternate_allele_info_fields, allow_incompatible_records))
 
 
 def write_headers(merged_header, file_path):
