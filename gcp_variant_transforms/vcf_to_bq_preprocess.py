@@ -22,21 +22,21 @@ output:
 - Resolved headers file: A VCF file that contains the resolved fields
   definitions.
 
-The files are generated in the "temp_location" if it is provided. Otherwise,
-they will be saved in the ``directory``.
+The report is generated in the ``report_path``, while the resolved headers file
+is generated in ``resolved_headers_path`` if provided.
 
 Run locally:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern <path to VCF file(s)> \
-  --report_name <local path to the report file> \
-  --resolved_headers_name <local path to the resolved headers file> \
+  --report_path <local path to the report file> \
+  --resolved_headers_path <local path to the resolved headers file> \
   --report_all True
 
 Run on Dataflow:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern <path to VCF file(s)>
-  --report_name <cloud path to the report file> \
-  --resolved_headers_name <cloud path to the resolved headers file> \
+  --report_path <cloud path to the report file> \
+  --resolved_headers_path <cloud path to the resolved headers file> \
   --report_all True \
   --project gcp-variant-transforms-test \
   --job_name preprocess \
@@ -65,7 +65,7 @@ _COMMAND_LINE_OPTIONS = [
 ]
 
 
-def _add_inferred_headers(pipeline,  # type: beam.Pipeline
+def _get_inferred_headers(pipeline,  # type: beam.Pipeline
                           known_args,  # type: argparse.Namespace
                           merged_header  # type: pvalue.PCollection
                          ):
@@ -97,19 +97,19 @@ def run(argv=None):
                           merge_header_definitions.MergeDefinitions())
     inferred_headers_side_input = None
     if known_args.report_all:
-      inferred_headers, merged_headers = _add_inferred_headers(
+      inferred_headers, merged_headers = _get_inferred_headers(
           p, known_args, merged_headers)
       inferred_headers_side_input = beam.pvalue.AsSingleton(inferred_headers)
 
     _ = (merged_definitions
          | 'GenerateConflictsReport' >>
          beam.ParDo(conflicts_reporter.generate_conflicts_report,
-                    known_args.report_name,
+                    known_args.report_path,
                     beam.pvalue.AsSingleton(merged_headers),
                     inferred_headers_side_input))
-    if known_args.resolved_headers_name:
+    if known_args.resolved_headers_path:
       vcf_to_bq_common.write_headers(merged_headers,
-                                     known_args.resolved_headers_name)
+                                     known_args.resolved_headers_path)
 
 
 if __name__ == '__main__':

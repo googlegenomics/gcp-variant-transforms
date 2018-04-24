@@ -20,7 +20,6 @@ PTransforms and writing the output.
 
 from typing import List  # pylint: disable=unused-import
 import argparse
-import datetime
 import enum
 
 import apache_beam as beam
@@ -83,17 +82,6 @@ def get_pipeline_mode(known_args):
   elif total_files > _SMALL_DATA_THRESHOLD:
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
-
-
-def form_absolute_file_name(directory, job_name, file_name):
-  # type: (str, str, str) -> str
-  """Returns the absolute file name."""
-  # Adds a time prefix to ensure files are unique in case multiple pipelines are
-  # run at the same time.
-  file_name = '-'.join([datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
-                        job_name,
-                        file_name])
-  return filesystems.FileSystems.join(directory, file_name)
 
 
 def read_variants(pipeline, known_args):

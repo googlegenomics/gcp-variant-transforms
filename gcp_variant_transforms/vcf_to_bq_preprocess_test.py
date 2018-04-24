@@ -27,20 +27,20 @@ class PreprocessTest(unittest.TestCase):
 
   def test_preprocess_run_locally(self):
     with temp_dir.TempDir() as tempdir:
-      report_name = filesystems.FileSystems.join(tempdir.get_path(),
-                                                 self._REPORT_NAME)
-      resolved_headers_name = filesystems.FileSystems.join(
-          tempdir.get_path(), self._RESOLVED_HEADERS_FILE_NAME)
+      report_path = filesystems.FileSystems.join(tempdir.get_path(),
+                                                 PreprocessTest._REPORT_NAME)
+      resolved_headers_path = filesystems.FileSystems.join(
+          tempdir.get_path(), PreprocessTest._RESOLVED_HEADERS_FILE_NAME)
       argv = [
           '--input_pattern',
           'gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined'
           '-header-fields.vcf',
           '--report_all',
-          '--report_name',
-          report_name,
-          '--resolved_headers_name',
-          resolved_headers_name
+          '--report_path',
+          report_path,
+          '--resolved_headers_path',
+          resolved_headers_path
       ]
       vcf_to_bq_preprocess.run(argv)
-      assert filesystems.FileSystems.exists(report_name)
-      assert filesystems.FileSystems.exists(resolved_headers_name)
+      assert filesystems.FileSystems.exists(report_path)
+      assert filesystems.FileSystems.exists(resolved_headers_path)

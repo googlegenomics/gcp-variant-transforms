@@ -34,6 +34,7 @@ python -m gcp_variant_transforms.vcf_to_bq \
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
+import datetime
 import logging
 import sys
 import tempfile
@@ -41,6 +42,7 @@ from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
+from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
@@ -127,10 +129,14 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     google_cloud_options.job_name = _MERGE_HEADERS_JOB_NAME
 
   temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
-  known_args.representative_header_file = (
-      vcf_to_bq_common.form_absolute_file_name(temp_directory,
-                                               google_cloud_options.job_name,
-                                               _MERGE_HEADERS_FILE_NAME))
+  # Add a time prefix to ensure files are unique in case multiple
+  # pipelines are run at the same time.
+  temp_merged_headers_file_name = '-'.join([
+      datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
+      google_cloud_options.job_name,
+      _MERGE_HEADERS_FILE_NAME])
+  known_args.representative_header_file = filesystems.FileSystems.join(
+      temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)

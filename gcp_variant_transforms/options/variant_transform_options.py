@@ -305,13 +305,14 @@ class PreprocessOptions(VariantTransformsOptions):
               'If true, it also reports the undefined headers and malformed '
               'records.'))
     parser.add_argument(
-        '--report_name',
+        '--report_path',
         required=True,
-        help=('The full path of the conflicts report. If runs locally, a local '
-              'path must be provided. Otherwise, a cloud path is required.'))
+        help=('The full path of the preprocessor report. If run locally, a '
+              'local path must be provided. Otherwise, a cloud path is '
+              'required.'))
     parser.add_argument(
-        '--resolved_headers_name',
+        '--resolved_headers_path',
         default='',
-        help=('The full path of the resolved headers. The file will not '
-              'generate if unspecified. Otherwise, please provide a local '
-              'path if runs locally, or a cloud path if runs on Dataflow.'))
+        help=('The full path of the resolved headers. The file will not be'
+              'generated if unspecified. Otherwise, please provide a local '
+              'path if run locally, or a cloud path if run on Dataflow.'))
