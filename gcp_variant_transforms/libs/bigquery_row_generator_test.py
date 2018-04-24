@@ -24,11 +24,11 @@ import mock
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
-from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
@@ -150,7 +150,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     # ProcessedVariant instances directly (instead of Variant) and avoid calling
     # create_processed_variant here. Then we should also add cases that
     # have annotation fields.
-    header_fields = vcf_header_parser.HeaderFields({}, {})
+    header_fields = vcf_header_io.VcfHeader()
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
 

@@ -18,13 +18,14 @@ from __future__ import absolute_import
 
 import apache_beam as beam
 
+from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_row_generator
-from gcp_variant_transforms.libs import bigquery_schema_descriptor  #pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
-from gcp_variant_transforms.libs import vcf_header_parser  #pylint: disable=unused-import
-from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  #pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_header_parser  # pylint: disable=unused-import
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms import limit_write
 
 
@@ -59,7 +60,7 @@ class VariantToBigQuery(beam.PTransform):
   def __init__(
       self,
       output_table,  # type: str
-      header_fields,  # type: vcf_header_parser.HeaderFields
+      header_fields,  # type: vcf_header_io.VcfHeader
       variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
       proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
       append=False,  # type: bool
@@ -71,8 +72,8 @@ class VariantToBigQuery(beam.PTransform):
 
     Args:
       output_table: Full path of the output BigQuery table.
-      header_fields: A `namedtuple` containing representative header fields for
-        all variants. This is needed for dynamically generating the schema.
+      header_fields: Representative header fields for all variants. This is
+        needed for dynamically generating the schema.
       variant_merger: The strategy used for merging variants (if any). Some
         strategies may change the schema, which is why this may be needed here.
       proc_var_factory: The factory class that knows how to convert Variant

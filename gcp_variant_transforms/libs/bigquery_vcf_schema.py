@@ -20,25 +20,27 @@ from typing import Dict, Any  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import vcf_header_parser # pylint: disable=unused-import
-from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy # pylint: disable=unused-import
+from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
+
+
+# An alias for the header key constants to make referencing easier.
+_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 
 
 def generate_schema_from_header_fields(
-    header_fields,  # type: vcf_header_parser.HeaderFields
+    header_fields,  # type: vcf_header_io.VcfHeader
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
     variant_merger=None  # type: variant_merge_strategy.VariantMergeStrategy
     ):
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
 
   Args:
-    header_fields: A `namedtuple` containing representative header fields for
-      all variant records. This specifies custom INFO and FORMAT fields in the
-      VCF file(s).
+    header_fields: Representative header fields for all variants.
     proc_variant_factory: The factory class that knows how to convert Variant
       instances to ProcessedVariant. As a side effect it also knows how to
       modify BigQuery schema based on the ProcessedVariants that it generates.
@@ -120,9 +122,12 @@ def generate_schema_from_header_fields(
       continue
     calls_record.fields.append(bigquery.TableFieldSchema(
         name=bigquery_util.get_bigquery_sanitized_field_name(key),
-        type=bigquery_util.get_bigquery_type_from_vcf_type(field.type),
-        mode=_get_bigquery_mode_from_vcf_num(field.num),
-        description=bigquery_util.get_bigquery_sanitized_field(field.desc)))
+        type=bigquery_util.get_bigquery_type_from_vcf_type(
+            field[_HeaderKeyConstants.TYPE]),
+        mode=bigquery_util.get_bigquery_mode_from_vcf_num(
+            field[_HeaderKeyConstants.NUM]),
+        description=bigquery_util.get_bigquery_sanitized_field(
+            field[_HeaderKeyConstants.DESC])))
   schema.fields.append(calls_record)
 
   # Add info fields.
@@ -134,16 +139,13 @@ def generate_schema_from_header_fields(
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=bigquery_util.get_bigquery_sanitized_field_name(key),
-        type=bigquery_util.get_bigquery_type_from_vcf_type(field.type),
-        mode=_get_bigquery_mode_from_vcf_num(field.num),
-        description=bigquery_util.get_bigquery_sanitized_field(field.desc)))
+        type=bigquery_util.get_bigquery_type_from_vcf_type(
+            field[_HeaderKeyConstants.TYPE]),
+        mode=bigquery_util.get_bigquery_mode_from_vcf_num(
+            field[_HeaderKeyConstants.NUM]),
+        description=bigquery_util.get_bigquery_sanitized_field(
+            field[_HeaderKeyConstants.DESC])))
     info_keys.add(key)
   if variant_merger:
     variant_merger.modify_bigquery_schema(schema, info_keys)
   return schema
-
-def _get_bigquery_mode_from_vcf_num(vcf_num):
-  if vcf_num in (0, 1):
-    return bigquery_util.TableFieldConstants.MODE_NULLABLE
-  else:
-    return bigquery_util.TableFieldConstants.MODE_REPEATED

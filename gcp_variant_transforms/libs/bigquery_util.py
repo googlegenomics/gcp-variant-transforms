@@ -73,6 +73,7 @@ _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 
 
 def get_bigquery_sanitized_field_name(field_name):
+  # (str) -> str
   """Returns the sanitized field name according to BigQuery restrictions.
 
   BigQuery field names must follow `[a-zA-Z][a-zA-Z0-9_]*`. This method converts
@@ -93,16 +94,28 @@ def get_bigquery_sanitized_field_name(field_name):
 
 
 def get_bigquery_type_from_vcf_type(vcf_type):
+  # type: (str) -> str
   vcf_type = vcf_type.lower()
   if vcf_type not in _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP:
     raise ValueError('Invalid VCF type: %s' % vcf_type)
   return _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP[vcf_type]
+
+
+def get_bigquery_mode_from_vcf_num(vcf_num):
+  # type: (int) -> str
+  """Returns mode (`repeated` or `nullable`) based on VCF field number."""
+  if vcf_num in (0, 1):
+    return TableFieldConstants.MODE_NULLABLE
+  else:
+    return TableFieldConstants.MODE_REPEATED
+
 
 def get_python_type_from_bigquery_type(bigquery_type):
   # type: (str) -> Union[str, int, bool, float]
   if bigquery_type not in _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP:
     raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
   return _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP[bigquery_type]
+
 
 def get_bigquery_sanitized_field(
     field, null_numeric_value_replacement=-sys.maxint):

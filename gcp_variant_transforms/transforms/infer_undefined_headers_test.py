@@ -30,7 +30,9 @@ from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.transforms import infer_undefined_headers
+
 
 class InferUndefinedHeaderFieldsTest(unittest.TestCase):
   """ Test case for ``InferUndefinedHeaderFields`` DoFn."""
@@ -143,7 +145,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
 
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
-      assert_that(inferred_headers, equal_to([expected]))
+      assert_that(inferred_headers,
+                  asserts.header_fields_equal_ignore_order([expected]))
       p.run()
 
   def test_defined_fields_filtered_two_variants(self):
@@ -165,5 +168,6 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
       expected_formats = {'FI_2': Format('FI_2', 1, 'Integer', '')}
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
-      assert_that(inferred_headers, equal_to([expected]))
+      assert_that(inferred_headers,
+                  asserts.header_fields_equal_ignore_order([expected]))
       p.run()
