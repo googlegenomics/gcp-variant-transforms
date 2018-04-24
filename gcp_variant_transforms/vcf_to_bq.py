@@ -49,6 +49,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs.annotation.vep import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -151,6 +152,14 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
+  # Note VepRunner creates new input files, so it should be run before any
+  # other access to known_args.input_pattern.
+  if known_args.run_annotation_pipeline:
+    runner = vep_runner.create_runner_and_update_args(known_args, pipeline_args)
+    runner.run_on_all_files()
+    runner.wait_until_done()
+    logging.info('Using VEP processed files: %s', known_args.input_pattern)
+
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args)
 
