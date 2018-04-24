@@ -22,17 +22,25 @@ from gcp_variant_transforms.testing import temp_dir
 
 
 class PreprocessTest(unittest.TestCase):
+  _REPORT_NAME = 'header_conflicts_report.csv'
+  _RESOLVED_HEADERS_FILE_NAME = 'resolved_headers.vcf'
 
   def test_preprocess_run_locally(self):
     with temp_dir.TempDir() as tempdir:
+      report_name = filesystems.FileSystems.join(tempdir.get_path(),
+                                                 self._REPORT_NAME)
+      resolved_headers_name = filesystems.FileSystems.join(
+          tempdir.get_path(), self._RESOLVED_HEADERS_FILE_NAME)
       argv = [
           '--input_pattern',
           'gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined'
           '-header-fields.vcf',
-          '--directory',
-          tempdir.get_path()
+          '--report_all',
+          '--report_name',
+          report_name,
+          '--resolved_headers_name',
+          resolved_headers_name
       ]
-      abs_report_name, abs_resolved_headers_name = (
-          vcf_to_bq_preprocess.run(argv))
-      assert filesystems.FileSystems.exists(abs_report_name)
-      assert filesystems.FileSystems.exists(abs_resolved_headers_name)
+      vcf_to_bq_preprocess.run(argv)
+      assert filesystems.FileSystems.exists(report_name)
+      assert filesystems.FileSystems.exists(resolved_headers_name)

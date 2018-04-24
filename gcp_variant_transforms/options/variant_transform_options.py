@@ -296,26 +296,22 @@ class MergeOptions(VariantTransformsOptions):
 
 class PreprocessOptions(VariantTransformsOptions):
   """Options for preprocess."""
-  _REPORT_NAME = 'conflicts_report.csv'
-  _RESOLVED_HEADERS_FILE_NAME = 'resolved_headers.vcf'
 
   def add_arguments(self, parser):
     parser.add_argument(
         '--report_all',
-        type='bool', default=True, nargs='?', const=False,
+        type='bool', default=False, nargs='?', const=True,
         help=('By default, only the incompatible VCF headers will be reported. '
               'If true, it also reports the undefined headers and malformed '
-              'recorded.'))
-    parser.add_argument(
-        '--directory',
-        default='',
-        help=('The local directory where the conflicts report and the resolved '
-              'headers are saved if running locally.'))
+              'records.'))
     parser.add_argument(
         '--report_name',
-        default=self._REPORT_NAME,
-        help=('The file name for the conflicts report.'))
+        required=True,
+        help=('The full path of the conflicts report. If runs locally, a local '
+              'path must be provided. Otherwise, a cloud path is required.'))
     parser.add_argument(
         '--resolved_headers_name',
-        default=self._RESOLVED_HEADERS_FILE_NAME,
-        help=('The file name for the resolved headers.'))
+        default='',
+        help=('The full path of the resolved headers. The file will not '
+              'generate if unspecified. Otherwise, please provide a local '
+              'path if runs locally, or a cloud path if runs on Dataflow.'))
