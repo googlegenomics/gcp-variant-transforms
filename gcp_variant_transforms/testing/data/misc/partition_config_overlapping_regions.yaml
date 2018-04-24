@@ -1,0 +1,8 @@
+-  partition:
+     partition_name: "chr01_part1"
+     regions:
+       - "chr1:0-1,000,001"
+-  partition:
+     partition_name: "chr01_part2"
+     regions:
+       - "chr1:1,000,000-2,000,000"

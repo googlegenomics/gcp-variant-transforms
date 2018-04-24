@@ -49,6 +49,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs import variant_partition
 from gcp_variant_transforms.libs.annotation.vep import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
@@ -70,10 +71,6 @@ _COMMAND_LINE_OPTIONS = [
 
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
-# The first 22 partitions [0, 21] are reserved for standard reference_name
-# formated as RegExp '^(c|ch|chr)?([0-9][0-9]?)$'.
-# Every other identifers will be matched to next available partitions [22, 26].
-_DEFAULT_PARTITION_NO = 22 + 5
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
                                ):
@@ -189,6 +186,7 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
+  partitioner = variant_partition.VariantPartition()
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = vcf_to_bq_common.read_variants(pipeline, known_args)
@@ -197,13 +195,16 @@ def run(argv=None):
   if variant_merger:
     if known_args.optimize_for_large_inputs:
       partitions = variants | 'PartitionVariants' >> beam.Partition(
-          partition_variants.PartitionVariants(), _DEFAULT_PARTITION_NO)
-      merged = [(partitions[i] | 'MergeVariants'+str(i) >>
-                 merge_variants.MergeVariants(variant_merger))
-                for i in xrange(_DEFAULT_PARTITION_NO)]
+          partition_variants.PartitionVariants(partitioner),
+          partitioner.get_num_partitions())
+      merged = []
+      for i in xrange(partitioner.get_num_partitions()):
+        merged.append((partitions[i] | 'MergeVariants' + str(i) >>
+                       merge_variants.MergeVariants(variant_merger)))
       variants = merged | 'FlattenPartitions' >> beam.Flatten()
     else:
-      variants |= ('MergeVariants' >> merge_variants.MergeVariants(variant_merger))
+      variants |= ('MergeVariants' >> merge_variants.MergeVariants(
+          variant_merger))
   proc_variants = variants | 'ProcessVaraints' >> beam.Map(
       processed_variant_factory.create_processed_variant).\
     with_output_types(processed_variant.ProcessedVariant)
