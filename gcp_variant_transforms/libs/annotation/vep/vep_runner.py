@@ -56,6 +56,9 @@ _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + '/output.vcf'
 # The time between operation polling rounds.
 _POLLING_INTERVAL_SECONDS = 30
 
+# Maximum number of times to retry API calls in case of server side errors.
+_NUMBER_OF_API_CALL_RETRIES = 5
+
 
 def create_runner_and_update_args(known_args, pipeline_args):
   # type: (argparse.Namespace, List[str]) -> VepRunner
@@ -203,20 +206,22 @@ class VepRunner(object):
     # TODO(bahsir2): Fix the error messages of _check_flag since
     # --worker_machine_type has dest='machine_type'.
     self._machine_type = self._get_flag(flags_dict, 'machine_type')
-    # TODO(bashir2): Fall back to num_workers if max_num_workers is not set.
-    self._max_num_workers = self._get_flag(flags_dict, 'max_num_workers')
+    self._max_num_workers = self._get_flag(
+        flags_dict, 'max_num_workers', 'num_workers')
     if self._max_num_workers <= 0:
       raise ValueError(
-          '--max_num_workers should be a positive number, got: {}'.format(
-              self._max_num_workers))
+          '--max_num_workers and --num_workers should be positive numbers, '
+          'got: {}'.format(self._max_num_workers))
 
-  def _get_flag(self, pipeline_flags, flag):
+  def _get_flag(self, pipeline_flags, *expected_flags):
     # type: (Dict[str, Any], str) -> Any
-    if flag not in pipeline_flags or not pipeline_flags[flag]:
-      raise ValueError('Could not find {} among pipeline flags {}'.format(
-          flag, pipeline_flags))
-    logging.info('Using %s flag: %s.', flag, pipeline_flags[flag])
-    return pipeline_flags[flag]
+    for flag in expected_flags:
+      if flag in pipeline_flags and pipeline_flags[flag]:
+        logging.info('Using %s flag for annotation run: %s.',
+                     flag, pipeline_flags[flag])
+        return pipeline_flags[flag]
+    raise ValueError('Could not find any of {} among pipeline flags {}'.format(
+        expected_flags, pipeline_flags))
 
   def wait_until_done(self):
     """Polls currently running operations and waits until all are done."""
@@ -228,12 +233,12 @@ class VepRunner(object):
 
   def _is_done(self, operation):
     # type: (str) -> bool
-    # TODO(bashir2): Catch exceptions in the following call and also silence the
-    # log messages of googleapiclient.discovery module for the next call of the
-    # API since they flood the log file.
+    # TODO(bashir2): Silence the log messages of googleapiclient.discovery
+    # module for the next call of the API since they flood the log file.
     # pylint: disable=no-member
-    request = self._pipeline_service.projects().operations().get(name=operation)
-    is_done = request.execute()['done']
+    request = self._pipeline_service.projects().operations().get(
+        name=operation)
+    is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)['done']
     # TODO(bashir2): Add better monitoring and log progress within each
     # operation instead of just checking `done`.
     if is_done:
@@ -284,7 +289,8 @@ class VepRunner(object):
                           flags=['ALWAYS_RUN']))
     # pylint: disable=no-member
     request = self._pipeline_service.pipelines().run(body=api_request)
-    operation_name = request.execute()['name']
+    operation_name = request.execute(
+        num_retries=_NUMBER_OF_API_CALL_RETRIES)['name']
     return operation_name
 
   def _check_and_write_to_output_dir(self, output_dir):

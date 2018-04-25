@@ -14,15 +14,12 @@
 
 from __future__ import absolute_import
 
+import argparse  # pylint: disable=unused-import
 import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
-
-
-__all__ = ['VariantTransformsOptions', 'VcfReadOptions', 'BigQueryWriteOptions',
-           'FilterOptions', 'MergeOptions']
 
 
 class VariantTransformsOptions(object):
@@ -36,6 +33,7 @@ class VariantTransformsOptions(object):
   """
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     """Adds all options of this transform to parser."""
     raise NotImplementedError
 
@@ -147,7 +145,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
 
+  _RUN_FLAG = 'run_annotation_pipeline'
+  _OUTPUT_DIR_FLAG = 'annotation_output_dir'
+  _VEP_IMAGE_FLAG = 'vep_image_uri'
+  _VEP_CACHE_FLAG = 'vep_cache_path'
+
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         '--annotation_fields',
         default=None, nargs='+',
@@ -158,7 +162,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'corresponding alternate alleles. [EXPERIMENTAL]'))
     parser.add_argument(
         '--use_allele_num',
-        type='bool', default=False, nargs='?', const=True,
+        type=bool, default=False, nargs='?', const=True,
         help=('If true, uses the "ALLELE_NUM" annotation to determine the ALT'
               'that matches each annotation set. Note this is the preferred way'
               'of ALT matching and should be used if available. In particular, '
@@ -168,7 +172,7 @@ class AnnotationOptions(VariantTransformsOptions):
               '--minimal_vep_alt_matching is ignored.'))
     parser.add_argument(
         '--minimal_vep_alt_matching',
-        type='bool', default=False, nargs='?', const=True,
+        type=bool, default=False, nargs='?', const=True,
         help=('If true, for ALT matching of annotation fields, the --minimal '
               'mode of VEP is simulated. Note that this can lead to ambiguous '
               'matches so by default this is False but if the VCF files are '
@@ -178,22 +182,22 @@ class AnnotationOptions(VariantTransformsOptions):
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
     parser.add_argument(
-        '--run_annotation_pipeline',
-        type='bool', default=False, nargs='?', const=True,
+        '--' + AnnotationOptions._RUN_FLAG,
+        type=bool, default=False, nargs='?', const=True,
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
-        '--annotation_output_dir',
+        '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default="",
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
               'structure as input files with a suffix added to them.'))
     parser.add_argument(
-        '--vep_image_uri',
+        '--' + AnnotationOptions._VEP_IMAGE_FLAG,
         default="",
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
-        '--vep_cache_path',
+        '--' + AnnotationOptions._VEP_CACHE_FLAG,
         default="",
         help=('The path for VEP cache on Google Cloud Storage.'))
     parser.add_argument(
@@ -208,9 +212,31 @@ class AnnotationOptions(VariantTransformsOptions):
               'core machine using two processes should help interleaving I/O '
               'vs CPU bound work.'))
 
-    # TODO(bashir2): Add validate() to check --vep_* arguments are sound when
-    # --run_annotation_pipeline is set (for example --annotation_output_dir
-    # should start with gs://).
+  def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
+    args_dict = vars(parsed_args)
+    if args_dict[AnnotationOptions._RUN_FLAG]:
+      output_dir = args_dict[AnnotationOptions._OUTPUT_DIR_FLAG]  # type: str
+      if not output_dir or not output_dir.startswith('gs://'):
+        raise ValueError('Flag {} should start with gs://, got {}'.format(
+            AnnotationOptions._OUTPUT_DIR_FLAG, output_dir))
+      vep_image = args_dict[AnnotationOptions._VEP_IMAGE_FLAG]  # type: str
+      if not vep_image:
+        raise ValueError('Flag {} is not set.'.format(
+            AnnotationOptions._VEP_IMAGE_FLAG))
+      vep_cache = args_dict[AnnotationOptions._VEP_CACHE_FLAG]  # type: str
+      if not vep_cache or not vep_cache.startswith('gs://'):
+        raise ValueError('Flag {} should start with gs://, got {}'.format(
+            AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
+    else:
+      for flag in [AnnotationOptions._VEP_IMAGE_FLAG,
+                   AnnotationOptions._VEP_CACHE_FLAG,
+                   AnnotationOptions._OUTPUT_DIR_FLAG]:
+        if flag not in args_dict:
+          raise AssertionError('Flag {} not found in args_dict.'.format(flag))
+        if args_dict[flag]:
+          raise ValueError('Flag {} is set but {} is not.'.format(
+              flag, AnnotationOptions._RUN_FLAG))
 
 
 class FilterOptions(VariantTransformsOptions):

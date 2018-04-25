@@ -16,7 +16,11 @@
 
 import unittest
 
+import argparse
 import collections
+
+from typing import List  # pylint: disable=unused-import
+
 import mock
 
 from apache_beam.io.gcp.internal.clients import bigquery
@@ -62,3 +66,51 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client.datasets.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
     self.assertRaises(ValueError, self.options.validate, args, client)
+
+
+class AnnotationOptionsTest(unittest.TestCase):
+
+  def setUp(self):
+    self._options = variant_transform_options.AnnotationOptions()
+
+  def make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    parser = argparse.ArgumentParser()
+    self._options.add_arguments(parser)
+    namespace, remining_args = parser.parse_known_args(args)
+    assert not remining_args
+    return namespace
+
+  def test_validate_okay(self):
+    """Tests that no exceptions are raised for valid arguments."""
+    args = self.make_args(['--run_annotation_pipeline',
+                           '--annotation_output_dir', 'gs://GOOD_DIR',
+                           '--vep_image_uri', 'AN_IMAGE',
+                           '--vep_cache_path', 'gs://VEP_CACHE'])
+    self._options.validate(args)
+
+  def test_invalid_output_dir(self):
+    args = self.make_args(['--run_annotation_pipeline',
+                           '--annotation_output_dir', 'BAD_DIR',
+                           '--vep_image_uri', 'AN_IMAGE',
+                           '--vep_cache_path', 'gs://VEP_CACHE'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_no_image(self):
+    args = self.make_args(['--run_annotation_pipeline',
+                           '--annotation_output_dir', 'BAD_DIR',
+                           '--vep_cache_path', 'gs://VEP_CACHE'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_invalid_vep_cache(self):
+    args = self.make_args(['--run_annotation_pipeline',
+                           '--annotation_output_dir', 'gs://GOOD_DIR',
+                           '--vep_image_uri', 'AN_IMAGE',
+                           '--vep_cache_path', 'VEP_CACHE'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_run_not_set(self):
+    args = self.make_args(['--annotation_output_dir', 'gs://GOOD_DIR',
+                           '--vep_image_uri', 'AN_IMAGE',
+                           '--vep_cache_path', 'gs://VEP_CACHE'])
+    self.assertRaises(ValueError, self._options.validate, args)
