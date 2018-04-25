@@ -20,7 +20,7 @@ import unittest
 
 from gcp_variant_transforms.libs import variant_partition
 from gcp_variant_transforms.libs.variant_partition import  \
-  _DEFAULT_PARTITION_NO as default_partitions_no
+  _DEFAULT_NUM_PARTITIONS as default_num_partitions
 from gcp_variant_transforms.libs.variant_partition import \
   _RESERVED_PARTITIONS as reserved_partitions
 
@@ -30,7 +30,7 @@ class VariantPartitionTest(unittest.TestCase):
   def test_no_config(self):
     config = variant_partition.VariantPartition()
     self.assertTrue(isinstance(config, variant_partition.VariantPartition))
-    self.assertEqual(config.get_num_partitions(), default_partitions_no)
+    self.assertEqual(config.get_num_partitions(), default_num_partitions)
     self.assertEqual(config.get_default_partition_index(), -1)
     self.assertFalse(config.is_default_partition_absent())
 
@@ -266,6 +266,12 @@ class VariantPartitionTest(unittest.TestCase):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
           "partition_config_redundant_full_chr.yaml")
+      self.fail('Broken config file should throw an exception')
+
+    with self.assertRaises(ValueError):
+      _ = variant_partition.VariantPartition(
+        "gcp_variant_transforms/testing/data/misc/"
+        "partition_config_conflicting_full_chr.yaml")
       self.fail('Broken config file should throw an exception')
 
     with self.assertRaises(ValueError):
