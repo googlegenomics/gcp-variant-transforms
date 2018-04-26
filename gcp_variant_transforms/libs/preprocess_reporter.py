@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generates conflicts report.
+"""Generates preprocess report.
 
 The report is aimed to help the user to easily import the malformed/incompatible
 VCF files. It contains two parts. The first part reports the header fields that
@@ -20,29 +20,34 @@ have conflicting definitions across multiple VCF files, by providing the
 conflicting definitions, the corresponding file paths, and the suggested
 resolutions. The second part contains the undefined header fields and the
 inferred definitions.
-TODO(yifangchen): Eventually, it also contains the malformed records.
+TODO(allieychen): Eventually, it also contains the malformed records and the
+resource estimation.
 """
 
 from typing import Dict, List, Union  # pylint: disable=unused-import
 
 from apache_beam.io.filesystems import FileSystems
+from apache_beam import pvalue
 
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
 from gcp_variant_transforms.transforms.merge_header_definitions import Definition  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeaderDefinitions  # pylint: disable=unused-import
 
 
-_HEADER_LINE = 'ID;Conflicts;Proposed Resolution\n'
+_HEADER_LINE = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution\n'
 _NO_CONFLICTS_MESSAGE = 'No conflicts found.'
 _NO_SOLUTION_MESSAGE = 'Not resolved.'
 _UNDEFINED_HEADER_MESSAGE = 'Undefined header.'
+_PADDING_CHARACTER = ' '
+_DELIMITER = '\t'
 
 
-def generate_conflicts_report(header_definitions,
-                              file_path,
-                              resolved_headers=None,
-                              inferred_headers=None):
+def generate_report(header_definitions,
+                    file_path,
+                    resolved_headers=None,
+                    inferred_headers=None):
   # type: (VcfHeaderDefinitions, str, VcfHeader, VcfHeader) -> None
   """Generates a report.
 
@@ -59,12 +64,16 @@ def generate_conflicts_report(header_definitions,
   inferred_headers = inferred_headers or VcfHeader()
   content_lines = []
   content_lines.extend(_generate_conflicting_headers_lines(
-      _extract_conflicts(header_definitions.formats), resolved_headers.formats))
+      _extract_conflicts(header_definitions.infos), resolved_headers.infos,
+      vcf_header_io.HeaderTypeConstants.INFO))
   content_lines.extend(_generate_conflicting_headers_lines(
-      _extract_conflicts(header_definitions.infos), resolved_headers.infos))
-  content_lines.extend(_generate_inferred_headers_lines(inferred_headers.infos))
-  content_lines.extend(_generate_inferred_headers_lines(
-      inferred_headers.formats))
+      _extract_conflicts(header_definitions.formats), resolved_headers.formats,
+      vcf_header_io.HeaderTypeConstants.FORMAT))
+  if not isinstance(inferred_headers, pvalue.EmptySideInput):
+    content_lines.extend(_generate_inferred_headers_lines(
+        inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
+    content_lines.extend(_generate_inferred_headers_lines(
+        inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
   _write_to_report(content_lines, file_path)
 
 
@@ -84,55 +93,75 @@ def _extract_conflicts(
 
 def _generate_conflicting_headers_lines(
     conflicts,  # type: Dict[str, Dict[Definition, List[str]]]
-    resolved_headers  # type: Dict[str, Dict[str, Union[str, int]]
+    resolved_headers,  # type: Dict[str, Dict[str, Union[str, int]]
+    category  # type: str
     ):
   # type: (...) -> List[str]
   """Returns the conflicting headers lines for the report.
 
-  The conflicting definitions, the file names and the resolutions are included
-  in the contents.
+  To better align contents in the report so that it can be viewed easily, for
+  every unique ID, generate several rows with the following steps.
+  - Step 1: The first row starts with The ID, the category('FOMRAT' or 'INFO'),
+    one conflicting definition, one file name and the resolution, separated by
+    the ``_DELIMITER ``.
+  - Step 2: If there there are more files having the same definition as the
+    previous step, list each file path in one separate row by filling all other
+    columns using ``_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
+  - Step 3: If there are more conflicting definitions, generate a new row with
+    one conflicting definition, one file path, and fill the ID, the category and
+    the resolution with `_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
+  - Repeat step 2 and step 3 until there are no more conflicts.
   Output example:
-  (NS;num=1 type=Float in ['file1','file2'], num=1 type=Integer in ['file3'];
-  num=1 type=Float)
+  DP\tFORMAT\tnum=1 type=Float\tfile1\tnum=1 type=Float
+   \t \t \tfile2\t
+   \t \tnum=1 type=Integer\tfile3\t
   """
   content_lines = []
   for field_id, definitions_to_files_map in conflicts.iteritems():
-    row = [field_id,
-           _extract_definitions_and_file_names(definitions_to_files_map),
-           _extract_resolution(resolved_headers, field_id)]
-    content_lines.append(';'.join(row))
+    first_item = True
+    for definition, file_names in definitions_to_files_map.iteritems():
+      if first_item:
+        row = [field_id,
+               category,
+               _format_definition(definition.num, definition.type),
+               file_names[0],
+               _extract_resolution(resolved_headers, field_id)]
+        first_item = False
+      else:
+        row = [_PADDING_CHARACTER,
+               _PADDING_CHARACTER,
+               _format_definition(definition.num, definition.type),
+               file_names[0],
+               _PADDING_CHARACTER]
+      content_lines.append(_DELIMITER.join(row))
+      for file_name in file_names[1:]:
+        row = [_PADDING_CHARACTER,
+               _PADDING_CHARACTER,
+               _PADDING_CHARACTER,
+               file_name,
+               _PADDING_CHARACTER]
+        content_lines.append(_DELIMITER.join(row))
   return content_lines
 
 
-def _generate_inferred_headers_lines(inferred_headers):
-  # type: (Dict[str, Dict[str, Union[str, int]]]) -> List[str]
+def _generate_inferred_headers_lines(inferred_headers, category):
+  # type: (Dict[str, Dict[str, Union[str, int]]], str) -> List[str]
   """Returns the inferred headers lines for the report.
 
-  The field ID and the inferred header definitions are included in the contents.
+  The field ID, category (FORMAT or INFO), and the inferred header definitions
+  are included in the contents.
   Output example:
-  NS;Undefined header;num=1 type=Float
+  NS\tFORMAT\tUndefined header.\t \tnum=1 type=Float
   """
   content_lines = []
   for field_id in inferred_headers.keys():
     row = [field_id,
+           category,
            _UNDEFINED_HEADER_MESSAGE,
+           _PADDING_CHARACTER,
            _extract_resolution(inferred_headers, field_id)]
-    content_lines.append(';'.join(row))
+    content_lines.append(_DELIMITER.join(row))
   return content_lines
-
-
-def _extract_definitions_and_file_names(definition_to_files_map):
-  # type: (Dict[Definition, List[str]]) -> str
-  """Extracts the definitions and related file names.
-
-  Output example:
-  num=1 type=Float in ['file1','file2'] num=1 type=Integer in ['file3']
-  """
-  conflict_definitions = []
-  for definition, file_names in definition_to_files_map.iteritems():
-    definition = _format_definition(definition.num, definition.type)
-    conflict_definitions.append(definition + ' in ' + str(file_names))
-  return ', '.join(conflict_definitions)
 
 
 def _extract_resolution(header, filed_id):
@@ -162,10 +191,11 @@ def _write_to_report(contents, file_path):
   """Generates the report in ``file_path``.
 
   Output example:
-  ID;Conflicts;Proposed Resolution
-  (NS;num=1 type=Float in ['file1','file2'], num=1 type=Integer in ['file3'];
-  num=1 type=Float)
-  DP;Undefined header;num=1 type=Float
+  ID\tCategory\tConflicts\tFile Paths\tProposed Resolution
+  DP\tFORMAT\tnum=1 type=Float\tfile1\tnum=1 type=Float
+   \t \t \tfile2\t
+   \t \tnum=1 type=Integer\tfile3\t
+  NS\tFORMAT\tUndefined header\t \tnum=1 type=Float
   """
   with FileSystems.create(file_path) as file_to_write:
     if not contents:

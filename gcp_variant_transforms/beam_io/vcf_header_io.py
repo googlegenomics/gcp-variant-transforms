@@ -229,7 +229,7 @@ class ReadAllVcfHeaders(PTransform):
     return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
-class _HeaderTypeConstants(object):
+class HeaderTypeConstants(object):
   INFO = 'INFO'
   FILTER = 'FILTER'
   ALT = 'ALT'
@@ -259,11 +259,11 @@ class _WriteVcfHeaderFn(beam.DoFn):
 
   def process(self, header):
     with FileSystems.create(self._file_path) as self._file_to_write:
-      self._write_headers_by_type(_HeaderTypeConstants.INFO, header.infos)
-      self._write_headers_by_type(_HeaderTypeConstants.FILTER, header.filters)
-      self._write_headers_by_type(_HeaderTypeConstants.ALT, header.alts)
-      self._write_headers_by_type(_HeaderTypeConstants.FORMAT, header.formats)
-      self._write_headers_by_type(_HeaderTypeConstants.CONTIG, header.contigs)
+      self._write_headers_by_type(HeaderTypeConstants.INFO, header.infos)
+      self._write_headers_by_type(HeaderTypeConstants.FILTER, header.filters)
+      self._write_headers_by_type(HeaderTypeConstants.ALT, header.alts)
+      self._write_headers_by_type(HeaderTypeConstants.FORMAT, header.formats)
+      self._write_headers_by_type(HeaderTypeConstants.CONTIG, header.contigs)
       self._file_to_write.write(self.FINAL_HEADER_LINE)
 
   def _write_headers_by_type(self, header_type, headers):

@@ -91,7 +91,7 @@ class _DefinitionsMerger(object):
     for key, definitions_to_files_map in second.iteritems():
       for definition, file_names in definitions_to_files_map.iteritems():
         first[key].setdefault(definition, [])
-        first[key][definition].extend(file_names)
+        first[key][definition].extend(str(s) for s in file_names)
         first[key][definition] = (
             first[key][definition][:self._MAX_NUM_FILE_NAMES])
 

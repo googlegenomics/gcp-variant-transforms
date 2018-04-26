@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test cases for conflicts_reporter module."""
+"""Test cases for preprocess_reporter module."""
 
 from collections import OrderedDict
 from typing import List  # pylint: disable=unused-import
@@ -23,17 +23,14 @@ from vcf.parser import _Format as Format
 from vcf.parser import _Info as Info
 
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
-from gcp_variant_transforms.libs import conflicts_reporter
+from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeaderDefinitions
 from gcp_variant_transforms.transforms.merge_header_definitions import Definition
 
 
-class ConflictsReporterTest(unittest.TestCase):
-
-  # TODO(yifangchen): Move the default report name to be the default value of
-  # the path argument.
-  _REPORT_NAME = 'header_conflicts_report.csv'
+class PreprocessReporterTest(unittest.TestCase):
+  _REPORT_NAME = 'report.tsv'
 
   def _generate_report_and_assert_contents_equal(self,
                                                  expected_content,
@@ -42,11 +39,12 @@ class ConflictsReporterTest(unittest.TestCase):
                                                  inferred_headers=None):
     # type: (List[str], VcfHeaderDefinitions, VcfHeader, VcfHeader) -> None
     with temp_dir.TempDir() as tempdir:
-      file_path = FileSystems.join(tempdir.get_path(), self._REPORT_NAME)
-      conflicts_reporter.generate_conflicts_report(header_definitions,
-                                                   file_path,
-                                                   resolved_headers,
-                                                   inferred_headers)
+      file_path = FileSystems.join(tempdir.get_path(),
+                                   PreprocessReporterTest._REPORT_NAME)
+      preprocess_reporter.generate_report(header_definitions,
+                                          file_path,
+                                          resolved_headers,
+                                          inferred_headers)
       with FileSystems.open(file_path) as f:
         reader = f.readlines()
         self.assertItemsEqual(reader, expected_content)
@@ -61,7 +59,7 @@ class ConflictsReporterTest(unittest.TestCase):
     formats = OrderedDict([('NS', Format('NS', 1, 'Float', 'Number samples'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
 
-    expected = [conflicts_reporter._NO_CONFLICTS_MESSAGE]
+    expected = [preprocess_reporter._NO_CONFLICTS_MESSAGE]
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
                                                     resolved_headers)
@@ -76,10 +74,11 @@ class ConflictsReporterTest(unittest.TestCase):
     resolved_headers = VcfHeader(infos=infos)
 
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('NS;'
-         'num=1 type=Float in [\'file2\'], num=1 type=Integer in [\'file1\'];'
-         'num=1 type=Float')
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'NS', 'INFO', 'num=1 type=Float', 'file2', 'num=1 type=Float\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=1 type=Integer', 'file1', ' '])
     ]
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
@@ -97,11 +96,13 @@ class ConflictsReporterTest(unittest.TestCase):
     resolved_headers = VcfHeader(infos=infos)
 
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('NS;'
-         'num=1 type=Float in [\'file1\', \'file2\'], '
-         'num=1 type=Integer in [\'file3\'];'
-         'num=1 type=Float')
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'NS', 'INFO', 'num=1 type=Float', 'file1', 'num=1 type=Float\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', ' ', 'file2', ' \n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=1 type=Integer', 'file3', ' '])
     ]
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
@@ -121,13 +122,16 @@ class ConflictsReporterTest(unittest.TestCase):
     resolved_headers = VcfHeader(infos=infos, formats=formats)
 
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('DP;'
-         'num=2 type=Float in [\'file3\'], num=2 type=Integer in [\'file4\'];'
-         'num=2 type=Float\n'),
-        ('NS;'
-         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
-         'num=1 type=Float'),
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'NS', 'INFO', 'num=1 type=Float', 'file1', 'num=1 type=Float\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=1 type=Integer', 'file2', ' \n']),
+        (preprocess_reporter._DELIMITER).join([
+            'DP', 'FORMAT', 'num=2 type=Float', 'file3', 'num=2 type=Float\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=2 type=Integer', 'file4', ' '])
+
     ]
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
@@ -139,10 +143,11 @@ class ConflictsReporterTest(unittest.TestCase):
                                         Definition(1, 'Integer'): ['file2']}}
 
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('NS;'
-         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
-         'Not resolved.')
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'NS', 'INFO', 'num=1 type=Float', 'file1', 'Not resolved.\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=1 type=Integer', 'file2', ' ']),
     ]
 
     self._generate_report_and_assert_contents_equal(expected,
@@ -154,8 +159,9 @@ class ConflictsReporterTest(unittest.TestCase):
 
     inferred_headers = VcfHeader(formats=formats)
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('DP;Undefined header.;num=2 type=Float')
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'DP', 'FORMAT', 'Undefined header.', ' ', 'num=2 type=Float'])
     ]
     self._generate_report_and_assert_contents_equal(
         expected, header_definitions, inferred_headers=inferred_headers)
@@ -172,13 +178,13 @@ class ConflictsReporterTest(unittest.TestCase):
     resolved_headers = VcfHeader(infos=infos, formats=formats)
     inferred_headers = VcfHeader(formats=formats)
     expected = [
-        conflicts_reporter._HEADER_LINE,
-        ('NS;'
-         'num=1 type=Float in [\'file1\'], num=1 type=Integer in [\'file2\'];'
-         'num=1 type=Float\n'),
-        ('DP;'
-         'Undefined header.;'
-         'num=2 type=Float')
+        preprocess_reporter._HEADER_LINE,
+        (preprocess_reporter._DELIMITER).join([
+            'NS', 'INFO', 'num=1 type=Float', 'file1', 'num=1 type=Float\n']),
+        (preprocess_reporter._DELIMITER).join([
+            ' ', ' ', 'num=1 type=Integer', 'file2', ' \n']),
+        (preprocess_reporter._DELIMITER).join([
+            'DP', 'FORMAT', 'Undefined header.', ' ', 'num=2 type=Float'])
     ]
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
