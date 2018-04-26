@@ -33,7 +33,7 @@ class PartitionVariantsTest(unittest.TestCase):
   """Test cases for the ``PartitionVariants`` transform."""
 
   def _get_standard_variants(self):
-    # Valid varints reference_name.strip().lower() will successfully matched to
+    # Valid variants reference_name.strip().lower() will successfully matched to
     #   re.compile(r'^(chr)?([0-9][0-9]?)$')
     variants = []
     # Partition 0
@@ -60,27 +60,27 @@ class PartitionVariantsTest(unittest.TestCase):
 
   def _get_nonstandard_variants(self):
     variants = []
-    variants.append(vcfio.Variant(reference_name='NOTchr1', start=0))
-    variants.append(vcfio.Variant(reference_name='NOTch3', start=0))
-    variants.append(vcfio.Variant(reference_name='NOTc4', start=0))
     variants.append(vcfio.Variant(reference_name='NOT6', start=0))
+    variants.append(vcfio.Variant(reference_name='NOTch3', start=0))
+    variants.append(vcfio.Variant(reference_name='NOTchr1', start=0))
+    variants.append(vcfio.Variant(reference_name='chr99', start=0))
     variants.append(vcfio.Variant(reference_name='NOT07', start=0))
     variants.append(vcfio.Variant(reference_name='chr008', start=0))
-    variants.append(vcfio.Variant(reference_name='chr010', start=0))
-    variants.append(vcfio.Variant(reference_name='chr0', start=0))
     variants.append(vcfio.Variant(reference_name='chr23', start=0))
-    variants.append(vcfio.Variant(reference_name='chr99', start=0))
     variants.append(vcfio.Variant(reference_name='chrX', start=0))
-    variants.append(vcfio.Variant(reference_name='chrY', start=0))
     variants.append(vcfio.Variant(reference_name='chrM', start=0))
+    variants.append(vcfio.Variant(reference_name='NOTc4', start=0))
+    variants.append(vcfio.Variant(reference_name='chr0', start=0))
+    variants.append(vcfio.Variant(reference_name='chrY', start=0))
     # All these variants will not match to standard reference_name Reg Exp, thus
     # they will all end up in the default partition.
-    return variants, variants
+    return variants, variants[0:2], variants[2:4], variants[4:9], variants[9:12]
 
   def test_partition_variants(self):
     standard_variants, par00, par01, par02, par05, par09, par21 = \
       self._get_standard_variants()
-    nonstandard_variants, par22 = self._get_nonstandard_variants()
+    nonstandard_variants, par22, par24, par25, par26 = \
+      self._get_nonstandard_variants()
 
     partitioner = variant_partition.VariantPartition()
     pipeline = TestPipeline()
@@ -88,8 +88,8 @@ class PartitionVariantsTest(unittest.TestCase):
         pipeline
         | Create(standard_variants + nonstandard_variants)
         | 'PartitionVariants' >> Partition(
-            partition_variants.PartitionVariants(partitioner), 22 + 1))
-
+            partition_variants.PartitionVariants(partitioner),
+            partitioner.get_num_partitions()))
     assert_that(partitions[0], equal_to(par00))
     assert_that(partitions[1], equal_to(par01), label='p1')
     assert_that(partitions[2], equal_to(par02), label='p2')
@@ -97,6 +97,9 @@ class PartitionVariantsTest(unittest.TestCase):
     assert_that(partitions[9], equal_to(par09), label='p9')
     assert_that(partitions[21], equal_to(par21), label='p21')
     assert_that(partitions[22], equal_to(par22), label='p22')
+    assert_that(partitions[24], equal_to(par24), label='p24')
+    assert_that(partitions[25], equal_to(par25), label='p25')
+    assert_that(partitions[26], equal_to(par26), label='p26')
 
     assert_that(partitions[3], equal_to([]), label='p3')
     assert_that(partitions[4], equal_to([]), label='p4')
@@ -114,4 +117,5 @@ class PartitionVariantsTest(unittest.TestCase):
     assert_that(partitions[18], equal_to([]), label='p18')
     assert_that(partitions[19], equal_to([]), label='p19')
     assert_that(partitions[20], equal_to([]), label='p20')
+    assert_that(partitions[23], equal_to([]), label='p23')
     pipeline.run()
