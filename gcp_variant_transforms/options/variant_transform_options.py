@@ -162,7 +162,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'corresponding alternate alleles. [EXPERIMENTAL]'))
     parser.add_argument(
         '--use_allele_num',
-        type=bool, default=False, nargs='?', const=True,
+        type='bool', default=False, nargs='?', const=True,
         help=('If true, uses the "ALLELE_NUM" annotation to determine the ALT'
               'that matches each annotation set. Note this is the preferred way'
               'of ALT matching and should be used if available. In particular, '
@@ -172,7 +172,7 @@ class AnnotationOptions(VariantTransformsOptions):
               '--minimal_vep_alt_matching is ignored.'))
     parser.add_argument(
         '--minimal_vep_alt_matching',
-        type=bool, default=False, nargs='?', const=True,
+        type='bool', default=False, nargs='?', const=True,
         help=('If true, for ALT matching of annotation fields, the --minimal '
               'mode of VEP is simulated. Note that this can lead to ambiguous '
               'matches so by default this is False but if the VCF files are '
@@ -183,7 +183,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'VEP_web_documentation.pdf'))
     parser.add_argument(
         '--' + AnnotationOptions._RUN_FLAG,
-        type=bool, default=False, nargs='?', const=True,
+        type='bool', default=False, nargs='?', const=True,
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(

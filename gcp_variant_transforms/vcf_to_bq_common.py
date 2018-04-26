@@ -55,8 +55,6 @@ def parse_args(argv, command_line_options):
       specifies the options that will be added to parser.
   """
   parser = argparse.ArgumentParser()
-  # TODO(bashir2): The next line is not needed; instead of type='bool' use
-  # type=bool (without quotes) when calling parser.add_argument
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   options = [option() for option in command_line_options]
   for transform_options in options:
