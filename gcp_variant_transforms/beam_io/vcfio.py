@@ -654,7 +654,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
   def __init__(self,
                file_pattern,
-               representative_headers=None,
+               representative_header_lines=None,
                compression_type=CompressionTypes.AUTO,
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,
                validate=True,
@@ -662,7 +662,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
                                      validate=validate)
-    self._representative_headers = representative_headers
+    self._representative_header_lines = representative_header_lines
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
@@ -674,7 +674,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         self._pattern,
         self._compression_type,
         self._allow_malformed_records,
-        self._representative_headers,
+        self._representative_header_lines,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -691,13 +691,12 @@ class _VcfSource(filebasedsource.FileBasedSource):
                  file_pattern,
                  compression_type,
                  allow_malformed_records,
-                 representative_headers=None,
+                 representative_header_lines=None,
                  **kwargs):
-      # If `representative_headers` is given, header lines in `file_name` are
-      # ignored.
-      self._header_lines = (
-          representative_headers if representative_headers else [])
-      self._representative_headers_given = representative_headers is not None
+      # If `representative_header_lines` is given, header lines in `file_name`
+      # are ignored.
+      self._header_lines = []
+      self._representative_header_lines = representative_header_lines
       self._last_record = None
       self._file_name = file_name
       self._allow_malformed_records = allow_malformed_records
@@ -709,9 +708,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
           True,  # strip_trailing_newlines
           coders.StrUtf8Coder(),  # coder
           validate=False,
-          header_processor_fns=(
-              lambda x: x.startswith('#'),
-              None if representative_headers else self._store_header_lines),
+          header_processor_fns=(lambda x: x.startswith('#'),
+                                self._store_header_lines),
           **kwargs)
 
       self._text_lines = text_source.read_records(self._file_name,
@@ -723,14 +721,19 @@ class _VcfSource(filebasedsource.FileBasedSource):
             'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
 
     def _store_header_lines(self, header_lines):
-      self._header_lines = header_lines
+      if self._representative_header_lines:
+        # Replace header lines with given representative header lines.
+        # We need to keep the last line of the header from the file because it
+        # contains the sample IDs, which is unique per file.
+        self._header_lines = (
+            self._representative_header_lines + header_lines[-1:])
+      else:
+        self._header_lines = header_lines
 
     def _create_generator(self):
       header_processed = False
       for text_line in self._text_lines:
-        if (not self._representative_headers_given and
-            not header_processed and
-            self._header_lines):
+        if not header_processed and self._header_lines:
           for header in self._header_lines:
             self._last_record = header
             yield self._last_record
@@ -892,7 +895,7 @@ class ReadFromVcf(PTransform):
   def __init__(
       self,
       file_pattern=None,
-      representative_headers=None,
+      representative_header_lines=None,
       compression_type=CompressionTypes.AUTO,
       validate=True,
       allow_malformed_records=False,
@@ -902,8 +905,9 @@ class ReadFromVcf(PTransform):
     Args:
       file_pattern (str): The file path to read from either as a single file or
         a glob pattern.
-      representative_headers(): Header definitions to be used for parsing VCF
-        files. If supplied, header definitions in VCF files are ignored.
+      representative_header_lines(list of str): Header definitions to be used
+        for parsing VCF files. If supplied, header definitions in VCF files are
+        ignored.
       compression_type (str): Used to handle compressed input files.
         Typical value is :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
@@ -914,7 +918,7 @@ class ReadFromVcf(PTransform):
     super(ReadFromVcf, self).__init__(**kwargs)
     self._source = _VcfSource(
         file_pattern,
-        representative_headers,
+        representative_header_lines,
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records)
@@ -924,10 +928,10 @@ class ReadFromVcf(PTransform):
 
 
 def _create_vcf_source(
-    file_pattern=None, representative_headers=None, compression_type=None,
+    file_pattern=None, representative_header_lines=None, compression_type=None,
     allow_malformed_records=None):
   return _VcfSource(file_pattern=file_pattern,
-                    representative_headers=representative_headers,
+                    representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records)
 
@@ -948,7 +952,7 @@ class ReadAllFromVcf(PTransform):
 
   def __init__(
       self,
-      representative_headers=None,
+      representative_header_lines=None,
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
       compression_type=CompressionTypes.AUTO,
       allow_malformed_records=False,
@@ -956,8 +960,9 @@ class ReadAllFromVcf(PTransform):
     """Initialize the :class:`ReadAllFromVcf` transform.
 
     Args:
-      representative_headers(): Header definitions to be used for parsing VCF
-        files. If supplied, header definitions in VCF files are ignored.
+      representative_header_lines(list of str): Header definitions to be used
+        for parsing VCF files. If supplied, header definitions in VCF files are
+        ignored.
       desired_bundle_size (int): Desired size of bundles that should be
         generated when splitting this source into bundles. See
         :class:`~apache_beam.io.filebasedsource.FileBasedSource` for more
@@ -973,7 +978,7 @@ class ReadAllFromVcf(PTransform):
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_source,
-        representative_headers=representative_headers,
+        representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records)
     self._read_all_files = filebasedsource.ReadAllFiles(

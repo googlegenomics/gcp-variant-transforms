@@ -81,3 +81,17 @@ class GetMergedVcfHeadersTest(unittest.TestCase):
       self.fail('Non existent VCF file must throw an exception.')
     except ValueError:
       pass
+
+  def test_get_header_lines(self):
+    lines = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\n',
+        '19	1234567	mi1	G	T	50	PASS	NS=3	GT:GQ:DP	0/1:35:4	0/2:17:2',]
+    with temp_dir.TempDir() as tempdir:
+      file_path = self._create_temp_vcf_file(lines, tempdir)
+      header_lines = vcf_header_parser.get_header_lines(file_path)
+      self.assertEqual(header_lines, lines[:-2])
