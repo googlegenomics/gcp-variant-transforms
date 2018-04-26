@@ -73,7 +73,7 @@ _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 
 
 def get_bigquery_sanitized_field_name(field_name):
-  # (str) -> str
+  # type: (str) -> str
   """Returns the sanitized field name according to BigQuery restrictions.
 
   BigQuery field names must follow `[a-zA-Z][a-zA-Z0-9_]*`. This method converts

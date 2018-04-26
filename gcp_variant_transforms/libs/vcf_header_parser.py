@@ -32,7 +32,7 @@ def get_vcf_headers(input_file):
       files matching the input_pattern of the job. It can be local or
       remote (e.g. on GCS).
   Returns:
-    :class:`vcf_header_io.VcfHeader` specifying header info.
+    VCF header info.
   Raises:
     ValueError: If ``input_file`` is not a valid VCF file (e.g. bad format,
     empty, non-existent).

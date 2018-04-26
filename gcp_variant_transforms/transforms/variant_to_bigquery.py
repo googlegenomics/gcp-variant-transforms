@@ -24,7 +24,6 @@ from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: di
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
-from gcp_variant_transforms.libs import vcf_header_parser  # pylint: disable=unused-import
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms import limit_write
 

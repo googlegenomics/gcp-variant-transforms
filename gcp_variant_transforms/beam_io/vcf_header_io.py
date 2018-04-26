@@ -65,18 +65,17 @@ class VcfHeader(object):
               ):
     """Initializes a VcfHeader object.
 
+    It keeps the order of values in the input dictionaries. Order is important
+    in some fields like `contigs` and for ensuring order is unchanged in
+    VCF->VCF pipelines.
+
     Args:
-      infos: A dictionary mapping info keys (str) to vcf info metadata
-        values (:class:`~vcf.parser._Info`).
-      filters: A dictionary mapping filter keys (str) to vcf filter
-        metadata values (:class:`~vcf.parser._Filter`).
-      alts: A dictionary mapping alt keys (str) to vcf alt metadata
-        values (:class:`~vcf.parser._Alt`).
-      formats: A dictionary mapping format keys (str) to vcf format
-        metadata values (:class:`~vcf.parser._Format`).
-      contigs: A dictionary mapping contig keys (str) to vcf contig
-        metadata values (:class:`~vcf.parser._Contig`).
-      file_name: A str representing the file name of the vcf file.
+      infos: A dictionary mapping info keys to vcf info metadata values.
+      filters: A dictionary mapping filter keys to vcf filter metadata values.
+      alts: A dictionary mapping alt keys to vcf alt metadata values.
+      formats: A dictionary mapping format keys to vcf format metadata values.
+      contigs: A dictionary mapping contig keys to vcf contig metadata values.
+      file_name: The file name of the vcf file.
     """
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
@@ -100,11 +99,11 @@ class VcfHeader(object):
                                                  self.contigs]])
 
   def _values_asdict(self, header):
-    """Converts PyVCF header values to dictionaries."""
+    """Converts PyVCF header values to ordered dictionaries."""
     ordered_dict = OrderedDict()
     for key in header:
       # These methods were not designed to be protected. They start with an
-      # underscore to avoid confilcts with field names. For more info, see
+      # underscore to avoid conflicts with field names. For more info, see
       # https://docs.python.org/2/library/collections.html#collections.namedtuple
       ordered_dict[key] = header[key]._asdict()  # pylint: disable=W0212
     return ordered_dict
