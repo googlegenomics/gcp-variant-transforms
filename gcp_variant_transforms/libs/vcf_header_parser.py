@@ -51,6 +51,24 @@ def get_vcf_headers(input_file):
                                  file_name=input_file)
 
 
+def get_metadata_header_lines(input_file):
+  """Returns header lines from the given VCF file ``input_file``.
+
+  Only returns lines starting with ## and not #.
+
+  Args:
+    input_file (str): A string specifying the path to a VCF file.
+      It can be local or remote (e.g. on GCS).
+  Returns:
+    A list containing header lines of ``input_file``.
+  Raises:
+    ValueError: If ``input_file`` does not exist.
+  """
+  if not FileSystems.exists(input_file):
+    raise ValueError('{} does not exist'.format(input_file))
+  return [line for line in _line_generator(input_file) if line.startswith('##')]
+
+
 def _line_generator(file_name):
   """Generator to return lines delimited by newline chars from ``file_name``."""
   with FileSystems.open(file_name) as f:
