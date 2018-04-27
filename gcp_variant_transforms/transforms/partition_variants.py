@@ -17,21 +17,17 @@
 from __future__ import absolute_import
 
 import apache_beam as beam
-from gcp_variant_transforms.libs import variant_partition
+from gcp_variant_transforms.beam_io import vcfio # pylint: disable=unused-import
+from gcp_variant_transforms.libs import variant_partition # pylint: disable=unused-import
 
 
 class PartitionVariants(beam.PartitionFn):
   """Partitions variants based on their reference_name."""
-  def __init__(
-      self,
-      partition  # type: variant_partition.VariantPartition
-      ):
-    assert isinstance(partition, variant_partition.VariantPartition)
+
+  def __init__(self, partition):
+    # type: (variant_partition.VariantPartition) -> None
     self._partition = partition
 
-  def partition_for(
-      self,
-      variant,  # type: Variant
-      num_partitions  # type: int
-      ):
+  def partition_for(self, variant, num_partitions):
+    # type: (vcfio.Variant, int) -> int
     return self._partition.get_partition(variant.reference_name, variant.start)

@@ -19,53 +19,46 @@ from __future__ import absolute_import
 import unittest
 
 from gcp_variant_transforms.libs import variant_partition
-from gcp_variant_transforms.libs.variant_partition import  \
-  _DEFAULT_NUM_PARTITIONS as default_num_partitions
-from gcp_variant_transforms.libs.variant_partition import \
-  _RESERVED_PARTITIONS as reserved_partitions
 
 
 class VariantPartitionTest(unittest.TestCase):
 
   def test_auto_partitioning(self):
     partitioner = variant_partition.VariantPartition()
-    self.assertTrue(isinstance(partitioner, variant_partition.VariantPartition))
-    self.assertEqual(partitioner.get_num_partitions(), default_num_partitions)
+    self.assertEqual(partitioner.get_num_partitions(),
+                     variant_partition._DEFAULT_NUM_PARTITIONS)
 
     # Checking standard reference_name formatted as: 'chr[0-9][0-9]'
-    for i in xrange(reserved_partitions):
-      self.assertEqual(partitioner.get_partition('chr'+str(i+1)), i)
+    for i in xrange(variant_partition._RESERVED_AUTO_PARTITIONS):
+      self.assertEqual(partitioner.get_partition('chr' + str(i + 1)), i)
     # Checking standard reference_name formatted as: '[0-9][0-9]'
-    for i in xrange(reserved_partitions):
-      self.assertEqual(partitioner.get_partition(str(i+1)), i)
+    for i in xrange(variant_partition._RESERVED_AUTO_PARTITIONS):
+      self.assertEqual(partitioner.get_partition(str(i + 1)), i)
 
     # Every other reference_name will be assigned to partitions >= 22
     self.assertGreaterEqual(partitioner.get_partition('chrY'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('chrX'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('chrM'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('chr23'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('chr30'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('Unknown'),
-                            reserved_partitions)
+                            variant_partition._RESERVED_AUTO_PARTITIONS)
 
-  def test_filed_partitioning(self):
+  def test_auto_partitioning_invalid_partitions(self):
     partitioner = variant_partition.VariantPartition()
-    self.assertTrue(isinstance(partitioner, variant_partition.VariantPartition))
-    self.assertEqual(partitioner.get_num_partitions(), default_num_partitions)
+    self.assertEqual(partitioner.get_num_partitions(),
+                     variant_partition._DEFAULT_NUM_PARTITIONS)
 
     with self.assertRaisesRegexp(ValueError, 'Cannot partition given input*'):
       partitioner.get_partition('chr1', -1)
-      self.fail('Negative position must fail partitioner.')
 
     with self.assertRaisesRegexp(ValueError, 'Cannot partition given input*'):
       partitioner.get_partition('', 1)
-      self.fail('Missing reference_name must fail partitioner.')
 
     with self.assertRaisesRegexp(ValueError, 'Cannot partition given input*'):
       partitioner.get_partition('  ', 1)
-      self.fail('Missing reference_name must fail partitioner.')

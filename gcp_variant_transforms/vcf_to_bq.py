@@ -72,6 +72,7 @@ _COMMAND_LINE_OPTIONS = [
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 
+
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
                                ):
   # type: (...) -> Optional(variant_merge_strategy.VariantMergeStrategy)
@@ -199,8 +200,8 @@ def run(argv=None):
           partitioner.get_num_partitions())
       merged = []
       for i in xrange(partitioner.get_num_partitions()):
-        merged.append((partitions[i] | 'MergeVariants' + str(i) >>
-                       merge_variants.MergeVariants(variant_merger)))
+        merged.append(partitions[i] | 'MergeVariants' + str(i) >>
+                      merge_variants.MergeVariants(variant_merger))
       variants = merged | 'FlattenPartitions' >> beam.Flatten()
     else:
       variants |= ('MergeVariants' >> merge_variants.MergeVariants(
