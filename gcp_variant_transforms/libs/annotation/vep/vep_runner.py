@@ -201,20 +201,20 @@ class VepRunner(object):
     # type: (List[str]) -> None
     flags_dict = pipeline_options.PipelineOptions(
         pipeline_args).get_all_options()
-    self._project = self._get_flag(flags_dict, ['project'])
-    self._region = self._get_flag(flags_dict, ['region'])
+    self._project = self._get_flag(flags_dict, 'project')
+    self._region = self._get_flag(flags_dict, 'region')
     # TODO(bahsir2): Fix the error messages of _check_flag since
     # --worker_machine_type has dest='machine_type'.
-    self._machine_type = self._get_flag(flags_dict, ['machine_type'])
+    self._machine_type = self._get_flag(flags_dict, 'machine_type')
     self._max_num_workers = self._get_flag(
-        flags_dict, ['max_num_workers', 'num_workers'])
+        flags_dict, 'max_num_workers', 'num_workers')
     if self._max_num_workers <= 0:
       raise ValueError(
           '--max_num_workers and --num_workers should be positive numbers, '
           'got: {}'.format(self._max_num_workers))
 
-  def _get_flag(self, pipeline_flags, expected_flags):
-    # type: (Dict[str, Any], List[str]) -> Any
+  def _get_flag(self, pipeline_flags, *expected_flags):
+    # type: (Dict[str, Any], str) -> Any
     for flag in expected_flags:
       if flag in pipeline_flags and pipeline_flags[flag]:
         logging.info('Using %s flag for annotation run: %s.',
