@@ -16,32 +16,23 @@
 
 from __future__ import absolute_import
 
-from collections import namedtuple
-from apache_beam.io.filesystems import FileSystems
-
 import vcf
 
-__all__ = ['HeaderFields', 'get_vcf_headers']
-
-
-# Stores parsed header information.
-#   - infos: Stores all `##INFO` header lines. Type is a ``dict`` with values
-#     equal to ``namedtuple`` defined in ``vcf.parser._Info``.
-#   - formats: Stores all `##FORMAT` header lines. Type is a ``dict`` with
-#     values equal to ``namedtuple`` defined in ``vcf.parser._Formats``.
-HeaderFields = namedtuple('HeaderFields', ['infos', 'formats'])
+from apache_beam.io.filesystems import FileSystems
+from gcp_variant_transforms.beam_io import vcf_header_io
 
 
 def get_vcf_headers(input_file):
-  """Returns VCF headers (FORMAT and INFO) from ``input_file``.
+  # type: (str) -> vcf_header_io.VcfHeader
+  """Returns VCF headers from ``input_file``.
 
   Args:
     input_file (str): A string specifying the path to the representative VCF
-    file, i.e., the VCF file that contains a header representative of all VCF
-    files matching the input_pattern of the job. It can be local or remote (e.g.
-    on GCS).
+      file, i.e., the VCF file that contains a header representative of all VCF
+      files matching the input_pattern of the job. It can be local or
+      remote (e.g. on GCS).
   Returns:
-    ``HeaderFields`` specifying header info.
+    VCF header info.
   Raises:
     ValueError: If ``input_file`` is not a valid VCF file (e.g. bad format,
     empty, non-existent).
@@ -52,7 +43,12 @@ def get_vcf_headers(input_file):
     vcf_reader = vcf.Reader(fsock=_line_generator(input_file))
   except (SyntaxError, StopIteration) as e:
     raise ValueError('Invalid VCF header: %s' % str(e))
-  return HeaderFields(vcf_reader.infos, vcf_reader.formats)
+  return vcf_header_io.VcfHeader(infos=vcf_reader.infos,
+                                 filters=vcf_reader.filters,
+                                 alts=vcf_reader.alts,
+                                 formats=vcf_reader.formats,
+                                 contigs=vcf_reader.contigs,
+                                 file_name=input_file)
 
 
 def _line_generator(file_name):

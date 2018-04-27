@@ -16,7 +16,9 @@
 
 from __future__ import absolute_import
 
+from typing import Callable, List  # pylint: disable=unused-import
 from apache_beam.testing.util import BeamAssertException
+from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 
 
 def items_equal(expected):
@@ -63,3 +65,19 @@ def header_vars_equal(expected):
     actual_vars = [vars(header) for header in actual]
     items_equal(expected_vars)(actual_vars)
   return _vars_equal
+
+
+def header_fields_equal_ignore_order(expected):
+  # type: (List[vcf_header_io.VcfHeader]) -> Callable
+  """Returns a function for checking presence of headers ignoring order.
+
+  Header fields have type `OrderedDict`, so this method essentially converts
+  them to `dict`, so that we can verify values ignoring order.
+  """
+  def _fields_equal(actual):
+    fields_to_check = ['alts', 'contigs', 'filters', 'formats', 'infos']
+    for field in fields_to_check:
+      expected_fields = [dict(getattr(header, field)) for header in expected]
+      actual_fields = [dict(getattr(header, field)) for header in actual]
+      items_equal(expected_fields)(actual_fields)
+  return _fields_equal

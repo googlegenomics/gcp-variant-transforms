@@ -20,12 +20,13 @@ import unittest
 from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 # This is intentionally breaking the style guide because without this the lines
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
-from gcp_variant_transforms.libs import vcf_header_parser
+
 
 class _CounterSpy(metrics_util.CounterInterface):
 
@@ -68,7 +69,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_no_change(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_parser.HeaderFields({}, {})
+    header_fields = vcf_header_io.VcfHeader()
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -94,7 +95,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_move_alt_info(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_parser.HeaderFields({}, {})
+    header_fields = vcf_header_io.VcfHeader()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
         split_alternate_allele_info_fields=True)
@@ -118,9 +119,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         desc='some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
         source=None,
         version=None)
-    header_fields = vcf_header_parser.HeaderFields(
-        infos={'CSQ': csq_info},
-        formats={})
+    header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
     return variant, header_fields
 
   def test_create_processed_variant_move_alt_info_and_annotation(self):
@@ -402,8 +401,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         id=None, num='.', type=None,
         desc='some desc Allele|Consequence|IMPACT|ALLELE_NUM',
         source=None, version=None)
-    header_fields = vcf_header_parser.HeaderFields(
-        infos={'CSQ': csq_info}, formats={})
+    header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
     variant = vcfio.Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
         # The following represent a SNV and an insertion, resp.
