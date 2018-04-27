@@ -138,8 +138,7 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     """
     infos = self._infer_undefined_info_fields(variant, defined_headers)
     formats = self._infer_undefined_format_fields(variant, defined_headers)
-    if infos or formats:
-      yield vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    yield vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
 
 class InferUndefinedHeaderFields(beam.PTransform):

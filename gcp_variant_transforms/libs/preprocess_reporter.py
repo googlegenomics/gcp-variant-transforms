@@ -27,7 +27,6 @@ resource estimation.
 from typing import Dict, List, Union  # pylint: disable=unused-import
 
 from apache_beam.io.filesystems import FileSystems
-from apache_beam import pvalue
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
@@ -69,11 +68,10 @@ def generate_report(header_definitions,
   content_lines.extend(_generate_conflicting_headers_lines(
       _extract_conflicts(header_definitions.formats), resolved_headers.formats,
       vcf_header_io.HeaderTypeConstants.FORMAT))
-  if not isinstance(inferred_headers, pvalue.EmptySideInput):
-    content_lines.extend(_generate_inferred_headers_lines(
-        inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
-    content_lines.extend(_generate_inferred_headers_lines(
-        inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
+  content_lines.extend(_generate_inferred_headers_lines(
+      inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
+  content_lines.extend(_generate_inferred_headers_lines(
+      inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
   _write_to_report(content_lines, file_path)
 
 
@@ -99,18 +97,14 @@ def _generate_conflicting_headers_lines(
   # type: (...) -> List[str]
   """Returns the conflicting headers lines for the report.
 
-  To better align contents in the report so that it can be viewed easily, for
-  every unique ID, generate several rows with the following steps.
-  - Step 1: The first row starts with The ID, the category('FOMRAT' or 'INFO'),
-    one conflicting definition, one file name and the resolution, separated by
-    the ``_DELIMITER ``.
-  - Step 2: If there there are more files having the same definition as the
-    previous step, list each file path in one separate row by filling all other
-    columns using ``_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
-  - Step 3: If there are more conflicting definitions, generate a new row with
-    one conflicting definition, one file path, and fill the ID, the category and
-    the resolution with `_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
-  - Repeat step 2 and step 3 until there are no more conflicts.
+  Each conflicting header record is structured into columns(TAB separated
+  values): the ID, the category('FOMRAT' or 'INFO'), conflicting definitions,
+  file names and the resolution. To make the contents more readable (especially
+  the file names can be extremely long and there can be at most 5 of them), the
+  conflicting definitions and the file names are split in the continuous rows
+  such that each row/cell only contains one definition/file name. While
+  splitting, the empty cells are filled by ``_PADDING_CHARACTER`` as a
+  placeholder so it can be easily viewed in both text editor and spreadsheets.
   Output example:
   DP\tFORMAT\tnum=1 type=Float\tfile1\tnum=1 type=Float
    \t \t \tfile2\t
