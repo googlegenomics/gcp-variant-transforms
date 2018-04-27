@@ -39,17 +39,17 @@ _NO_SOLUTION_MESSAGE = 'Not resolved.'
 _UNDEFINED_HEADER_MESSAGE = 'Undefined header.'
 
 
-def generate_conflicts_report(file_path,
-                              header_definitions,
+def generate_conflicts_report(header_definitions,
+                              file_path,
                               resolved_headers=None,
                               inferred_headers=None):
-  # type: (str, VcfHeaderDefinitions, VcfHeader, VcfHeader) -> None
+  # type: (VcfHeaderDefinitions, str, VcfHeader, VcfHeader) -> None
   """Generates a report.
 
   Args:
-    file_path: The location where the conflicts report is saved.
     header_definitions: The container which contains all header definitions and
       the corresponding file names.
+    file_path: The location where the conflicts report is saved.
     resolved_headers: The ``VcfHeader`` that provides the resolutions for the
       fields that have conflicting definitions.
     inferred_headers: The ``VcfHeader`` that contains the inferred header

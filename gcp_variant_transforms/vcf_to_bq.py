@@ -49,6 +49,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs.annotation.vep import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -103,7 +104,8 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
       (inferred_headers, merged_header)
       | beam.Flatten()
       | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
-          known_args.split_alternate_allele_info_fields))
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
   return merged_header
 
 
@@ -138,7 +140,10 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
 
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_header = vcf_to_bq_common.get_merged_headers(headers, known_args)
+    merged_header = vcf_to_bq_common.get_merged_headers(
+        headers,
+        known_args.split_alternate_allele_info_fields,
+        known_args.allow_incompatible_records)
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header,
@@ -151,6 +156,14 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
+  # Note VepRunner creates new input files, so it should be run before any
+  # other access to known_args.input_pattern.
+  if known_args.run_annotation_pipeline:
+    runner = vep_runner.create_runner_and_update_args(known_args, pipeline_args)
+    runner.run_on_all_files()
+    runner.wait_until_done()
+    logging.info('Using VEP processed files: %s', known_args.input_pattern)
+
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args)
 

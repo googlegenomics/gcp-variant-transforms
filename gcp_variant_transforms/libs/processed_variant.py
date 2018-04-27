@@ -33,10 +33,11 @@ from typing import Dict, List, Any, Tuple, Optional  # pylint: disable=unused-im
 import vcf
 
 from apache_beam.io.gcp.internal.clients import bigquery
+
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import vcf_header_parser  # pylint: disable=unused-import
 
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
@@ -54,6 +55,9 @@ _ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_allele'
 # The annotation field that VEP uses to record the index of the alternate
 # allele (i.e., ALT) that an annotation list is for.
 _ALLELE_NUM_ANNOTATION = 'ALLELE_NUM'
+
+# An alias for the header key constants to make referencing easier.
+_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 
 
 # Counter names
@@ -193,7 +197,7 @@ class ProcessedVariantFactory(object):
   """
   def __init__(
       self,
-      header_fields,  # type: vcf_header_parser.HeaderFields
+      header_fields,  # type: vcf_header_io.VcfHeader
       split_alternate_allele_info_fields=True,  # type: bool
       annotation_fields=None,  # type: List[str]
       use_allele_num=False,  # type: bool
@@ -204,7 +208,7 @@ class ProcessedVariantFactory(object):
 
     Args:
       header_fields: Header information used for parsing and splitting INFO
-        fields of thei variant.
+        fields of the variant.
       split_alternate_allele_info_fields: If True, splits fields with
         field_count='A' (i.e., one value for each alternate) among alternates.
       annotation_fields: If provided, this is the list of INFO field names that
@@ -280,19 +284,21 @@ class ProcessedVariantFactory(object):
         description='Alternate base.'))
     if self._split_alternate_allele_info_fields:
       for key, field in self._header_fields.infos.iteritems():
-        if field.num == vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]:
+        if (field[_HeaderKeyConstants.NUM] ==
+            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
           alternate_bases_record.fields.append(bigquery.TableFieldSchema(
               name=bigquery_util.get_bigquery_sanitized_field_name(key),
-              type=bigquery_util.get_bigquery_type_from_vcf_type(field.type),
+              type=bigquery_util.get_bigquery_type_from_vcf_type(
+                  field[_HeaderKeyConstants.TYPE]),
               mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
               description=bigquery_util.get_bigquery_sanitized_field(
-                  field.desc)))
+                  field[_HeaderKeyConstants.DESC])))
 
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
       annotation_names = _extract_annotation_names(
-          self._header_fields.infos[annot_field].desc)
+          self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_record = bigquery.TableFieldSchema(
           name=bigquery_util.get_bigquery_sanitized_field(annot_field),
           type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -327,7 +333,7 @@ class ProcessedVariantFactory(object):
       raise ValueError('INFO field {} not found'.format(info_field_name))
     is_per_alt_info = (
         self._split_alternate_allele_info_fields and
-        self._header_fields.infos[info_field_name].num ==
+        self._header_fields.infos[info_field_name][_HeaderKeyConstants.NUM] ==
         vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])
     is_annotation = info_field_name in self._annotation_field_set
     return is_per_alt_info or is_annotation
@@ -345,7 +351,7 @@ class _AnnotationProcessor(object):
 
   def __init__(self,
                annotation_fields,  # type: List[str]
-               header_fields,  # type: vcf_header_parser.HeaderFields
+               header_fields,  # type: vcf_header_io.VcfHeader
                counter_factory,  # type: metrics_util.CounterFactoryInterface
                use_allele_num,  # type: bool
                minimal_match,  # type: bool
@@ -366,7 +372,7 @@ class _AnnotationProcessor(object):
     for field in annotation_fields or []:
       if field not in header_fields.infos:
         raise ValueError('{} INFO not found in the header'.format(field))
-      header_desc = header_fields.infos[field].desc
+      header_desc = header_fields.infos[field][_HeaderKeyConstants.DESC]
       self._annotation_names_map[field] = _extract_annotation_names(
           header_desc)
     self._alt_match_counter = counter_factory.create_counter(

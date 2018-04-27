@@ -21,10 +21,6 @@ from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 
-__all__ = ['VariantTransformsOptions', 'VcfReadOptions', 'BigQueryWriteOptions',
-           'FilterOptions', 'MergeOptions']
-
-
 class VariantTransformsOptions(object):
   """Base class for defining groups of options for Variant Transforms.
 
@@ -177,6 +173,40 @@ class AnnotationOptions(VariantTransformsOptions):
               'See the "Complext VCF Entries" of this doc for details:'
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
+    parser.add_argument(
+        '--run_annotation_pipeline',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, runs annotation tools (currently only VEP) on input '
+              'VCFs before loading to BigQuery.'))
+    parser.add_argument(
+        '--annotation_output_dir',
+        default="",
+        help=('The path on Google Cloud Storage to store annotated outputs. '
+              'The output files are VCF and follow the same directory '
+              'structure as input files with a suffix added to them.'))
+    parser.add_argument(
+        '--vep_image_uri',
+        default="",
+        help=('The URI of the docker image for VEP.'))
+    parser.add_argument(
+        '--vep_cache_path',
+        default="",
+        help=('The path for VEP cache on Google Cloud Storage.'))
+    parser.add_argument(
+        '--vep_info_field',
+        default="CSQ_VT",
+        help=('The name of the new INFO field for annotaitons.'))
+    parser.add_argument(
+        '--vep_num_fork',
+        type=int, default=2,
+        help=('Number of local processes to use when running vep for a single '
+              'file. The default is chosen to be 2 because even on a single '
+              'core machine using two processes should help interleaving I/O '
+              'vs CPU bound work.'))
+
+    # TODO(bashir2): Add validate() to check --vep_* arguments are sound when
+    # --run_annotation_pipeline is set (for example --annotation_output_dir
+    # should start with gs://).
 
 
 class FilterOptions(VariantTransformsOptions):
@@ -262,3 +292,27 @@ class MergeOptions(VariantTransformsOptions):
             '--variant_merge_strategy {}|{}'.format(
                 MergeOptions.MOVE_TO_CALLS,
                 MergeOptions.MERGE_WITH_NON_VARIANTS))
+
+
+class PreprocessOptions(VariantTransformsOptions):
+  """Options for preprocess."""
+
+  def add_arguments(self, parser):
+    parser.add_argument(
+        '--report_all',
+        type='bool', default=False, nargs='?', const=True,
+        help=('By default, only the incompatible VCF headers will be reported. '
+              'If true, it also reports the undefined headers and malformed '
+              'records.'))
+    parser.add_argument(
+        '--report_path',
+        required=True,
+        help=('The full path of the preprocessor report. If run locally, a '
+              'local path must be provided. Otherwise, a cloud path is '
+              'required.'))
+    parser.add_argument(
+        '--resolved_headers_path',
+        default='',
+        help=('The full path of the resolved headers. The file will not be'
+              'generated if unspecified. Otherwise, please provide a local '
+              'path if run locally, or a cloud path if run on Dataflow.'))
