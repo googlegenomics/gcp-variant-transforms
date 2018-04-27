@@ -133,7 +133,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
       google_cloud_options.job_name,
       _MERGE_HEADERS_FILE_NAME])
-  known_args.representative_header_file = filesystems.FileSystems.join(
+  temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
@@ -141,9 +141,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     merged_header = vcf_to_bq_common.get_merged_headers(headers, known_args)
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
-    vcf_to_bq_common.write_headers(merged_header,
-                                   known_args.representative_header_file)
-
+    vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
+    known_args.representative_header_file = temp_merged_headers_file_path
 
 def run(argv=None):
   # type: (List[str]) -> None
