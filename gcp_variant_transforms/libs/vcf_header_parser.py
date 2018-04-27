@@ -55,8 +55,10 @@ def get_vcf_headers(input_file):
   return HeaderFields(vcf_reader.infos, vcf_reader.formats)
 
 
-def get_header_lines(input_file):
+def get_metadata_header_lines(input_file):
   """Returns header lines from the given VCF file ``input_file``.
+
+  Only returns lines starting with ## and not #.
 
   Args:
     input_file (str): A string specifying the path to a VCF file.

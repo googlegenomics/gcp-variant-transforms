@@ -89,7 +89,7 @@ def read_variants(pipeline, known_args):
   """Helper method for returning a PCollection of Variants from VCFs."""
   representative_header_lines = None
   if known_args.representative_header_file:
-    representative_header_lines = vcf_header_parser.get_header_lines(
+    representative_header_lines = vcf_header_parser.get_metadata_header_lines(
         known_args.representative_header_file)
 
   if known_args.optimize_for_large_inputs:
