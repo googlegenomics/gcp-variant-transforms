@@ -28,6 +28,7 @@ from apache_beam.io import filesystems
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import infer_undefined_headers
 from gcp_variant_transforms.transforms import merge_headers
@@ -83,19 +84,25 @@ def get_pipeline_mode(known_args):
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
 
-
 def read_variants(pipeline, known_args):
   # type: (beam.Pipeline, argparse.Namespace) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
+  representative_header_lines = None
+  if known_args.representative_header_file:
+    representative_header_lines = vcf_header_parser.get_metadata_header_lines(
+        known_args.representative_header_file)
+
   if known_args.optimize_for_large_inputs:
     variants = (pipeline
                 | 'InputFilePattern' >> beam.Create([known_args.input_pattern])
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    representative_header_lines=representative_header_lines,
                     allow_malformed_records=(
                         known_args.allow_malformed_records)))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         known_args.input_pattern,
+        representative_header_lines=representative_header_lines,
         allow_malformed_records=known_args.allow_malformed_records)
   return variants
 

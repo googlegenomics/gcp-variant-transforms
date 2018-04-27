@@ -171,14 +171,18 @@ class VcfSourceTest(unittest.TestCase):
     return tempdir.create_temp_file(
         suffix=suffix, lines=lines, compression_type=compression_type)
 
-  def _read_records(self, file_or_pattern, **kwargs):
+  def _read_records(self, file_or_pattern,
+                    representative_header_lines=None, **kwargs):
     return source_test_utils.read_from_source(
-        VcfSource(file_or_pattern, **kwargs))
+        VcfSource(file_or_pattern,
+                  representative_header_lines=representative_header_lines,
+                  **kwargs))
 
-  def _create_temp_file_and_read_records(self, lines):
+  def _create_temp_file_and_read_records(
+      self, lines, representative_header_lines=None):
     with TempDir() as tempdir:
       file_name = tempdir.create_temp_file(suffix='.vcf', lines=lines)
-      return self._read_records(file_name)
+      return self._read_records(file_name, representative_header_lines)
 
   def _assert_variants_equal(self, actual, expected):
     self.assertEqual(
@@ -388,6 +392,7 @@ class VcfSourceTest(unittest.TestCase):
         self._read_records(self._create_temp_vcf_file(content, tempdir),
                            allow_malformed_records=True)
 
+
   def test_no_samples(self):
     header_line = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO\n'
     record_line = '19	123	.	G	A	.	PASS	AF=0.2'
@@ -444,6 +449,77 @@ class VcfSourceTest(unittest.TestCase):
         info_headers + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
     self._assert_variants_equal([variant_1, variant_2], read_data)
+
+  def test_use_of_representative_header(self):
+    # Info field `HU` is defined as Float in file header while data is String.
+    # This results in parser failure. We test if parser completes successfully
+    # when a representative headers with String definition for field `HU` is
+    # given.
+    file_content = [
+        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
+        '19	2	.	A	T	.	.	HU=a,b	GT	0/0	0/1\n',]
+    representative_header_lines = [
+        '##INFO=<ID=HU,Number=.,Type=String,Description="Info">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',]
+    variant = Variant(
+        reference_name='19', start=1, end=2, reference_bases='A',
+        alternate_bases=['T'],
+        info={'HU': VariantInfo(data=['a', 'b'], field_count=None)})
+    variant.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
+    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+
+    # `file_headers` is used.
+    with self.assertRaises(ValueError):
+      read_data = self._create_temp_file_and_read_records(file_content)
+
+    # `representative_header` is used.
+    read_data = self._create_temp_file_and_read_records(
+        file_content, representative_header_lines)
+    self.assertEqual(1, len(read_data))
+    self._assert_variants_equal([variant], read_data)
+
+  def test_use_of_representative_header_two_files(self):
+    # Info field `HU` is defined as Float in file header while data is String.
+    # This results in parser failure. We test if parser completes successfully
+    # when a representative headers with String definition for field `HU` is
+    # given.
+    file_content_1 = [
+        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1\r\n',
+        '9     2       .       A       T       .       .       HU=a,b  GT 0/0']
+    file_content_2 = [
+        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample2\r\n',
+        '19	2	.	A	T	.	.	HU=a,b	GT	0/1\n',]
+    representative_header_lines = [
+        '##INFO=<ID=HU,Number=.,Type=String,Description="Info">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',]
+
+    variant_1 = Variant(
+        reference_name='9', start=1, end=2, reference_bases='A',
+        alternate_bases=['T'],
+        info={'HU': VariantInfo(data=['a', 'b'], field_count=None)})
+    variant_1.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
+
+    variant_2 = Variant(
+        reference_name='19', start=1, end=2, reference_bases='A',
+        alternate_bases=['T'],
+        info={'HU': VariantInfo(data=['a', 'b'], field_count=None)})
+    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+
+    read_data_1 = self._create_temp_file_and_read_records(
+        file_content_1, representative_header_lines)
+    self.assertEqual(1, len(read_data_1))
+    self._assert_variants_equal([variant_1], read_data_1)
+
+    read_data_2 = self._create_temp_file_and_read_records(
+        file_content_2, representative_header_lines)
+    self.assertEqual(1, len(read_data_2))
+    self._assert_variants_equal([variant_2], read_data_2)
 
   def test_end_info_key(self):
     end_info_header_line = (

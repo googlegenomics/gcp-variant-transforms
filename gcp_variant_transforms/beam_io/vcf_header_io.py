@@ -16,7 +16,9 @@
 
 from __future__ import absolute_import
 
+from collections import OrderedDict
 from functools import partial
+from typing import Dict  # pylint: disable=unused-import
 import vcf
 
 import apache_beam as beam
@@ -54,26 +56,26 @@ class VcfHeader(object):
   """Container for header data."""
 
   def __init__(self,
-               infos=None,
-               filters=None,
-               alts=None,
-               formats=None,
-               contigs=None,
-               file_name=None):
+               infos=None,  # type: Dict[str, OrderedDict[vcf.parser._Info]]
+               filters=None,  # type: Dict[str, OrderedDict[vcf.parser._Filter]]
+               alts=None,  # type: Dict[str, OrderedDict[vcf.parser._Alt]]
+               formats=None,  # type: Dict[str, OrderedDict[vcf.parser._Format]]
+               contigs=None,  # type: Dict[str, OrderedDict[vcf.parser._Contig]]
+               file_name=None  # type: str
+              ):
     """Initializes a VcfHeader object.
 
+    It keeps the order of values in the input dictionaries. Order is important
+    in some fields like `contigs` and for ensuring order is unchanged in
+    VCF->VCF pipelines.
+
     Args:
-      infos (dict): A dictionary mapping info keys (str) to vcf info metadata
-        values (:class:`~vcf.parser._Info`).
-      filters (dict): A dictionary mapping filter keys (str) to vcf filter
-        metadata values (:class:`~vcf.parser._Filter`).
-      alts (dict): A dictionary mapping alt keys (str) to vcf alt metadata
-        values (:class:`~vcf.parser._Alt`).
-      formats (dict): A dictionary mapping format keys (str) to vcf format
-        metadata values (:class:`~vcf.parser._Format`).
-      contigs (dict): A dictionary mapping contig keys (str) to vcf contig
-        metadata values (:class:`~vcf.parser._Contig`).
-      file_name (str): A str representing the file name of the vcf file.
+      infos: A dictionary mapping info keys to vcf info metadata values.
+      filters: A dictionary mapping filter keys to vcf filter metadata values.
+      alts: A dictionary mapping alt keys to vcf alt metadata values.
+      formats: A dictionary mapping format keys to vcf format metadata values.
+      contigs: A dictionary mapping contig keys to vcf contig metadata values.
+      file_name: The file name of the vcf file.
     """
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
@@ -97,12 +99,15 @@ class VcfHeader(object):
                                                  self.contigs]])
 
   def _values_asdict(self, header):
-    """Converts PyVCF header values to dictionaries."""
+    """Converts PyVCF header values to ordered dictionaries."""
+    ordered_dict = OrderedDict()
+    for key in header:
+      # These methods were not designed to be protected. They start with an
+      # underscore to avoid conflicts with field names. For more info, see
+      # https://docs.python.org/2/library/collections.html#collections.namedtuple
+      ordered_dict[key] = header[key]._asdict()  # pylint: disable=W0212
+    return ordered_dict
 
-    # These methods were not designed to be protected. They start with an
-    # underscore to avoid confilcts with field names. For more info, see below:
-    # https://docs.python.org/2/library/collections.html#collections.namedtuple
-    return {key: header[key]._asdict() for key in header}  # pylint: disable=W0212
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
   """A source for reading VCF file headers.

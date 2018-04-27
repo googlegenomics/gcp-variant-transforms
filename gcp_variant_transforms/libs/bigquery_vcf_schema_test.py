@@ -25,9 +25,9 @@ from vcf.parser import _Format as Format
 from vcf.parser import _Info as Info
 from vcf.parser import field_counts
 
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_vcf_schema
 from gcp_variant_transforms.libs import processed_variant
-from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
@@ -86,7 +86,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
                      self._get_fields_from_schema(actual_schema))
 
   def test_no_header_fields(self):
-    header_fields = vcf_header_parser.HeaderFields({}, {})
+    header_fields = vcf_header_io.VcfHeader()
     self._assert_fields_equal(
         self._generate_expected_fields(),
         bigquery_vcf_schema.generate_schema_from_header_fields(
@@ -104,7 +104,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         ('IA2', Info('IA2', field_counts['A'], 'Float', 'desc', 'src', 'v')),
         ('END',  # END should not be included in the generated schema.
          Info('END', 1, 'Integer', 'Special END key', 'src', 'v'))])
-    header_fields = vcf_header_parser.HeaderFields(infos, {})
+    header_fields = vcf_header_io.VcfHeader(infos=infos)
 
     self._assert_fields_equal(
         self._generate_expected_fields(
@@ -158,7 +158,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
         ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    header_fields = vcf_header_parser.HeaderFields(infos, formats)
+    header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._assert_fields_equal(
         self._generate_expected_fields(
             alt_fields=['IA'],
@@ -179,7 +179,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     formats = OrderedDict([
         ('a^b', Format('a^b', 1, 'String', 'desc')),
         ('OK_format_09', Format('OK_format_09', 1, 'String', 'desc'))])
-    header_fields = vcf_header_parser.HeaderFields(infos, formats)
+    header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._assert_fields_equal(
         self._generate_expected_fields(
             alt_fields=['I_A'],
@@ -195,7 +195,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
         ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
     formats = OrderedDict([('F1', Format('F1', 1, 'String', 'desc'))])
-    header_fields = vcf_header_parser.HeaderFields(infos, formats)
+    header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._assert_fields_equal(
         self._generate_expected_fields(
             alt_fields=['IA'],
