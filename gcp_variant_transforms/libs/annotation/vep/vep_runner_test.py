@@ -17,8 +17,10 @@ from __future__ import absolute_import
 import unittest
 
 import logging
-import mock
 
+from typing import List  # pylint: disable=unused-import
+
+import mock
 from mock import patch
 
 from apache_beam.io import filesystems
@@ -66,13 +68,13 @@ class VepRunnerTest(unittest.TestCase):
 
   def setUp(self):
     self._mock_service = mock.Mock()
-    self._mock_pipelines = mock.Mock()
     self._mock_request = mock.Mock()
-    self._mock_service.pipelines = mock.Mock(return_value=self._mock_pipelines)
-    self._mock_pipelines.run = mock.Mock(return_value=self._mock_request)
+    self._pipelines_spy = PipelinesSpy(self._mock_request)
+    self._mock_service.pipelines = mock.Mock(return_value=self._pipelines_spy)
     self._mock_request.execute = mock.Mock(return_value={'name': 'operation'})
 
   def _create_test_instance(self, pipeline_args=None):
+    # type: (List[str]) -> vep_runner.VepRunner
     test_object = vep_runner.VepRunner(
         self._mock_service, _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
@@ -91,7 +93,7 @@ class VepRunnerTest(unittest.TestCase):
     self._create_test_instance()
 
   def test_instantiation_bad_pipeline_options(self):
-    """This is just to test object construction."""
+    """This is to test object construction fails with incomplete arguments."""
     with self.assertRaisesRegexp(ValueError, '.*project.*'):
       self._create_test_instance(pipeline_args=['no_arguments'])
 
@@ -100,11 +102,7 @@ class VepRunnerTest(unittest.TestCase):
     self.assertEqual(output_pattern, _OUTPUT_DIR + '/**_vep_output.vcf')
 
   def _validate_run_for_all_files(self):
-    matcher = _PartialCommandMatcher(
-        [f[0] for f in _INPUT_FILES_WITH_SIZE])
-    for args_list in self._mock_pipelines.run.call_args_list:
-      self.assertEqual(args_list, mock.call(body=matcher))
-    self.assertEqual(len(matcher.input_file_set), 0)
+    self._pipelines_spy.validate_calls([f[0] for f in _INPUT_FILES_WITH_SIZE])
 
   def test_run_on_all_files(self):
     num_workers = len(_INPUT_FILES_WITH_SIZE) / 2 + 1
@@ -112,8 +110,7 @@ class VepRunnerTest(unittest.TestCase):
         self._get_pipeline_args(num_workers))
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
-    all_call_args = self._mock_pipelines.run.call_args_list
-    self.assertEqual(len(all_call_args), num_workers)
+    self.assertEqual(self._pipelines_spy.num_run_calls(), num_workers)
     self._validate_run_for_all_files()
 
   def test_run_on_all_files_with_more_workers(self):
@@ -122,42 +119,62 @@ class VepRunnerTest(unittest.TestCase):
         self._get_pipeline_args(num_workers))
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
-    all_call_args = self._mock_pipelines.run.call_args_list
-    self.assertEqual(len(all_call_args), len(_INPUT_FILES_WITH_SIZE))
+    self.assertEqual(self._pipelines_spy.num_run_calls(),
+                     len(_INPUT_FILES_WITH_SIZE))
     self._validate_run_for_all_files()
 
+  def test_wait_until_done(self):
+    mock_projects = mock.Mock()
+    mock_opearations = mock.Mock()
+    mock_request = mock.Mock()
+    self._mock_service.projects = mock.Mock(return_value=mock_projects)
+    mock_projects.operations = mock.Mock(return_value=mock_opearations)
+    mock_opearations.get = mock.Mock(return_value=mock_request)
+    mock_request.execute = mock.Mock(return_value={'done': True})
+    test_instance = self._create_test_instance()
+    with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
+      test_instance.run_on_all_files()
+      with self.assertRaisesRegexp(AssertionError, '.*already.*running.*'):
+        # Since there are running operations, the next call raises an exception.
+        test_instance.run_on_all_files()
+      test_instance.wait_until_done()
+      # Since all operations are done, the next call should raise no exceptions.
+      test_instance.run_on_all_files()
 
-class _PartialCommandMatcher(object):
-  """This is used for checking that calls to Pipelines API cover all inputs.
 
-  We need this matcher to avoid duplicating the whole JSON object created in
-  the production code. Instead we just do a simple heuristic match by going
-  through all `commands` and check if at least in one of them one of the
-  input files appear. Note that we dropped each matched input file becuase
-  if an input is repeated in two `actions` set, that's an error.
-  """
+class PipelinesSpy(object):
+  """A class to intercept calls to the run() function of Pipelines API."""
 
-  def __init__(self, input_file_list):
-    self.input_file_set = set(input_file_list)
+  def __init__(self, mock_request):
+    # type: (mock.Mock) -> None
+    self._actions_list = []
+    self._mock_request = mock_request
 
-  # TODO(bashir2): This __eq__ not being idempotent is confusing. Replace this
-  # pattern with an Spy pattern where _mock_pipelines is replaced by a Spy
-  # object (instead of a Mock) and it captures the arguments passed to
-  # the run() function; with a separate validation function called at the end.
-  def __eq__(self, other):
-    if not isinstance(other, dict):
-      return False
-    start_len = len(self.input_file_set)
-    action_list = other['pipeline']['actions']
-    for action in action_list:
-      for command_part in action['commands']:
-        if command_part in self.input_file_set:
-          self.input_file_set.remove(command_part)
-    # Making sure that each action list convers at least one file.
-    if start_len == len(self.input_file_set):
-      logging.error('None of the input files appeared in %s or it was repeated',
-                    str(action_list))
-      logging.error('List of remaining files: %s', str(self.input_file_set))
+  def run(self, body=None):
+    assert body
+    self._actions_list.append(body['pipeline']['actions'])
+    return self._mock_request
+
+  def num_run_calls(self):
+    return len(self._actions_list)
+
+  def validate_calls(self, input_file_list):
+    # type: (List[str]) -> bool
+    input_file_set = set(input_file_list)
+    for one_call_actions in self._actions_list:
+      start_len = len(input_file_set)
+      for action in one_call_actions:
+        for command_part in action['commands']:
+          if command_part in input_file_set:
+            input_file_set.remove(command_part)
+      # Making sure that each actions for each call cover at least one file.
+      if start_len == len(input_file_set):
+        logging.error('None of input files appeared in %s or it was repeated',
+                      str(one_call_actions))
+        logging.error('List of remaining files: %s', str(input_file_set))
+        return False
+    if input_file_set:
+      logging.error('Never ran on these files: %s', str(input_file_set))
       return False
     return True
 
