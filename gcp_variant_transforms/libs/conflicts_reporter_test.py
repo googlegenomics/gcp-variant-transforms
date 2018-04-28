@@ -43,8 +43,8 @@ class ConflictsReporterTest(unittest.TestCase):
     # type: (List[str], VcfHeaderDefinitions, VcfHeader, VcfHeader) -> None
     with temp_dir.TempDir() as tempdir:
       file_path = FileSystems.join(tempdir.get_path(), self._REPORT_NAME)
-      conflicts_reporter.generate_conflicts_report(file_path,
-                                                   header_definitions,
+      conflicts_reporter.generate_conflicts_report(header_definitions,
+                                                   file_path,
                                                    resolved_headers,
                                                    inferred_headers)
       with FileSystems.open(file_path) as f:

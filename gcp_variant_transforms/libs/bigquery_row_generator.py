@@ -25,7 +25,6 @@ from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: di
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import vcf_header_parser # pylint: disable=unused-import
 
 
 # Maximum size of a BigQuery row is 10MB. See

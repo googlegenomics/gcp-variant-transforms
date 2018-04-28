@@ -14,15 +14,12 @@
 
 from __future__ import absolute_import
 
+import argparse  # pylint: disable=unused-import
 import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
-
-
-__all__ = ['VariantTransformsOptions', 'VcfReadOptions', 'BigQueryWriteOptions',
-           'FilterOptions', 'MergeOptions']
 
 
 class VariantTransformsOptions(object):
@@ -36,6 +33,7 @@ class VariantTransformsOptions(object):
   """
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     """Adds all options of this transform to parser."""
     raise NotImplementedError
 
@@ -147,7 +145,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
 
+  _RUN_FLAG = 'run_annotation_pipeline'
+  _OUTPUT_DIR_FLAG = 'annotation_output_dir'
+  _VEP_IMAGE_FLAG = 'vep_image_uri'
+  _VEP_CACHE_FLAG = 'vep_cache_path'
+
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         '--annotation_fields',
         default=None, nargs='+',
@@ -177,6 +181,62 @@ class AnnotationOptions(VariantTransformsOptions):
               'See the "Complext VCF Entries" of this doc for details:'
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
+    parser.add_argument(
+        '--' + AnnotationOptions._RUN_FLAG,
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, runs annotation tools (currently only VEP) on input '
+              'VCFs before loading to BigQuery.'))
+    parser.add_argument(
+        '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
+        default="",
+        help=('The path on Google Cloud Storage to store annotated outputs. '
+              'The output files are VCF and follow the same directory '
+              'structure as input files with a suffix added to them.'))
+    parser.add_argument(
+        '--' + AnnotationOptions._VEP_IMAGE_FLAG,
+        default="",
+        help=('The URI of the docker image for VEP.'))
+    parser.add_argument(
+        '--' + AnnotationOptions._VEP_CACHE_FLAG,
+        default="",
+        help=('The path for VEP cache on Google Cloud Storage.'))
+    parser.add_argument(
+        '--vep_info_field',
+        default="CSQ_VT",
+        help=('The name of the new INFO field for annotaitons.'))
+    parser.add_argument(
+        '--vep_num_fork',
+        type=int, default=2,
+        help=('Number of local processes to use when running vep for a single '
+              'file. The default is chosen to be 2 because even on a single '
+              'core machine using two processes should help interleaving I/O '
+              'vs CPU bound work.'))
+
+  def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
+    args_dict = vars(parsed_args)
+    if args_dict[AnnotationOptions._RUN_FLAG]:
+      output_dir = args_dict[AnnotationOptions._OUTPUT_DIR_FLAG]  # type: str
+      if not output_dir or not output_dir.startswith('gs://'):
+        raise ValueError('Flag {} should start with gs://, got {}'.format(
+            AnnotationOptions._OUTPUT_DIR_FLAG, output_dir))
+      vep_image = args_dict[AnnotationOptions._VEP_IMAGE_FLAG]  # type: str
+      if not vep_image:
+        raise ValueError('Flag {} is not set.'.format(
+            AnnotationOptions._VEP_IMAGE_FLAG))
+      vep_cache = args_dict[AnnotationOptions._VEP_CACHE_FLAG]  # type: str
+      if not vep_cache or not vep_cache.startswith('gs://'):
+        raise ValueError('Flag {} should start with gs://, got {}'.format(
+            AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
+    else:
+      for flag in [AnnotationOptions._VEP_IMAGE_FLAG,
+                   AnnotationOptions._VEP_CACHE_FLAG,
+                   AnnotationOptions._OUTPUT_DIR_FLAG]:
+        if flag not in args_dict:
+          raise AssertionError('Flag {} not found in args_dict.'.format(flag))
+        if args_dict[flag]:
+          raise ValueError('Flag {} is set but {} is not.'.format(
+              flag, AnnotationOptions._RUN_FLAG))
 
 
 class FilterOptions(VariantTransformsOptions):
@@ -262,3 +322,27 @@ class MergeOptions(VariantTransformsOptions):
             '--variant_merge_strategy {}|{}'.format(
                 MergeOptions.MOVE_TO_CALLS,
                 MergeOptions.MERGE_WITH_NON_VARIANTS))
+
+
+class PreprocessOptions(VariantTransformsOptions):
+  """Options for preprocess."""
+
+  def add_arguments(self, parser):
+    parser.add_argument(
+        '--report_all',
+        type='bool', default=False, nargs='?', const=True,
+        help=('By default, only the incompatible VCF headers will be reported. '
+              'If true, it also reports the undefined headers and malformed '
+              'records.'))
+    parser.add_argument(
+        '--report_path',
+        required=True,
+        help=('The full path of the preprocessor report. If run locally, a '
+              'local path must be provided. Otherwise, a cloud path is '
+              'required.'))
+    parser.add_argument(
+        '--resolved_headers_path',
+        default='',
+        help=('The full path of the resolved headers. The file will not be'
+              'generated if unspecified. Otherwise, please provide a local '
+              'path if run locally, or a cloud path if run on Dataflow.'))
