@@ -20,6 +20,9 @@ FROM google/cloud-sdk
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
 ADD / /opt/gcp_variant_transforms/src/
 
+# Needed for installing mmh3 (one of the required packages in setup.py).
+RUN apt install -y g++
+
 # Install dependencies.
 RUN pip install --upgrade pip && pip install --upgrade virtualenv && \
     virtualenv /opt/gcp_variant_transforms/venv && \
