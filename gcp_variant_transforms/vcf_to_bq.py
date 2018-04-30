@@ -49,6 +49,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
+from gcp_variant_transforms.libs import variant_partition
 from gcp_variant_transforms.libs.annotation.vep import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
@@ -57,6 +58,7 @@ from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
+from gcp_variant_transforms.transforms import partition_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
 
 _COMMAND_LINE_OPTIONS = [
@@ -135,7 +137,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       datetime.datetime.now().strftime('%Y%m%d-%H%M%S'),
       google_cloud_options.job_name,
       _MERGE_HEADERS_FILE_NAME])
-  known_args.representative_header_file = filesystems.FileSystems.join(
+  temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
@@ -146,9 +148,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
         known_args.allow_incompatible_records)
     if known_args.infer_undefined_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
-    vcf_to_bq_common.write_headers(merged_header,
-                                   known_args.representative_header_file)
-
+    vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
+    known_args.representative_header_file = temp_merged_headers_file_path
 
 def run(argv=None):
   # type: (List[str]) -> None
@@ -185,14 +186,25 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
+  partitioner = variant_partition.VariantPartition()
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = vcf_to_bq_common.read_variants(pipeline, known_args)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if variant_merger:
-    variants |= (
-        'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
+    if known_args.optimize_for_large_inputs:
+      partitions = variants | 'PartitionVariants' >> beam.Partition(
+          partition_variants.PartitionVariants(partitioner),
+          partitioner.get_num_partitions())
+      merged = []
+      for i in xrange(partitioner.get_num_partitions()):
+        merged.append(partitions[i] | 'MergeVariants' + str(i) >>
+                      merge_variants.MergeVariants(variant_merger))
+      variants = merged | 'FlattenPartitions' >> beam.Flatten()
+    else:
+      variants |= ('MergeVariants' >> merge_variants.MergeVariants(
+          variant_merger))
   proc_variants = variants | 'ProcessVaraints' >> beam.Map(
       processed_variant_factory.create_processed_variant).\
     with_output_types(processed_variant.ProcessedVariant)

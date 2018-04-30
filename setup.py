@@ -25,6 +25,7 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
+    'mmh3<2.6',
 ]
 
 INTEGRATION_TEST_REQUIREMENTS = [
