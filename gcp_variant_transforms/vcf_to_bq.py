@@ -69,6 +69,7 @@ _COMMAND_LINE_OPTIONS = [
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
     variant_transform_options.MergeOptions,
+    variant_transform_options.PartitionOptions,
 ]
 
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
@@ -218,38 +219,59 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
-  partitioner = variant_partition.VariantPartition()
+  partitioner = None
+  if known_args.optimize_for_large_inputs or known_args.partition_config_path:
+    partitioner = variant_partition.VariantPartition(
+        known_args.partition_config_path)
+
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(pipeline, known_args)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
-  if variant_merger:
-    if known_args.optimize_for_large_inputs:
-      partitions = variants | 'PartitionVariants' >> beam.Partition(
-          partition_variants.PartitionVariants(partitioner),
-          partitioner.get_num_partitions())
-      merged = []
-      for i in xrange(partitioner.get_num_partitions()):
-        merged.append(partitions[i] | 'MergeVariants' + str(i) >>
+  if partitioner:
+    num_partitions = partitioner.get_num_partitions()
+    partitioned_variants = variants | 'PartitionVariants' >> beam.Partition(
+        partition_variants.PartitionVariants(partitioner), num_partitions)
+    variants = []
+    for i in range(num_partitions):
+      if partitioner.should_keep_partition(i):
+        variants.append(partitioned_variants[i])
+      else:
+        num_partitions -= 1
+  else:
+    # By default we don't partition the data, so we have only 1 partition.
+    num_partitions = 1
+    variants = [variants]
+
+  for i in range(num_partitions):
+    if variant_merger:
+      variants[i] |= ('MergeVariants' + str(i) >>
                       merge_variants.MergeVariants(variant_merger))
-      variants = merged | 'FlattenPartitions' >> beam.Flatten()
-    else:
-      variants |= ('MergeVariants' >> merge_variants.MergeVariants(
-          variant_merger))
-  proc_variants = variants | 'ProcessVaraints' >> beam.Map(
-      processed_variant_factory.create_processed_variant).\
-    with_output_types(processed_variant.ProcessedVariant)
-  _ = (proc_variants |
-       'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
-           known_args.output_table,
-           header_fields,
-           variant_merger,
-           processed_variant_factory,
-           append=known_args.append,
-           allow_incompatible_records=known_args.allow_incompatible_records,
-           omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-           num_bigquery_write_shards=known_args.num_bigquery_write_shards))
+    variants[i] |= (
+        'ProcessVaraints' + str(i) >>
+        beam.Map(processed_variant_factory.create_processed_variant).\
+            with_output_types(processed_variant.ProcessedVariant))
+  if partitioner and partitioner.should_flatten():
+    variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
+    num_partitions = 1
+
+  for i in range(num_partitions):
+    table_suffix = ''
+    if partitioner and partitioner.get_partition_name(i):
+      table_suffix = '_' + partitioner.get_partition_name(i)
+    table_name = known_args.output_table + table_suffix
+    _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
+         variant_to_bigquery.VariantToBigQuery(
+             table_name,
+             header_fields,
+             variant_merger,
+             processed_variant_factory,
+             append=known_args.append,
+             allow_incompatible_records=known_args.allow_incompatible_records,
+             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+             num_bigquery_write_shards=known_args.num_bigquery_write_shards))
+
   result = pipeline.run()
   result.wait_until_finish()
 
