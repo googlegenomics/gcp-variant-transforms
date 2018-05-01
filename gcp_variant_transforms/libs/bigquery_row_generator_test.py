@@ -27,6 +27,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -316,8 +317,8 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: [],
-        'IF': float(sys.maxint),
-        'IFR': [float(-sys.maxint), null_replacement_value, 1.2],
+        'IF': bigquery_util._INF_FLOAT_VALUE,
+        'IFR': [-bigquery_util._INF_FLOAT_VALUE, null_replacement_value, 1.2],
         'IF2': None}
     self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
