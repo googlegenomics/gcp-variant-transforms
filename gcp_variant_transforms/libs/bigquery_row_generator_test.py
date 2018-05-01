@@ -85,6 +85,16 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         mode=TableFieldConstants.MODE_REPEATED,
         description='INFO foo desc'))
     schema.fields.append(bigquery.TableFieldSchema(
+        name='IF',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IF2',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
         name='IFR',
         type=TableFieldConstants.TYPE_FLOAT,
         mode=TableFieldConstants.MODE_REPEATED,
@@ -295,9 +305,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'II': vcfio.VariantInfo(float('inf'), '1'),
-              'IIR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
-              'II2': vcfio.VariantInfo(float('nan'), '1'),})
+        info={'IF': vcfio.VariantInfo(float('inf'), '1'),
+              'IFR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
+              'IF2': vcfio.VariantInfo(float('nan'), '1'),})
     null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -306,9 +316,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: [],
-        'II': sys.maxint,
-        'IIR': [-sys.maxint, null_replacement_value, 1.2],
-        'II2': None}
+        'IF': float(sys.maxint),
+        'IFR': [float(-sys.maxint), null_replacement_value, 1.2],
+        'IF2': None}
     self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_nonstandard_fields_names(self):

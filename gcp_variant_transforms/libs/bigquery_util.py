@@ -217,9 +217,9 @@ def _get_bigquery_sanitized_float(input_float):
   with None. It returns the same value for all other values.
   """
   if input_float == float('inf'):
-    return sys.maxint
+    return float(sys.maxint)
   elif input_float == float('-inf'):
-    return -sys.maxint
+    return float(-sys.maxint)
   elif math.isnan(input_float):
     return None
   else:
