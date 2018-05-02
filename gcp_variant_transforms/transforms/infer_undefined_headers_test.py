@@ -117,8 +117,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
           | 'InferUndefinedHeaderFields' >>
           infer_undefined_headers.InferUndefinedHeaderFields(
               pvalue.AsSingleton(vcf_headers_side_input)))
-
-      assert_that(inferred_headers, equal_to([]))
+      expected = vcf_header_io.VcfHeader()
+      assert_that(inferred_headers, equal_to([expected]))
       p.run()
 
   def test_header_fields_inferred_from_two_variants(self):

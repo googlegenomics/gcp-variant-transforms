@@ -27,6 +27,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -83,6 +84,16 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         name='IIR',
         type=TableFieldConstants.TYPE_INTEGER,
         mode=TableFieldConstants.MODE_REPEATED,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IF',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='INFO foo desc'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='IF2',
+        type=TableFieldConstants.TYPE_FLOAT,
+        mode=TableFieldConstants.MODE_NULLABLE,
         description='INFO foo desc'))
     schema.fields.append(bigquery.TableFieldSchema(
         name='IFR',
@@ -295,9 +306,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'II': vcfio.VariantInfo(float('inf'), '1'),
-              'IIR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
-              'II2': vcfio.VariantInfo(float('nan'), '1'),})
+        info={'IF': vcfio.VariantInfo(float('inf'), '1'),
+              'IFR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
+              'IF2': vcfio.VariantInfo(float('nan'), '1'),})
     null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -306,9 +317,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: [],
-        'II': sys.maxint,
-        'IIR': [-sys.maxint, null_replacement_value, 1.2],
-        'II2': None}
+        'IF': bigquery_util._INF_FLOAT_VALUE,
+        'IFR': [-bigquery_util._INF_FLOAT_VALUE, null_replacement_value, 1.2],
+        'IF2': None}
     self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
 
   def test_nonstandard_fields_names(self):

@@ -53,7 +53,7 @@ import apache_beam as beam
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
-from gcp_variant_transforms.libs import conflicts_reporter
+from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_header_definitions
@@ -103,7 +103,7 @@ def run(argv=None):
 
     _ = (merged_definitions
          | 'GenerateConflictsReport' >>
-         beam.ParDo(conflicts_reporter.generate_conflicts_report,
+         beam.ParDo(preprocess_reporter.generate_report,
                     known_args.report_path,
                     beam.pvalue.AsSingleton(merged_headers),
                     inferred_headers_side_input))
