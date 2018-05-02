@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 
+import random
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
@@ -31,7 +32,12 @@ from gcp_variant_transforms.transforms import limit_write
 # This has to be less than 10000.
 # TODO(samanvp): remove this hack when BQ custom sink is added to Python SDK,
 # see: https://issues.apache.org/jira/browse/BEAM-2801
-_WRITE_SHARDS_LIMIT = 4500
+_WRITE_SHARDS_LIMIT = 1000
+_NUM_RANDOM_PARTITIONS = 20
+
+
+def random_partition(unused_bq_row, num_partitions):
+  return random.randint(0, num_partitions - 1)
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class _ConvertToBigQueryTableRow(beam.DoFn):
@@ -113,7 +119,22 @@ class VariantToBigQuery(beam.PTransform):
             self._allow_incompatible_records,
             self._omit_empty_sample_calls))
     if self._limited_write:
-      bq_rows |= 'LimitWrite' >> limit_write.LimitWrite(_WRITE_SHARDS_LIMIT)
+      bq_row_partitions = bq_rows | beam.Partition(random_partition,
+                                                   _NUM_RANDOM_PARTITIONS)
+      bq_writes = []
+      for i in range(_NUM_RANDOM_PARTITIONS):
+        bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
+                   limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
+        bq_writes.append(bq_rows | 'WriteToBigQuery' + str(i) >>
+                         beam.io.Write(beam.io.BigQuerySink(
+                           self._output_table,
+                           schema=self._schema,
+                           create_disposition=(
+                             beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
+                           write_disposition=(
+                             beam.io.BigQueryDisposition.WRITE_APPEND))))
+      return bq_writes
+    # If _limit_write == False we don't need any hack to avoid the BQ failure.
     return (bq_rows
             | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,

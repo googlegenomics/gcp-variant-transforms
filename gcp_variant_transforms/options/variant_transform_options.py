@@ -140,7 +140,26 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       else:
         # For the rest of the errors, use BigQuery error message.
         raise
-
+    # Ensuring given output table doesn't already exist to avoid overwriting it.
+    try:
+      if not client:
+        credentials = GoogleCredentials.get_application_default().create_scoped(
+          ['https://www.googleapis.com/auth/bigquery'])
+        client = bigquery.BigqueryV2(credentials=credentials)
+      client.tables.Get(bigquery.BigqueryTablesGetRequest(
+        projectId=output_table_re_match.group('project'),
+        datasetId=output_table_re_match.group('dataset'),
+        tableId=output_table_re_match.group('table')))
+      raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
+                       (output_table_re_match.group('project'),
+                        output_table_re_match.group('dataset'),
+                        output_table_re_match.group('table')))
+    except exceptions.HttpError as e:
+      if e.status_code == 404:
+        print('This is expected, output table must not already exist')
+      else:
+        # For the rest of the errors, use BigQuery error message.
+        raise
 
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
