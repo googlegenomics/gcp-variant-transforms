@@ -1,8 +1,8 @@
 -  partition:
-     partition_name: "chr01_part1"
-     regions:
-       - "chr1:0-1,000,000"
--  partition:
      partition_name: "chrom01_full"
      regions:
        - "chr1"
+-  partition:
+     partition_name: "chr01_part1"
+     regions:
+       - "chr1:0-1,000,000"

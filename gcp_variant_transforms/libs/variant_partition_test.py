@@ -311,9 +311,4 @@ class VariantPartitionTest(unittest.TestCase):
         'Table names must be unique *'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
-<<<<<<< HEAD
           "partition_config_redundant_table_names.yaml")
-      self.fail('Broken config file should throw an exception')
-=======
-          "partition_config_redundant_table_names.yaml")
->>>>>>> Default partition as 'residual'

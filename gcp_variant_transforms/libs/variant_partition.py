@@ -27,7 +27,6 @@ from collections import defaultdict
 from mmh3 import hash  # pylint: disable=no-name-in-module,redefined-builtin
 import yaml
 import intervaltree
->>>>>>> Partitioning Part 2 (input config file)
 
 # A reg exp that will match to standard reference_names such as "chr01" or "13".
 _CHROMOSOME_NAME_REGEXP = re.compile(r'^(chr)?([0-9][0-9]?)$')

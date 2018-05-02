@@ -4,6 +4,8 @@
        - "chr1:0-1,000,000"
 -  partition:
      partition_name: "all_remaining"
+     regions:
+       - "residual"
 -  partition:
      partition_name: "redundant_name"
      regions:

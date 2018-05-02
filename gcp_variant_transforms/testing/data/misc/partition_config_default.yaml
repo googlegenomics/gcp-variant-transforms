@@ -126,4 +126,5 @@
        - "M"
 -  partition:
      partition_name: "all_remaining"
-
+     regions:
+       - "residual"

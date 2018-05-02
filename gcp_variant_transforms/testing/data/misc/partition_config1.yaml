@@ -33,4 +33,5 @@
        - "3:500,000-1,000,000"
 -  partition:
      partition_name: "all_remaining"
-
+     regions:
+       - "residual"
