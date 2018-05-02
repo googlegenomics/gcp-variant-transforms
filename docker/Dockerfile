@@ -35,3 +35,9 @@ RUN printf '#!/bin/bash\n%s\n%s' \
       'python -m gcp_variant_transforms.vcf_to_bq --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/vcf_to_bq && \
     chmod +x /opt/gcp_variant_transforms/bin/vcf_to_bq
+
+RUN printf '#!/bin/bash\n%s\n%s' \
+      ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
+      'python -m gcp_variant_transforms.vcf_to_bq_preprocess --setup_file ./setup.py "$@"' > \
+      /opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess && \
+    chmod +x /opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess
