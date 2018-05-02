@@ -1,0 +1,10 @@
+{
+  "test_name": "no-conflicts",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+  "report_path": "gs://integration_test_runs/temp/report_no_conflicts.tsv",
+  "runner": "DataflowRunner",
+  "expected_contents": [
+    "No Header Conflicts Found.\n",
+    "\n"
+  ]
+}
