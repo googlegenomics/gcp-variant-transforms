@@ -71,6 +71,10 @@ _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
 # as required by BigQuery.
 _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 
+# A big number to represent infinite float values. The division by 10 is to
+# prevent unintentional overflows when doing subsequent operations.
+_INF_FLOAT_VALUE = sys.float_info.max / 10
+
 
 def get_bigquery_sanitized_field_name(field_name):
   # type: (str) -> str
@@ -213,13 +217,14 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
 def _get_bigquery_sanitized_float(input_float):
   """Returns a sanitized float for BigQuery.
 
-  This method replaces INF with sys.maxint, -INF with -sys.maxint, and NaN
-  with None. It returns the same value for all other values.
+  This method replaces INF and -INF with positive and negative numbers with huge
+  absolute values, and replaces NaN with None. It returns the same value for all
+  other values.
   """
   if input_float == float('inf'):
-    return sys.maxint
+    return _INF_FLOAT_VALUE
   elif input_float == float('-inf'):
-    return -sys.maxint
+    return -_INF_FLOAT_VALUE
   elif math.isnan(input_float):
     return None
   else:
