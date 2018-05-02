@@ -22,7 +22,7 @@ from gcp_variant_transforms.testing import temp_dir
 
 
 class PreprocessTest(unittest.TestCase):
-  _REPORT_NAME = 'header_conflicts_report.csv'
+  _REPORT_NAME = 'report.tsv'
   _RESOLVED_HEADERS_FILE_NAME = 'resolved_headers.vcf'
 
   def test_preprocess_run_locally(self):
@@ -44,3 +44,17 @@ class PreprocessTest(unittest.TestCase):
       vcf_to_bq_preprocess.run(argv)
       assert filesystems.FileSystems.exists(report_path)
       assert filesystems.FileSystems.exists(resolved_headers_path)
+
+  def test_preprocess_no_conflicts(self):
+    with temp_dir.TempDir() as tempdir:
+      report_path = filesystems.FileSystems.join(tempdir.get_path(),
+                                                 PreprocessTest._REPORT_NAME)
+      argv = [
+          '--input_pattern',
+          'gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf',
+          '--report_path',
+          report_path,
+          '--report_all'
+      ]
+      vcf_to_bq_preprocess.run(argv)
+      assert filesystems.FileSystems.exists(report_path)
