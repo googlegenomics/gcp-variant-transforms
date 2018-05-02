@@ -149,12 +149,12 @@ class VariantPartitionTest(unittest.TestCase):
         "gcp_variant_transforms/testing/data/misc/partition_config1.yaml")
     self.assertEqual(partitioner.get_num_partitions(), 8)
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError, 'Given partition index is outside of expected range.'):
       partitioner.get_suffix(-1)
-      self.fail('Non existent partition index should throw an exception')
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError, 'Given partition index is outside of expected range.'):
       partitioner.get_suffix(8)
-      self.fail('Non existent partition index should throw an exception')
 
   def test_config_default_partition_in_middle(self):
     partitioner = variant_partition.VariantPartition(
@@ -251,38 +251,69 @@ class VariantPartitionTest(unittest.TestCase):
                      partitioner.get_default_partition_index())
 
   def test_config_failed_config_validation(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Each partition must have at least one region.'):
+      _ = variant_partition.VariantPartition(
+        "gcp_variant_transforms/testing/data/misc/"
+        "partition_config_missing_region.yaml")
+
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Each partition must have partition_name field.'):
+      _ = variant_partition.VariantPartition(
+        "gcp_variant_transforms/testing/data/misc/"
+        "partition_config_missing_partition_name.yaml")
+
+    with self.assertRaisesRegexp(
+        ValueError,
+        'There must be only one default partition intercepted at least 2'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
           "partition_config_redundant_default.yaml")
-      self.fail('Broken config file should throw an exception')
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
           "partition_config_overlapping_regions.yaml")
-      self.fail('Broken config file should throw an exception')
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Can not add region to an existing full chromosome.'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
           "partition_config_full_and_partial_chr.yaml")
-      self.fail('Broken config file should throw an exception')
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'A full chromosome must be disjoint from all other regions'):
+      _ = variant_partition.VariantPartition(
+        "gcp_variant_transforms/testing/data/misc/"
+        "partition_config_partial_and_full_chr.yaml")
+
+    with self.assertRaisesRegexp(
+        ValueError,
+        'A full chromosome must be disjoint from all other regions'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
           "partition_config_redundant_full_chr.yaml")
-      self.fail('Broken config file should throw an exception')
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/misc/"
-        "partition_config_conflicting_full_chr.yaml")
-      self.fail('Broken config file should throw an exception')
+        "partition_config_conflicting_regions.yaml")
 
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Table names must be unique *'):
       _ = variant_partition.VariantPartition(
           "gcp_variant_transforms/testing/data/misc/"
+<<<<<<< HEAD
           "partition_config_redundant_table_names.yaml")
       self.fail('Broken config file should throw an exception')
+=======
+          "partition_config_redundant_table_names.yaml")
+>>>>>>> Default partition as 'residual'

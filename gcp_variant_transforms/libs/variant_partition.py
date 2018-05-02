@@ -44,24 +44,27 @@ _MAX_NUM_PARTITIONS = 1000
 _MAX_NUM_REGIONS = 64
 # Matches to regions formatted as 'chr12:10,000-20,000' used in par_config.yaml
 _REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
+# A special literal for identifying default partition's region name.
+_DEFAULT_REGION_LITERAL = 'residual'
 
 
 class RegionIndexer(object):
   """Assigns indices to multiple regions or one index to a whole chromosome.
 
   If self._index != -1 then this instance is encoding one whole chromosome.
-  If self._interval_tree != None this intance is encoding multiple regions.
+  If self._interval_tree != None this instance is encoding multiple regions.
   """
+
   def __init__(self):
     # Each instance contains either:
-    #    one whole chromosome
+    #    one whole chromosome (in that case _index != -1).
     self._index = -1
-    #    OR multiple regions of one chromosome
+    #    OR multiple regions of one chromosome (_interval_tree != None).
     self._interval_tree = None
 
   def add_interval(self, start, end, index):
     if self._index != -1:
-      raise ValueError('You can not add region to a full chromosome instance.')
+      raise ValueError('Can not add region to an existing full chromosome.')
     if start < 0:
       raise ValueError('Start position on a region cannot be negative: {}'.
                        format(start))
@@ -81,8 +84,7 @@ class RegionIndexer(object):
 
   def add_index(self, index):
     if self._interval_tree is not None:
-      raise ValueError('You can not add full chromosome to multi region '
-                       'instance.')
+      raise ValueError('Can not add full chromosome to existing multi region.')
     if index < 0:
       raise ValueError('Index of a region cannot be negative {}'.format(index))
     self._index = index
@@ -164,45 +166,52 @@ class VariantPartition(object):
     self._default_partition_index = -1
     partition_index = 0
     for partition_config in partition_configs:
-      partition = partition_config.get('partition')
-      regions = partition.get('regions')
+      partition = partition_config.get('partition', None)
+      if partition is None:
+        raise ValueError('Wrong yaml file format, partition field missing.')
+
+      regions = partition.get('regions', None)
       if regions is None:
+        raise ValueError('Each partition must have at least one region.')
+      if len(regions) > _MAX_NUM_REGIONS:
+        raise ValueError(
+            'At most {} regions per partition, thie partition  contains {}'
+            .format(_MAX_NUM_REGIONS, len(regions)))
+      # Check whether this is the default region.
+      if (len(regions) == 1 and
+          regions[0].strip().lower() == _DEFAULT_REGION_LITERAL):
         if self._default_partition_index != -1:
           raise ValueError(
-              'There must be only one default partition intercepted at least 2')
+            'There must be only one default partition intercepted at least 2')
         else:
           self._default_partition_index = partition_index
-      else:
-        if len(regions) > _MAX_NUM_REGIONS:
-          raise ValueError(
-              'At most {} regions per partition, thie partition  contains {}'
-              .format(_MAX_NUM_REGIONS, len(regions)))
+      for r in regions:
+        matched = _REGION_LITERAL_REGEXP.match(r)
+        if matched:
+          ref_name, start, end = matched.groups()
+          ref_name = ref_name.strip().lower()
+          start = _parse_position(start)
+          end = _parse_position(end)
 
-        for r in regions:
-          matched = _REGION_LITERAL_REGEXP.match(r)
-          if matched:
-            ref_name, start, end = matched.groups()
-            ref_name = ref_name.strip().lower()
-            start = _parse_position(start)
-            end = _parse_position(end)
+          region_indexer = self._by_ref_name.get(ref_name, None)
+          if region_indexer and region_indexer.is_full_chromosome:
+            raise ValueError(
+                'Can not add region to an existing full chromosome.')
+          self._by_ref_name[ref_name].add_interval(start, end,
+                                                   partition_index)
+        else:
+          # This region includes a full chromosome
+          ref_name = r.strip().lower()
+          if self._by_ref_name.get(ref_name, None):
+            raise ValueError('A full chromosome must be disjoint from all '
+                             'other regions, {} is not'.format(ref_name))
+          self._by_ref_name[ref_name].add_index(partition_index)
 
-            region_indexer = self._by_ref_name.get(ref_name, None)
-            if region_indexer and region_indexer.is_full_chromosome:
-              raise ValueError('A full chromosome must be disjoint from all '
-                               'other regions, {} is not'.format(ref_name))
-            self._by_ref_name[ref_name].add_interval(start, end,
-                                                     partition_index)
-          else:
-            # This region includes a full chromosome
-            ref_name = r.strip().lower()
-            if self._by_ref_name.get(ref_name, None):
-              raise ValueError('A full chromosome must be disjoint from all '
-                               'other regions, {} is not'.format(ref_name))
-            self._by_ref_name[ref_name].add_index(partition_index)
-
+      if partition.get('partition_name', None) is None:
+        raise ValueError('Each partition must have partition_name field.')
       suffix = partition.get('partition_name').strip()
       if table_suffix_duplicate.get(suffix, None) is not None:
-        raise ValueError('Table names need to be unique, {} is duplicated'
+        raise ValueError('Table names must be unique, {} is duplicated'
                          .format(suffix))
       table_suffix_duplicate[suffix] = True
       self._suffixes.append(suffix)
@@ -296,6 +305,5 @@ class VariantPartition(object):
 
   def get_suffix(self, index):
     if index >= self._partition_no or index < 0:
-      raise ValueError('given partition index is larger than the no of '
-                       'partitions {} vs {}'.format(index, self._partition_no))
+      raise ValueError('Given partition index is outside of expected range.')
     return self._suffixes[index]
