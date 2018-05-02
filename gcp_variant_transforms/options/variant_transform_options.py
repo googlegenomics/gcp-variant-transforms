@@ -345,8 +345,11 @@ class PreprocessOptions(VariantTransformsOptions):
   """Options for preprocess."""
 
   def add_arguments(self, parser):
+    parser.add_argument('--input_pattern',
+                        required=True,
+                        help='Input pattern for VCF files to process.')
     parser.add_argument(
-        '--report_all',
+        '--report_all_conflicts',
         type='bool', default=False, nargs='?', const=True,
         help=('By default, only the incompatible VCF headers will be reported. '
               'If true, it also reports the undefined headers and malformed '
@@ -356,7 +359,9 @@ class PreprocessOptions(VariantTransformsOptions):
         required=True,
         help=('The full path of the preprocessor report. If run locally, a '
               'local path must be provided. Otherwise, a cloud path is '
-              'required.'))
+              'required. For best readability, please save the report as a tab '
+              'delimited file (by appending the extension .tsv to the file '
+              'name) and open with the spreadsheets.'))
     parser.add_argument(
         '--resolved_headers_path',
         default='',

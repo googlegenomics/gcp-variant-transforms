@@ -15,73 +15,91 @@
 """Generates preprocess report.
 
 The report is aimed to help the user to easily import the malformed/incompatible
-VCF files. It contains two parts. The first part reports the header fields that
-have conflicting definitions across multiple VCF files, by providing the
-conflicting definitions, the corresponding file paths, and the suggested
-resolutions. The second part contains the undefined header fields and the
-inferred definitions.
-TODO(allieychen): Eventually, it also contains the malformed records and the
-resource estimation.
+VCF files. It contains three parts and each of them reports one type of error.
+- The first part reports the header fields that have conflicting definitions
+  across multiple VCF files, by providing the conflicting definitions, the
+  corresponding file paths, and the suggested resolutions.
+- The second part contains the undefined header fields and the inferred
+  definitions.
+- The last part contains the malformed records.
+TODO(allieychen): Eventually, it also contains the resource estimation.
+
+Output example (assuming opening in spreedsheet):
+Header Conflicts
+ID    Category    Conflicts            File Paths    Proposed Resolution
+NS    INFO        num=1 type=Float     file1         num=1 type=Float
+                  num=1 type=Integer   file2
+DP    FORMAT      num=1 type=Float     file1         num=1 type=Float
+                                       file2
+                  num=1 type=Integer   file3
+
+Undefined Headers
+ID    Category    Proposed Resolution
+GT    INFO        num=1 type=Float
+GQ    FORMAT      num=1 type=Float
+
+Malformed Records
+File Path   Variant Record              Error Message
+file 1      rs6 G A 29 PASS NS=3;       invalid literal for int() with base 10.
 """
 
-from typing import Dict, List, Union  # pylint: disable=unused-import
+from typing import Dict, List, Optional, Union  # pylint: disable=unused-import
 
-from apache_beam.io.filesystems import FileSystems
-from apache_beam import pvalue
+from apache_beam.io import filesystems
 
+from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
+from gcp_variant_transforms.transforms import merge_header_definitions  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms.merge_header_definitions import Definition  # pylint: disable=unused-import
-from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeaderDefinitions  # pylint: disable=unused-import
 
 
-_HEADER_LINE = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution\n'
-_NO_CONFLICTS_MESSAGE = 'No conflicts found.'
 _NO_SOLUTION_MESSAGE = 'Not resolved.'
-_UNDEFINED_HEADER_MESSAGE = 'Undefined header.'
 _PADDING_CHARACTER = ' '
 _DELIMITER = '\t'
 
 
-def generate_report(header_definitions,
-                    file_path,
-                    resolved_headers=None,
-                    inferred_headers=None):
-  # type: (VcfHeaderDefinitions, str, VcfHeader, VcfHeader) -> None
+class _InconsistencyType(object):
+  """Inconsistency types that included in the report."""
+  HEADER_CONFLICTS = 'Header Conflicts'
+  UNDEFINED_HEADERS = 'Undefined Headers'
+  MALFORMED_RECORDS = 'Malformed Records'
+
+
+class _HeaderLine(object):
+  """Header lines for each error type."""
+  CONFLICTS_HEADER = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution'
+  UNDEFINED_FIELD_HEADER = 'ID\tCategory\tProposed Resolution'
+  MALFORMED_RECORDS_HEADER = 'File Path\tVariant Record\tError Message'
+
+
+def generate_report(
+    header_definitions,  # type: merge_header_definitions.VcfHeaderDefinitions
+    file_path,  # type: str
+    resolved_headers=None,  # type: vcf_header_io.VcfHeader
+    inferred_headers=None,  # type: vcf_header_io.VcfHeader
+    malformed_records=None  # type: List[vcfio.MalformedVcfRecord]
+    ):
+  # type: (...) -> None
   """Generates a report.
 
   Args:
     header_definitions: The container which contains all header definitions and
       the corresponding file names.
-    file_path: The location where the conflicts report is saved.
+    file_path: The location where the report is saved.
     resolved_headers: The ``VcfHeader`` that provides the resolutions for the
       fields that have conflicting definitions.
     inferred_headers: The ``VcfHeader`` that contains the inferred header
       definitions of the undefined header fields.
+    malformed_records: A list of ``MalformedVcfRecord`` for which VCF parser
+      failed.
   """
-  resolved_headers = resolved_headers or VcfHeader()
-  inferred_headers = inferred_headers or VcfHeader()
-  content_lines = []
-  content_lines.extend(_generate_conflicting_headers_lines(
-      _extract_conflicts(header_definitions.infos), resolved_headers.infos,
-      vcf_header_io.HeaderTypeConstants.INFO))
-  content_lines.extend(_generate_conflicting_headers_lines(
-      _extract_conflicts(header_definitions.formats), resolved_headers.formats,
-      vcf_header_io.HeaderTypeConstants.FORMAT))
-<<<<<<< HEAD:gcp_variant_transforms/libs/preprocess_reporter.py
-  content_lines.extend(_generate_inferred_headers_lines(
-      inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
-  content_lines.extend(_generate_inferred_headers_lines(
-      inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
-=======
-  if not isinstance(inferred_headers, pvalue.EmptySideInput):
-    content_lines.extend(_generate_inferred_headers_lines(
-        inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
-    content_lines.extend(_generate_inferred_headers_lines(
-        inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
->>>>>>> Format the report:gcp_variant_transforms/libs/preprocess_reporter.py
-  _write_to_report(content_lines, file_path)
+  resolved_headers = resolved_headers or vcf_header_io.VcfHeader()
+  with filesystems.FileSystems.create(file_path) as file_to_write:
+    _append_conflicting_headers_to_report(file_to_write, header_definitions,
+                                          resolved_headers)
+    _append_inferred_headers_to_report(file_to_write, inferred_headers)
+    _append_malformed_records_to_report(file_to_write, malformed_records)
 
 
 def _extract_conflicts(
@@ -98,6 +116,73 @@ def _extract_conflicts(
   return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
 
 
+def _append_conflicting_headers_to_report(
+    file_to_write,  # type: file
+    header_definitions,  # type: merge_header_definitions.VcfHeaderDefinitions
+    resolved_headers  # type: vcf_header_io.VcfHeader
+    ):
+  # type: (...) -> None
+  """Appends the human readable conflicting headers to the report.
+
+  Output example:
+  Header Conflicts
+  ID    Category    Conflicts            File Paths    Proposed Resolution
+  NS    INFO        num=1 type=Float     file1         num=1 type=Float
+                    num=1 type=Integer   file2
+  DP    FORMAT      num=1 type=Float     file1         num=1 type=Float
+                                         file2
+                    num=1 type=Integer   file3
+  """
+  content_lines = []
+  content_lines.extend(_generate_conflicting_headers_lines(
+      _extract_conflicts(header_definitions.infos), resolved_headers.infos,
+      vcf_header_io.HeaderTypeConstants.INFO))
+  content_lines.extend(_generate_conflicting_headers_lines(
+      _extract_conflicts(header_definitions.formats), resolved_headers.formats,
+      vcf_header_io.HeaderTypeConstants.FORMAT))
+  _append_to_report(file_to_write, _InconsistencyType.HEADER_CONFLICTS,
+                    _HeaderLine.CONFLICTS_HEADER, content_lines)
+
+
+def _append_inferred_headers_to_report(file_to_write, inferred_headers):
+  # type: (file, Optional[vcf_header_io.VcfHeader]) -> None
+  """Appends the human readable inferred headers to the report.
+
+  Output example:
+  Undefined Headers
+  ID    Category    Proposed Resolution
+  GT    INFO        num=1 type=Float
+  GQ    FORMAT      num=1 type=Float
+  """
+  if inferred_headers is not None:
+    content_lines = []
+    content_lines.extend(_generate_inferred_headers_lines(
+        inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
+    content_lines.extend(_generate_inferred_headers_lines(
+        inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
+    _append_to_report(file_to_write, _InconsistencyType.UNDEFINED_HEADERS,
+                      _HeaderLine.UNDEFINED_FIELD_HEADER, content_lines)
+
+
+def _append_malformed_records_to_report(file_to_write, malformed_records):
+  # type: (file, Optional[List[MalformedVcfRecord]]) -> None
+  """Appends the human readable malformed records to the report.
+
+  Output example:
+  Malformed Records
+  File Path   Variant Record             Error Message
+  file 1      rs6 G A 29 PASS NS=3;      invalid literal for int() with base 10.
+  """
+  if malformed_records is not None:
+    content_lines = []
+    for record in malformed_records:
+      content_lines.append(_DELIMITER.join([record.file_name,
+                                            record.line,
+                                            record.error]))
+    _append_to_report(file_to_write, _InconsistencyType.MALFORMED_RECORDS,
+                      _HeaderLine.MALFORMED_RECORDS_HEADER, content_lines)
+
+
 def _generate_conflicting_headers_lines(
     conflicts,  # type: Dict[str, Dict[Definition, List[str]]]
     resolved_headers,  # type: Dict[str, Dict[str, Union[str, int]]
@@ -106,7 +191,6 @@ def _generate_conflicting_headers_lines(
   # type: (...) -> List[str]
   """Returns the conflicting headers lines for the report.
 
-<<<<<<< HEAD:gcp_variant_transforms/libs/preprocess_reporter.py
   Each conflicting header record is structured into columns(TAB separated
   values): the ID, the category('FOMRAT' or 'INFO'), conflicting definitions,
   file names and the resolution. To make the contents more readable (especially
@@ -115,24 +199,9 @@ def _generate_conflicting_headers_lines(
   such that each row/cell only contains one definition/file name. While
   splitting, the empty cells are filled by ``_PADDING_CHARACTER`` as a
   placeholder so it can be easily viewed in both text editor and spreadsheets.
-=======
-  To better align contents in the report so that it can be viewed easily, for
-  every unique ID, generate several rows with the following steps.
-  - Step 1: The first row starts with The ID, the category('FOMRAT' or 'INFO'),
-    one conflicting definition, one file name and the resolution, separated by
-    the ``_DELIMITER ``.
-  - Step 2: If there there are more files having the same definition as the
-    previous step, list each file path in one separate row by filling all other
-    columns using ``_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
-  - Step 3: If there are more conflicting definitions, generate a new row with
-    one conflicting definition, one file path, and fill the ID, the category and
-    the resolution with `_PADDING_CHARACTER``, separated by the ``_DELIMITER ``.
-  - Repeat step 2 and step 3 until there are no more conflicts.
->>>>>>> Format the report:gcp_variant_transforms/libs/preprocess_reporter.py
   Output example:
-  DP\tFORMAT\tnum=1 type=Float\tfile1\tnum=1 type=Float
-   \t \t \tfile2\t
-   \t \tnum=1 type=Integer\tfile3\t
+  NS    INFO        num=1 type=Float     file1         num=1 type=Float
+                    num=1 type=Integer   file2
   """
   content_lines = []
   for field_id, definitions_to_files_map in conflicts.iteritems():
@@ -169,14 +238,12 @@ def _generate_inferred_headers_lines(inferred_headers, category):
   The field ID, category (FORMAT or INFO), and the inferred header definitions
   are included in the contents.
   Output example:
-  NS\tFORMAT\tUndefined header.\t \tnum=1 type=Float
+  GT    INFO    num=1 type=Float
   """
   content_lines = []
   for field_id in inferred_headers.keys():
     row = [field_id,
            category,
-           _UNDEFINED_HEADER_MESSAGE,
-           _PADDING_CHARACTER,
            _extract_resolution(inferred_headers, field_id)]
     content_lines.append(_DELIMITER.join(row))
   return content_lines
@@ -204,20 +271,18 @@ def _format_definition(num_value, type_value):
   return ' '.join(formatted_definition)
 
 
-def _write_to_report(contents, file_path):
-  # type: (List[str], str) -> None
-  """Generates the report in ``file_path``.
+def _append_to_report(file_to_write, error_type, header, contents):
+  # type: (file, str, str, List[str]) -> None
+  """Appends the contents to ``file_to_write``.
 
-  Output example:
-  ID\tCategory\tConflicts\tFile Paths\tProposed Resolution
-  DP\tFORMAT\tnum=1 type=Float\tfile1\tnum=1 type=Float
-   \t \t \tfile2\t
-   \t \tnum=1 type=Integer\tfile3\t
-  NS\tFORMAT\tUndefined header\t \tnum=1 type=Float
+  The ``error_type``, ``header`` and the ``contents`` are written to
+  ``file_to_write`` sequentially.
   """
-  with FileSystems.create(file_path) as file_to_write:
-    if not contents:
-      file_to_write.write(_NO_CONFLICTS_MESSAGE)
-    else:
-      file_to_write.write(_HEADER_LINE)
-      file_to_write.write('\n'.join(contents))
+  if not contents:
+    file_to_write.write('No ' + error_type + ' Found.\n')
+  else:
+    file_to_write.write(error_type + '\n')
+    file_to_write.write(header + '\n')
+    for content in contents:
+      file_to_write.write(content + '\n')
+  file_to_write.write('\n')
