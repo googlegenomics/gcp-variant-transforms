@@ -46,10 +46,10 @@ repeated record field `CSQ` under each `alternate_bases`:
 As it can be seen in the above example, the alternate alleles listed in the
 `CSQ` field are different from `ALT` strings of the variant record (for example
 the `AAC->C` variant is represented by a single `-` which means a deletion).
-This is because, the gnomAD set is run through VEP with the
+This is because, the gnomAD dataset is run through VEP with the
 [`--minimal`](http://useast.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_minimal)
-option. VT can recognize this, in fact, currently there are three modes of `ALT`
-matching implemented in `VT`
+option. VT supports matching alt fields in the minimal mode. There are actually
+three modes of `ALT` matching supported by VT:
 
 * If no `ALT` matching flag is set, VT implements
 [the spec](http://snpeff.sourceforge.net/VCFannotationformat_v1.0.pdf) by
