@@ -127,12 +127,12 @@ class VariantToBigQuery(beam.PTransform):
                    limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
         bq_writes.append(bq_rows | 'WriteToBigQuery' + str(i) >>
                          beam.io.Write(beam.io.BigQuerySink(
-                           self._output_table,
-                           schema=self._schema,
-                           create_disposition=(
-                             beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                           write_disposition=(
-                             beam.io.BigQueryDisposition.WRITE_APPEND))))
+                             self._output_table,
+                             schema=self._schema,
+                             create_disposition=(
+                                 beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
+                             write_disposition=(
+                                 beam.io.BigQueryDisposition.WRITE_APPEND))))
       return bq_writes
     # If _limit_write == False we don't need any hack to avoid the BQ failure.
     return (bq_rows
