@@ -38,7 +38,7 @@ data science with BigQuery.
     down arrow icon next to your project name in the navigation, and clicking on
     _Create new dataset_.
 
-## Loading VCF files to BigQuery
+## Loading VCF files to BigQuery  <a name="vcf_to_bq"></a>
 
 ### Using docker
 
@@ -159,100 +159,21 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 ```
 
-### Running jobs in a particular region/zone
 
-You may need to constrain Cloud Dataflow job processing to a specific
-geographic region in support of yourproject’s security and compliance needs.
-See [Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
+## Running VCF files preprocessor
+
+The VCF files preprocessor is used for validating the datasets such that the
+inconsistencies can be easily identified. It can be used as an individual
+validator to check the validity of the information inside the VCF files, or as a
+helper tool for [VCF to BigQuery pipeline](#vcf_to_bq). Please refer to
+[VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
 
 
-## Running VCF files to BigQuery Preprocessor
+## Running jobs in a particular region/zone
 
-Similarly, the preprocessor can be ran using docker or directly from the source.
-
-### Using docker
-
-First, set up the preprocessor pipeline configurations shown below and save it
-as `vcf_to_bigquery_preprocess.yaml`. The parameters that you need to replace
-are:
-
-* `my_project`: This is your project name that contains the BigQuery dataset.
-* `gs://my_bucket/vcffiles/*.vcf`: A location in Google Cloud Storage where the
-  VCF file are stored. You may specify a single file or provide a pattern to
-  load multiple files at once.
-* `report_path`: This can be any path in Google Cloud Storage that your project
-  has write access to. It is used to store the preprocess report.
-* `resolved_headers_path`: Optional. This can be any path in Google Cloud
-  Storage that your project has write access to. It is used to store the
-  resolved headers which can be further used as a representative header for VCF
-  files to BigQuery Pipeline.
-* `gs://my_bucket/staging` and `gs://my_bucket/temp`: These can be any folder in
-  Google Cloud Storage that your project has write access to. These are used to
-  store temporary files needed for running the pipeline.
-
-`report_all` is optional. By default, the preprocessor reports the inconsistent
-header definitions across multiple VCF files. By setting this parameter to true,
-it also checks the undefined headers and the malformed records.
-
-```yaml
-name: vcf-to-bigquery-preprocess-pipeline
-docker:
-  imageName: gcr.io/gcp-variant-transforms/gcp-variant-transforms
-  cmd: |
-    ./opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
-      --project my_project \
-      --input_pattern gs://my_bucket/vcffiles/*.vcf \
-      --report_path gs://my_bucket/preprocess/report.tsv \
-      --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-      --report_all true \
-      --staging_location gs://my_bucket/staging \
-      --temp_location gs://my_bucket/temp \
-      --job_name vcf-to-bigquery-preprocess \
-      --runner DataflowRunner
-```
-
-Next, run the following command to launch the pipeline. Replace `my_project`
-with your project name, `gs://my_bucket/temp/runner_logs` with a Cloud Storage
-folder to store the logs from the pipeline.
-
-```bash
-gcloud alpha genomics pipelines run \
-    --project my_project \
-    --pipeline-file vcf_to_bigquery_preprocess.yaml \
-    --logging gs://my_bucket/temp/runner_logs \
-    --zones us-west1-b
-```
-
-### Running from github
-
-In addition to using the docker image, you may run the pipeline directly from
-source.
-
-Example command for DirectRunner:
-
-```bash
-python -m gcp_variant_transforms.vcf_to_bq_preprocess \
-  --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --report_path gs://my_bucket/preprocess/report.tsv
-  --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-  --report_all true
-```
-
-Example command for DataflowRunner:
-
-```bash
-python -m gcp_variant_transforms.vcf_to_bq_preprocess \
-  --input_pattern gs://my_bucket/vcffiles/*.vcf \
-  --report_path gs://my_bucket/preprocess/report.tsv \
-  --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-  --report_all true \
-  --project my_project \
-  --staging_location gs://my_bucket/staging \
-  --temp_location gs://my_bucket/temp \
-  --job_name vcf-to-bigquery-preprocess \
-  --setup_file ./setup.py \
-  --runner DataflowRunner
-```
+You may need to constrain Cloud Dataflow job processing to a specific geographic
+region in support of your project’s security and compliance needs. See
+[Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
 
 
 ## Additional topics
