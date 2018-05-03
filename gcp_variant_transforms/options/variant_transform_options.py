@@ -124,23 +124,40 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       raise ValueError(
           'Expected a table reference (PROJECT:DATASET.TABLE) '
           'instead of {}.'.format(parsed_args.output_table))
+    if not client:
+      credentials = GoogleCredentials.get_application_default().create_scoped(
+          ['https://www.googleapis.com/auth/bigquery'])
+      client = bigquery.BigqueryV2(credentials=credentials)
+    project_id = output_table_re_match.group('project')
+    dataset_id = output_table_re_match.group('dataset')
+    table_id = output_table_re_match.group('table')
     try:
-      if not client:
-        credentials = GoogleCredentials.get_application_default().create_scoped(
-            ['https://www.googleapis.com/auth/bigquery'])
-        client = bigquery.BigqueryV2(credentials=credentials)
       client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-          projectId=output_table_re_match.group('project'),
-          datasetId=output_table_re_match.group('dataset')))
+          projectId=project_id,
+          datasetId=dataset_id))
     except exceptions.HttpError as e:
       if e.status_code == 404:
         raise ValueError('Dataset %s:%s does not exist.' %
-                         (output_table_re_match.group('project'),
-                          output_table_re_match.group('dataset')))
+                         (project_id, dataset_id))
       else:
         # For the rest of the errors, use BigQuery error message.
         raise
-
+    # Ensuring given output table doesn't already exist to avoid overwriting it.
+    if not parsed_args.append:
+      try:
+        client.tables.Get(bigquery.BigqueryTablesGetRequest(
+            projectId=project_id,
+            datasetId=dataset_id,
+            tableId=table_id))
+        raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
+                         (project_id, dataset_id, table_id))
+      except exceptions.HttpError as e:
+        if e.status_code == 404:
+          # This is expected, output table must not already exist
+          pass
+        else:
+          # For the rest of the errors, use BigQuery error message.
+          raise
 
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
