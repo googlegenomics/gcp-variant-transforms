@@ -28,6 +28,15 @@ from apitools.base.py import exceptions
 from gcp_variant_transforms.options import variant_transform_options
 
 
+def make_args(options, args):
+  parser = argparse.ArgumentParser()
+  parser.register('type', 'bool', lambda v: v.lower() == 'true')
+  options.add_arguments(parser)
+  namespace, remining_args = parser.parse_known_args(args)
+  assert not remining_args
+  return namespace
+
+
 class BigQueryWriteOptionsTest(unittest.TestCase):
   """Tests cases for the BigQueryWriteOptions class."""
 
@@ -36,12 +45,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
   def _make_args(self, args):
     # type: (List[str]) -> argparse.Namespace
-    parser = argparse.ArgumentParser()
-    parser.register('type', 'bool', lambda v: v.lower() == 'true')
-    self._options.add_arguments(parser)
-    namespace, remining_args = parser.parse_known_args(args)
-    assert not remining_args
-    return namespace
+    return make_args(self._options, args)
 
   def test_valid_table_path(self):
     args = self._make_args(['--append',
@@ -92,12 +96,7 @@ class AnnotationOptionsTest(unittest.TestCase):
 
   def _make_args(self, args):
     # type: (List[str]) -> argparse.Namespace
-    parser = argparse.ArgumentParser()
-    parser.register('type', 'bool', lambda v: v.lower() == 'true')
-    self._options.add_arguments(parser)
-    namespace, remining_args = parser.parse_known_args(args)
-    assert not remining_args
-    return namespace
+    return make_args(self._options, args)
 
   def test_validate_okay(self):
     """Tests that no exceptions are raised for valid arguments."""

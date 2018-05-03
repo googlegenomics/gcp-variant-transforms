@@ -92,8 +92,6 @@ class VcfReadOptions(VariantTransformsOptions):
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
-  _APPEND_FLAG = 'append'
-
   def add_arguments(self, parser):
     parser.add_argument('--output_table',
                         required=True,
@@ -108,7 +106,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'easier, because it avoids having to map each field with the '
               'corresponding alternate record while querying.'))
     parser.add_argument(
-        '--' + BigQueryWriteOptions._APPEND_FLAG,
+        '--append',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, existing records in output_table will not be '
               'overwritten. New records will be appended to those that '
@@ -130,33 +128,33 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       credentials = GoogleCredentials.get_application_default().create_scoped(
           ['https://www.googleapis.com/auth/bigquery'])
       client = bigquery.BigqueryV2(credentials=credentials)
+    project_id = output_table_re_match.group('project')
+    dataset_id = output_table_re_match.group('dataset')
+    table_id = output_table_re_match.group('table')
     try:
       client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-          projectId=output_table_re_match.group('project'),
-          datasetId=output_table_re_match.group('dataset')))
+          projectId=project_id,
+          datasetId=dataset_id))
     except exceptions.HttpError as e:
       if e.status_code == 404:
         raise ValueError('Dataset %s:%s does not exist.' %
-                         (output_table_re_match.group('project'),
-                          output_table_re_match.group('dataset')))
+                         (project_id, dataset_id))
       else:
         # For the rest of the errors, use BigQuery error message.
         raise
     # Ensuring given output table doesn't already exist to avoid overwriting it.
-    args_dict = vars(parsed_args)
-    if not args_dict[BigQueryWriteOptions._APPEND_FLAG]:
+    if not parsed_args.append:
       try:
         client.tables.Get(bigquery.BigqueryTablesGetRequest(
-            projectId=output_table_re_match.group('project'),
-            datasetId=output_table_re_match.group('dataset'),
-            tableId=output_table_re_match.group('table')))
+            projectId=project_id,
+            datasetId=dataset_id,
+            tableId=table_id))
         raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
-                         (output_table_re_match.group('project'),
-                          output_table_re_match.group('dataset'),
-                          output_table_re_match.group('table')))
+                         (project_id, dataset_id, table_id))
       except exceptions.HttpError as e:
         if e.status_code == 404:
-          print 'This is expected, output table must not already exist'
+          # This is expected, output table must not already exist
+          pass
         else:
           # For the rest of the errors, use BigQuery error message.
           raise
