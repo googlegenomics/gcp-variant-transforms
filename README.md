@@ -13,7 +13,9 @@ manner based on [Apache Beam](https://beam.apache.org/) using
 
 It can be used to directly load VCF files to
 [BigQuery](https://cloud.google.com/bigquery/) supporting hundreds of thousands
-of files, millions of samples, and billions of records.
+of files, millions of samples, and billions of records. Additionally, it
+provides a preprocess functionality to validate the VCF files such that the
+inconsistencies can be easily identified.
 
 Please see
 [this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
@@ -157,11 +159,21 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 ```
 
-### Running jobs in a particular region/zone
 
-You may need to constrain Cloud Dataflow job processing to a specific
-geographic region in support of yourproject’s security and compliance needs.
-See [Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
+## Running VCF files preprocessor
+
+The VCF files preprocessor is used for validating the datasets such that the
+inconsistencies can be easily identified. It can be used as a standalone
+validator to check the validity of the VCF files, or as a helper tool for
+[VCF to BigQuery pipeline](#loading-vcf-files-to-bigquery). Please refer to
+[VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
+
+
+## Running jobs in a particular region/zone
+
+You may need to constrain Cloud Dataflow job processing to a specific geographic
+region in support of your project’s security and compliance needs. See
+[Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
 
 
 ## Additional topics
