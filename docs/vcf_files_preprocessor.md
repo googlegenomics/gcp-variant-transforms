@@ -1,9 +1,8 @@
 # VCF files preprocessor
 
 The VCF files preprocessor is used for validating the datasets such that the
-inconsistencies can be easily identified. It can be used as an individual
-validator to check the validity of the information inside the VCF files, or as a
-helper tool for
+inconsistencies can be easily identified. It can be used as a standalone
+validator to check the validity of the VCF files, or as a helper tool for
 [VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery). The VCF
 to BigQuery loading process may fail for ill-defined datasets, which can be
 resolved by applying
