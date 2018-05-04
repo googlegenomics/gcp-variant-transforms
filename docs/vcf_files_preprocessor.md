@@ -3,10 +3,11 @@
 The VCF files preprocessor is used for validating the datasets such that the
 inconsistencies can be easily identified. It can be used as an individual
 validator to check the validity of the information inside the VCF files, or as a
-helper tool for [VCF to BigQuery pipeline](/README.md/#vcf_to_bq). The VCF to
-BigQuery loading process may fail for ill-defined datasets, which can be
+helper tool for
+[VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery). The VCF
+to BigQuery loading process may fail for ill-defined datasets, which can be
 resolved by applying
-[conflicts resolving strategies](https://docs.google.com/document/d/1JusaPllbpXynNziNzdyOdSRTM8i7UXbNvtkbrWNMq3Q).
+[conflicts resolving strategies](multiple_files.md#field-compatibility).
 This tool provides insights on what conflicts are there in the VCF files and the
 resolutions that will be applied when loading the data into BigQuery. Meanwhile,
 it also makes the manual corrections easier if the proposed resolutions are not
@@ -21,14 +22,14 @@ This tool generates a report that includes three types of inconsistencies:
   parsed correctly by the VCF parser. In this case, the file paths and the
   malformed variant records are included in the report for reference.
 * Undefined headers (Optional): Occasionally, some fields may be used directly
-  without a definition in the VCF files. Those fields and the inferred
-  definitions are provided in the report.
+  without a definition in the VCF files. The tool can infer the type for such
+  fields and provides them in the report.
 
 ## Running VCF files to BigQuery Preprocessor
 
 Similar to running the
-[VCF to BigQuery pipeline](/README.md/#vcf_to_bq), the
-preprocessor can also be ran using docker or directly from the source.
+[VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery), the
+preprocessor can also be run using docker or directly from the source.
 
 ### Using docker
 
@@ -47,7 +48,7 @@ are:
   Storage that your project has write access to. It is used to store the
   resolved headers which can be further used as a representative header (via
   `--representative_header_file`) for the
-  [VCF to BigQuery pipeline](/README.md/#vcf_to_bq).
+  [VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery).
 * `gs://my_bucket/staging` and `gs://my_bucket/temp`: These can be any folder in
   Google Cloud Storage that your project has write access to. These are used to
   store temporary files needed for running the pipeline.

@@ -38,7 +38,7 @@ data science with BigQuery.
     down arrow icon next to your project name in the navigation, and clicking on
     _Create new dataset_.
 
-## Loading VCF files to BigQuery  <a name="vcf_to_bq"></a>
+## Loading VCF files to BigQuery
 
 ### Using docker
 
@@ -163,9 +163,9 @@ python -m gcp_variant_transforms.vcf_to_bq \
 ## Running VCF files preprocessor
 
 The VCF files preprocessor is used for validating the datasets such that the
-inconsistencies can be easily identified. It can be used as an individual
-validator to check the validity of the information inside the VCF files, or as a
-helper tool for [VCF to BigQuery pipeline](#vcf_to_bq). Please refer to
+inconsistencies can be easily identified. It can be used as a standalone
+validator to check the validity of the VCF files, or as a helper tool for
+[VCF to BigQuery pipeline](#loading-vcf-files-to-bigquery). Please refer to
 [VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
 
 
