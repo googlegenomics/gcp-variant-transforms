@@ -22,9 +22,9 @@ VCF Header:
 ##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|ALLELE_NUM|...>
 ```
 Corresponding annotations for a sample variant record where `REF=AAC` and
-`ALT=TAC,C`:
+`ALT=TAC,A`:
 ```
-CSQ=-|downstream_gene_variant|MODIFIER|WASH7P|ENSG00000227232|Transcript|ENST00000423562|unprocessed_pseudogene|||1,...,T|upstream_gene_variant|MODIFIER|DDX11L1|ENSG00000223972|Transcript|ENST00000518655|transcribed_unprocessed_pseudogene|||2
+CSQ=-|downstream_gene_variant|MODIFIER|WASH7P|ENSG00000227232|Transcript|ENST00000423562|unprocessed_pseudogene|||2,...,T|upstream_gene_variant|MODIFIER|DDX11L1|ENSG00000223972|Transcript|ENST00000518655|transcribed_unprocessed_pseudogene|||1
 ```
 For each variant record, multiple annotation lists are provided which are
 separated by comma. The first field of each set refers to an alternate allele or
@@ -127,7 +127,7 @@ WHERE CSQ.SYMBOL = "HBB" AND CSQ.IMPACT = "HIGH"
 ORDER BY start_position
 ```
 
-and here is an snapshot from BigQuery UI for this query:
+and here is a snapshot from the BigQuery UI for this query:
 
 ![A sample query on the gnomAD genomes table](images/gnomAD_HBB_query.png)
 
