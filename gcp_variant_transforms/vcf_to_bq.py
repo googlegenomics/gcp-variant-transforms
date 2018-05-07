@@ -151,6 +151,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path
 
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
