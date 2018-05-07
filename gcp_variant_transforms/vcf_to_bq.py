@@ -217,7 +217,7 @@ def run(argv=None):
            append=known_args.append,
            allow_incompatible_records=known_args.allow_incompatible_records,
            omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-           num_output_splits=known_args.num_output_splits))
+           num_bigquery_write_shards=known_args.num_bigquery_write_shards))
   result = pipeline.run()
   result.wait_until_finish()
 

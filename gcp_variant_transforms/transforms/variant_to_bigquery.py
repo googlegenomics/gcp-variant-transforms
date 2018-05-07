@@ -67,7 +67,7 @@ class VariantToBigQuery(beam.PTransform):
       append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      num_output_splits=1  # type: int
+      num_bigquery_write_shards=1  # type: int
       ):
     """Initializes the transform.
 
@@ -87,8 +87,8 @@ class VariantToBigQuery(beam.PTransform):
 +        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
-      num_output_splits: If > 1, we will limit number of sources which are used
-        for writing to the output BigQuery table.
+      num_bigquery_write_shards: If > 1, we will limit number of sources which
+        are used for writing to the output BigQuery table.
     """
     self._output_table = output_table
     self._header_fields = header_fields
@@ -106,7 +106,7 @@ class VariantToBigQuery(beam.PTransform):
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
-    self._num_output_splits = num_output_splits
+    self._num_bigquery_write_shards = num_bigquery_write_shards
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
@@ -114,15 +114,15 @@ class VariantToBigQuery(beam.PTransform):
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls))
-    if self._num_output_splits > 1:
-      # We split data into self._num_output_splits random partitions
+    if self._num_bigquery_write_shards > 1:
+      # We split data into self._num_bigquery_write_shards random partitions
       # and then write each part to final BQ by appending them together.
       # Combined with LimitWrite transform, this will avoid the BQ failure.
       bq_row_partitions = bq_rows | beam.Partition(
           lambda _, n: random.randint(0, n - 1),
-          self._num_output_splits)
+          self._num_bigquery_write_shards)
       bq_writes = []
-      for i in range(self._num_output_splits):
+      for i in range(self._num_bigquery_write_shards):
         bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
                    limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
         bq_writes.append(

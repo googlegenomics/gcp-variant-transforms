@@ -116,13 +116,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         type='bool', default=False, nargs='?', const=True,
         help=("If true, samples that don't have a given call will be omitted."))
     parser.add_argument(
-        '--num_output_splits',
+        '--num_bigquery_write_shards',
         type=int, default=1,
-        help=('Before writing the final result to output BigQuery we split '
-              'data to avoid a known failure caused by a BigQuery sink. If set '
-              'to 1, the output will be written without splitting. We '
-              'recommend 20 for large outputs. if --optimize_for_large_inputs '
-              'is set then use 5 for this flag.'))
+        help=('Before writing the final result to output BigQuery, the data is '
+              'sharded to avoid a known failure for very large inputs (issue '
+              '#199). Setting this flag to 1 will avoid this extra sharding.'
+              'It is recommended to use 20 for loading large inputs without '
+              'merging. Use a smaller value (2 or 3) if both merging and '
+              'optimize_for_large_inputs are enabled.'))
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
