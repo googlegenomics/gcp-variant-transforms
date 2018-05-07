@@ -8,6 +8,7 @@
   "worker_machine_type": "n1-standard-64",
   "max_num_workers": "64",
   "num_workers": "20",
+  "num_output_splits": "20",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

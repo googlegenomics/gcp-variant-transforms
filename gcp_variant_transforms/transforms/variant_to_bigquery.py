@@ -33,7 +33,6 @@ from gcp_variant_transforms.transforms import limit_write
 # see: https://issues.apache.org/jira/browse/BEAM-2801
 # This has to be less than 10000.
 _WRITE_SHARDS_LIMIT = 1000
-_NUM_BQ_LIMITED_WRITE_PARTITIONS = 20
 
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
@@ -68,7 +67,7 @@ class VariantToBigQuery(beam.PTransform):
       append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      limited_write=False  # type: bool
+      num_output_splits=1  # type: int
       ):
     """Initializes the transform.
 
@@ -88,7 +87,7 @@ class VariantToBigQuery(beam.PTransform):
 +        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
-      limited_write: If true, we will limit number of sources which are used
+      num_output_splits: If > 1, we will limit number of sources which are used
         for writing to the output BigQuery table.
     """
     self._output_table = output_table
@@ -107,7 +106,7 @@ class VariantToBigQuery(beam.PTransform):
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
-    self._limited_write = limited_write
+    self._num_output_splits = num_output_splits
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
@@ -115,15 +114,15 @@ class VariantToBigQuery(beam.PTransform):
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls))
-    if self._limited_write:
-      # We split data into _NUM_BQ_LIMITED_WRITE_PARTITIONS random partitions
+    if self._num_output_splits > 1:
+      # We split data into self._num_output_splits random partitions
       # and then write each part to final BQ by appending them together.
       # Combined with LimitWrite transform, this will avoid the BQ failure.
       bq_row_partitions = bq_rows | beam.Partition(
           lambda _, n: random.randint(0, n - 1),
-          _NUM_BQ_LIMITED_WRITE_PARTITIONS)
+          self._num_output_splits)
       bq_writes = []
-      for i in range(_NUM_BQ_LIMITED_WRITE_PARTITIONS):
+      for i in range(self._num_output_splits):
         bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
                    limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
         bq_writes.append(

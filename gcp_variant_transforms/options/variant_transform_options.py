@@ -115,6 +115,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--omit_empty_sample_calls',
         type='bool', default=False, nargs='?', const=True,
         help=("If true, samples that don't have a given call will be omitted."))
+    parser.add_argument(
+        '--num_output_splits',
+        type=int, default=1,
+        help=('Before writing the final result to output BigQuery we split '
+              'data to avoid a known failure caused by a BigQuery sink. If set '
+              'to 1, the output will be written without splitting. We '
+              'recommend 20 for large outputs. if --optimize_for_large_inputs '
+              'is set then use 5 for this flag.'))
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
