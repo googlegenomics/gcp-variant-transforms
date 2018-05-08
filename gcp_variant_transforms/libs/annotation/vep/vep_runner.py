@@ -85,6 +85,12 @@ def create_runner_and_update_args(known_args, pipeline_args):
     known_args.annotation_fields.append(known_args.vep_info_field)
   else:
     known_args.annotation_fields = [known_args.vep_info_field]
+  # TODO(bashir2): The VEP runner by default runs VEP with --allele_number hence
+  # we turn on this feature here. However, this might be inconsistent with other
+  # annotation fields that are originally present in input files, if they do not
+  # have ALLELE_NUM annotation. The fix is to make annotation ALT matching
+  # smarter to fall back on other matching methods if ALLELE_NUM is not present.
+  known_args.use_allele_num = True
   return runner
 
 
@@ -205,7 +211,10 @@ class VepRunner(object):
     self._region = self._get_flag(flags_dict, 'region')
     # TODO(bahsir2): Fix the error messages of _check_flag since
     # --worker_machine_type has dest='machine_type'.
-    self._machine_type = self._get_flag(flags_dict, 'machine_type')
+    try:
+      self._machine_type = self._get_flag(flags_dict, 'machine_type')
+    except ValueError:
+      self._machine_type = self._get_machine_type_from_fork()
     self._max_num_workers = self._get_flag(
         flags_dict, 'max_num_workers', 'num_workers')
     if self._max_num_workers <= 0:
@@ -222,6 +231,21 @@ class VepRunner(object):
         return pipeline_flags[flag]
     raise ValueError('Could not find any of {} among pipeline flags {}'.format(
         expected_flags, pipeline_flags))
+
+  def _get_machine_type_from_fork(self):
+    # type: () -> str
+    if self._vep_num_fork == 1:
+      return 'n1-standard-1'
+    elif self._vep_num_fork == 2:
+      return 'n1-standard-2'
+    elif self._vep_num_fork <= 4:
+      return 'n1-standard-4'
+    elif self._vep_num_fork <= 8:
+      return 'n1-standard-8'
+    else:
+      # This is just a heuristic since after a certain point having more cores
+      # does not help VEP performance much more because of its file I/O.
+      return 'n1-standard-16'
 
   def wait_until_done(self):
     """Polls currently running operations and waits until all are done."""
