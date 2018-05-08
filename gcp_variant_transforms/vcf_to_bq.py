@@ -46,6 +46,7 @@ from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
@@ -56,6 +57,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
+from gcp_variant_transforms.transforms import infer_undefined_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import partition_variants
@@ -71,6 +73,29 @@ _COMMAND_LINE_OPTIONS = [
 
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
+
+
+def _read_variants(pipeline, known_args):
+  # type: (beam.Pipeline, argparse.Namespace) -> pvalue.PCollection
+  """Helper method for returning a PCollection of Variants from VCFs."""
+  representative_header_lines = None
+  if known_args.representative_header_file:
+    representative_header_lines = vcf_header_parser.get_metadata_header_lines(
+        known_args.representative_header_file)
+
+  if known_args.optimize_for_large_inputs:
+    variants = (pipeline
+                | 'InputFilePattern' >> beam.Create([known_args.input_pattern])
+                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    representative_header_lines=representative_header_lines,
+                    allow_malformed_records=(
+                        known_args.allow_malformed_records)))
+  else:
+    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+        known_args.input_pattern,
+        representative_header_lines=representative_header_lines,
+        allow_malformed_records=known_args.allow_malformed_records)
+  return variants
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -100,8 +125,13 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> pvalue.PCollection
-  inferred_headers = vcf_to_bq_common.get_inferred_headers(pipeline, known_args,
-                                                           merged_header)
+  inferred_headers = (
+      _read_variants(pipeline, known_args)
+      | 'FilterVariants' >> filter_variants.FilterVariants(
+          reference_names=known_args.reference_names)
+      | ' InferUndefinedHeaderFields' >>
+      infer_undefined_headers.InferUndefinedHeaderFields(
+          pvalue.AsSingleton(merged_header)))
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()
@@ -190,7 +220,7 @@ def run(argv=None):
   partitioner = variant_partition.VariantPartition()
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
-  variants = vcf_to_bq_common.read_variants(pipeline, known_args)
+  variants = _read_variants(pipeline, known_args)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if variant_merger:
