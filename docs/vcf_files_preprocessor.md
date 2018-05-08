@@ -52,7 +52,7 @@ are:
   Google Cloud Storage that your project has write access to. These are used to
   store temporary files needed for running the pipeline.
 
-`report_all` is optional. By default, the preprocessor reports the inconsistent
+`report_all_conflicts` is optional. By default, the preprocessor reports the inconsistent
 header definitions across multiple VCF files. By setting this parameter to true,
 it also checks the undefined headers and the malformed records.
 
@@ -66,7 +66,7 @@ docker:
       --input_pattern gs://my_bucket/vcffiles/*.vcf \
       --report_path gs://my_bucket/preprocess/report.tsv \
       --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-      --report_all true \
+      --report_all_conflicts true \
       --staging_location gs://my_bucket/staging \
       --temp_location gs://my_bucket/temp \
       --job_name vcf-to-bigquery-preprocess \
@@ -97,7 +97,7 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
   --report_path gs://my_bucket/preprocess/report.tsv
   --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-  --report_all true
+  --report_all_conflicts true
 ```
 
 Example command for DataflowRunner:
@@ -107,7 +107,7 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gs://my_bucket/vcffiles/*.vcf \
   --report_path gs://my_bucket/preprocess/report.tsv \
   --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-  --report_all true \
+  --report_all_conflicts true \
   --project my_project \
   --staging_location gs://my_bucket/staging \
   --temp_location gs://my_bucket/temp \
