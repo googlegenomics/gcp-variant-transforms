@@ -372,5 +372,4 @@ class PreprocessOptions(VariantTransformsOptions):
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, the pipeline runs in optimized way for handling large '
-              'inputs. Set this to true if you are loading more than 50,000 '
-              'files.'))
+              'inputs.'))
