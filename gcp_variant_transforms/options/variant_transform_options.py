@@ -368,3 +368,9 @@ class PreprocessOptions(VariantTransformsOptions):
         help=('The full path of the resolved headers. The file will not be'
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
+    parser.add_argument(
+        '--optimize_for_large_inputs',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, the pipeline runs in optimized way for handling large '
+              'inputs. Set this to true if you are loading more than 50,000 '
+              'files.'))
