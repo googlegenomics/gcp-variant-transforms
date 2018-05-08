@@ -38,12 +38,6 @@ class DataProcessorTest(unittest.TestCase):
          self.assertRaises(ValueError):
       get_pipeline_mode(args)
 
-  def test_get_mode_optimize_set(self):
-    args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=True)
-
-    self.assertEqual(get_pipeline_mode(args), PipelineModes.LARGE)
-
   def test_get_mode_small(self):
     args = self._create_mock_args(
         input_pattern='', optimize_for_large_inputs=False)

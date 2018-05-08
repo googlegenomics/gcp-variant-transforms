@@ -50,11 +50,15 @@ import logging
 import sys
 
 import apache_beam as beam
+from apache_beam import pvalue
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
+from gcp_variant_transforms.transforms import filter_variants
+from gcp_variant_transforms.transforms import infer_undefined_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_header_definitions
 
@@ -65,13 +69,15 @@ _COMMAND_LINE_OPTIONS = [
 ]
 
 
-def _get_inferred_headers(pipeline,  # type: beam.Pipeline
-                          known_args,  # type: argparse.Namespace
+def _get_inferred_headers(variants,  # type: pvalue.PCollection
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
-  inferred_headers = vcf_to_bq_common.get_inferred_headers(pipeline, known_args,
-                                                           merged_header)
+  inferred_headers = (variants
+                      | 'FilterVariants' >> filter_variants.FilterVariants()
+                      | ' InferUndefinedHeaderFields' >>
+                      infer_undefined_headers.InferUndefinedHeaderFields(
+                          pvalue.AsSingleton(merged_header)))
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()
@@ -97,8 +103,10 @@ def run(argv=None):
                           merge_header_definitions.MergeDefinitions())
     inferred_headers_side_input = None
     if known_args.report_all:
+      variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+          known_args.input_pattern, allow_malformed_records=True)
       inferred_headers, merged_headers = _get_inferred_headers(
-          p, known_args, merged_headers)
+          variants, merged_headers)
       inferred_headers_side_input = beam.pvalue.AsSingleton(inferred_headers)
 
     _ = (merged_definitions
