@@ -197,7 +197,8 @@ def run(argv=None):
     logging.info('Using VEP processed files: %s', known_args.input_pattern)
 
   variant_merger = _get_variant_merge_strategy(known_args)
-  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args)
+  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(
+      known_args.input_pattern, known_args.optimize_for_large_inputs)
 
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
