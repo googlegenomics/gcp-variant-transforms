@@ -14,27 +14,33 @@
 
 """Encapsulates all partitioning logic used by VCF to BigQuery pipeline.
 
-VariantPartition class basically returns an index for a given (
-reference_name, pos) pair. The main utilization of this class is in
+VariantPartition class basically returns an index for a given
+(reference_name, pos) pair. The main utilization of this class is in
 partition_for() function used by DataFlow pipeline.
+This class has 2 main operating modes:
+  1) Automatic: it will partition variants based on their reference_name
+  2) Based on user provided config file: Users can parition output tables as
+     they wish by providing a partition config file, example config files are
+     available at gcp_variant_transforms/testing/data/misc/*.yaml
 """
 
 from __future__ import absolute_import
 
-import re
-from apache_beam.io.filesystems import FileSystems
 from collections import defaultdict
+import re
+import intervaltree
 from mmh3 import hash  # pylint: disable=no-name-in-module,redefined-builtin
 import yaml
-import intervaltree
+
+from apache_beam.io.filesystems import FileSystems
 
 # A reg exp that will match to standard reference_names such as "chr01" or "13".
 _CHROMOSOME_NAME_REGEXP = re.compile(r'^(chr)?([0-9][0-9]?)$')
 # Partition 0 to 21 is reserved for common reference_names such as "chr1".
 _RESERVED_AUTO_PARTITIONS = 22
-# If config_file_path_given == false we try to assign each chromosome to a partition.
-# The first 22 partitions [0, 22) are reserved for standard reference_names.
-# Every other identifiers will be matched to next available partitions [22, 27).
+# We try to assign each chromosome to a partition. The first 22 partitions
+# [0, 22) are reserved for standard reference_names. Every other identifiers
+# will be matched to next available partitions [22, 27).
 _DEFAULT_NUM_PARTITIONS = _RESERVED_AUTO_PARTITIONS + 5
 
 # At most 1000 partitions can be set as output of VariantTransform.
@@ -73,8 +79,10 @@ class RegionIndexer(object):
     if index < 0:
       raise ValueError('Index of a region cannot be negative {}'.format(index))
     if not self._interval_tree:
+      # interval tree has not been initiated.
       self._interval_tree = intervaltree.IntervalTree()
     else:
+      # Check the existing interval tree for possible overlap with new interval.
       if self._interval_tree.overlaps_range(start, end):
         raise ValueError('Cannot add overlapping region {}-{}'.
                          format(start, end))
@@ -84,13 +92,15 @@ class RegionIndexer(object):
   def add_index(self, index):
     if self._interval_tree is not None:
       raise ValueError('Can not add full chromosome to existing multi region.')
+    if self._index != -1:
+      raise ValueError('This instance has already been assinged an index.')
     if index < 0:
       raise ValueError('Index of a region cannot be negative {}'.format(index))
     self._index = index
 
   def get_index(self, pos=0):
     if self._interval_tree is None and self._index == -1:
-      raise ValueError('This instance has not been assigned any role.')
+      raise ValueError('This instance has not been assigned any index.')
     if self._interval_tree is None:
       return self._index
     else:
@@ -120,8 +130,8 @@ class VariantPartition(object):
   def __init__(self, config_file_path=''):
     if not config_file_path:
       if _DEFAULT_NUM_PARTITIONS <= _RESERVED_AUTO_PARTITIONS:
-	raise ValueError(
-	    '_DEFAULT_NUM_PARTITIONS must be > _RESERVED_AUTO_PARTITIONS')
+        raise ValueError(
+            '_DEFAULT_NUM_PARTITIONS must be > _RESERVED_AUTO_PARTITIONS')
       self._config_file_path_given = False
       self._reference_name_to_partition_map = {}
     else:
@@ -136,7 +146,6 @@ class VariantPartition(object):
     Raises:
       A ValueError if any of the expected config formats are violated.
     """
-
     def _parse_position(pos_str):
       return int(pos_str.replace(',', ''))
 
@@ -150,10 +159,10 @@ class VariantPartition(object):
       raise ValueError(
           'There can be at most {} partitions but given config file contains {}'
           .format(_MAX_NUM_PARTITIONS, len(partition_configs)))
-    if len(partition_configs) == 0:
+    if not partition_configs:
       raise ValueError('There must be at least one partition in config file.')
 
-    self._partition_no = len(partition_configs)
+    self._num_partitions = len(partition_configs)
 
     self._by_ref_name = defaultdict(RegionIndexer)
 
@@ -181,9 +190,11 @@ class VariantPartition(object):
           regions[0].strip().lower() == _DEFAULT_REGION_LITERAL):
         if self._default_partition_index != -1:
           raise ValueError(
-            'There must be only one default partition intercepted at least 2')
+              'There must be only one default partition intercepted at least 2')
         else:
           self._default_partition_index = partition_index
+          # To skip the following for loop.
+          regions = []
       for r in regions:
         matched = _REGION_LITERAL_REGEXP.match(r)
         if matched:
@@ -206,10 +217,10 @@ class VariantPartition(object):
                              'other regions, {} is not'.format(ref_name))
           self._by_ref_name[ref_name].add_index(partition_index)
 
-      if partition.get('partition_name', None) is None:
+      if not partition.get('partition_name', None):
         raise ValueError('Each partition must have partition_name field.')
       suffix = partition.get('partition_name').strip()
-      if table_suffix_duplicate.get(suffix, None) is not None:
+      if table_suffix_duplicate.get(suffix, None):
         raise ValueError('Table names must be unique, {} is duplicated'
                          .format(suffix))
       table_suffix_duplicate[suffix] = True
@@ -221,11 +232,7 @@ class VariantPartition(object):
     if not self._config_file_path_given:
       return _DEFAULT_NUM_PARTITIONS
     else:
-      if self.is_default_partition_absent():
-        # In this case we have a dummy partition for all remaining variants.
-        return self._partition_no + 1
-      else:
-        return self._partition_no
+      return self._num_partitions
 
   def get_partition(self, reference_name, pos=0):
     # type: (str, int) -> int
@@ -241,7 +248,7 @@ class VariantPartition(object):
   def _get_config_partition(self, reference_name, pos):
     # Lookup _by_ref_name dict to see if we have an entry for this ref_name.
     indexer = self._by_ref_name.get(reference_name, None)
-    if indexer is not None:
+    if indexer:
       index = indexer.get_index(pos)
       if index != -1:
         return index
@@ -289,20 +296,24 @@ class VariantPartition(object):
     if self._config_file_path_given:
       return self._default_partition_index == -1
     else:
-      # default partition does not exist, return -1.
+      # In auto mode default partition does not exist.
       return False
 
   def get_default_partition_index(self):
-    # If not _config_file_path_given default partition does not exist, return -1.
+    # In auto mode default partition doesnt exist, return -1.
     if not self._config_file_path_given:
       return -1
 
+    # If default partition is absent in the config file, we still need an index
+    # for all residual variants. In this case we add a dummy paritition indexed
+    # _num_partitions which will be ignored right after the partitioning stage.
     if self.is_default_partition_absent():
-      return self._partition_no
+      return self._num_partitions
     else:
       return self._default_partition_index
 
   def get_suffix(self, index):
-    if index >= self._partition_no or index < 0:
-      raise ValueError('Given partition index is outside of expected range.')
+    if index >= self._num_partitions or index < 0:
+      raise ValueError('Given partition index is outside of expected range: {}'.
+                       format(index))
     return self._suffixes[index]

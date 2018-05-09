@@ -397,7 +397,7 @@ class PartitionOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     parser.add_argument(
-        '--partition_config_file',
+        '--partition_config_path',
         default='', nargs='?',
         help=('File containing list of partitions and output table names. You '
               'can use provided default partition_config file to split output '

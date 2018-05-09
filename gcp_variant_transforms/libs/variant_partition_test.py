@@ -206,7 +206,7 @@ class VariantPartitionTest(unittest.TestCase):
   def test_config_default_partition_absent(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/misc/partition_config3.yaml")
-    self.assertEqual(partitioner.get_num_partitions(), 5)
+    self.assertEqual(partitioner.get_num_partitions(), 4)
     self.assertEqual(partitioner.get_default_partition_index(), 4)
     self.assertTrue(partitioner.is_default_partition_absent())
 
@@ -255,15 +255,15 @@ class VariantPartitionTest(unittest.TestCase):
         ValueError,
         'Each partition must have at least one region.'):
       _ = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/"
-        "partition_config_missing_region.yaml")
+          "gcp_variant_transforms/testing/data/misc/"
+          "partition_config_missing_region.yaml")
 
     with self.assertRaisesRegexp(
         ValueError,
         'Each partition must have partition_name field.'):
       _ = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/"
-        "partition_config_missing_partition_name.yaml")
+          "gcp_variant_transforms/testing/data/misc/"
+          "partition_config_missing_partition_name.yaml")
 
     with self.assertRaisesRegexp(
         ValueError,
@@ -289,8 +289,8 @@ class VariantPartitionTest(unittest.TestCase):
         ValueError,
         'A full chromosome must be disjoint from all other regions'):
       _ = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/"
-        "partition_config_partial_and_full_chr.yaml")
+          "gcp_variant_transforms/testing/data/misc/"
+          "partition_config_partial_and_full_chr.yaml")
 
     with self.assertRaisesRegexp(
         ValueError,
@@ -303,8 +303,8 @@ class VariantPartitionTest(unittest.TestCase):
         ValueError,
         'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/"
-        "partition_config_conflicting_regions.yaml")
+          "gcp_variant_transforms/testing/data/misc/"
+          "partition_config_conflicting_regions.yaml")
 
     with self.assertRaisesRegexp(
         ValueError,

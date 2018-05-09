@@ -219,9 +219,9 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
-  if known_args.partition_config_file:
+  if known_args.partition_config_path:
     partitioner = variant_partition.VariantPartition(
-        known_args.partition_config_file)
+        known_args.partition_config_path)
   else:
     partitioner = variant_partition.VariantPartition()
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
@@ -233,8 +233,7 @@ def run(argv=None):
           reference_names=known_args.reference_names))
   # By default we don't partition data, so we have only 1 partition.
   num_partitions = 1
-  table_names = known_args.output_table
-  if known_args.partition_config_file:
+  if known_args.partition_config_path:
     num_partitions = partitioner.get_num_partitions()
     if partitioner.is_default_partition_absent():
       #  We add an extra partition for residual variants; this extra partition
@@ -247,7 +246,7 @@ def run(argv=None):
 
   if variant_merger:
     if (known_args.optimize_for_large_inputs and
-        not known_args.partition_config_file):
+        not known_args.partition_config_path):
       partitions = variants | 'PartitionVariants' >> beam.Partition(
           partition_variants.PartitionVariants(partitioner),
           partitioner.get_num_partitions())
@@ -264,7 +263,7 @@ def run(argv=None):
       beam.Map(
           processed_variant_factory.create_processed_variant).with_output_types(
               processed_variant.ProcessedVariant))
-  if not known_args.partition_config_file:
+  if not known_args.partition_config_path:
     _ = (proc_variants |
          'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
              known_args.output_table,
