@@ -115,6 +115,15 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--omit_empty_sample_calls',
         type='bool', default=False, nargs='?', const=True,
         help=("If true, samples that don't have a given call will be omitted."))
+    parser.add_argument(
+        '--num_bigquery_write_shards',
+        type=int, default=1,
+        help=('Before writing the final result to output BigQuery, the data is '
+              'sharded to avoid a known failure for very large inputs (issue '
+              '#199). Setting this flag to 1 will avoid this extra sharding.'
+              'It is recommended to use 20 for loading large inputs without '
+              'merging. Use a smaller value (2 or 3) if both merging and '
+              'optimize_for_large_inputs are enabled.'))
 
   def validate(self, parsed_args, client=None):
     output_table_re_match = re.match(
@@ -345,8 +354,11 @@ class PreprocessOptions(VariantTransformsOptions):
   """Options for preprocess."""
 
   def add_arguments(self, parser):
+    parser.add_argument('--input_pattern',
+                        required=True,
+                        help='Input pattern for VCF files to process.')
     parser.add_argument(
-        '--report_all',
+        '--report_all_conflicts',
         type='bool', default=False, nargs='?', const=True,
         help=('By default, only the incompatible VCF headers will be reported. '
               'If true, it also reports the undefined headers and malformed '
@@ -356,7 +368,9 @@ class PreprocessOptions(VariantTransformsOptions):
         required=True,
         help=('The full path of the preprocessor report. If run locally, a '
               'local path must be provided. Otherwise, a cloud path is '
-              'required.'))
+              'required. For best readability, please save the report as a tab '
+              'delimited file (by appending the extension .tsv to the file '
+              'name) and open with the spreadsheets.'))
     parser.add_argument(
         '--resolved_headers_path',
         default='',

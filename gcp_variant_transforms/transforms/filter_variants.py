@@ -16,13 +16,12 @@
 
 from __future__ import absolute_import
 
+from typing import Iterable  # pylint: disable=unused-import
 import logging
 
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcfio
-
-__all__ = ['FilterVariants']
 
 
 class FilterVariants(beam.PTransform):
@@ -61,3 +60,15 @@ class FilterVariants(beam.PTransform):
 
   def expand(self, pcoll):
     return pcoll | 'ApplyFilters' >> beam.ParDo(self._apply_filters)
+
+
+class ExtractMalformedVariants(beam.PTransform):
+  """Extracts malformed variants from all variants."""
+
+  def _apply_filters(self, variant):
+    # type: (vcfio.Variant) -> Iterable[vcfio.Variant]
+    if isinstance(variant, vcfio.MalformedVcfRecord):
+      yield variant
+
+  def expand(self, pcoll):
+    return pcoll | 'ExtractMalformedVariants' >> beam.ParDo(self._apply_filters)

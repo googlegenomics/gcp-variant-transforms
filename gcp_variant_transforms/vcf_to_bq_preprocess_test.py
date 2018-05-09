@@ -35,7 +35,7 @@ class PreprocessTest(unittest.TestCase):
           '--input_pattern',
           'gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined'
           '-header-fields.vcf',
-          '--report_all',
+          '--report_all_conflicts',
           '--report_path',
           report_path,
           '--resolved_headers_path',
@@ -54,7 +54,22 @@ class PreprocessTest(unittest.TestCase):
           'gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf',
           '--report_path',
           report_path,
-          '--report_all'
+          '--report_all_conflicts'
+      ]
+      vcf_to_bq_preprocess.run(argv)
+      assert filesystems.FileSystems.exists(report_path)
+
+  def test_preprocess_malformed_records(self):
+    with temp_dir.TempDir() as tempdir:
+      report_path = filesystems.FileSystems.join(tempdir.get_path(),
+                                                 PreprocessTest._REPORT_NAME)
+      argv = [
+          '--input_pattern',
+          'gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS'
+          '-empty.vcf',
+          '--report_path',
+          report_path,
+          '--report_all_conflicts'
       ]
       vcf_to_bq_preprocess.run(argv)
       assert filesystems.FileSystems.exists(report_path)

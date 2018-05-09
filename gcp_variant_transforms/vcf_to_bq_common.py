@@ -23,14 +23,10 @@ import argparse
 import enum
 
 import apache_beam as beam
-from apache_beam import pvalue
+from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystems
 
-from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.transforms import filter_variants
-from gcp_variant_transforms.transforms import infer_undefined_headers
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
@@ -66,16 +62,15 @@ def parse_args(argv, command_line_options):
   return known_args, pipeline_args
 
 
-def get_pipeline_mode(known_args):
-  # type: (argparse.Namespace) -> int
+def get_pipeline_mode(input_pattern, optimize_for_large_inputs=False):
+  # type: (str, bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
-  if known_args.optimize_for_large_inputs:
+  if optimize_for_large_inputs:
     return PipelineModes.LARGE
 
-  match_results = filesystems.FileSystems.match([known_args.input_pattern])
+  match_results = filesystems.FileSystems.match([input_pattern])
   if not match_results:
-    raise ValueError('No files matched input_pattern: {}'.format(
-        known_args.input_pattern))
+    raise ValueError('No files matched input_pattern: {}'.format(input_pattern))
 
   total_files = len(match_results[0].metadata_list)
   if total_files > _LARGE_DATA_THRESHOLD:
@@ -83,42 +78,6 @@ def get_pipeline_mode(known_args):
   elif total_files > _SMALL_DATA_THRESHOLD:
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
-
-def read_variants(pipeline, known_args):
-  # type: (beam.Pipeline, argparse.Namespace) -> pvalue.PCollection
-  """Helper method for returning a PCollection of Variants from VCFs."""
-  representative_header_lines = None
-  if known_args.representative_header_file:
-    representative_header_lines = vcf_header_parser.get_metadata_header_lines(
-        known_args.representative_header_file)
-
-  if known_args.optimize_for_large_inputs:
-    variants = (pipeline
-                | 'InputFilePattern' >> beam.Create([known_args.input_pattern])
-                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
-                    representative_header_lines=representative_header_lines,
-                    allow_malformed_records=(
-                        known_args.allow_malformed_records)))
-  else:
-    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-        known_args.input_pattern,
-        representative_header_lines=representative_header_lines,
-        allow_malformed_records=known_args.allow_malformed_records)
-  return variants
-
-
-def get_inferred_headers(pipeline,  # type: beam.Pipeline
-                         known_args,  # type: argparse.Namespace
-                         merged_header  # type: pvalue.PCollection
-                        ):
-  # type: (...) -> pvalue.PCollection
-  """Infers the missing headers."""
-  return (read_variants(pipeline, known_args)
-          | 'FilterVariants' >> filter_variants.FilterVariants(
-              reference_names=known_args.reference_names)
-          | ' InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
-              pvalue.AsSingleton(merged_header)))
 
 
 def read_headers(pipeline, pipeline_mode, known_args):
