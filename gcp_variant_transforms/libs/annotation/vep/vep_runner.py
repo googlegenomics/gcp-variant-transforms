@@ -90,6 +90,8 @@ def create_runner_and_update_args(known_args, pipeline_args):
   # annotation fields that are originally present in input files, if they do not
   # have ALLELE_NUM annotation. The fix is to make annotation ALT matching
   # smarter to fall back on other matching methods if ALLELE_NUM is not present.
+  # When this is implemented, we may even consider removing use_allele_num flag
+  # and always start by checking if ALLELE_NUM is present.
   known_args.use_allele_num = True
   return runner
 

@@ -92,10 +92,10 @@ class TestCase(object):
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
     for k, v in kwargs.iteritems():
-      if k == 'annotation_output_dir':
-        args.append('--{} {}/{}'.format(k, v, dataset_id))
-      else:
-        args.append('--{} {}'.format(k, v))
+      value = v
+      if isinstance(v, basestring):
+        value = v.format(TABLE_NAME=self._table_name)
+      args.append('--{} {}'.format(k, value))
 
     self._pipelines_api_request = {
         'pipelineArgs': {

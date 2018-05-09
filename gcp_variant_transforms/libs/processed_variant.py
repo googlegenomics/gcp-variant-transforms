@@ -437,10 +437,9 @@ class _AnnotationProcessor(object):
 
   def _find_common_alt_ref_prefix_char(self, proc_var):
     # type: (ProcessedVariant) -> str
-    if proc_var.reference_bases:
-      common_char = proc_var.reference_bases[0]
-    else:
+    if not proc_var.reference_bases:
       return ''
+    common_char = proc_var.reference_bases[0]
     for alt in proc_var._alternate_datas:
       if not alt.alternate_bases or alt.alternate_bases[0] != common_char:
         return ''

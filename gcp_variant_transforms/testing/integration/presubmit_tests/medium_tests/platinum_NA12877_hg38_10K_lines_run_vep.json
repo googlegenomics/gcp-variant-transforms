@@ -7,7 +7,7 @@
   "run_annotation_pipeline": "True",
   "vep_image_uri": "gcr.io/gcp-variant-transforms-test/vep_91",
   "vep_cache_path": "gs://gcp-variant-transforms-test_vep_cache/vep_cache_homo_sapiens_GRCh38_91.tar.gz",
-  "annotation_output_dir": "gs://integration_test_runs/temp/vep_output",
+  "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
   "num_workers": 1,
   "assertion_configs": [
     {
