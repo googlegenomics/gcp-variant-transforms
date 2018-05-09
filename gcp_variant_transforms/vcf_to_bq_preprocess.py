@@ -91,7 +91,7 @@ def run(argv=None):
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args)
+  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args.input_pattern)
 
   with beam.Pipeline(options=options) as p:
     headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
