@@ -92,7 +92,10 @@ class TestCase(object):
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
     for k, v in kwargs.iteritems():
-      args.append('--{} {}'.format(k, v))
+      value = v
+      if isinstance(v, basestring):
+        value = v.format(TABLE_NAME=self._table_name)
+      args.append('--{} {}'.format(k, value))
 
     self._pipelines_api_request = {
         'pipelineArgs': {
@@ -115,6 +118,7 @@ class TestCase(object):
     return self._name
 
   def run(self, context):
+    # type: (TestContextManager) -> None
     service = discovery.build(
         'genomics', 'v1alpha2', credentials=context.credentials)
     # The following pylint hint is needed because `pipelines` is a method that
@@ -279,8 +283,8 @@ def _get_args():
   parser.add_argument(
       '--image',
       help=('The name of the container image to run the test against it, for '
-            'example: gcr.io/test-gcp-variant-transforms/'
-            'test_gcp-variant-transforms_2018-01-20-13-47-12. '
+            'example: gcr.io/gcp-variant-transforms-test/'
+            'gcp-variant-transforms:2018-01-20-13-47-12. '
             'By default the production image {} is used.'
            ).format(DEFAULT_IMAGE_NAME),
       default=DEFAULT_IMAGE_NAME,
@@ -361,6 +365,7 @@ def _validate_assertion_config(assertion_config):
 
 
 def _run_test(test, context):
+  # type: (TestCase, TestContextManager) -> None
   if not context.revalidation_dataset_id:
     test.run(context)
   test.validate_table()
