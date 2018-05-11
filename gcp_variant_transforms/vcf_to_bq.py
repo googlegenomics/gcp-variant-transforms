@@ -219,54 +219,49 @@ def run(argv=None):
       known_args.minimal_vep_alt_matching,
       counter_factory)
 
+  partitioner = None
   if known_args.partition_config_path:
     partitioner = variant_partition.VariantPartition(
         known_args.partition_config_path)
-  else:
+  if known_args.optimize_for_large_inputs:
     partitioner = variant_partition.VariantPartition()
+
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(pipeline, known_args)
-  variants = apply_transform(
-      variants, 1, 'FilterVariants',
-      filter_variants.FilterVariants(
-          reference_names=known_args.reference_names))
-  # By default we don't partition data, so we have only 1 partition.
-  num_partitions = 1
-  if known_args.partition_config_path:
+  variants |= 'FilterVariants' >> filter_variants.FilterVariants(
+      reference_names=known_args.reference_names)
+  if partitioner:
     num_partitions = partitioner.get_num_partitions()
-    if partitioner.is_default_partition_absent():
-      #  We add an extra partition for residual variants; this extra partition
-      #  will be ignored in the rest of the pipeline.
-      variants = variants | 'PartitionVariants' >> beam.Partition(
-          partition_variants.PartitionVariants(partitioner), num_partitions + 1)
-    else:
-      variants = variants | 'PartitionVariants' >> beam.Partition(
-          partition_variants.PartitionVariants(partitioner), num_partitions)
+    variants = variants | 'PartitionVariants' >> beam.Partition(
+        partition_variants.PartitionVariants(partitioner), num_partitions)
+    if (not partitioner.should_flatten() and
+        not partitioner.has_residual_partition()):
+      #  An extra partition for residual variants is added to the end of list.
+      #  This extra partition will be ignored in the rest of the pipeline.
+      num_partitions -= 1
+  else:
+    # By default we don't partition data, so we have only 1 partition.
+    num_partitions = 1
+    variants = [variants]
 
   if variant_merger:
-    if (known_args.optimize_for_large_inputs and
-        not known_args.partition_config_path):
-      partitions = variants | 'PartitionVariants' >> beam.Partition(
-          partition_variants.PartitionVariants(partitioner),
-          partitioner.get_num_partitions())
-      merged = apply_transform(
-          partitions, partitioner.get_num_partitions(), 'MergeVariants',
-          merge_variants.MergeVariants(variant_merger))
-      variants = merged | 'FlattenPartitions' >> beam.Flatten()
-    else:
-      variants = apply_transform(
-          variants, num_partitions, 'MergeVariants',
-          merge_variants.MergeVariants(variant_merger))
+    variants = apply_transform(
+        variants, num_partitions, 'MergeVariants',
+        merge_variants.MergeVariants(variant_merger))
+    if partitioner.should_flatten():
+      variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
+      num_partitions = 1
   proc_variants = apply_transform(
       variants, num_partitions, 'ProcessVaraints',
       beam.Map(
           processed_variant_factory.create_processed_variant).with_output_types(
               processed_variant.ProcessedVariant))
-  if not known_args.partition_config_path:
-    _ = (proc_variants |
-         'VariantToBigQuery' >> variant_to_bigquery.VariantToBigQuery(
-             known_args.output_table,
+  for i in range(num_partitions):
+    partition_name = partitioner.get_partition_name(i)
+    _ = (proc_variants[i] | 'VariantToBigQuery' + partition_name >>
+         variant_to_bigquery.VariantToBigQuery(
+             known_args.output_table + partition_name,
              header_fields,
              variant_merger,
              processed_variant_factory,
@@ -274,19 +269,6 @@ def run(argv=None):
              allow_incompatible_records=known_args.allow_incompatible_records,
              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
              num_bigquery_write_shards=known_args.num_bigquery_write_shards))
-  else:
-    for i in range(num_partitions):
-      table_suffix = partitioner.get_suffix(i)
-      _ = (proc_variants[i] | 'VariantToBigQuery' + '_' + table_suffix >>
-           variant_to_bigquery.VariantToBigQuery(
-               known_args.output_table + '_' + table_suffix,
-               header_fields,
-               variant_merger,
-               processed_variant_factory,
-               append=known_args.append,
-               allow_incompatible_records=known_args.allow_incompatible_records,
-               omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-               num_bigquery_write_shards=known_args.num_bigquery_write_shards))
 
   result = pipeline.run()
   result.wait_until_finish()
