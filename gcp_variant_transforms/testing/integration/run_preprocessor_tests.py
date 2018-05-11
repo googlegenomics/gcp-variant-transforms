@@ -16,7 +16,7 @@ r"""Integration testing runner for Variant Transforms' Preprocessor pipeline.
 
 You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
-python gcp_variant_transforms/testing/integration/run_tests_preprocessor.py \
+python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
   --project myproject \
   --staging_location gs://mybucket/staging \
   --temp_location gs://mybucket/temp \
@@ -39,7 +39,7 @@ from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
-_PIPELINE_NAME = 'gcp-variant-transforms-preprocessor_integration-test'
+_PIPELINE_NAME = 'gcp-variant-transforms-preprocessor-integration-test'
 _SCOPES = []
 _DEFAULT_ZONES = ['us-west1-b']
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'

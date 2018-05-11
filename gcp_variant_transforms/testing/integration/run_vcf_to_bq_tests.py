@@ -16,7 +16,7 @@ r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
 You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
-python gcp_variant_transforms/testing/integration/run_tests.py \
+python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
   --project myproject \
   --staging_location gs://mybucket/staging \
   --temp_location gs://mybucket/temp \

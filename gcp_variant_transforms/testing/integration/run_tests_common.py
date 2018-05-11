@@ -14,9 +14,9 @@
 
 """Common functions and classes that are used by integration tests.
 
-It provides common functions and classes for both run_tests (integration test
-script for vcf_to_bq pipeline) and run_tests_preprocessor (integration test
-script for vcf_to_bq preprocessor pipeline).
+It provides common functions and classes for both run_vcf_to_bq_tests
+(integration test script for vcf_to_bq pipeline) and run_preprocessor_tests
+(integration test script for vcf_to_bq preprocessor pipeline).
 """
 
 from abc import abstractmethod

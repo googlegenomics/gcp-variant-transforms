@@ -85,9 +85,9 @@ usage() {
 # file exists.
 #################################################
 check_dir() {
-  local test_script="gcp_variant_transforms/testing/integration/run_tests.py"
+  local test_script="gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py"
   ls_script_file="$(ls ${test_script})" || true
-  dir_ok="$(echo "${ls_script_file}" | sed -e 's/.*run_tests.py$/MATCHED/')"
+  dir_ok="$(echo "${ls_script_file}" | sed -e 's/.*run_vcf_to_bq_tests.py$/MATCHED/')"
   if [[ "${dir_ok}" != "MATCHED" ]]; then
     usage
     color_print "ERROR: Cannot find ${test_script}" "${RED}"
@@ -219,7 +219,7 @@ if [[ -n "${run_unit_tests}" ]]; then
 fi
 pip install --upgrade .[int_test]
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
-python gcp_variant_transforms/testing/integration/run_tests.py \
+python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --project "${project}" \
     --staging_location "gs://${gs_dir}/staging" \
     --temp_location "gs://${gs_dir}/temp" \
@@ -227,7 +227,7 @@ python gcp_variant_transforms/testing/integration/run_tests.py \
     --image "${full_image_name}" ${TEST_ARGUMENTS}
 
 if  [[ -n "${run_preprocessor_tests}" ]]; then
-python gcp_variant_transforms/testing/integration/run_tests_preprocessor.py \
+python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
     --project "${project}" \
     --staging_location "gs://${gs_dir}/staging" \
     --temp_location "gs://${gs_dir}/temp" \
