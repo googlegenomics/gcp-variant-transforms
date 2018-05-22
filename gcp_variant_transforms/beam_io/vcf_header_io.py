@@ -18,11 +18,12 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 from functools import partial
-from typing import Dict  # pylint: disable=unused-import
+from typing import Dict, Iterable  # pylint: disable=unused-import
 import vcf
 
 import apache_beam as beam
 from apache_beam.io import filebasedsource
+from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.iobase import Read
@@ -38,7 +39,6 @@ class VcfHeaderFieldTypeConstants(object):
   STRING = 'String'
   FLAG = 'Flag'
   CHARACTER = 'Character'
-  STRING = 'String'
 
 
 class VcfParserHeaderKeyConstants(object):
@@ -63,6 +63,7 @@ class VcfHeader(object):
                contigs=None,  # type: Dict[str, OrderedDict[vcf.parser._Contig]]
                file_name=None  # type: str
               ):
+    # type: (...) -> None
     """Initializes a VcfHeader object.
 
     It keeps the order of values in the input dictionaries. Order is important
@@ -119,13 +120,19 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                file_pattern,
                compression_type=CompressionTypes.AUTO,
                validate=True):
+    # type: (str, str, bool) -> None
     super(VcfHeaderSource, self).__init__(file_pattern,
                                           compression_type=compression_type,
                                           validate=validate,
                                           splittable=False)
     self._compression_type = compression_type
 
-  def read_records(self, file_name, unused_range_tracker):
+  def read_records(
+      self,
+      file_name,  # type: str
+      unused_range_tracker  # type: range_trackers.UnsplittableRangeTracker
+      ):
+    # type: (...) -> Iterable[VcfHeader]
     try:
       vcf_reader = vcf.Reader(fsock=self._read_headers(file_name))
     except StopIteration:
@@ -157,21 +164,23 @@ class ReadVcfHeaders(PTransform):
 
   def __init__(
       self,
-      file_pattern,
-      compression_type=CompressionTypes.AUTO,
-      validate=True,
-      **kwargs):
+      file_pattern,  # type: str
+      compression_type=CompressionTypes.AUTO,  # type: str
+      validate=True,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadVcfHeaders` transform.
 
     Args:
-      file_pattern (str): The file path to read from either as a single file or
-        a glob pattern.
-      compression_type (str): Used to handle compressed input files.
+      file_pattern: The file path to read from either as a single file or a glob
+        pattern.
+      compression_type: Used to handle compressed input files.
         Typical value is :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
-      validate (bool): flag to verify that the files exist during the pipeline
-        creation time.
+      validate: Flag to verify that the files exist during the pipeline creation
+        time.
     """
     super(ReadVcfHeaders, self).__init__(**kwargs)
     self._source = VcfHeaderSource(
@@ -204,14 +213,15 @@ class ReadAllVcfHeaders(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
       compression_type=CompressionTypes.AUTO,
       **kwargs):
+    # type: (int, str, **str) -> None
     """Initialize the :class:`ReadAllVcfHeaders` transform.
 
     Args:
-      desired_bundle_size (int): Desired size of bundles that should be
-        generated when splitting this source into bundles. See
+      desired_bundle_size: Desired size of bundles that should be generated when
+        splitting this source into bundles. See
         :class:`~apache_beam.io.filebasedsource.FileBasedSource` for more
         details.
-      compression_type (str): Used to handle compressed input files.
+      compression_type: Used to handle compressed input files.
         Typical value is :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
@@ -254,10 +264,12 @@ class _WriteVcfHeaderFn(beam.DoFn):
   FINAL_HEADER_LINE = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
 
   def __init__(self, file_path):
+    # type: (str) -> None
     self._file_path = file_path
     self._file_to_write = None
 
   def process(self, header):
+    # type: (VcfHeader) -> None
     with FileSystems.create(self._file_path) as self._file_to_write:
       self._write_headers_by_type(HeaderTypeConstants.INFO, header.infos)
       self._write_headers_by_type(HeaderTypeConstants.FILTER, header.filters)
@@ -267,24 +279,26 @@ class _WriteVcfHeaderFn(beam.DoFn):
       self._file_to_write.write(self.FINAL_HEADER_LINE)
 
   def _write_headers_by_type(self, header_type, headers):
+    # type: (str, Dict[str, Dict[str, Union[str, int]]]) -> None
     """Writes all VCF headers of a specific type.
 
     Args:
-      header_type (str): The type of `headers` (e.g. INFO, FORMAT, etc.).
-      headers (dict): Each value of headers is a dictionary that describes a
-        single VCF header line.
+      header_type: The type of `headers` (e.g. INFO, FORMAT, etc.).
+      headers: Each value of headers is a dictionary that describes a single VCF
+        header line.
     """
     for header in headers.values():
       self._file_to_write.write(
           self._to_vcf_header_line(header_type, header))
 
   def _to_vcf_header_line(self, header_type, header):
+    # type: (str, Dict[str, Union[str, int]]) -> str
     """Formats a single VCF header line.
 
     Args:
-      header_type (str): The VCF type of `header` (e.g. INFO, FORMAT, etc.).
-      header (dict): A dictionary mapping header field keys (e.g. id, desc,
-        etc.) to their corresponding values for the header line.
+      header_type: The VCF type of `header` (e.g. INFO, FORMAT, etc.).
+      header: A dictionary mapping header field keys (e.g. id, desc, etc.) to
+        their corresponding values for the header line.
 
     Returns:
       A formatted VCF header line.
@@ -293,11 +307,12 @@ class _WriteVcfHeaderFn(beam.DoFn):
     return self.HEADER_TEMPLATE.format(header_type, formatted_header_values)
 
   def _format_header(self, header):
+    # type: (Dict[str, Union[str, int]]) -> str
     """Formats all key, value pairs that describe the header line.
 
     Args:
-      header (dict): A dictionary mapping header field keys (e.g. id, desc,
-        etc.) to their corresponding values for the header line.
+      header: A dictionary mapping header field keys (e.g. id, desc, etc.) to
+        their corresponding values for the header line.
 
     Returns:
       A formatted string composed of header keys and values.
@@ -312,10 +327,11 @@ class _WriteVcfHeaderFn(beam.DoFn):
     return value is not None or (key != 'source' and key != 'version')
 
   def _format_header_key_value(self, key, value):
+    # type: (str, Union[str, int]) -> str
     """Formats a single key, value pair in a header line.
 
     Args:
-      key (str): The key of the header field (e.g. num, desc, etc.).
+      key: The key of the header field (e.g. num, desc, etc.).
       value: The header value corresponding to the key in a specific
         header line.
 
@@ -352,6 +368,7 @@ class _WriteVcfHeaderFn(beam.DoFn):
       raise ValueError('Invalid VCF header key {}.'.format(key))
 
   def _format_number(self, number):
+    # type: (int) -> Optional[str]
     """Returns the string representation of field_count from PyVCF.
 
     PyVCF converts field counts to an integer with some predefined constants
@@ -360,8 +377,8 @@ class _WriteVcfHeaderFn(beam.DoFn):
     direct dependency on the arbitrary PyVCF constants.
 
     Args:
-      number (int): An integer representing the number of fields in INFO
-        as specified by PyVCF.
+      number: An integer representing the number of fields in INFO as specified
+        by PyVCF.
 
     Returns:
       A string representation of field_count (e.g. '-1' becomes 'A').
@@ -387,6 +404,7 @@ class WriteVcfHeaders(PTransform):
   """A PTransform for writing VCF header lines."""
 
   def __init__(self, file_path):
+    # type: (str) -> None
     self._file_path = file_path
 
   def expand(self, pcoll):

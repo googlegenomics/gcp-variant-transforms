@@ -19,6 +19,7 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
+from typing import Dict, Iterable, List, Optional  # pylint: disable=unused-import
 import logging
 from collections import namedtuple
 from functools import partial
@@ -27,6 +28,7 @@ import vcf
 
 from apache_beam.coders import coders
 from apache_beam.io import filebasedsource
+from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import textio
 from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.iobase import Read
@@ -71,39 +73,38 @@ class Variant(object):
   """
 
   def __init__(self,
-               reference_name=None,
-               start=None,
-               end=None,
-               reference_bases=None,
-               alternate_bases=None,
-               names=None,
-               quality=None,
-               filters=None,
-               info=None,
-               calls=None):
-    """Initialize the :class:`Variant` object.
+               reference_name=None,  # type: str
+               start=None,  # type: int
+               end=None,  # type: int
+               reference_bases=None,  # type: str
+               alternate_bases=None,  # type: List[str]
+               names=None,  # type: List[str]
+               quality=None,  # type: float
+               filters=None,  # type: List[str]
+               info=None,  # type: Dict[str, VariantInfo]
+               calls=None  # type: List[VariantCall]
+              ):
+    # type: (...) -> None
+    """Initialize the ``Variant`` object.
 
     Args:
-      reference_name (str): The reference on which this variant occurs
-        (such as `chr20` or `X`). .
-      start (int): The position at which this variant occurs (0-based).
-        Corresponds to the first base of the string of reference bases.
-      end (int): The end position (0-based) of this variant. Corresponds to the
-        first base after the last base in the reference allele.
-      reference_bases (str): The reference bases for this variant.
-      alternate_bases (List[str]): The bases that appear instead of the
-        reference bases.
-      names (List[str]): Names for the variant, for example a RefSNP ID.
-      quality (float): Phred-scaled quality score (-10log10 prob(call is wrong))
+      reference_name: The reference on which this variant occurs (such as
+        `chr20` or `X`).
+      start: The position at which this variant occurs (0-based). Corresponds to
+        the first base of the string of reference bases.
+      end: The end position (0-based) of this variant. Corresponds to the first
+        base after the last base in the reference allele.
+      reference_bases: The reference bases for this variant.
+      alternate_bases: The bases that appear instead of the reference bases.
+      names: Names for the variant, for example a RefSNP ID.
+      quality: Phred-scaled quality score (-10log10 prob(call is wrong)).
         Higher values imply better quality.
-      filters (List[str]): A list of filters (normally quality filters) this
-        variant has failed. `PASS` indicates this variant has passed all
-        filters.
-      info (dict): A map of additional variant information. The key is specified
+      filters: A list of filters (normally quality filters) this variant has
+        failed. `PASS` indicates this variant has passed all filters.
+      info: A map of additional variant information. The key is specified
         in the VCF record and the value is of type ``VariantInfo``.
-      calls (list of :class:`VariantCall`): The variant calls for this variant.
-        Each one represents the determination of genotype with respect to this
-        variant.
+      calls: The variant calls for this variant. Each one represents the
+        determination of genotype with respect to this variant.
     """
     self.reference_name = reference_name
     self.start = start
@@ -185,23 +186,24 @@ class VariantCall(object):
   """
 
   def __init__(self, name=None, genotype=None, phaseset=None, info=None):
+    # type: (str, List[int], str, Dict[str, VariantInfo]) -> None
     """Initialize the :class:`VariantCall` object.
 
     Args:
-      name (str): The name of the call.
-      genotype (List[int]): The genotype of this variant call as specified by
-        the VCF schema. The values are either `0` representing the reference,
-        or a 1-based index into alternate bases. Ordering is only important if
+      name: The name of the call.
+      genotype: The genotype of this variant call as specified by the VCF
+        schema. The values are either `0` representing the reference, or a
+        1-based index into alternate bases. Ordering is only important if
         `phaseset` is present. If a genotype is not called (that is, a `.` is
-        present in the GT string), -1 is used
-      phaseset (str): If this field is present, this variant call's genotype
-        ordering implies the phase of the bases and is consistent with any other
-        variant calls in the same reference sequence which have the same
-        phaseset value. If the genotype data was phased but no phase set was
-        specified, this field will be set to `*`.
-      info (dict): A map of additional variant call information. The key is
-        specified in the VCF record and the type of the value is specified by
-        the VCF header FORMAT.
+        present in the GT string), -1 is used.
+      phaseset: If this field is present, this variant call's genotype ordering
+        implies the phase of the bases and is consistent with any other variant
+        calls in the same reference sequence which have the same phaseset value.
+        If the genotype data was phased but no phase set was specified, this
+        field will be set to `*`.
+      info: A map of additional variant call information. The key is specified
+        in the VCF record and the type of the value is specified by the VCF
+        header FORMAT.
     """
     self.name = name
     self.genotype = genotype or []
@@ -243,6 +245,7 @@ class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
 
   def encode(self, variant):
+    # type: (Variant) -> str
     """Converts a :class:`Variant` object back to a VCF line."""
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
@@ -369,12 +372,14 @@ class _VcfSource(filebasedsource.FileBasedSource):
   DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
 
   def __init__(self,
-               file_pattern,
-               representative_header_lines=None,
-               compression_type=CompressionTypes.AUTO,
-               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,
-               validate=True,
-               allow_malformed_records=False):
+               file_pattern,  # type: str
+               representative_header_lines=None,  # type: List[str]
+               compression_type=CompressionTypes.AUTO,  # type: str
+               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
+               validate=True,  # type: bool
+               allow_malformed_records=False  # type: bool
+              ):
+    # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
                                      validate=validate)
@@ -383,7 +388,11 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
 
-  def read_records(self, file_name, range_tracker):
+  def read_records(self,
+                   file_name,  # type: str
+                   range_tracker  # type: range_trackers.OffsetRangeTracker
+                  ):
+    # type: (...) -> Iterable[MalformedVcfRecord]
     record_iterator = _VcfSource._VcfRecordIterator(
         file_name,
         range_tracker,
@@ -402,13 +411,15 @@ class _VcfSource(filebasedsource.FileBasedSource):
     """An Iterator for processing a single VCF file."""
 
     def __init__(self,
-                 file_name,
-                 range_tracker,
-                 file_pattern,
-                 compression_type,
-                 allow_malformed_records,
-                 representative_header_lines=None,
-                 **kwargs):
+                 file_name,  # type: str
+                 range_tracker,  # type: range_trackers.OffsetRangeTracker
+                 file_pattern,  # type: str
+                 compression_type,  # type: str
+                 allow_malformed_records,  # type: bool
+                 representative_header_lines=None,  # type:  List[str]
+                 **kwargs  # type: **str
+                ):
+      # type: (...) -> None
       # If `representative_header_lines` is given, header lines in `file_name`
       # are ignored.
       self._header_lines = []
@@ -475,16 +486,21 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
         raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
 
-    def _convert_to_variant_record(self, record, infos, formats):
+    def _convert_to_variant_record(
+        self,
+        record,  # type: vcf.model._Record
+        infos,  # type: Dict[str, vcf.parser._Info]
+        formats  # type: Dict[str, vcf.parser._Format]
+        ):
+      # type: (...) -> Variant
       """Converts the PyVCF record to a :class:`Variant` object.
 
       Args:
-        record (:class:`~vcf.model._Record`): An object containing info about a
-          variant.
-        infos (dict): The PyVCF dict storing INFO extracted from the VCF header.
+        record: An object containing info about a variant.
+        info: The PyVCF dict storing INFO extracted from the VCF header.
           The key is the info key and the value is :class:`~vcf.parser._Info`.
-        formats (dict): The PyVCF dict storing FORMAT extracted from the VCF
-          header. The key is the FORMAT key and the value is
+        formats: The PyVCF dict storing FORMAT extracted from the VCF header.
+          The key is the FORMAT key and the value is
           :class:`~vcf.parser._Format`.
 
       Returns:
@@ -536,6 +552,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
       return info
 
     def _get_field_count_as_string(self, field_count):
+      # type: (Optional[int]) -> Optional[str]
       """Returns the string representation of field_count from PyVCF.
 
       PyVCF converts field counts to an integer with some predefined constants
@@ -544,8 +561,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
       direct dependency on the arbitrary PyVCF constants.
 
       Args:
-        field_count (int): An integer representing the number of fields in INFO
-          as specified by PyVCF.
+        field_count: An integer representing the number of fields in INFO as
+          specified by PyVCF.
 
       Returns:
         A string representation of field_count (e.g. '-1' becomes 'A').
@@ -610,26 +627,27 @@ class ReadFromVcf(PTransform):
 
   def __init__(
       self,
-      file_pattern=None,
-      representative_header_lines=None,
-      compression_type=CompressionTypes.AUTO,
-      validate=True,
-      allow_malformed_records=False,
-      **kwargs):
+      file_pattern=None,  # type: str
+      representative_header_lines=None,  # type: List[str]
+      compression_type=CompressionTypes.AUTO,  # type: str
+      validate=True,  # type: bool
+      allow_malformed_records=False,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadFromVcf` transform.
 
     Args:
-      file_pattern (str): The file path to read from either as a single file or
-        a glob pattern.
-      representative_header_lines(list of str): Header definitions to be used
-        for parsing VCF files. If supplied, header definitions in VCF files are
-        ignored.
-      compression_type (str): Used to handle compressed input files.
-        Typical value is :attr:`CompressionTypes.AUTO
+      file_pattern: The file path to read from either as a single file or a
+        glob pattern.
+      representative_header_lines: Header definitions to be used for parsing
+        VCF files. If supplied, header definitions in VCF files are ignored.
+      compression_type: Used to handle compressed input files. Typical value is
+        :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
-      validate (bool): flag to verify that the files exist during the pipeline
-        creation time.
+      validate: flag to verify that the files exist during the pipeline creation
+        time.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
     self._source = _VcfSource(
@@ -668,28 +686,28 @@ class ReadAllFromVcf(PTransform):
 
   def __init__(
       self,
-      representative_header_lines=None,
-      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
-      compression_type=CompressionTypes.AUTO,
-      allow_malformed_records=False,
-      **kwargs):
+      representative_header_lines=None,  # type: List[str]
+      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
+      compression_type=CompressionTypes.AUTO,  # type: str
+      allow_malformed_records=False,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadAllFromVcf` transform.
 
     Args:
-      representative_header_lines(list of str): Header definitions to be used
-        for parsing VCF files. If supplied, header definitions in VCF files are
-        ignored.
-      desired_bundle_size (int): Desired size of bundles that should be
-        generated when splitting this source into bundles. See
+      representative_header_lines: Header definitions to be used for parsing VCF
+        files. If supplied, header definitions in VCF files are ignored.
+      desired_bundle_size: Desired size of bundles that should be generated when
+        splitting this source into bundles. See
         :class:`~apache_beam.io.filebasedsource.FileBasedSource` for more
         details.
-      compression_type (str): Used to handle compressed input files.
+      compression_type: Used to handle compressed input files.
         Typical value is :attr:`CompressionTypes.AUTO
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
-      allow_malformed_records (bool): If true, malformed records from VCF files
-        will be returned as :class:`MalformedVcfRecord` instead of failing
-        the pipeline.
+      allow_malformed_records: If true, malformed records from VCF files will be
+        returned as :class:`MalformedVcfRecord` instead of failing the pipeline.
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(
@@ -715,6 +733,7 @@ class WriteToVcf(PTransform):
                num_shards=1,
                compression_type=CompressionTypes.AUTO,
                headers=None):
+    # type: (str, int, str, List[str]) -> None
     """Initialize a WriteToVcf PTransform.
 
     Args:
