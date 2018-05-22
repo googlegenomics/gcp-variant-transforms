@@ -183,6 +183,7 @@ region in support of your project’s security and compliance needs. See
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
 * [Appending data to existing tables](docs/data_append.md)
+* [Variant Annotation](docs/variant_annotation.md)
 * [Troubleshooting](docs/troubleshooting.md)
 
 ## Development
