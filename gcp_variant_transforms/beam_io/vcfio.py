@@ -372,13 +372,14 @@ class _VcfSource(filebasedsource.FileBasedSource):
   DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
 
   def __init__(self,
-               file_pattern,
-               representative_header_lines=None,
-               compression_type=CompressionTypes.AUTO,
-               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,
-               validate=True,
-               allow_malformed_records=False):
-    # type: (str, List[str], str, int, bool, bool) -> None
+               file_pattern,  # type: str
+               representative_header_lines=None,  # type: List[str]
+               compression_type=CompressionTypes.AUTO,  # type: str
+               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
+               validate=True,  # type: bool
+               allow_malformed_records=False  # type: bool
+              ):
+    # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
                                      validate=validate)
@@ -626,13 +627,14 @@ class ReadFromVcf(PTransform):
 
   def __init__(
       self,
-      file_pattern=None,
-      representative_header_lines=None,
-      compression_type=CompressionTypes.AUTO,
-      validate=True,
-      allow_malformed_records=False,
-      **kwargs):
-    # type: (str, List[str], str, bool, bool, **str) -> None
+      file_pattern=None,  # type: str
+      representative_header_lines=None,  # type: List[str]
+      compression_type=CompressionTypes.AUTO,  # type: str
+      validate=True,  # type: bool
+      allow_malformed_records=False,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadFromVcf` transform.
 
     Args:
@@ -684,12 +686,13 @@ class ReadAllFromVcf(PTransform):
 
   def __init__(
       self,
-      representative_header_lines=None,
-      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,
-      compression_type=CompressionTypes.AUTO,
-      allow_malformed_records=False,
-      **kwargs):
-    # type: (List[str], int, str, bool, **str) -> None
+      representative_header_lines=None,  # type: List[str]
+      desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
+      compression_type=CompressionTypes.AUTO,  # type: str
+      allow_malformed_records=False,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadAllFromVcf` transform.
 
     Args:
