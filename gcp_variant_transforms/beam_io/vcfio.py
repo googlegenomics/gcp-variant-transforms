@@ -18,8 +18,8 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
 from __future__ import absolute_import
-# pylint: disable=unused-import
-from typing import Dict, Iterable, List, Optional
+
+from typing import Dict, Iterable, List, Optional  # pylint: disable=unused-import
 import logging
 from collections import namedtuple
 from functools import partial

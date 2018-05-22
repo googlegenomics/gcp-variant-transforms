@@ -164,11 +164,12 @@ class ReadVcfHeaders(PTransform):
 
   def __init__(
       self,
-      file_pattern,
-      compression_type=CompressionTypes.AUTO,
-      validate=True,
-      **kwargs):
-    # type: (str, str, bool, **str) -> None
+      file_pattern,  # type: str
+      compression_type=CompressionTypes.AUTO,  # type: str
+      validate=True,  # type: bool
+      **kwargs  # type: **str
+      ):
+    # type: (...) -> None
     """Initialize the :class:`ReadVcfHeaders` transform.
 
     Args:
