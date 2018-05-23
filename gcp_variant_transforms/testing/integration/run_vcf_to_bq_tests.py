@@ -14,6 +14,10 @@
 
 r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
+To define a new integration test case, create a json file in
+gcp_variant_transforms/testing/integration directory and specify at least
+test_name, table_name, and input_pattern for the integration test.
+
 You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
@@ -34,11 +38,11 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 
 import argparse
 import enum
-import multiprocessing
 import os
 import sys
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
+
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -46,32 +50,29 @@ from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
-PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
-SCOPES = ['https://www.googleapis.com/auth/bigquery']
-DEFAULT_ZONES = ['us-west1-b']
-SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
+_PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
+_SCOPES = ['https://www.googleapis.com/auth/bigquery']
+_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
 
-class VcfToBQTestCase(run_tests_common.TestCase):
-  """Test case that holds information to run in pipelines API.
-
-  To define a new integration test case, create a json file in
-  gcp_variant_transforms/testing/integration directory and specify at least
-  test_name, table_name, and input_pattern for the integration test.
-  """
+class VcfToBQTestCase(object):
+  """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,
-               context,
-               test_name,
-               table_name,
-               input_pattern,
-               assertion_configs,
-               **kwargs):
-    # type: (TestContextManager, str, str, str, List[Dict], str) -> None
-    super(VcfToBQTestCase, self).__init__(test_name, context.project)
+               context,  # type: TestContextManager
+               test_name,  # type: str
+               table_name,  # type: str
+               input_pattern,  # type: str
+               assertion_configs,  # type: List[Dict]
+               **kwargs  # type: **str
+              ):
+    # type: (...) -> None
+
     dataset_id = context.dataset_id
     self._table_name = '{}.{}'.format(dataset_id, table_name)
+    self._name = test_name
+    self._project = context.project
     output_table = '{}:{}'.format(context.project, self._table_name)
     self._assertion_configs = assertion_configs
     args = ['--input_pattern {}'.format(input_pattern),
@@ -85,23 +86,9 @@ class VcfToBQTestCase(run_tests_common.TestCase):
       if isinstance(v, basestring):
         value = v.format(TABLE_NAME=self._table_name)
       args.append('--{} {}'.format(k, value))
-
-    self._pipelines_api_request = {
-        'pipelineArgs': {
-            'projectId': context.project,
-            'logging': {'gcsPath': context.logging_location},
-            'serviceAccount': {'scopes': SCOPES}
-        },
-        'ephemeralPipeline': {
-            'projectId': context.project,
-            'name': PIPELINE_NAME,
-            'resources': {'zones': DEFAULT_ZONES},
-            'docker': {
-                'imageName': context.image,
-                'cmd': ' '.join([SCRIPT_PATH] + args)
-            }
-        }
-    }
+    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
+        context.project, context.logging_location, context.image, _SCOPES,
+        _PIPELINE_NAME, _SCRIPT_PATH, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
@@ -112,6 +99,9 @@ class VcfToBQTestCase(run_tests_common.TestCase):
       assertion = QueryAssertion(client, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
+
+  def get_name(self):
+    return self._name
 
 
 class QueryAssertion(object):
@@ -283,29 +273,20 @@ def _validate_assertion_config(assertion_config):
           assertion_config, key))
 
 
-def _run_test(test, context):
-  # type: (VcfToBQTestCase, TestContextManager) -> None
-  if not context.revalidation_dataset_id:
-    test.run(context)
-  test.validate_result()
-
-
 def main():
   args = _get_args()
   test_case_configs = _get_test_configs(
       args.run_presubmit_tests, args.run_all_tests)
   with TestContextManager(args) as context:
-    pool = multiprocessing.Pool(processes=len(test_case_configs))
-    results = []
+    tests = []
     for config in test_case_configs:
-      test = VcfToBQTestCase(context, **config)
-      results.append(
-          (pool.apply_async(func=_run_test, args=(test, context)), test))
-
-    pool.close()
-    pool.join()
-
-  return run_tests_common.print_errors(results)
+      tests.append(VcfToBQTestCase(context, **config))
+    test_runner = run_tests_common.TestRunner(tests)
+    if not context.revalidation_dataset_id:
+      test_runner.run()
+    for test in tests:
+      test.validate_result()
+  return test_runner.print_errors()
 
 
 if __name__ == '__main__':

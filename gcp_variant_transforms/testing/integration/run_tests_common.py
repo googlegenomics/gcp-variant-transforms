@@ -16,19 +16,20 @@
 
 It provides common functions and classes for both run_vcf_to_bq_tests
 (integration test script for vcf_to_bq pipeline) and run_preprocessor_tests
-(integration test script for vcf_to_bq preprocessor pipeline).
+(integration test script for vcf_to_bq_preprocess pipeline).
 """
 
-from abc import abstractmethod
-from typing import Dict, List  # pylint: disable=unused-import
 import argparse  # pylint: disable=unused-import
 import json
 import os
 import time
+from typing import Dict, List  # pylint: disable=unused-import
 
 from googleapiclient import discovery
+from oauth2client.client import GoogleCredentials
 
-DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
+_DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
+_DEFAULT_ZONES = ['us-west1-b']
 
 
 class TestCaseFailure(Exception):
@@ -36,40 +37,44 @@ class TestCaseFailure(Exception):
   pass
 
 
-class TestCase(object):
-  """Test case that holds information to run in pipelines API."""
+class TestRunner(object):
+  """Runs the tests using pipelines API."""
 
-  def __init__(self, test_name, project):
-    # type: (str, str) -> None
-    self._name = test_name
-    self._project = project
+  def __init__(self, tests):
+    # type: (List[Union[PreprocessorTestCase, VcfToBQTestCase]]) -> None
+    self._tests = tests
+    self._service = discovery.build(
+        'genomics',
+        'v1alpha2',
+        credentials=GoogleCredentials.get_application_default())
+    self._operation_names = []
+    self._responses = []
 
-  def get_name(self):
-    return self._name
+  def run(self):
+    """Runs all tests."""
+    for test in self._tests:
+      # The following pylint hint is needed because `pipelines` is a method that
+      # is dynamically added to the returned `service` object above. See
+      # `googleapiclient.discovery.Resource._set_service_methods`.
+      # pylint: disable=no-member
+      request = self._service.pipelines().run(body=test.pipeline_api_request)
+      operation_name = request.execute()['name']
+      self._operation_names.append(operation_name)
+    self._wait_for_all_operations_done()
 
-  def run(self, context):
-    service = discovery.build(
-        'genomics', 'v1alpha2', credentials=context.credentials)
-    # The following pylint hint is needed because `pipelines` is a method that
-    # is dynamically added to the returned `service` object above. See
-    # `googleapiclient.discovery.Resource._set_service_methods`.
-    # pylint: disable=no-member
-    request = service.pipelines().run(body=self._pipelines_api_request)
-
-    operation_name = request.execute()['name']
-    response = self._wait_for_operation_done(service, operation_name)
-    self._handle_failure(response)
-
-  def _wait_for_operation_done(self, service, operation_name):
-    """Waits until the operation ``operation_name`` of ``service`` is done."""
+  def _wait_for_all_operations_done(self):
+    """Waits until all operations of ``service`` are done."""
     time.sleep(60)
-    operations = service.operations()
-    request = operations.get(name=operation_name)
-    response = request.execute()
-    while not response['done']:
-      time.sleep(10)
+    # pylint: disable=no-member
+    operations = self._service.operations()
+    for operation_name in self._operation_names:
+      request = operations.get(name=operation_name)
       response = request.execute()
-    return response
+      while not response['done']:
+        time.sleep(10)
+        response = request.execute()
+      self._handle_failure(response)
+      self._responses.append(response)
 
   def _handle_failure(self, response):
     """Raises errors if test case failed."""
@@ -81,9 +86,50 @@ class TestCase(object):
         raise TestCaseFailure(
             'No traceback. See logs for more information on error.')
 
-  @abstractmethod
-  def validate_result(self):
-    raise NotImplementedError
+  def print_errors(self):
+    """Prints results of test cases and traceback for any errors."""
+    errors = []
+    for (result, test) in zip(self._responses, self._tests):
+      print '{} ...'.format(test.get_name()),
+      try:
+        _ = result
+        print 'ok'
+      except TestCaseFailure as e:
+        print 'FAIL'
+        errors.append((test.get_name(), _get_traceback(str(e))))
+    for test_name, error in errors:
+      print _get_failure_message(test_name, error)
+    if errors:
+      return 1
+    else:
+      return 0
+
+
+def form_pipeline_api_request(project,  # type: str
+                              logging_location,  # type: str
+                              image,  # type: str
+                              scopes,  # type: List[str]
+                              pipeline_name,  # type: str
+                              script_path,  # type: str
+                              args  # type: List[str]
+                             ):
+  # type: (...) -> Dict
+  return {
+      'pipelineArgs': {
+          'projectId': project,
+          'logging': {'gcsPath': logging_location},
+          'serviceAccount': {'scopes': scopes}
+      },
+      'ephemeralPipeline': {
+          'projectId': project,
+          'name': pipeline_name,
+          'resources': {'zones': _DEFAULT_ZONES},
+          'docker': {
+              'imageName': image,
+              'cmd': ' '.join([script_path] + args)
+          }
+      }
+  }
 
 
 def add_args(parser):
@@ -98,8 +144,8 @@ def add_args(parser):
       help=('The name of the container image to run the test against it, for '
             'example: gcr.io/test-gcp-variant-transforms/'
             'test_gcp-variant-transforms_2018-01-20-13-47-12. By default the '
-            'production image {} is used.').format(DEFAULT_IMAGE_NAME),
-      default=DEFAULT_IMAGE_NAME,
+            'production image {} is used.').format(_DEFAULT_IMAGE_NAME),
+      default=_DEFAULT_IMAGE_NAME,
       required=False)
 
 
@@ -116,25 +162,6 @@ def get_configs(test_file_path, required_keys):
     raise TestCaseFailure('Found no .json files in directory {}'.format(
         test_file_path))
   return test_configs
-
-
-def print_errors(results):
-  """Prints results of test cases and traceback for any errors."""
-  errors = []
-  for result, test in results:
-    print '{} ...'.format(test.get_name()),
-    try:
-      _ = result.get()
-      print 'ok'
-    except TestCaseFailure as e:
-      print 'FAIL'
-      errors.append((test.get_name(), _get_traceback(str(e))))
-  for test_name, error in errors:
-    print _get_failure_message(test_name, error)
-  if errors:
-    return 1
-  else:
-    return 0
 
 
 def _load_test_config(filename, required_keys):

@@ -14,13 +14,17 @@
 
 r"""Integration testing runner for Variant Transforms' Preprocessor pipeline.
 
-You may run this test in any project (the test files are publicly accessible).
+To define a new preprocessor_tests integration test case, create a json file in
+gcp_variant_transforms/testing/integration/preprocessor_tests directory and
+specify at least test_name, input_pattern, blob_name and expected_contents
+for the integration test.
+
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
-  --project myproject \
-  --staging_location gs://mybucket/staging \
-  --temp_location gs://mybucket/temp \
-  --logging_location gs://mybucket/temp/integration_test_logs
+  --project gcp-variant-transforms-test \
+  --staging_location gs://integration_test_runs/staging \
+  --temp_location gs://integration_test_runs/temp \
+  --logging_location gs://integration_test_runs/temp/integration_test_logs
 
 To keep the reports that this test creates, use the --keep_reports option.
 
@@ -29,108 +33,75 @@ It runs all integration tests inside
 """
 
 import argparse
-import multiprocessing
-import sys
 import os
+import sys
 from typing import Dict, List  # pylint: disable=unused-import
 
-from apache_beam.io import filesystems
-from oauth2client.client import GoogleCredentials
+from google.cloud import storage
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
+_BUCKET_NAME = 'integration_test_runs'
 _PIPELINE_NAME = 'gcp-variant-transforms-preprocessor-integration-test'
 _SCOPES = []
-_DEFAULT_ZONES = ['us-west1-b']
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
-class PreprocessorTestCase(run_tests_common.TestCase):
-  """Test case that holds information to run in pipelines API.
-
-  To define a new preprocessor_tests integration test case, create a json file
-  in gcp_variant_transforms/testing/integration/preprocessor_tests directory and
-  specify at least test_name, input_pattern, report_path and expected_contents
-  for the integration test.
-  """
+class PreprocessorTestCase(object):
+  """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,
-               context,
-               test_name,
-               input_pattern,
-               expected_contents,
-               report_path,
-               **kwargs):
-    # type: (TestContextManager, str, str, List[str], str, str) -> None
-    super(PreprocessorTestCase, self).__init__(test_name, context.project)
+               parser_args,  # type: Namespace
+               test_name,  # type: str
+               input_pattern,  # type: str
+               expected_contents,  # type: List[str]
+               blob_name,  # type: str
+               **kwargs  # type: **str
+              ):
+    # type: (...) -> None
+    self._keep_reports = parser_args.keep_reports
+    self._name = test_name
     self._expected_contents = expected_contents
-    self._report_path = report_path
-    self._keep_reports = context.keep_reports
+    self._report_path = '/'.join(['gs:/', _BUCKET_NAME, blob_name])
+    self._blob_name = blob_name
+    self._project = parser_args.project
     args = ['--input_pattern {}'.format(input_pattern),
-            '--report_path {}'.format(report_path),
-            '--project {}'.format(context.project),
-            '--staging_location {}'.format(context.staging_location),
-            '--temp_location {}'.format(context.temp_location),
+            '--report_path {}'.format(self._report_path),
+            '--project {}'.format(parser_args.project),
+            '--staging_location {}'.format(parser_args.staging_location),
+            '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(test_name)]
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self._pipelines_api_request = {
-        'pipelineArgs': {
-            'projectId': context.project,
-            'logging': {'gcsPath': context.logging_location},
-            'serviceAccount': {'scopes': _SCOPES}
-        },
-        'ephemeralPipeline': {
-            'projectId': context.project,
-            'name': _PIPELINE_NAME,
-            'resources': {'zones': _DEFAULT_ZONES},
-            'docker': {
-                'imageName': context.image,
-                'cmd': ' '.join([_SCRIPT_PATH] + args)
-            }
-        }
-    }
+    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
+        parser_args.project, parser_args.logging_location, parser_args.image,
+        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, args)
 
   def validate_result(self):
     """Validates the results.
 
     - Checks that the report is generated.
-    - Validates report's contents are the same as ``expected_contents``.
+    - Validates report's contents are the same as `expected_contents`.
     """
-    if not filesystems.FileSystems.exists(self._report_path):
+    client = storage.Client(self._project)
+    bucket = client.get_bucket(_BUCKET_NAME)
+    blob = bucket.get_blob(self._blob_name)
+    if not blob.exists(client):
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {}'.format(self._report_path))
-    with filesystems.FileSystems.open(self._report_path) as f:
-      for expected_content in self._expected_contents:
-        line = f.readline()
-        if expected_content != line:
-          raise run_tests_common.TestCaseFailure(
-              'Contents mismatch: expected {}, got {}'.format(
-                  expected_content, line))
+    contents = blob.download_as_string()
+    expected_contents = ''.join(self._expected_contents)
+    if expected_contents != contents:
+      raise run_tests_common.TestCaseFailure(
+          'Contents mismatch: expected {}, got {}'.format(
+              expected_contents, contents))
     if not self._keep_reports:
-      filesystems.FileSystems.delete(self._report_path)
+      blob.delete()
 
-
-class TestContextManager(object):
-  """Manages all resources for a given run of tests."""
-
-  def __init__(self, args):
-    # type: (argparse.ArgumentParser) -> None
-    self.staging_location = args.staging_location
-    self.temp_location = args.temp_location
-    self.logging_location = args.logging_location
-    self.project = args.project
-    self.credentials = GoogleCredentials.get_application_default()
-    self.image = args.image
-    self.keep_reports = args.keep_reports
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, *args):
-    return
+  def get_name(self):
+    return self._name
 
 
 def _get_args():
@@ -138,39 +109,32 @@ def _get_args():
   run_tests_common.add_args(parser)
   parser.add_argument('--keep_reports',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, generated reports and resolved headers are '
-                           'not deleted.')
+                      help='If set, generated reports are not deleted.')
   return parser.parse_args()
 
 
 def _get_test_configs():
   # type: () -> List[Dict]
   """Gets all test configs in preprocessor_tests."""
-  required_keys = ['test_name', 'report_path', 'input_pattern',
+  required_keys = ['test_name', 'blob_name', 'input_pattern',
                    'expected_contents']
   test_file_path = os.path.join(os.getcwd(), _TEST_FOLDER)
   return run_tests_common.get_configs(test_file_path, required_keys)
-
-
-def _run_test(test, context):
-  test.run(context)
 
 
 def main():
   """Runs the integration tests for preprocessor."""
   args = _get_args()
   test_case_configs = _get_test_configs()
-  with TestContextManager(args) as context:
-    pool = multiprocessing.Pool(processes=len(test_case_configs))
-    results = []
-    for config in test_case_configs:
-      test = PreprocessorTestCase(context, **config)
-      results.append(
-          (pool.apply_async(func=_run_test, args=(test, context)), test))
 
-    pool.close()
-    pool.join()
-  return run_tests_common.print_errors(results)
+  tests = []
+  for config in test_case_configs:
+    tests.append(PreprocessorTestCase(args, **config))
+  test_runner = run_tests_common.TestRunner(tests)
+  test_runner.run()
+  for test in tests:
+    test.validate_result()
+  return test_runner.print_errors()
 
 
 if __name__ == '__main__':
