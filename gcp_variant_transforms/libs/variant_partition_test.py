@@ -19,7 +19,7 @@ from __future__ import absolute_import
 import unittest
 
 from gcp_variant_transforms.libs import variant_partition
-
+from gcp_variant_transforms.testing import temp_dir
 
 class VariantPartitionTest(unittest.TestCase):
 
@@ -69,7 +69,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_boundaries(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config1.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config1.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     self.assertEqual(partitioner.get_residual_partition_index(), 7)
@@ -86,21 +87,24 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('chr1', 999999998), 2)
     self.assertEqual(partitioner.get_partition('chr1', 999999999), 7)
 
-    # "chr2" OR "ch2" OR "c2" OR "2"
+    # "chr2" OR "chr2_alternate_name1" OR "chr2_alternate_name2" OR "2".
     self.assertEqual(partitioner.get_partition('chr2', 0), 3)
     self.assertEqual(partitioner.get_partition('chr2', 999999999000), 3)
-    self.assertEqual(partitioner.get_partition('ch2', 0), 3)
-    self.assertEqual(partitioner.get_partition('ch2', 999999999000), 3)
-    self.assertEqual(partitioner.get_partition('c2', 0), 3)
-    self.assertEqual(partitioner.get_partition('c2', 999999999000), 3)
+    self.assertEqual(
+        partitioner.get_partition('chr2_alternate_name1', 0), 3)
+    self.assertEqual(
+        partitioner.get_partition('chr2_alternate_name1', 999999999000), 3)
+    self.assertEqual(partitioner.get_partition('chr2_alternate_name2', 0), 3)
+    self.assertEqual(
+        partitioner.get_partition('CHR2_ALTERNATE_NAME2', 999999999000), 3)
     self.assertEqual(partitioner.get_partition('2', 0), 3)
     self.assertEqual(partitioner.get_partition('2', 999999999000), 3)
 
     # "C4" OR "cr5" OR "chr6:1,000,000-2,000,000"
-    self.assertEqual(partitioner.get_partition('c4', 0), 4)
-    self.assertEqual(partitioner.get_partition('c4', 999999999000), 4)
-    self.assertEqual(partitioner.get_partition('cr5', 0), 4)
-    self.assertEqual(partitioner.get_partition('cr5', 999999999000), 4)
+    self.assertEqual(partitioner.get_partition('chr4', 0), 4)
+    self.assertEqual(partitioner.get_partition('chr4', 999999999000), 4)
+    self.assertEqual(partitioner.get_partition('chr5', 0), 4)
+    self.assertEqual(partitioner.get_partition('chr5', 999999999000), 4)
     self.assertEqual(partitioner.get_partition('chr6', 1000000), 4)
     self.assertEqual(partitioner.get_partition('chr6', 2000000 - 1), 4)
     self.assertEqual(partitioner.get_partition('chr6', 0), 7)
@@ -117,7 +121,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_case_insensitive(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config1.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config1.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     self.assertEqual(partitioner.get_residual_partition_index(), 7)
@@ -135,7 +140,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_get_partition_name(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config1.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config1.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     self.assertEqual(partitioner.get_residual_partition_index(), 7)
@@ -153,7 +159,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_non_existent_partition_name(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config1.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config1.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
 
@@ -166,7 +173,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_residual_partition_in_middle(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config2.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config2.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
     self.assertEqual(partitioner.get_residual_partition_index(), 1)
@@ -214,7 +222,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_residual_partition_absent(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/misc/partition_config3.yaml")
+        "gcp_variant_transforms/testing/data/partition_configs/"
+        "partition_config3.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
     self.assertEqual(partitioner.get_residual_partition_index(), 5 - 1)
@@ -260,65 +269,146 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('chr6', 0),
                      partitioner.get_residual_partition_index())
 
-  def test_config_failed_config_validation(self):
+  def test_config_failed_missing_region(self):
+    tempdir = temp_dir.TempDir()
+    missing_region = [
+        '-  partition:\n',
+        '     partition_name: "chr01_part1"\n',
+        '     regions:\n',
+        '       - "chr1:0-1,000,000"\n',
+        '-  partition:\n',
+        '     partition_name: "all_remaining"\n',
+        '     regions:\n',
+        '       - "residual"\n',
+        '-  partition:\n',
+        '     partition_name: "missing_region"\n',
+        '     regions:\n',
+    ]
     with self.assertRaisesRegexp(
         ValueError,
         'Each partition must have at least one region.'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_missing_region.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=missing_region))
 
+  def test_config_failed_missing_partition_name(self):
+    tempdir = temp_dir.TempDir()
+    missing_par_name = [
+        '-  partition:\n',
+        '     regions:\n',
+        '       - "chr1:0-1,000,000"\n',
+    ]
     with self.assertRaisesRegexp(
         ValueError,
         'Each partition must have partition_name field.'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_missing_partition_name.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=missing_par_name))
 
+  def test_config_failed_duplicate_residual_partition(self):
+    tempdir = temp_dir.TempDir()
+    duplicate_residual = [
+        '-  partition:\n',
+        '     partition_name: "all_remaining"\n',
+        '     regions:\n',
+        '       - "residual"\n',
+        '-  partition:\n',
+        '     partition_name: "chr01"\n',
+        '     regions:\n',
+        '       - "chr1"\n',
+        '-  partition:\n',
+        '     partition_name: "all_remaining_2"\n',
+        '     regions:\n',
+        '       - "residual"\n',
+    ]
     with self.assertRaisesRegexp(
         ValueError,
-        'There must be only one residual partition intercepted at least 2'):
+        'There must be only one residual partition.'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_redundant_default.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=duplicate_residual))
 
+  def test_config_failed_overlapping_regions(self):
+    tempdir = temp_dir.TempDir()
+    overlapping_regions = [
+        '-  partition:\n',
+        '     partition_name: "chr01_part1"\n',
+        '     regions:\n',
+        '       - "chr1:0-1,000,000"\n',
+        '-  partition:\n',
+        '     partition_name: "chr01_part2_overlapping"\n',
+        '     regions:\n',
+        '       - "chr1:999,999-2,000,000"\n',
+    ]
     with self.assertRaisesRegexp(
         ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_overlapping_regions.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=overlapping_regions))
 
+    full_and_partial = [
+        '-  partition:\n',
+        '     partition_name: "chr01_full"\n',
+        '     regions:\n',
+        '       - "chr1"\n',
+        '-  partition:\n',
+        '     partition_name: "chr01_part_overlapping"\n',
+        '     regions:\n',
+        '       - "chr1:1,000,000-2,000,000"\n',
+    ]
     with self.assertRaisesRegexp(
-        ValueError,
-        'Can not add region to an existing full chromosome.'):
+        ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_full_and_partial_chr.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=full_and_partial))
 
+    partial_and_full = [
+        '-  partition:\n',
+        '     partition_name: "chr01_part"\n',
+        '     regions:\n',
+        '       - "chr1:1,000,000-2,000,000"\n',
+        '-  partition:\n',
+        '     partition_name: "chr01_full_overlapping"\n',
+        '     regions:\n',
+        '       - "chr1"\n',
+    ]
     with self.assertRaisesRegexp(
-        ValueError,
-        'A full chromosome must be disjoint from all other regions'):
+        ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_partial_and_full_chr.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=partial_and_full))
 
+    full_and_full = [
+        '-  partition:\n',
+        '     partition_name: "chr01_full"\n',
+        '     regions:\n',
+        '       - "chr1"\n',
+        '-  partition:\n',
+        '     partition_name: "chr02_part"\n',
+        '     regions:\n',
+        '       - "chr2:1,000,000-2,000,000"\n',
+        '-  partition:\n',
+        '     partition_name: "chr01_full_redundant"\n',
+        '     regions:\n',
+        '       - "chr1"\n',
+    ]
     with self.assertRaisesRegexp(
-        ValueError,
-        'A full chromosome must be disjoint from all other regions'):
+        ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_redundant_full_chr.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=full_and_full))
 
-    with self.assertRaisesRegexp(
-        ValueError,
-        'Cannot add overlapping region *'):
-      _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_conflicting_regions.yaml")
-
+  def test_config_failed_duplicate_table_name(self):
+    tempdir = temp_dir.TempDir()
+    dup_table_name = [
+        '-  partition:\n',
+        '     partition_name: "duplicate_name"\n',
+        '     regions:\n',
+        '       - "chr1:0-1,000,000"\n',
+        '-  partition:\n',
+        '     partition_name: "all_remaining"\n',
+        '     regions:\n',
+        '       - "residual"\n',
+        '-  partition:\n',
+        '     partition_name: "duplicate_name"\n',
+        '     regions:\n',
+        '       - "chr1:1,000,000-2,000,000"\n',
+    ]
     with self.assertRaisesRegexp(
         ValueError,
         'Table names must be unique *'):
       _ = variant_partition.VariantPartition(
-          "gcp_variant_transforms/testing/data/misc/"
-          "partition_config_redundant_table_names.yaml")
+          tempdir.create_temp_file(suffix='.yaml', lines=dup_table_name))

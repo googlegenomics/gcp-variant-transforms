@@ -220,11 +220,9 @@ def run(argv=None):
       counter_factory)
 
   partitioner = None
-  if known_args.partition_config_path:
+  if known_args.optimize_for_large_inputs or known_args.partition_config_path:
     partitioner = variant_partition.VariantPartition(
         known_args.partition_config_path)
-  if known_args.optimize_for_large_inputs:
-    partitioner = variant_partition.VariantPartition()
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
@@ -240,6 +238,7 @@ def run(argv=None):
       #  An extra partition for residual variants is added to the end of list.
       #  This extra partition will be ignored in the rest of the pipeline.
       num_partitions -= 1
+      variants = [variants[i] for i in range(0, num_partitions)]
   else:
     # By default we don't partition data, so we have only 1 partition.
     num_partitions = 1
