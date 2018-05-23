@@ -124,12 +124,9 @@ query to extract high impact variants in the HBB gene which encodes the beta
 chain of Haemoglobin:
 ```
 #standardSQL
-SELECT
-  reference_name, start_position, reference_bases, ALT.alt, CSQ.*
-FROM
-  vcf_imports_external.gnomad_genomes_chr_hg19 AS T, T.alternate_bases AS ALT, ALT.CSQ AS CSQ
-WHERE
-  CSQ.SYMBOL = "HBB" AND CSQ.IMPACT = "HIGH"
+SELECT reference_name, start_position, reference_bases, ALT.alt, CSQ.*
+FROM vcf_imports_external.gnomad_genomes_chr_hg19 AS T, T.alternate_bases AS ALT, ALT.CSQ AS CSQ
+WHERE CSQ.SYMBOL = "HBB" AND CSQ.IMPACT = "HIGH"
 ORDER BY start_position
 ```
 
@@ -156,20 +153,22 @@ the double-strand break repair pathway as defined by the
 ```
 #standardSQL
 SELECT
-  reference_name, start_position, reference_bases, ALT.alt, CSQ.*
+  reference_name, start_position, reference_bases, ALT.alt, CSQ.Consequence, CSQ.Impact, CSQ.SYMBOL
 FROM
-  vcf_imports_external.gnomad_genomes_chr_hg19 AS T, T.alternate_bases AS ALT, ALT.CSQ AS CSQ
+  `vcf_imports_external.gnomad_genomes_chr_hg19` AS T, T.alternate_bases AS ALT, ALT.CSQ AS CSQ
 WHERE
   CSQ.SYMBOL IN (SELECT DB_Object_Symbol
                  FROM `isb-cgc.genome_reference.GO_Annotations`
                  WHERE GO_ID = 'GO:0006302')
   AND CSQ.IMPACT = "HIGH"
-ORDER BY start_position
+ORDER BY
+  start_position
 ```
 
 ![A sample query joining annotations with GO database](images/gnomAD_GO_0006302.png)
 
-Other pathway databases are also available in BigQuery including
+As part of the [ISB-CGC](https://isb-cgc.appspot.com/) project, several more
+public databases are also made available in BigQuery including
 [Reactome](https://reactome.org/)
 ([table](https://bigquery.cloud.google.com/table/isb-cgc:genome_reference.Ensembl2Reactome?tab=details))
 and [WikiPathways](https://www.wikipathways.org)
