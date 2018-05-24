@@ -153,10 +153,14 @@ the double-strand break repair pathway as defined by the
 ```
 #standardSQL
 SELECT
-  reference_name, start_position, reference_bases, ALT.alt, CSQ.Consequence, CSQ.Impact, CSQ.SYMBOL
+  reference_name, start_position, reference_bases, ALT.alt,
+  CSQ.Consequence, CSQ.Impact, CSQ.SYMBOL
 FROM
-  `vcf_imports_external.gnomad_genomes_chr_hg19` AS T, T.alternate_bases AS ALT, ALT.CSQ AS CSQ
+  `vcf_imports_external.gnomad_genomes_chr_hg19` AS T,
+  T.alternate_bases AS ALT, ALT.CSQ AS CSQ
 WHERE
+  # Note: Matching based on symbol is "best effort" as the names may not be
+  # standardized across sources.
   CSQ.SYMBOL IN (SELECT DB_Object_Symbol
                  FROM `isb-cgc.genome_reference.GO_Annotations`
                  WHERE GO_ID = 'GO:0006302')
