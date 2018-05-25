@@ -28,12 +28,12 @@ class FilterVariants(beam.PTransform):
   """Filters variants according to input parameters."""
 
   def __init__(self, reference_names=None):
+    # type: (List[str]) -> None
     """Initializes the transform.
 
     Args:
-      reference_names (List[str]): A list of reference_names that will be
-        kept. If this parameter is None or empty all references will be
-        kept.
+      reference_names : A list of reference_names that will be kept. If this
+        parameter is None or empty all references will be kept.
     """
     self._reference_names = reference_names
 

@@ -194,7 +194,7 @@ class VepRunner(object):
     }
 
   def _make_action(self, *args, **kwargs):
-    # type: (str, str) -> Dict
+    # type: (*str, **List[str]) -> Dict
     command_args = list(args)
     action = {
         'commands': command_args,
@@ -250,6 +250,7 @@ class VepRunner(object):
       return 'n1-standard-16'
 
   def wait_until_done(self):
+    # type: () -> None
     """Polls currently running operations and waits until all are done."""
     while self._running_operation_ids:
       self._running_operation_ids = [op for op in self._running_operation_ids

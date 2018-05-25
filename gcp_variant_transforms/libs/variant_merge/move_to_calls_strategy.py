@@ -18,6 +18,9 @@ from __future__ import absolute_import
 
 import hashlib
 import re
+from typing import Iterable, Set  # pylint: disable=unused-import
+
+from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.libs import bigquery_util
@@ -45,15 +48,16 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
   def __init__(self, info_keys_to_move_to_calls_regex, copy_quality_to_calls,
                copy_filter_to_calls):
+    # type: (str, bool, bool) -> None
     """Initializes the strategy.
 
     Args:
-      info_keys_to_move_to_calls_regex (str): A regular expression specifying
-        info fields that should be moved to calls.
-      copy_quality_to_calls (bool): Whether to copy the quality field to
-        the associated calls in each record.
-      copy_filter_to_calls (bool): Whether to copy filter field to the
-        associated calls in each record.
+      info_keys_to_move_to_calls_regex: A regular expression specifying info
+        fields that should be moved to calls.
+      copy_quality_to_calls: Whether to copy the quality field to the associated
+        calls in each record.
+      copy_filter_to_calls: Whether to copy filter field to the associated calls
+        in each record.
     """
     self._info_keys_to_move_to_calls_re = (
         re.compile(info_keys_to_move_to_calls_regex)
@@ -62,12 +66,13 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     self._copy_filter_to_calls = copy_filter_to_calls
 
   def move_data_to_calls(self, variant):
+    # type: (Variant) -> None
     """Moves filters, calls, and info items to the variant's calls based on the
     strategy's initialization parameters.
 
     Args:
-      variant (Variant): The variant whose filters, quality,
-        and info items will be moved to its calls if specified.
+      variant: The variant whose filters, quality, and info items will be moved
+        to its calls if specified.
     """
     additional_call_info = {}
     if self._should_copy_filter_to_calls():
@@ -83,19 +88,21 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
       call.info.update(additional_call_info)
 
   def move_data_to_merged(self, variant, merged_variant):
+    # type: (Variant, Variant) -> None
     """Moves items from the variant's info to merged_variant.
 
     Args:
-      variant (Variant): The variant whose info items will be
-        moved to `merged_variant` if specified.
-      merged_variant (Variant): The variant who will receive
-        the info items of `variant` if specified.
+      variant: The variant whose info items will be moved to `merged_variant` if
+        specified.
+      merged_variant: The variant who will receive the info items of `variant`
+        if specified.
     """
     for info_key, info_value in variant.info.iteritems():
       if not self._should_move_info_key_to_calls(info_key):
         merged_variant.info[info_key] = info_value
 
   def get_merged_variants(self, variants, unused_key=None):
+    # type: (List[Variant], str) -> List[Variant]
     if not variants:
       return []
     merged_variant = None
@@ -141,6 +148,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
             self._get_hash(','.join(variant.alternate_bases or []))]])
 
   def modify_bigquery_schema(self, schema, info_keys):
+    # type: (bigquery.TableSchema, Set[str]) -> None
     # Find the calls record so that it's easier to reference it below.
     calls_record = None
     for field in schema.fields:

@@ -16,6 +16,8 @@
 
 from __future__ import absolute_import
 
+from typing import Dict, Iterable, List, Optional, Union  # pylint: disable=unused-import
+
 import apache_beam as beam
 
 from vcf.parser import _Format as Format
@@ -23,19 +25,19 @@ from vcf.parser import _Info as Info
 from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms import merge_headers
-
 
 
 class _InferUndefinedHeaderFields(beam.DoFn):
   """Extracts undefined header fields from ``Variant`` record."""
 
   def _get_field_count(self, field_value):
+    # type: (Union[List, bool, int, str]) -> Optional[int]
     """
     Args:
-      field_value (list, bool, integer, or string): value for the field
-        returned by PyVCF. E.g. [0.33, 0.66] is a field value for Allele
-        frequency (AF) field.
+      field_value: value for the field returned by PyVCF. E.g. [0.33, 0.66] is a
+        field value for Allele frequency (AF) field.
     """
     if isinstance(field_value, list):
       return field_counts['.']
@@ -77,12 +79,12 @@ class _InferUndefinedHeaderFields(beam.DoFn):
       return False
 
   def _infer_undefined_info_fields(self, variant, defined_headers):
+    # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Info]
     """Returns info fields not defined in the headers.
 
     Args:
-      variant (:class:`vcfio.Variant`): variant obj.
-      defined_headers (:class:`vcf_header_io.VcfHeader`): header fields defined
-        in header section of VCF files.
+      variant: variant obj.
+      defined_headers: header fields defined in header section of VCF files.
     Returns:
       A dict of (info_key(str), :class:`Info`) for any info field in `variant`
       that is not defined in the header.
@@ -104,12 +106,12 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     return infos
 
   def _infer_undefined_format_fields(self, variant, defined_headers):
+    # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Format]
     """Returns format fields not defined in the headers.
 
     Args:
-      variant (:class:`vcfio.Variant`): variant obj.
-      defined_headers (:class:`vcf_header_io.VcfHeader`): header fields defined
-        in header section of VCF files.
+      variant: variant obj.
+      defined_headers: header fields defined in header section of VCF files.
     Returns:
       A dict of (format_key(str), :class:`Format`) for any format key in
       `variant` that is not defined in the header.
@@ -130,11 +132,14 @@ class _InferUndefinedHeaderFields(beam.DoFn):
       break
     return formats
 
-  def process(self, variant, defined_headers):
+  def process(self,
+              variant,  # type: vcfio.Variant
+              defined_headers  # type: vcf_header_io.VcfHeader
+             ):
+    # type: (...) -> Iterable[vcf_header_io.VcfHeader]
     """
     Args:
-      defined_headers (:class:`vcf_header_io.VcfHeader`): header fields defined
-        in header section of VCF files.
+      defined_headers: header fields defined in header section of VCF files.
     """
     infos = self._infer_undefined_info_fields(variant, defined_headers)
     formats = self._infer_undefined_format_fields(variant, defined_headers)
@@ -145,12 +150,12 @@ class InferUndefinedHeaderFields(beam.PTransform):
   """Extracts undefined header fields from ``Variant`` records."""
 
   def __init__(self, defined_headers):
+    # type: (vcf_header_io.VcfHeader) -> None
     """Initializes the transform.
     Args:
-      defined_headers (:class:`vcf_header_io.VCFHeader`): Side input
-        containing all the header fields (e.g., INFO, FORMAT) defined
-        in the header section of the VCF files. This is used to skip already
-        defined header fields.
+      defined_headers: Side input containing all the header fields (e.g., INFO,
+        FORMAT) defined in the header section of the VCF files. This is used to
+        skip already defined header fields.
     """
     self._defined_headers = defined_headers
 

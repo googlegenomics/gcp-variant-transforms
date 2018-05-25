@@ -17,6 +17,7 @@ class FileMetadataStub(object):
   """This is an object to imitate apache_beam.io.filesystem.FileMetadata."""
 
   def __init__(self, path, size_in_bytes):
+    # type: (str, int) -> None
     self.path = path
     self.size_in_bytes = size_in_bytes
 

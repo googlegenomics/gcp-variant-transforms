@@ -17,6 +17,7 @@
 import re
 import math
 import sys
+from typing import List  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
 
@@ -123,6 +124,7 @@ def get_python_type_from_bigquery_type(bigquery_type):
 
 def get_bigquery_sanitized_field(
     field, null_numeric_value_replacement=-sys.maxint):
+  # type: (Any, int) ->  Any
   """Returns sanitized field according to BigQuery restrictions.
 
   This method only sanitizes lists and strings. It returns the same
@@ -144,7 +146,7 @@ def get_bigquery_sanitized_field(
 
   Args:
     field: Field to sanitize. It can be of any type.
-    null_numeric_value_replacement (int): Value to use instead of null for
+    null_numeric_value_replacement: Value to use instead of null for
       numeric (float/int/long) lists.
   Raises:
     ValueError: If the field could not be sanitized (e.g. unsupported types in
@@ -163,6 +165,7 @@ def get_bigquery_sanitized_field(
 
 
 def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
+  # type: (List, int) -> List
   """Returns sanitized list according to BigQuery restrictions.
 
   Null values are replaced with reasonable defaults since the
@@ -179,7 +182,7 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
 
   Args:
     input_list: List to sanitize.
-    null_numeric_value_replacement (int): Value to use instead of null for
+    null_numeric_value_replacement: Value to use instead of null for
       numeric (float/int/long) lists.
   Raises:
     ValueError: If a list contains unsupported values. Supported types are

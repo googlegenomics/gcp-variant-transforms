@@ -49,6 +49,7 @@ class VariantPartition(object):
     return _DEFAULT_NUM_PARTITIONS
 
   def get_partition(self, reference_name, pos=0):
+    # type: (str, int) -> int
     reference_name = reference_name.strip().lower()
     if not reference_name or pos < 0:
       raise ValueError('Cannot partition given input {}:{}'
@@ -56,6 +57,7 @@ class VariantPartition(object):
     return self._get_auto_partition(reference_name)
 
   def _get_auto_partition(self, reference_name):
+    # type: (str) -> int
     """Automatically chooses an partition for the given reference_name.
 
     Given a reference_name returns an index in [0, _DEFAULT_NUM_PARTITIONS)

@@ -35,6 +35,7 @@ class _HeaderMerger(object):
     self._resolver = resolver
 
   def merge(self, first, second):
+    # type: (vcf_header_io.VcfHeader, vcf_header_io.VcfHeader) -> None
     """Updates ``first``'s headers with values from ``second``.
 
     If a specific key does not already exist in a specific one of ``first``'s
@@ -43,9 +44,9 @@ class _HeaderMerger(object):
     key will be updated with the value from ``second``.
 
     Args:
-      first (:class:`VcfHeader`): The VcfHeader object.
-      second (:class:`VcfHeader`): The VcfHeader object that's headers will be
-        merged into the headers of first.
+      first: The VcfHeader object.
+      second: The VcfHeader object that's headers will be merged into the
+        headers of first.
     """
     if (not isinstance(first, vcf_header_io.VcfHeader) or
         not isinstance(first, vcf_header_io.VcfHeader)):
@@ -56,14 +57,17 @@ class _HeaderMerger(object):
     self._merge_header_fields(first.formats, second.formats)
     self._merge_header_fields(first.contigs, second.contigs)
 
-  def _merge_header_fields(self, first, second):
-    #type: (Dict[str, OrderedDict[str, Union[str, int]]],
-    #       Dict[str, OrderedDict[str, Union[str, int]]]) -> None
+  def _merge_header_fields(
+      self,
+      first,  # type: Dict[str, OrderedDict[str, Union[str, int]]]
+      second  # type: Dict[str, OrderedDict[str, Union[str, int]]]
+      ):
+    # type: (...) -> None
     """Modifies ``first`` to add any keys from ``second`` not in ``first``.
 
     Args:
-      first (dict): first header fields.
-      second (dict): second header fields.
+      first: first header fields.
+      second: second header fields.
     Raises:
       ValueError: If the header fields are incompatible (e.g. same key with
         different types or numbers).
@@ -96,22 +100,30 @@ class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""
 
   def __init__(self, header_merger):
+    # type: (_HeaderMerger) -> None
     super(_MergeHeadersFn, self).__init__()
     self._header_merger = header_merger
 
   def create_accumulator(self):
+    # type: () -> vcf_header_io.VcfHeader
     return vcf_header_io.VcfHeader()
 
-  def add_input(self, source, to_merge):
+  def add_input(self,
+                source,  # type: vcf_header_io.VcfHeader
+                to_merge  # type: vcf_header_io.VcfHeader
+               ):
+    # type: (...) -> vcf_header_io.VcfHeader
     return self.merge_accumulators([source, to_merge])
 
   def merge_accumulators(self, accumulators):
+    # type: (List[vcf_header_io.VcfHeader]) -> vcf_header_io.VcfHeader
     merged_headers = self.create_accumulator()
     for to_merge in accumulators:
       self._header_merger.merge(merged_headers, to_merge)
     return merged_headers
 
   def extract_output(self, merged_headers):
+    # type: (vcf_header_io.VcfHeader) -> vcf_header_io.VcfHeader
     return merged_headers
 
 

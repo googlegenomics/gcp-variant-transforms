@@ -111,7 +111,7 @@ class BigQueryRowGenerator(object):
       # type: bigquery_schema_descriptor.SchemaDescriptor
       allow_incompatible_records,  # type: bool
       ):
-    # type: (...) -> Dict[str, Any], bool
+    # type: (...) -> (Dict[str, Any], bool)
     """A helper method for ``get_rows`` to get a call as JSON.
 
     Args:
@@ -178,8 +178,8 @@ class BigQueryRowGenerator(object):
   def _get_bigquery_field_entry(
       self,
       key,  # type: str
-      data, # type: Union[Any, List[Any]]
-      schema_descriptor, # type: bigquery_schema_descriptor.SchemaDescriptor
+      data,  # type: Union[Any, List[Any]]
+      schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
       allow_incompatible_records,  # type: bool
   ):
     # type: (...) -> (str, Any)
