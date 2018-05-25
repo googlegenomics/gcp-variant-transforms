@@ -49,8 +49,10 @@ class VariantPartitionTest(unittest.TestCase):
                             variant_partition._RESERVED_AUTO_PARTITIONS)
     self.assertGreaterEqual(partitioner.get_partition('Unknown'),
                             variant_partition._RESERVED_AUTO_PARTITIONS)
-    # Expected empty string as partition_name
-    self.assertEqual(partitioner.get_partition_name(0), '')
+    # Expected empty string as partition_name as we are in auto mode.
+    self.assertEqual(partitioner.get_partition_name(0), None)
+    self.assertEqual(partitioner.get_partition_name(100), None)
+
 
   def test_auto_partitioning_invalid_partitions(self):
     partitioner = variant_partition.VariantPartition()
@@ -70,11 +72,11 @@ class VariantPartitionTest(unittest.TestCase):
   def test_config_boundaries(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config1.yaml")
+        "residual_at_end.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
-    self.assertEqual(partitioner.get_residual_partition_index(), 7)
-    self.assertTrue(partitioner.has_residual_partition())
+    for i in range(partitioner.get_num_partitions()):
+      self.assertTrue(partitioner.should_keep_partition(i))
 
     # "chr1:0-1,000,000"
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
@@ -122,11 +124,11 @@ class VariantPartitionTest(unittest.TestCase):
   def test_config_case_insensitive(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config1.yaml")
+        "residual_at_end.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
-    self.assertEqual(partitioner.get_residual_partition_index(), 7)
-    self.assertTrue(partitioner.has_residual_partition())
+    for i in range(partitioner.get_num_partitions()):
+      self.assertTrue(partitioner.should_keep_partition(i))
 
     # "chr1:0-1,000,000"
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
@@ -141,44 +143,44 @@ class VariantPartitionTest(unittest.TestCase):
   def test_config_get_partition_name(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config1.yaml")
+        "residual_at_end.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
-    self.assertEqual(partitioner.get_residual_partition_index(), 7)
-    self.assertTrue(partitioner.has_residual_partition())
+    for i in range(partitioner.get_num_partitions()):
+      self.assertTrue(partitioner.should_keep_partition(i))
 
-    self.assertEqual(partitioner.get_partition_name(0), '_chr01_part1')
-    self.assertEqual(partitioner.get_partition_name(1), '_chr01_part2')
-    self.assertEqual(partitioner.get_partition_name(2), '_chr01_part3')
-    self.assertEqual(partitioner.get_partition_name(3), '_chrom02')
-    self.assertEqual(partitioner.get_partition_name(4), '_chrom04_05_part_06')
-    self.assertEqual(partitioner.get_partition_name(5), '_chr3_01')
-    self.assertEqual(partitioner.get_partition_name(6), '_chr3_02')
-    self.assertEqual(partitioner.get_partition_name(7), '_all_remaining')
+    self.assertEqual(partitioner.get_partition_name(0), 'chr01_part1')
+    self.assertEqual(partitioner.get_partition_name(1), 'chr01_part2')
+    self.assertEqual(partitioner.get_partition_name(2), 'chr01_part3')
+    self.assertEqual(partitioner.get_partition_name(3), 'chrom02')
+    self.assertEqual(partitioner.get_partition_name(4), 'chrom04_05_part_06')
+    self.assertEqual(partitioner.get_partition_name(5), 'chr3_01')
+    self.assertEqual(partitioner.get_partition_name(6), 'chr3_02')
+    self.assertEqual(partitioner.get_partition_name(7), 'all_remaining')
 
 
   def test_config_non_existent_partition_name(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config1.yaml")
+        "residual_at_end.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
 
     with self.assertRaisesRegexp(
-        ValueError, 'Partition index is outside of expected range.'):
+        ValueError, 'Given partition index -1 is outside of expected range*'):
       partitioner.get_partition_name(-1)
     with self.assertRaisesRegexp(
-        ValueError, 'Partition index is outside of expected range.'):
+        ValueError, 'Given partition index 8 is outside of expected range*'):
       partitioner.get_partition_name(8)
 
   def test_config_residual_partition_in_middle(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config2.yaml")
+        "residual_in_middle.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
-    self.assertEqual(partitioner.get_residual_partition_index(), 1)
-    self.assertTrue(partitioner.has_residual_partition())
+    for i in range(partitioner.get_num_partitions()):
+      self.assertTrue(partitioner.should_keep_partition(i))
 
     # "chr1:0-1,000,000"
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
@@ -194,40 +196,31 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('3', 999999), 4)
 
     # All the followings are assigned to residual partition.
-    self.assertEqual(partitioner.get_partition('chr1', 2000000),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('chr1', 999999999),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('chr1', 2000000), 1)
+    self.assertEqual(partitioner.get_partition('chr1', 999999999), 1)
 
-    self.assertEqual(partitioner.get_partition('3', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('3', 499999),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('3', 1000000),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('3', 0), 1)
+    self.assertEqual(partitioner.get_partition('3', 499999), 1)
+    self.assertEqual(partitioner.get_partition('3', 1000000), 1)
 
-    self.assertEqual(partitioner.get_partition('ch2', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('c2', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('2', 0),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('ch2', 0), 1)
+    self.assertEqual(partitioner.get_partition('c2', 0), 1)
+    self.assertEqual(partitioner.get_partition('2', 0), 1)
 
-    self.assertEqual(partitioner.get_partition('c4', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('cr5', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('chr6', 0),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('c4', 0), 1)
+    self.assertEqual(partitioner.get_partition('cr5', 0), 1)
+    self.assertEqual(partitioner.get_partition('chr6', 0), 1)
 
   def test_config_residual_partition_absent(self):
     partitioner = variant_partition.VariantPartition(
         "gcp_variant_transforms/testing/data/partition_configs/"
-        "partition_config3.yaml")
+        "residual_missing.yaml")
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
-    self.assertEqual(partitioner.get_residual_partition_index(), 5 - 1)
-    self.assertFalse(partitioner.has_residual_partition())
+    # All partitions excpet the last one (dummy residual) should be kept.
+    for i in range(partitioner.get_num_partitions() - 1):
+      self.assertTrue(partitioner.should_keep_partition(i))
+    self.assertFalse(partitioner.should_keep_partition(5 - 1))
 
     # "chr1:0-1,000,000"
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
@@ -243,31 +236,20 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('3', 999999), 3)
 
     # All the followings are assigned to residual partition.
-    self.assertEqual(partitioner.get_partition('chr1', 2000000),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('chr1', 999999999),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('chr1', 2000000), 4)
+    self.assertEqual(partitioner.get_partition('chr1', 999999999), 4)
 
-    self.assertEqual(partitioner.get_partition('3', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('3', 499999),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('3', 1000000),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('3', 0), 4)
+    self.assertEqual(partitioner.get_partition('3', 499999), 4)
+    self.assertEqual(partitioner.get_partition('3', 1000000), 4)
 
-    self.assertEqual(partitioner.get_partition('ch2', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('c2', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('2', 0),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('ch2', 0), 4)
+    self.assertEqual(partitioner.get_partition('c2', 0), 4)
+    self.assertEqual(partitioner.get_partition('2', 0), 4)
 
-    self.assertEqual(partitioner.get_partition('c4', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('cr5', 0),
-                     partitioner.get_residual_partition_index())
-    self.assertEqual(partitioner.get_partition('chr6', 0),
-                     partitioner.get_residual_partition_index())
+    self.assertEqual(partitioner.get_partition('c4', 0), 4)
+    self.assertEqual(partitioner.get_partition('cr5', 0), 4)
+    self.assertEqual(partitioner.get_partition('chr6', 0), 4)
 
   def test_config_failed_missing_region(self):
     tempdir = temp_dir.TempDir()
@@ -302,6 +284,17 @@ class VariantPartitionTest(unittest.TestCase):
         'Each partition must have partition_name field.'):
       _ = variant_partition.VariantPartition(
           tempdir.create_temp_file(suffix='.yaml', lines=missing_par_name))
+    empty_par_name = [
+        '-  partition:\n',
+        '     partition_name: "          "\n',
+        '     regions:\n',
+        '       - "chr1:0-1,000,000"\n',
+    ]
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Partition name can not be empty string.'):
+      _ = variant_partition.VariantPartition(
+          tempdir.create_temp_file(suffix='.yaml', lines=empty_par_name))
 
   def test_config_failed_duplicate_residual_partition(self):
     tempdir = temp_dir.TempDir()
@@ -409,6 +402,6 @@ class VariantPartitionTest(unittest.TestCase):
     ]
     with self.assertRaisesRegexp(
         ValueError,
-        'Table names must be unique *'):
+        'Partition names must be unique *'):
       _ = variant_partition.VariantPartition(
           tempdir.create_temp_file(suffix='.yaml', lines=dup_table_name))

@@ -231,36 +231,39 @@ def run(argv=None):
       reference_names=known_args.reference_names)
   if partitioner:
     num_partitions = partitioner.get_num_partitions()
-    variants = variants | 'PartitionVariants' >> beam.Partition(
+    partitioned_variants = variants | 'PartitionVariants' >> beam.Partition(
         partition_variants.PartitionVariants(partitioner), num_partitions)
-    if (not partitioner.should_flatten() and
-        not partitioner.has_residual_partition()):
-      #  An extra partition for residual variants is added to the end of list.
-      #  This extra partition will be ignored in the rest of the pipeline.
-      num_partitions -= 1
-      variants = [variants[i] for i in range(0, num_partitions)]
+    variants = []
+    for i in range(num_partitions):
+      if partitioner.should_keep_partition(i):
+        variants.append(partitioned_variants[i])
+      else:
+        num_partitions -= 1
   else:
-    # By default we don't partition data, so we have only 1 partition.
+    # By default we don't partition the data, so we have only 1 partition.
     num_partitions = 1
     variants = [variants]
 
-  if variant_merger:
-    variants = apply_transform(
-        variants, num_partitions, 'MergeVariants',
-        merge_variants.MergeVariants(variant_merger))
-    if partitioner.should_flatten():
-      variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
-      num_partitions = 1
-  proc_variants = apply_transform(
-      variants, num_partitions, 'ProcessVaraints',
-      beam.Map(
-          processed_variant_factory.create_processed_variant).with_output_types(
-              processed_variant.ProcessedVariant))
   for i in range(num_partitions):
-    partition_name = partitioner.get_partition_name(i)
-    _ = (proc_variants[i] | 'VariantToBigQuery' + partition_name >>
+    if variant_merger:
+      variants[i] |= ('MergeVariants' + str(i) >>
+                      merge_variants.MergeVariants(variant_merger))
+    variants[i] |= (
+        'ProcessVaraints' + str(i) >>
+        beam.Map(processed_variant_factory.create_processed_variant).\
+            with_output_types(processed_variant.ProcessedVariant))
+  if partitioner and partitioner.should_flatten():
+    variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
+    num_partitions = 1
+
+  for i in range(num_partitions):
+    table_suffix = ''
+    if partitioner and partitioner.get_partition_name(i):
+      table_suffix = '_' + partitioner.get_partition_name(i)
+    table_name = known_args.output_table + table_suffix
+    _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
          variant_to_bigquery.VariantToBigQuery(
-             known_args.output_table + partition_name,
+             table_name,
              header_fields,
              variant_merger,
              processed_variant_factory,
@@ -273,17 +276,6 @@ def run(argv=None):
   result.wait_until_finish()
 
   metrics_util.log_all_counters(result)
-
-
-def apply_transform(partitions, num_partitions, transform_name, transform_fn):
-  if num_partitions == 1:
-    return partitions | transform_name >> transform_fn
-  if num_partitions > 1:
-    result = []
-    for i in range(num_partitions):
-      result.append(partitions[i] | transform_name + str(i) >> transform_fn)
-    return result
-  raise ValueError("Number of partitions cannot be less than 1.")
 
 
 if __name__ == '__main__':

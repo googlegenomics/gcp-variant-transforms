@@ -395,6 +395,6 @@ class PartitionOptions(VariantTransformsOptions):
         default='',
         help=('File containing list of partitions and output table names. You '
               'can use provided default partition_config file to split output '
-              'by chromosome (one table per chromosome) which is located at:'
-              'gcp_variant_transforms/testing/data/misc/'
-              'partition_config_default.yaml'))
+              'by chromosome (one table per chromosome) which is located at: '
+              'gcp_variant_transforms/data/partition_configs/'
+              'homo_sapiens_default.yaml'))

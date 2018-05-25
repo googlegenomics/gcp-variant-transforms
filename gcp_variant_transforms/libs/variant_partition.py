@@ -52,6 +52,7 @@ _MAX_NUM_REGIONS = 64
 _REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
 # A special literal for identifying residual partition's region name.
 _RESIDUAL_REGION_LITERAL = 'residual'
+_UNDEFINED_PARTITION_INDEX = -1
 
 
 class _ChromosomePartitioner(object):
@@ -59,54 +60,47 @@ class _ChromosomePartitioner(object):
 
   This class logic is implemented using an interval tree, each region is
   considered as an interval and will be added to the interval tree. Note all
-  regions must be pairwise disjoint, ie no overlapping interval is accepted.
+  regions must be pairwise disjoint, i.e. no overlapping interval is accepted.
   """
 
   def __init__(self):
     # Each instance contains multiple regions of one chromosome.
-    self._interval_tree = None
+    self._interval_tree = intervaltree.IntervalTree()
 
   def add_region(self, start, end, partition_index):
     if start < 0:
-      raise ValueError('Start position on a region cannot be negative: {}'.
-                       format(start))
+      raise ValueError(
+          'Start position on a region cannot be negative: {}'.format(start))
     if end <= start:
       raise ValueError('End position must be larger than start position: {} '
                        'vs {}'.format(end, start))
     if partition_index < 0:
-      raise ValueError('Index of a region cannot be negative {}'.
-                       format(partition_index))
-    if not self._interval_tree:
-      # interval tree has not been initiated.
-      self._interval_tree = intervaltree.IntervalTree()
-    else:
-      # Check the existing interval tree for possible overlap with new region.
-      if self._interval_tree.overlaps_range(start, end):
-        raise ValueError('Cannot add overlapping region {}-{}'.
-                         format(start, end))
+      raise ValueError(
+          'Index of a region cannot be negative {}'.format(partition_index))
+    if self._interval_tree.overlaps_range(start, end):
+      raise ValueError(
+          'Cannot add overlapping region {}-{}'.format(start, end))
     # If everything goes well we add the new region to the interval tree.
     self._interval_tree.addi(start, end, partition_index)
 
   def get_partition_index(self, pos=0):
-    """Finds a region that pos falls in it, if no region is found returns -1."""
-    if self._interval_tree is None:
-      raise ValueError('This instance has not been assigned any index.')
+    """Finds a region that includes pos, if none _UNDEFINED_PARTITION_INDEX."""
     matched_regions = self._interval_tree.search(pos)
     # Ensure at most one region is matching to the give position.
     assert len(matched_regions) <= 1
     if len(matched_regions) == 1:
       return next(iter(matched_regions)).data
     else:
-      return -1
+      return _UNDEFINED_PARTITION_INDEX
 
 class VariantPartition(object):
   """Partition variants based on their reference_name and position.
 
   This class has 2 operating modes:
-    1) No config file is given (config_file_path == ''):
-        Automatically partition variants based on their reference_name.
+    1) No config file is given (config_file_path == None):
+       Automatically partition variants based on their reference_name.
     2) A config file is given:
-        partitions variants based on input config file.
+       partitions variants based on input config file.
   """
 
   def __init__(self, config_file_path=None):
@@ -116,17 +110,19 @@ class VariantPartition(object):
     self._num_partitions = _DEFAULT_NUM_PARTITIONS
     # This variable determines the operation mode auto (default mode) vs config.
     self._config_file_path_given = False
-    # Residual partition will contain all remaining readings that do not match
-    # to any other partition. -1 means it does not exist.
-    self._residual_partition_index = -1
+    # Residual partition will contain all remaining variants that do not match
+    # to any other partition.
+    self._residual_partition_index = _UNDEFINED_PARTITION_INDEX
+    self._should_keep_residual_partition = False
     self._ref_name_to_partitions_map = defaultdict(_ChromosomePartitioner)
-    self._partition_names = []
+    self._partition_names = {}
 
     if config_file_path:
       self._config_file_path_given = True
       self._parse_config(config_file_path)
 
   def _validate_config(self, config_file_path):
+    # type: (str) -> None
     with FileSystems.open(config_file_path, 'r') as f:
       try:
         partition_configs = yaml.load(f)
@@ -134,12 +130,12 @@ class VariantPartition(object):
         raise ValueError('Invalid yaml file: %s' % str(e))
     if len(partition_configs) > _MAX_NUM_PARTITIONS:
       raise ValueError(
-          'There can be at most {} partitions but given config file contains {}'
-          .format(_MAX_NUM_PARTITIONS, len(partition_configs)))
+          'There can be at most {} partitions but given config file '
+          'contains {}'.format(_MAX_NUM_PARTITIONS, len(partition_configs)))
     if not partition_configs:
       raise ValueError('There must be at least one partition in config file.')
 
-    partition_name_duplicate = {}
+    existing_partition_names = set()
     for partition_config in partition_configs:
       partition = partition_config.get('partition', None)
       if partition is None:
@@ -148,20 +144,21 @@ class VariantPartition(object):
       if regions is None:
         raise ValueError('Each partition must have at least one region.')
       if len(regions) > _MAX_NUM_REGIONS:
-        raise ValueError(
-            'At most {} regions per partition, thie partition  contains {}'
-            .format(_MAX_NUM_REGIONS, len(regions)))
-      # Check the partition_name is unique.
+        raise ValueError('At most {} regions per partition, thie partition '
+                         'contains {}'.format(_MAX_NUM_REGIONS, len(regions)))
       if not partition.get('partition_name', None):
         raise ValueError('Each partition must have partition_name field.')
       partition_name = partition.get('partition_name').strip()
-      if partition_name_duplicate.get(partition_name, None):
-        raise ValueError('Table names must be unique, {} is duplicated'
-                         .format(partition_name))
-      partition_name_duplicate[partition_name] = True
+      if not partition_name:
+        raise ValueError('Partition name can not be empty string.')
+      if partition_name in existing_partition_names:
+        raise ValueError('Partition names must be unique, '
+                         '{} is duplicated'.format(partition_name))
+      existing_partition_names.add(partition_name)
     return partition_configs
 
   def _parse_config(self, config_file_path):
+    # type: (str) -> None
     """Parses the given partition config file.
 
     Args:
@@ -170,22 +167,28 @@ class VariantPartition(object):
       A ValueError if any of the expected config formats are violated.
     """
     def _parse_position(pos_str):
+      # type: (str) -> int
       return int(pos_str.replace(',', ''))
+
+    def _is_residual_partition(regions):
+      # type: (List[str]) -> bool
+      return (len(regions) == 1 and
+              regions[0].strip().lower() == _RESIDUAL_REGION_LITERAL)
 
     partition_configs = self._validate_config(config_file_path)
 
     self._num_partitions = len(partition_configs)
     for partition_index in range(self._num_partitions):
       partition = partition_configs[partition_index].get('partition')
-      self._partition_names.append(partition.get('partition_name').strip())
+      self._partition_names[partition_index] = (
+          partition.get('partition_name').strip())
       regions = partition.get('regions', None)
 
-      # Check whether this is the residual partition.
-      if (len(regions) == 1 and
-          regions[0].strip().lower() == _RESIDUAL_REGION_LITERAL):
-        if self._residual_partition_index != -1:
+      if _is_residual_partition(regions):
+        if self._residual_partition_index != _UNDEFINED_PARTITION_INDEX:
           raise ValueError('There must be only one residual partition.')
         self._residual_partition_index = partition_index
+        self._should_keep_residual_partition = True
         continue
 
       for r in regions:
@@ -199,38 +202,41 @@ class VariantPartition(object):
           # This region includes a full chromosome
           ref_name = r.strip().lower()
           start = 0
-          end = sys.maxsize
+          end = sys.maxint
         self._ref_name_to_partitions_map[ref_name].add_region(
             start, end, partition_index)
 
-    if not self.has_residual_partition():
+    if self._residual_partition_index == _UNDEFINED_PARTITION_INDEX:
       # We add an extra dummy partition for residuals.
+      # Note, here self._should_keep_residual_partition is False.
+      self._residual_partition_index = self._num_partitions
       self._num_partitions += 1
 
   def get_num_partitions(self):
-    """Returns the number of partitions."""
+    # type: (None) -> int
     return self._num_partitions
 
   def get_partition(self, reference_name, pos=0):
-    # type: (str, int) -> int
+    # type: (str, Optional[int]) -> int
+    """Returns partition index on ref_name chromosome which pos falls into ."""
     reference_name = reference_name.strip().lower()
     if not reference_name or pos < 0:
-      raise ValueError('Cannot partition given input {}:{}'
-                       .format(reference_name, pos))
+      raise ValueError(
+          'Cannot partition given input {}:{}'.format(reference_name, pos))
     if self._config_file_path_given:
       return self._get_config_partition(reference_name, pos)
     else:
       return self._get_auto_partition(reference_name)
 
   def _get_config_partition(self, reference_name, pos):
-    # Lookup _ref_name_to_partitions_map to check this ref_name has an entry.
+    # type: (str, int) -> int
     partitioner = self._ref_name_to_partitions_map.get(reference_name, None)
     if partitioner:
       partition_index = partitioner.get_partition_index(pos)
-      if partition_index != -1:
+      if partition_index != _UNDEFINED_PARTITION_INDEX:
         return partition_index
-    # No full/partial chromosome match, return residual partition.
-    return self.get_residual_partition_index()
+    # No match was found, returns residual partition index.
+    return self._residual_partition_index
 
   def _get_auto_partition(self, reference_name):
     # type: (str) -> int
@@ -241,9 +247,9 @@ class VariantPartition(object):
       1) Lookup the reference_name in _ref_name_to_partitions_map dict
 
     If the result of lookup is None, we will try the following steps:
-      2) Match the reference_name to a reg exp of common names (eg 'chr12')
+      2) Match the reference_name to a reg exp of common names (e.g. 'chr12') or
       3) Hash the reference_name and calculate its mod to remaining buckets
-    result is added to _ref_name_to_partitions_map for future quick lookups.
+    result of 2-3 is added to _ref_name_to_partitions_map for future lookups.
 
     Args:
       reference_name: reference name of the variant which is being partitioned
@@ -252,7 +258,6 @@ class VariantPartition(object):
     """
     partitioner = self._ref_name_to_partitions_map.get(reference_name, None)
     if partitioner:
-      # In auto mode all partitions are whole chromosome.
       return partitioner.get_partition_index()
     else:
       matched = _CHROMOSOME_NAME_REGEXP.match(reference_name)
@@ -263,7 +268,7 @@ class VariantPartition(object):
         if chr_no > 0 and chr_no <= _RESERVED_AUTO_PARTITIONS:
           partition_index = chr_no - 1
           self._ref_name_to_partitions_map[reference_name].add_region(
-              0, sys.maxsize, partition_index)
+              0, sys.maxint, partition_index)
           return partition_index
       # If RegExp didn't match, we will find the hash of reference_name
       remaining_partitions = _DEFAULT_NUM_PARTITIONS - _RESERVED_AUTO_PARTITIONS
@@ -271,37 +276,29 @@ class VariantPartition(object):
                          _RESERVED_AUTO_PARTITIONS)
       # Save partition in _reference_name_to_partition dict for future lookups
       self._ref_name_to_partitions_map[reference_name].add_region(
-          0, sys.maxsize, partition_index)
+          0, sys.maxint, partition_index)
       return partition_index
 
-  def has_residual_partition(self):
-    return self._residual_partition_index != -1
-
   def should_flatten(self):
-    # In case we are in auto mode (ie no config) we flatten partitions and
-    # produce only one output table.
+    # type: (None) -> bool
+    """In auto mode (no config) flattens partitions, produces 1 output table."""
     return not self._config_file_path_given
 
-  def get_residual_partition_index(self):
-    # In auto mode residual partition doesnt exist, return -1.
-    if not self._config_file_path_given:
-      return -1
-
-    # If residual partition is absent in the config file, we still need an index
-    # for all residual variants. In this case we add a dummy paritition indexed
-    # _num_partitions - 1 which will be ignored right after the partitioning.
-    if self.has_residual_partition():
-      return self._residual_partition_index
+  def should_keep_partition(self, partition_index):
+    # type: (int) -> bool
+    """Returns False only for dummy extra residual partition (if was added)."""
+    if partition_index != self._residual_partition_index:
+      return True
     else:
-      return self._num_partitions - 1
+      return self._should_keep_residual_partition
 
   def get_partition_name(self, partition_index):
+    # type: (int) -> Optional[str]
     if self._config_file_path_given:
       if partition_index >= self._num_partitions or partition_index < 0:
-        raise ValueError('Partition index is outside of expected range: {}'.
-                         format(partition_index))
-      # Note, a '_' is automatically added, so output table name would be:
-      #   known_args.output_table + '_' + partition_name
-      return '_' + self._partition_names[partition_index]
+        raise ValueError(
+            'Given partition index {} is outside of expected range: '
+            '[0, {}]'.format(partition_index, self._num_partitions))
+      return self._partition_names[partition_index]
     else:
-      return ''
+      return None
