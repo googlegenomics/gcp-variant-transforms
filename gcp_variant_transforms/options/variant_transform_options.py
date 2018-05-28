@@ -128,7 +128,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'optimize_for_large_inputs are enabled.'))
 
   def validate(self, parsed_args, client=None):
-    # type: (argparse.Namespace) -> None
+    # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
     output_table_re_match = re.match(
         r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
         parsed_args.output_table)
