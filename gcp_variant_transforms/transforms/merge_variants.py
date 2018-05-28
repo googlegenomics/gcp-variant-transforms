@@ -27,11 +27,12 @@ class MergeVariants(beam.PTransform):
   """Merges variants according to the specified strategy."""
 
   def __init__(self, variant_merger):
+    # type: (variant_merge_strategy.VariantMergeStrategy) -> None
     """Initializes the transform.
 
     Args:
-      variant_merger (``VariantMergeStrategy``): The strategy to use for merging
-        variants. Must not be null.
+      variant_merger: The strategy to use for merging variants. Must not be
+        null.
     """
     assert isinstance(variant_merger,
                       variant_merge_strategy.VariantMergeStrategy)

@@ -37,6 +37,7 @@ def generate_schema_from_header_fields(
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
     variant_merger=None  # type: variant_merge_strategy.VariantMergeStrategy
     ):
+  # type: (...) -> bigquery.TableSchema
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
 
   Args:

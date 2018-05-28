@@ -18,9 +18,12 @@ from __future__ import absolute_import
 
 import collections
 import copy
+from typing import Iterable, Set  # pylint: disable=unused-import
 
+from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 from intervaltree import IntervalTree
 
+from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 
@@ -49,19 +52,24 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
   header).
   """
 
-  def __init__(self, info_keys_to_move_to_calls_regex, copy_quality_to_calls,
-               copy_filter_to_calls, window_size=DEFAULT_WINDOW_SIZE):
+  def __init__(self,
+               info_keys_to_move_to_calls_regex,  # type: str
+               copy_quality_to_calls,  # type: bool
+               copy_filter_to_calls,  # type: bool
+               window_size=DEFAULT_WINDOW_SIZE  # type: int
+              ):
+    # type: (...) -> None
     """Initializes the strategy.
 
     Args:
-      info_keys_to_move_to_calls_regex (str): A regular expression
-        specifying info fields that should be moved to calls.
-      copy_quality_to_calls (bool): Whether to copy the quality field to
-        the associated calls in each record.
-      copy_filter_to_calls (bool): Whether to copy filter field to the
-        associated calls in each record.
-      window_size (int): Size of windows that variants will be grouped
-        in based on the start position of the variant.
+      info_keys_to_move_to_calls_regex: A regular expression specifying info
+        fields that should be moved to calls.
+      copy_quality_to_calls: Whether to copy the quality field to the associated
+        calls in each record.
+      copy_filter_to_calls: Whether to copy filter field to the  associated
+        calls in each record.
+      window_size: Size of windows that variants will be grouped in based on the
+        start position of the variant.
     """
     self._move_to_calls = move_to_calls_strategy.MoveToCallsStrategy(
         info_keys_to_move_to_calls_regex=info_keys_to_move_to_calls_regex,
@@ -70,11 +78,13 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
     self._window_size = window_size
 
   def get_merge_keys(self, variant):
+    # type: (vcfio.Variant) -> Iterable[str]
     start = variant.start - (variant.start % self._window_size)
     for i in range(start, variant.end, self._window_size):
       yield ':'.join([str(x) for x in [variant.reference_name, i]])
 
   def get_merged_variants(self, variants, key=None):
+    # type: (List[vcfio.Variant], str) -> Iterable[vcfio.Variant]
     non_variant_tree = IntervalTree()
     grouped_variants = collections.defaultdict(list)
     for v in variants:
@@ -200,5 +210,6 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
     return int(key.split(':')[1])
 
   def modify_bigquery_schema(self, schema, info_keys):
+    # type: (bigquery.TableSchema, Set[str]) -> None
     # Find the calls record so that it's easier to reference it below.
     self._move_to_calls.modify_bigquery_schema(schema, info_keys)

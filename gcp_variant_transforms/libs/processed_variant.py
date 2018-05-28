@@ -203,6 +203,7 @@ class ProcessedVariantFactory(object):
       minimal_match=False,  # type: bool
       counter_factory=None  # type: metrics_util.CounterFactoryInterface
   ):
+    # type: (...) -> None
     """Sets the internal state of the factory class.
 
     Args:
@@ -355,6 +356,7 @@ class _AnnotationProcessor(object):
                use_allele_num,  # type: bool
                minimal_match,  # type: bool
               ):
+    # type: (...) -> None
     """Creates an instance for adding annotations to `ProcessedVariant` objects.
 
     Note this class is intended to be an auxiliary for ProcessedVariantFactory

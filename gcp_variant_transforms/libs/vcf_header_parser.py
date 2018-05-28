@@ -52,12 +52,13 @@ def get_vcf_headers(input_file):
 
 
 def get_metadata_header_lines(input_file):
+  # type: (str) -> List[str]
   """Returns header lines from the given VCF file ``input_file``.
 
   Only returns lines starting with ## and not #.
 
   Args:
-    input_file (str): A string specifying the path to a VCF file.
+    input_file: A string specifying the path to a VCF file.
       It can be local or remote (e.g. on GCS).
   Returns:
     A list containing header lines of ``input_file``.

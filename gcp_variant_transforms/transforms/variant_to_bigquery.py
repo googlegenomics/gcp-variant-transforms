@@ -69,6 +69,7 @@ class VariantToBigQuery(beam.PTransform):
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1  # type: int
       ):
+    # type: (...) -> None
     """Initializes the transform.
 
     Args:

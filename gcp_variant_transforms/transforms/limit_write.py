@@ -29,11 +29,13 @@ import apache_beam as beam
 
 class _RoundRobinKeyFn(beam.DoFn):
   def __init__(self, count):
+    # type: (int) -> None
     self._count = count
     # This attribute will be properly initiated at each worker by start_bundle()
     self._counter = 0
 
   def start_bundle(self):
+    # type: () -> None
     self._counter = random.randint(0, self._count - 1)
 
   def process(self, element):
@@ -45,6 +47,7 @@ class _RoundRobinKeyFn(beam.DoFn):
 
 class LimitWrite(beam.PTransform):
   def __init__(self, count):
+    # type: (int) -> None
     self._count = count
 
   def expand(self, pcoll):

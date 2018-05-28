@@ -38,6 +38,7 @@ class VariantTransformsOptions(object):
     raise NotImplementedError
 
   def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
     """Validates this group's options parsed from the command line."""
     pass
 
@@ -93,6 +94,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument('--output_table',
                         required=True,
                         help='BigQuery table to store the results.')
@@ -126,6 +128,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'optimize_for_large_inputs are enabled.'))
 
   def validate(self, parsed_args, client=None):
+    # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
     output_table_re_match = re.match(
         r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
         parsed_args.output_table)
@@ -167,6 +170,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         else:
           # For the rest of the errors, use BigQuery error message.
           raise
+
 
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
@@ -269,6 +273,7 @@ class FilterOptions(VariantTransformsOptions):
   """Options for filtering Variant records."""
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         '--reference_names',
         default=None, nargs='+',
@@ -293,6 +298,7 @@ class MergeOptions(VariantTransformsOptions):
   ]
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument(
         '--variant_merge_strategy',
         default='NONE',
@@ -326,6 +332,7 @@ class MergeOptions(VariantTransformsOptions):
                   MergeOptions.MERGE_WITH_NON_VARIANTS)))
 
   def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
     if (parsed_args.variant_merge_strategy !=
         MergeOptions.MOVE_TO_CALLS and
         parsed_args.variant_merge_strategy !=
@@ -354,6 +361,7 @@ class PreprocessOptions(VariantTransformsOptions):
   """Options for preprocess."""
 
   def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
     parser.add_argument('--input_pattern',
                         required=True,
                         help='Input pattern for VCF files to process.')
