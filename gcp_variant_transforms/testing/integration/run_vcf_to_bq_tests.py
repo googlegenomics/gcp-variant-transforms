@@ -286,7 +286,7 @@ def main():
       test_runner.run()
     for test in tests:
       test.validate_result()
-  return test_runner.print_errors()
+  return test_runner.print_results()
 
 
 if __name__ == '__main__':

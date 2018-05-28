@@ -31,6 +31,7 @@ REQUIRED_PACKAGES = [
 INTEGRATION_TEST_REQUIREMENTS = [
     # Need to explicitly install v>0.25 as the BigQuery python API has changed.
     'google-cloud-bigquery>0.25',
+    'google-cloud-storage'
 ]
 
 REQUIRED_SETUP_PACKAGES = [

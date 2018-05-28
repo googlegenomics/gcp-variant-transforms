@@ -228,7 +228,6 @@ python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --image "${full_image_name}" ${TEST_ARGUMENTS}
 
 if [[ -n "${run_preprocessor_tests}" ]]; then
-  pip install --upgrade google-cloud-storage
   python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
       --project "${project}" \
       --staging_location "gs://${gs_dir}/staging" \

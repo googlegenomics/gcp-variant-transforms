@@ -47,8 +47,8 @@ class TestRunner(object):
         'genomics',
         'v1alpha2',
         credentials=GoogleCredentials.get_application_default())
-    self._operation_names = []
-    self._responses = []
+    self._operation_names = []  # type: List[str]
+    self._responses = []  # List[Dict]
 
   def run(self):
     """Runs all tests."""
@@ -63,18 +63,22 @@ class TestRunner(object):
     self._wait_for_all_operations_done()
 
   def _wait_for_all_operations_done(self):
-    """Waits until all operations of ``service`` are done."""
-    time.sleep(60)
+    """Waits until all operations of `service` are done."""
     # pylint: disable=no-member
     operations = self._service.operations()
+    running_operation_names = set()
     for operation_name in self._operation_names:
-      request = operations.get(name=operation_name)
-      response = request.execute()
-      while not response['done']:
-        time.sleep(10)
-        response = request.execute()
-      self._handle_failure(response)
-      self._responses.append(response)
+      running_operation_names.add(operation_name)
+    while running_operation_names:
+      time.sleep(10)
+      for operation_name in self._operation_names:
+        if operation_name in running_operation_names:
+          request = operations.get(name=operation_name)
+          response = request.execute()
+          if response['done']:
+            self._handle_failure(response)
+            self._responses.append(response)
+            running_operation_names.remove(operation_name)
 
   def _handle_failure(self, response):
     """Raises errors if test case failed."""
@@ -86,23 +90,11 @@ class TestRunner(object):
         raise TestCaseFailure(
             'No traceback. See logs for more information on error.')
 
-  def print_errors(self):
-    """Prints results of test cases and traceback for any errors."""
-    errors = []
-    for (result, test) in zip(self._responses, self._tests):
-      print '{} ...'.format(test.get_name()),
-      try:
-        _ = result
-        print 'ok'
-      except TestCaseFailure as e:
-        print 'FAIL'
-        errors.append((test.get_name(), _get_traceback(str(e))))
-    for test_name, error in errors:
-      print _get_failure_message(test_name, error)
-    if errors:
-      return 1
-    else:
-      return 0
+  def print_results(self):
+    """Prints results of test cases."""
+    for test in self._tests:
+      print '{} ...ok'.format(test.get_name())
+    return 0
 
 
 def form_pipeline_api_request(project,  # type: str
