@@ -14,9 +14,13 @@
 
 r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
+To define a new integration test case, create a json file in
+gcp_variant_transforms/testing/integration directory and specify at least
+test_name, table_name, and input_pattern for the integration test.
+
 You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
-python gcp_variant_transforms/testing/integration/run_tests.py \
+python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
   --project myproject \
   --staging_location gs://mybucket/staging \
   --temp_location gs://mybucket/temp \
@@ -34,55 +38,41 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 
 import argparse
 import enum
-import json
-import multiprocessing
 import os
 import sys
-import time
-
 from datetime import datetime
-from typing import List  # pylint: disable=unused-import
+from typing import Dict, List  # pylint: disable=unused-import
+
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
-
-from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
+from gcp_variant_transforms.testing.integration import run_tests_common
 
-DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
-PIPELINE_NAME = 'gcp-variant-transforms-integration-test'
-SCOPES = ['https://www.googleapis.com/auth/bigquery']
-DEFAULT_ZONES = ['us-west1-b']
-SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
-_BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration'
-
-
-class TestCaseFailure(Exception):
-  """Exception for failed test cases."""
-  pass
+_PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
+_SCOPES = ['https://www.googleapis.com/auth/bigquery']
+_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
+_BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
 
-class TestCase(object):
-  """Test case that holds information to run in pipelines API.
-
-  To define a new integration test case, create a json file in
-  gcp_variant_transforms/testing/integration directory and specify at least
-  test_name, table_name, and input_pattern for the integration test.
-  """
+class VcfToBQTestCase(object):
+  """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,
-               context,
-               test_name,
-               table_name,
-               input_pattern,
-               assertion_configs,
-               **kwargs):
+               context,  # type: TestContextManager
+               test_name,  # type: str
+               table_name,  # type: str
+               input_pattern,  # type: str
+               assertion_configs,  # type: List[Dict]
+               **kwargs  # type: **str
+              ):
+    # type: (...) -> None
 
-    self._name = test_name
     dataset_id = context.dataset_id
-    self._project = context.project
     self._table_name = '{}.{}'.format(dataset_id, table_name)
+    self._name = test_name
+    self._project = context.project
     output_table = '{}:{}'.format(context.project, self._table_name)
     self._assertion_configs = assertion_configs
     args = ['--input_pattern {}'.format(input_pattern),
@@ -96,63 +86,11 @@ class TestCase(object):
       if isinstance(v, basestring):
         value = v.format(TABLE_NAME=self._table_name)
       args.append('--{} {}'.format(k, value))
+    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
+        context.project, context.logging_location, context.image, _SCOPES,
+        _PIPELINE_NAME, _SCRIPT_PATH, args)
 
-    self._pipelines_api_request = {
-        'pipelineArgs': {
-            'projectId': context.project,
-            'logging': {'gcsPath': context.logging_location},
-            'serviceAccount': {'scopes': SCOPES}
-        },
-        'ephemeralPipeline': {
-            'projectId': context.project,
-            'name': PIPELINE_NAME,
-            'resources': {'zones': DEFAULT_ZONES},
-            'docker': {
-                'imageName': context.image,
-                'cmd': ' '.join([SCRIPT_PATH] + args)
-            },
-        }
-    }
-
-  def get_name(self):
-    return self._name
-
-  def run(self, context):
-    # type: (TestContextManager) -> None
-    service = discovery.build(
-        'genomics', 'v1alpha2', credentials=context.credentials)
-    # The following pylint hint is needed because `pipelines` is a method that
-    # is dynamically added to the returned `service` object above. See
-    # `googleapiclient.discovery.Resource._set_service_methods`.
-    # pylint: disable=no-member
-    request = service.pipelines().run(body=self._pipelines_api_request)
-
-    operation_name = request.execute()['name']
-    response = self._wait_for_operation_done(service, operation_name)
-    self._handle_failure(response)
-
-  def _wait_for_operation_done(self, service, operation_name):
-    """Waits until the operation `operation_name` of `service` is done."""
-    time.sleep(60)
-    operations = service.operations()
-    request = operations.get(name=operation_name)
-    response = request.execute()
-    while not response['done']:
-      time.sleep(10)
-      response = request.execute()
-    return response
-
-  def _handle_failure(self, response):
-    """Raises errors if test case failed."""
-    if 'error' in response:
-      if 'message' in response['error']:
-        raise TestCaseFailure(response['error']['message'])
-      else:
-        # This case should never happen.
-        raise TestCaseFailure(
-            'No traceback. See logs for more information on error.')
-
-  def validate_table(self):
+  def validate_result(self):
     """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
     query_formatter = QueryFormatter(self._table_name)
@@ -161,6 +99,9 @@ class TestCase(object):
       assertion = QueryAssertion(client, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
+
+  def get_name(self):
+    return self._name
 
 
 class QueryAssertion(object):
@@ -176,16 +117,16 @@ class QueryAssertion(object):
     iterator = query_job.result(timeout=60)
     rows = list(iterator)
     if len(rows) != 1:
-      raise TestCaseFailure('Expected one row in query result, got {}'.format(
-          len(rows)))
+      raise run_tests_common.TestCaseFailure(
+          'Expected one row in query result, got {}'.format(len(rows)))
     row = rows[0]
     if len(self._expected_result) != len(row):
-      raise TestCaseFailure(
+      raise run_tests_common.TestCaseFailure(
           'Expected {} columns in the query result, got {}'.format(
               len(self._expected_result), len(row)))
     for key in self._expected_result.keys():
       if self._expected_result[key] != row.get(key):
-        raise TestCaseFailure(
+        raise run_tests_common.TestCaseFailure(
             'Column {} mismatch: expected {}, got {}'.format(
                 key, self._expected_result[key], row.get(key)))
 
@@ -235,6 +176,7 @@ class TestContextManager(object):
   """
 
   def __init__(self, args):
+    # type: (argparse.ArgumentParser) -> None
     self.staging_location = args.staging_location
     self.temp_location = args.temp_location
     self.logging_location = args.logging_location
@@ -276,19 +218,7 @@ class TestContextManager(object):
 
 def _get_args():
   parser = argparse.ArgumentParser()
-  parser.add_argument('--project', required=True)
-  parser.add_argument('--staging_location', required=True)
-  parser.add_argument('--temp_location', required=True)
-  parser.add_argument('--logging_location', required=True)
-  parser.add_argument(
-      '--image',
-      help=('The name of the container image to run the test against it, for '
-            'example: gcr.io/gcp-variant-transforms-test/'
-            'gcp-variant-transforms:2018-01-20-13-47-12. '
-            'By default the production image {} is used.'
-           ).format(DEFAULT_IMAGE_NAME),
-      default=DEFAULT_IMAGE_NAME,
-      required=False)
+  run_tests_common.add_args(parser)
   parser.add_argument('--run_presubmit_tests',
                       type=bool, default=False, nargs='?', const=True,
                       help='If set, runs the presubmit_tests.')
@@ -309,17 +239,16 @@ def _get_args():
 
 
 def _get_test_configs(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> List
+  # type: (bool, bool) -> List[Dict]
   """Gets all test configs in integration directory and subdirectories."""
-  test_configs = []
+  required_keys = ['test_name', 'table_name', 'input_pattern',
+                   'assertion_configs']
   test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests)
-  for root, _, files in os.walk(test_file_path):
-    for filename in files:
-      if filename.endswith('.json'):
-        test_configs.append(_load_test_config(os.path.join(root, filename)))
-  if not test_configs:
-    raise TestCaseFailure('Found no .json files in directory {}'.format(
-        test_file_path))
+  test_configs = run_tests_common.get_configs(test_file_path, required_keys)
+  for test_config in test_configs:
+    assertion_configs = test_config['assertion_configs']
+    for assertion_config in assertion_configs:
+      _validate_assertion_config(assertion_config)
   return test_configs
 
 
@@ -336,26 +265,6 @@ def _get_test_file_path(run_presubmit_tests, run_all_tests):
   return test_file_path
 
 
-def _load_test_config(filename):
-  """Loads an integration test JSON object from a file."""
-  with open(filename, 'r') as f:
-    test = json.loads(f.read())
-    _validate_test(test, filename)
-    return test
-
-
-def _validate_test(test, filename):
-  required_keys = ['test_name', 'table_name', 'input_pattern',
-                   'assertion_configs']
-  for key in required_keys:
-    if key not in test:
-      raise ValueError('Test case in {} is missing required key: {}'.format(
-          filename, key))
-  assertion_configs = test['assertion_configs']
-  for assertion_config in assertion_configs:
-    _validate_assertion_config(assertion_config)
-
-
 def _validate_assertion_config(assertion_config):
   required_keys = ['query', 'expected_result']
   for key in required_keys:
@@ -364,67 +273,20 @@ def _validate_assertion_config(assertion_config):
           assertion_config, key))
 
 
-def _run_test(test, context):
-  # type: (TestCase, TestContextManager) -> None
-  if not context.revalidation_dataset_id:
-    test.run(context)
-  test.validate_table()
-
-
-def _print_errors(results):
-  """Prints results of test cases and tracebacks for any errors."""
-  errors = []
-  for result, test in results:
-    print '{} ...'.format(test.get_name()),
-    try:
-      _ = result.get()
-      print 'ok'
-    except TestCaseFailure as e:
-      print 'FAIL'
-      errors.append((test.get_name(), _get_traceback(str(e))))
-  for test_name, error in errors:
-    print _get_failure_message(test_name, error)
-  if errors:
-    return 1
-  else:
-    return 0
-
-
-def _get_traceback(message):
-  traceback_index = message.find('Traceback')
-  if traceback_index == -1:
-    # If error contains no traceback, provide the message for some context.
-    return message
-  return message[traceback_index:]
-
-
-def _get_failure_message(test_name, message):
-  """Prints a formatted message for failed tests."""
-  lines = [
-      '=' * 70,
-      'FAIL: {}'.format(test_name),
-      '-' * 70,
-      message,
-  ]
-  return '\n' + '\n'.join(lines) + '\n'
-
-
 def main():
   args = _get_args()
   test_case_configs = _get_test_configs(
       args.run_presubmit_tests, args.run_all_tests)
   with TestContextManager(args) as context:
-    pool = multiprocessing.Pool(processes=len(test_case_configs))
-    results = []
+    tests = []
     for config in test_case_configs:
-      test = TestCase(context, **config)
-      results.append(
-          (pool.apply_async(func=_run_test, args=(test, context)), test))
-
-    pool.close()
-    pool.join()
-
-  return _print_errors(results)
+      tests.append(VcfToBQTestCase(context, **config))
+    test_runner = run_tests_common.TestRunner(tests)
+    if not context.revalidation_dataset_id:
+      test_runner.run()
+    for test in tests:
+      test.validate_result()
+  return test_runner.print_results()
 
 
 if __name__ == '__main__':

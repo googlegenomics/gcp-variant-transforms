@@ -17,7 +17,9 @@ set -euo pipefail
 #
 # This script builds a Docker image from the current state of the local code,
 # pushes the image to a test registry (project 'gcp-variant-transforms-test')
-# and runs integration tests against that image.
+# and runs integration tests against that image. By default, only integration
+# tests for vcf_to_bq pipeline will run. To run the preprocessor integration
+# tests, use --run_preprocessor_tests options.
 #
 # To run this test successfully:
 # - The user's gcloud credentials should be set; follow the steps at:
@@ -33,6 +35,7 @@ KEEP_IMAGE_OPT="--keep_image"
 IMAGE_TAG_OPT="--image_tag"
 PROJECT_OPT="--project"
 RUN_UNIT_TEST_OPT="--run_unit_tests"
+RUN_PREPROCESSOR_TEST_OPT="--run_preprocessor_tests"
 SKIP_BUILD_OPT="--skip_build"
 image_tag=""
 keep_image=""
@@ -40,6 +43,7 @@ skip_build=""
 gs_dir="integration_test_runs"  # default GS dir to store logs, etc.
 project="gcp-variant-transforms-test"  # default project to use
 run_unit_tests=""  # By default do not run unit-tests.
+run_preprocessor_tests=""  # By default skip preprocessor integration tests.
 
 #################################################
 # Prints a given message with a color.
@@ -70,6 +74,7 @@ usage() {
   echo "    the image, create BigQuery tables, run Genomics pipelines etc."
   echo "    Default is gcp-variant-transforms-test."
   echo "  ${RUN_UNIT_TEST_OPT} runs the unit-tests before integration tests."
+  echo "  ${RUN_PREPROCESSOR_TEST_OPT} runs the preprocessor integration tests."
   echo "  ${SKIP_BUILD_OPT} skips the build step so it has to be used with "
   echo "    a valid tag_name passed through {$IMAGE_TAG_OPT}."
   echo "  This script should be run from the root of source tree."
@@ -80,9 +85,9 @@ usage() {
 # file exists.
 #################################################
 check_dir() {
-  local test_script="gcp_variant_transforms/testing/integration/run_tests.py"
+  local test_script="gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py"
   ls_script_file="$(ls ${test_script})" || true
-  dir_ok="$(echo "${ls_script_file}" | sed -e 's/.*run_tests.py$/MATCHED/')"
+  dir_ok="$(echo "${ls_script_file}" | sed -e 's/.*run_vcf_to_bq_tests.py$/MATCHED/')"
   if [[ "${dir_ok}" != "MATCHED" ]]; then
     usage
     color_print "ERROR: Cannot find ${test_script}" "${RED}"
@@ -141,6 +146,9 @@ parse_args() {
       shift
     elif [[ "$1" = "${RUN_UNIT_TEST_OPT}" ]]; then
       run_unit_tests="yes"  # can be any non-empty string
+      shift
+    elif [[ "$1" = "${RUN_PREPROCESSOR_TEST_OPT}" ]]; then
+      run_preprocessor_tests="yes"  # can be any non-empty string
       shift
     elif [[ "$1" = "${SKIP_BUILD_OPT}" ]]; then
       skip_build="yes"  # can be any non-empty string
@@ -210,13 +218,22 @@ if [[ -n "${run_unit_tests}" ]]; then
   python setup.py test
 fi
 pip install --upgrade .[int_test]
+
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
-python gcp_variant_transforms/testing/integration/run_tests.py \
+python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --project "${project}" \
     --staging_location "gs://${gs_dir}/staging" \
     --temp_location "gs://${gs_dir}/temp" \
     --logging_location "gs://${gs_dir}/temp/logs" \
     --image "${full_image_name}" ${TEST_ARGUMENTS}
 
+if [[ -n "${run_preprocessor_tests}" ]]; then
+  python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
+      --project "${project}" \
+      --staging_location "gs://${gs_dir}/staging" \
+      --temp_location "gs://${gs_dir}/temp" \
+      --logging_location "gs://${gs_dir}/temp/logs" \
+      --image "${full_image_name}" ${TEST_ARGUMENTS}
+fi
 color_print "$0 succeeded!" "${GREEN}"
 
