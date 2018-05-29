@@ -65,7 +65,8 @@ setuptools.setup(
         'int_test': INTEGRATION_TEST_REQUIREMENTS,
     },
     test_suite='nose.collector',
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(
+        exclude=('gcp_variant_transforms/testing')),
     package_data={
         'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
     },

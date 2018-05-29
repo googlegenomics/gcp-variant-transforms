@@ -63,12 +63,10 @@ class TestRunner(object):
     self._wait_for_all_operations_done()
 
   def _wait_for_all_operations_done(self):
-    """Waits until all operations of `service` are done."""
+    """Waits until all operations of `_operation_names` are done."""
     # pylint: disable=no-member
     operations = self._service.operations()
-    running_operation_names = set()
-    for operation_name in self._operation_names:
-      running_operation_names.add(operation_name)
+    running_operation_names = set(self._operation_names)
     while running_operation_names:
       time.sleep(10)
       for operation_name in self._operation_names:
@@ -170,22 +168,3 @@ def _validate_test(test, filename, required_keys):
     if key not in test:
       raise ValueError('Test case in {} is missing required key: {}'.format(
           filename, key))
-
-
-def _get_traceback(message):
-  traceback_index = message.find('Traceback')
-  if traceback_index == -1:
-    # If error contains no traceback, provide the message for some context.
-    return message
-  return message[traceback_index:]
-
-
-def _get_failure_message(test_name, message):
-  """Prints a formatted message for failed tests."""
-  lines = [
-      '=' * 70,
-      'FAIL: {}'.format(test_name),
-      '-' * 70,
-      message,
-  ]
-  return '\n' + '\n'.join(lines) + '\n'
