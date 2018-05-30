@@ -17,6 +17,8 @@ from __future__ import absolute_import
 import argparse  # pylint: disable=unused-import
 import re
 
+from apache_beam.io.filesystem import BeamIOError
+from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
@@ -97,10 +99,23 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
+    try:
+      # Gets at most one pattern match result of type `filesystems.MatchResult`.
+      first_match = FileSystems.match([parsed_args.input_pattern], [1])[0]
+      if not first_match.metadata_list:
+        raise ValueError(
+            'Input pattern {} returned '
+            'no matched files.'.format(parsed_args.input_pattern))
+    except BeamIOError:
+      # Retrieves the HttpError from BeamIOError.
+      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+          parsed_args.input_pattern))
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
+
+  _BQ_TABLE_URI = r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$'
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
@@ -145,8 +160,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
     output_table_re_match = re.match(
-        r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
-        parsed_args.output_table)
+        self._BQ_TABLE_URI, parsed_args.output_table)
     if not output_table_re_match:
       raise ValueError(
           'Expected a table reference (PROJECT:DATASET.TABLE) '
