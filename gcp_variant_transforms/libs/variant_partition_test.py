@@ -71,25 +71,25 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_boundaries(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_at_end.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_at_end.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     for i in range(partitioner.get_num_partitions()):
       self.assertTrue(partitioner.should_keep_partition(i))
 
-    # "chr1:0-1,000,000"
+    # 'chr1:0-1,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
     self.assertEqual(partitioner.get_partition('chr1', 999999), 0)
-    # "chr1:1,000,000-2,000,000"
+    # 'chr1:1,000,000-2,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 1000000), 1)
     self.assertEqual(partitioner.get_partition('chr1', 1999999), 1)
-    # "chr1:2,000,000-999,999,999"
+    # 'chr1:2,000,000-999,999,999'
     self.assertEqual(partitioner.get_partition('chr1', 2000000), 2)
     self.assertEqual(partitioner.get_partition('chr1', 999999998), 2)
     self.assertEqual(partitioner.get_partition('chr1', 999999999), 7)
 
-    # "chr2" OR "chr2_alternate_name1" OR "chr2_alternate_name2" OR "2".
+    # 'chr2' OR 'chr2_alternate_name1' OR 'chr2_alternate_name2' OR '2'.
     self.assertEqual(partitioner.get_partition('chr2', 0), 3)
     self.assertEqual(partitioner.get_partition('chr2', 999999999000), 3)
     self.assertEqual(
@@ -102,7 +102,7 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('2', 0), 3)
     self.assertEqual(partitioner.get_partition('2', 999999999000), 3)
 
-    # "C4" OR "cr5" OR "chr6:1,000,000-2,000,000"
+    # 'chr4' OR 'chr5' OR 'chr6:1,000,000-2,000,000'
     self.assertEqual(partitioner.get_partition('chr4', 0), 4)
     self.assertEqual(partitioner.get_partition('chr4', 999999999000), 4)
     self.assertEqual(partitioner.get_partition('chr5', 0), 4)
@@ -113,37 +113,33 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition('chr6', 999999), 7)
     self.assertEqual(partitioner.get_partition('chr6', 2000000), 7)
 
-    # "3:0-500,000"
+    # '3:0-500,000'
     self.assertEqual(partitioner.get_partition('3', 0), 5)
     self.assertEqual(partitioner.get_partition('3', 499999), 5)
-    # "3:500,000-1,000,000"
+    # '3:500,000-1,000,000'
     self.assertEqual(partitioner.get_partition('3', 500000), 6)
     self.assertEqual(partitioner.get_partition('3', 999999), 6)
     self.assertEqual(partitioner.get_partition('3', 1000000), 7)
 
   def test_config_case_insensitive(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_at_end.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_at_end.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     for i in range(partitioner.get_num_partitions()):
       self.assertTrue(partitioner.should_keep_partition(i))
 
-    # "chr1:0-1,000,000"
+    # 'chr1:0-1,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
     self.assertEqual(partitioner.get_partition('Chr1', 0), 0)
-    self.assertEqual(partitioner.get_partition('cHr1', 0), 0)
-    self.assertEqual(partitioner.get_partition('chR1', 0), 0)
     self.assertEqual(partitioner.get_partition('CHr1', 0), 0)
-    self.assertEqual(partitioner.get_partition('ChR1', 0), 0)
-    self.assertEqual(partitioner.get_partition('cHR1', 0), 0)
     self.assertEqual(partitioner.get_partition('CHR1', 0), 0)
 
   def test_config_get_partition_name(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_at_end.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_at_end.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
     for i in range(partitioner.get_num_partitions()):
@@ -161,8 +157,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_non_existent_partition_name(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_at_end.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_at_end.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 8)
 
@@ -175,23 +171,23 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_residual_partition_in_middle(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_in_middle.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_in_middle.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
     for i in range(partitioner.get_num_partitions()):
       self.assertTrue(partitioner.should_keep_partition(i))
 
-    # "chr1:0-1,000,000"
+    # 'chr1:0-1,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
     self.assertEqual(partitioner.get_partition('chr1', 999999), 0)
-    # "chr1:1,000,000-2,000,000"
+    # 'chr1:1,000,000-2,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 1000000), 2)
     self.assertEqual(partitioner.get_partition('chr1', 1999999), 2)
-    # "chr2" OR "ch2" OR "c2" OR "2"
+    # 'chr2' OR 'ch2' OR 'c2' OR '2'
     self.assertEqual(partitioner.get_partition('chr2', 0), 3)
     self.assertEqual(partitioner.get_partition('chr2', 999999999000), 3)
-    # "3:500,000-1,000,000"
+    # '3:500,000-1,000,000'
     self.assertEqual(partitioner.get_partition('3', 500000), 4)
     self.assertEqual(partitioner.get_partition('3', 999999), 4)
 
@@ -213,8 +209,8 @@ class VariantPartitionTest(unittest.TestCase):
 
   def test_config_residual_partition_absent(self):
     partitioner = variant_partition.VariantPartition(
-        "gcp_variant_transforms/testing/data/partition_configs/"
-        "residual_missing.yaml")
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_missing.yaml')
     self.assertFalse(partitioner.should_flatten())
     self.assertEqual(partitioner.get_num_partitions(), 5)
     # All partitions excpet the last one (dummy residual) should be kept.
@@ -222,16 +218,16 @@ class VariantPartitionTest(unittest.TestCase):
       self.assertTrue(partitioner.should_keep_partition(i))
     self.assertFalse(partitioner.should_keep_partition(5 - 1))
 
-    # "chr1:0-1,000,000"
+    # 'chr1:0-1,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 0), 0)
     self.assertEqual(partitioner.get_partition('chr1', 999999), 0)
-    # "chr1:1,000,000-2,000,000"
+    # 'chr1:1,000,000-2,000,000'
     self.assertEqual(partitioner.get_partition('chr1', 1000000), 1)
     self.assertEqual(partitioner.get_partition('chr1', 1999999), 1)
-    # "chr2" OR "ch2" OR "c2" OR "2"
+    # 'chr2' OR 'ch2' OR 'c2' OR '2'
     self.assertEqual(partitioner.get_partition('chr2', 0), 2)
     self.assertEqual(partitioner.get_partition('chr2', 999999999000), 2)
-    # "3:500,000-1,000,000"
+    # '3:500,000-1,000,000'
     self.assertEqual(partitioner.get_partition('3', 500000), 3)
     self.assertEqual(partitioner.get_partition('3', 999999), 3)
 
@@ -254,154 +250,163 @@ class VariantPartitionTest(unittest.TestCase):
   def test_config_failed_missing_region(self):
     tempdir = temp_dir.TempDir()
     missing_region = [
-        '-  partition:\n',
-        '     partition_name: "chr01_part1"\n',
-        '     regions:\n',
-        '       - "chr1:0-1,000,000"\n',
-        '-  partition:\n',
-        '     partition_name: "all_remaining"\n',
-        '     regions:\n',
-        '       - "residual"\n',
-        '-  partition:\n',
-        '     partition_name: "missing_region"\n',
-        '     regions:\n',
+        '-  partition:',
+        '     partition_name: "chr01_part1"',
+        '     regions:',
+        '       - "chr1:0-1,000,000"',
+        '-  partition:',
+        '     partition_name: "all_remaining"',
+        '     regions:',
+        '       - "residual"',
+        '-  partition:',
+        '     partition_name: "missing_region"',
+        '     regions:',
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Each partition must have at least one region.'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=missing_region))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_region)))
 
   def test_config_failed_missing_partition_name(self):
     tempdir = temp_dir.TempDir()
     missing_par_name = [
-        '-  partition:\n',
-        '     regions:\n',
-        '       - "chr1:0-1,000,000"\n',
+        '-  partition:',
+        '     regions:',
+        '       - "chr1:0-1,000,000"',
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Each partition must have partition_name field.'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=missing_par_name))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_par_name)))
     empty_par_name = [
-        '-  partition:\n',
-        '     partition_name: "          "\n',
-        '     regions:\n',
-        '       - "chr1:0-1,000,000"\n',
+        '-  partition:',
+        '     partition_name: "          "',
+        '     regions:',
+        '       - "chr1:0-1,000,000"',
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Partition name can not be empty string.'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=empty_par_name))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(empty_par_name)))
 
   def test_config_failed_duplicate_residual_partition(self):
     tempdir = temp_dir.TempDir()
     duplicate_residual = [
-        '-  partition:\n',
-        '     partition_name: "all_remaining"\n',
-        '     regions:\n',
-        '       - "residual"\n',
-        '-  partition:\n',
-        '     partition_name: "chr01"\n',
-        '     regions:\n',
-        '       - "chr1"\n',
-        '-  partition:\n',
-        '     partition_name: "all_remaining_2"\n',
-        '     regions:\n',
-        '       - "residual"\n',
+        '-  partition:',
+        '     partition_name: "all_remaining"',
+        '     regions:',
+        '       - "residual"',
+        '-  partition:',
+        '     partition_name: "chr01"',
+        '     regions:',
+        '       - "chr1"',
+        '-  partition:',
+        '     partition_name: "all_remaining_2"',
+        '     regions:',
+        '       - "residual"',
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'There must be only one residual partition.'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=duplicate_residual))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(duplicate_residual)))
 
   def test_config_failed_overlapping_regions(self):
     tempdir = temp_dir.TempDir()
     overlapping_regions = [
-        '-  partition:\n',
-        '     partition_name: "chr01_part1"\n',
-        '     regions:\n',
-        '       - "chr1:0-1,000,000"\n',
-        '-  partition:\n',
-        '     partition_name: "chr01_part2_overlapping"\n',
-        '     regions:\n',
-        '       - "chr1:999,999-2,000,000"\n',
+        '-  partition:',
+        '     partition_name: "chr01_part1"',
+        '     regions:',
+        '       - "chr1:0-1,000,000"',
+        '-  partition:',
+        '     partition_name: "chr01_part2_overlapping"',
+        '     regions:',
+        '       - "chr1:999,999-2,000,000"',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=overlapping_regions))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(overlapping_regions)))
 
     full_and_partial = [
-        '-  partition:\n',
-        '     partition_name: "chr01_full"\n',
-        '     regions:\n',
-        '       - "chr1"\n',
-        '-  partition:\n',
-        '     partition_name: "chr01_part_overlapping"\n',
-        '     regions:\n',
-        '       - "chr1:1,000,000-2,000,000"\n',
+        '-  partition:',
+        '     partition_name: "chr01_full"',
+        '     regions:',
+        '       - "chr1"',
+        '-  partition:',
+        '     partition_name: "chr01_part_overlapping"',
+        '     regions:',
+        '       - "chr1:1,000,000-2,000,000"',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=full_and_partial))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(full_and_partial)))
 
     partial_and_full = [
-        '-  partition:\n',
-        '     partition_name: "chr01_part"\n',
-        '     regions:\n',
-        '       - "chr1:1,000,000-2,000,000"\n',
-        '-  partition:\n',
-        '     partition_name: "chr01_full_overlapping"\n',
-        '     regions:\n',
-        '       - "chr1"\n',
+        '-  partition:',
+        '     partition_name: "chr01_part"',
+        '     regions:',
+        '       - "chr1:1,000,000-2,000,000"',
+        '-  partition:',
+        '     partition_name: "chr01_full_overlapping"',
+        '     regions:',
+        '       - "chr1"',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=partial_and_full))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(partial_and_full)))
 
     full_and_full = [
-        '-  partition:\n',
-        '     partition_name: "chr01_full"\n',
-        '     regions:\n',
-        '       - "chr1"\n',
-        '-  partition:\n',
-        '     partition_name: "chr02_part"\n',
-        '     regions:\n',
-        '       - "chr2:1,000,000-2,000,000"\n',
-        '-  partition:\n',
-        '     partition_name: "chr01_full_redundant"\n',
-        '     regions:\n',
-        '       - "chr1"\n',
+        '-  partition:',
+        '     partition_name: "chr01_full"',
+        '     regions:',
+        '       - "chr1"',
+        '-  partition:',
+        '     partition_name: "chr02_part"',
+        '     regions:',
+        '       - "chr2:1,000,000-2,000,000"',
+        '-  partition:',
+        '     partition_name: "chr01_full_redundant"',
+        '     regions:',
+        '       - "chr1"',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Cannot add overlapping region *'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=full_and_full))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(full_and_full)))
 
   def test_config_failed_duplicate_table_name(self):
     tempdir = temp_dir.TempDir()
     dup_table_name = [
-        '-  partition:\n',
-        '     partition_name: "duplicate_name"\n',
-        '     regions:\n',
-        '       - "chr1:0-1,000,000"\n',
-        '-  partition:\n',
-        '     partition_name: "all_remaining"\n',
-        '     regions:\n',
-        '       - "residual"\n',
-        '-  partition:\n',
-        '     partition_name: "duplicate_name"\n',
-        '     regions:\n',
-        '       - "chr1:1,000,000-2,000,000"\n',
+        '-  partition:',
+        '     partition_name: "duplicate_name"',
+        '     regions:',
+        '       - "chr1:0-1,000,000"',
+        '-  partition:',
+        '     partition_name: "all_remaining"',
+        '     regions:',
+        '       - "residual"',
+        '-  partition:',
+        '     partition_name: "duplicate_name"',
+        '     regions:',
+        '       - "chr1:1,000,000-2,000,000"',
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Partition names must be unique *'):
       _ = variant_partition.VariantPartition(
-          tempdir.create_temp_file(suffix='.yaml', lines=dup_table_name))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(dup_table_name)))
