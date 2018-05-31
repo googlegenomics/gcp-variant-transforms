@@ -29,7 +29,7 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
-_DEFAULT_ZONES = ['us-west1-b']
+_DEFAULT_ZONES = ['us-east1-b']
 
 
 class TestCaseFailure(Exception):
