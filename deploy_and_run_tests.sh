@@ -213,11 +213,11 @@ export VIRTUAL_ENV_DISABLE_PROMPT="something"
 virtualenv "${temp_dir}"
 source ${temp_dir}/bin/activate;
 trap clean_up EXIT
-pip install --upgrade .[int_test]
 if [[ -n "${run_unit_tests}" ]]; then
   pip install --upgrade .
   python setup.py test
 fi
+pip install --upgrade .[int_test]
 
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
@@ -233,7 +233,6 @@ if [[ -n "${run_preprocessor_tests}" ]]; then
       --staging_location "gs://${gs_dir}/staging" \
       --temp_location "gs://${gs_dir}/temp" \
       --logging_location "gs://${gs_dir}/temp/logs" \
-      --image "${full_image_name}" ${TEST_ARGUMENTS}
+      --image "${full_image_name}"
 fi
 color_print "$0 succeeded!" "${GREEN}"
-
