@@ -385,3 +385,16 @@ class PreprocessOptions(VariantTransformsOptions):
         help=('The full path of the resolved headers. The file will not be'
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
+
+class PartitionOptions(VariantTransformsOptions):
+  """Options for partitioning Variant records."""
+
+  def add_arguments(self, parser):
+    parser.add_argument(
+        '--partition_config_path',
+        default='',
+        help=('File containing list of partitions and output table names. You '
+              'can use provided default partition_config file to split output '
+              'by chromosome (one table per chromosome) which is located at: '
+              'gcp_variant_transforms/data/partition_configs/'
+              'homo_sapiens_default.yaml'))
