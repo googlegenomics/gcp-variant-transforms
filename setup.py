@@ -26,6 +26,10 @@ REQUIRED_PACKAGES = [
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
     'mmh3<2.6',
+    # Need to explicitly install v<=1.2.0. apache-beam requires
+    # google-cloud-pubsub 0.26.0, which relies on google-cloud-core<0.26dev,
+    # >=0.25.0. google-cloud-storage also has requirements on google-cloud-core,
+    # and version 1.2.0 resolves the dependency conflicts.
     'google-cloud-storage<=1.2.0'
 ]
 
