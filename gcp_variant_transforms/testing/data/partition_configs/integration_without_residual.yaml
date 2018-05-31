@@ -1,0 +1,16 @@
+-  partition:
+     partition_name: "chr19_1M"
+     regions:
+       - "chr19:0-1,000,000"
+-  partition:
+     partition_name: "chr05_1M"
+     regions:
+       - "chr5:0-1,000,000"
+-  partition:
+     partition_name: "chr07_1M"
+     regions:
+       - "chr7:0-1,000,000"
+-  partition:
+     partition_name: "chr01_1M"
+     regions:
+       - "chr1:0-1,000,000"
