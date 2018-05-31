@@ -1,0 +1,12 @@
+{
+  "test_name": "report-malformed-records",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS-empty.vcf",
+  "report_all_conflicts": "True",
+  "report_blob_name": "temp/report_malformed_records.tsv",
+  "runner": "DataflowRunner",
+  "expected_headlines": [
+    "No Header Conflicts Found.",
+    "No Undefined Headers Found.",
+    "Malformed Records"
+  ]
+}

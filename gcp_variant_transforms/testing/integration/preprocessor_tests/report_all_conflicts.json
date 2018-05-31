@@ -1,0 +1,12 @@
+{
+  "test_name": "report-all-conflicts",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/preprocessor/*.vcf",
+  "report_all_conflicts": "True",
+  "report_blob_name": "temp/report_all_conflicts.tsv",
+  "runner": "DataflowRunner",
+  "expected_headlines": [
+    "Header Conflicts",
+    "Undefined Headers",
+    "Malformed Records"
+  ]
+}

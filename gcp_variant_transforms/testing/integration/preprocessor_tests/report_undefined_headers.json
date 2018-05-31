@@ -1,0 +1,12 @@
+{
+  "test_name": "report-undefined-headers",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
+  "report_all_conflicts": "True",
+  "report_blob_name": "temp/report_undefined_headers.tsv",
+  "runner": "DataflowRunner",
+  "expected_headlines": [
+    "No Header Conflicts Found.",
+    "Undefined Headers",
+    "No Malformed Records Found."
+  ]
+}

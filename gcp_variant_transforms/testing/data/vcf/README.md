@@ -34,3 +34,7 @@ FORMAT field are not defined in VCF header.
 
 `incompatible-field-value.vcf` is used to test the case where values provided
 for the fields does not match the definition. Checkout fields `NS` and `DB`.
+
+The folder `preprocessor` is created to test vcf to bq preprocessor. The
+conflicting header definitions (`ID=GQ`), missing header definitions (`FT`), and
+malformed records (last variant) are created intentionally.
