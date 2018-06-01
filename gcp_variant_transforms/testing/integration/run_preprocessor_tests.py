@@ -35,6 +35,7 @@ It runs all integration tests inside
 import argparse
 import os
 import sys
+from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
 from google.cloud import storage
@@ -63,15 +64,18 @@ class PreprocessorTestCase(object):
     self._keep_reports = parser_args.keep_reports
     self._name = test_name
     self._expected_contents = expected_contents
-    self._report_path = '/'.join(['gs:/', _BUCKET_NAME, blob_name])
-    self._blob_name = blob_name
+    suffix = '_integration_tests_{}'.format(
+        datetime.now().strftime('%Y%m%d_%H%M%S'))
+    self._blob_name = ''.join([blob_name, suffix])
+    self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._blob_name])
     self._project = parser_args.project
     args = ['--input_pattern {}'.format(input_pattern),
             '--report_path {}'.format(self._report_path),
             '--project {}'.format(parser_args.project),
             '--staging_location {}'.format(parser_args.staging_location),
             '--temp_location {}'.format(parser_args.temp_location),
-            '--job_name {}'.format(test_name)]
+            '--job_name {}'.format(
+                ''.join([test_name, suffix]).replace('_', '-'))]
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
