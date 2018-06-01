@@ -11,6 +11,14 @@
      regions:
        - "chr7:0-1,000,000"
 -  partition:
-     partition_name: "chr01_1M"
+     partition_name: "chr01_100M"
      regions:
-       - "chr1:0-1,000,000"
+       - "chr1:0-100,000,000"
+-  partition:
+     partition_name: "chr01_200M"
+     regions:
+       - "chr1:100,000,000-200,000,000"
+-  partition:
+     partition_name: "chr01_remaining"
+     regions:
+       - "chr1:200,000,000-999,999,999"
