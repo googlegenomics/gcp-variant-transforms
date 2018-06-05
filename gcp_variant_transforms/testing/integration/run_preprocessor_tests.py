@@ -56,17 +56,17 @@ class PreprocessorTestCase(object):
                parser_args,  # type: Namespace
                test_name,  # type: str
                input_pattern,  # type: str
-               expected_headlines,  # type: List[str]
+               expected_contents,  # type: List[str]
                report_blob_name,  # type: str
                **kwargs  # type: **str
               ):
     # type: (...) -> None
     self._keep_reports = parser_args.keep_reports
     self._name = test_name
-    self._expected_headlines = expected_headlines
+    self._expected_contents = expected_contents
     suffix = '_integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
-    self._report_blob_name = self._append_suffix(suffix, report_blob_name)
+    self._report_blob_name = self._append_suffix(report_blob_name, suffix)
     self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._report_blob_name])
     self._project = parser_args.project
     args = ['--input_pattern {}'.format(input_pattern),
@@ -108,11 +108,11 @@ class PreprocessorTestCase(object):
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {}'.format(self._report_path))
     contents = report_blob.download_as_string()
-    for expected_headline in self._expected_headlines:
-      if expected_headline not in contents:
-        raise run_tests_common.TestCaseFailure(
-            'Contents headlines mismatch: expected {}, got {}'.format(
-                expected_headline, contents))
+    expected_contents = ''.join(self._expected_contents)
+    if expected_contents != contents:
+      raise run_tests_common.TestCaseFailure(
+          'Contents mismatch: expected {}, got {}'.format(
+              expected_contents, contents))
     if not self._keep_reports:
       report_blob.delete()
 
@@ -128,7 +128,7 @@ class PreprocessorTestCase(object):
   def get_name(self):
     return self._name
 
-  def _append_suffix(self, suffix, file_path):
+  def _append_suffix(self, file_path, suffix):
     # type: (str, str) -> str
     file_name, file_extension = os.path.splitext(file_path)
     return ''.join([file_name, suffix, file_extension])
@@ -139,8 +139,8 @@ def _get_args():
   run_tests_common.add_args(parser)
   parser.add_argument('--keep_reports',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, generated reports and resolved headers are '
-                           'not deleted.')
+                      help=('If set, generated reports and resolved headers '
+                            'are not deleted.'))
   return parser.parse_args()
 
 
@@ -148,7 +148,7 @@ def _get_test_configs():
   # type: () -> List[Dict]
   """Gets all test configs in preprocessor_tests."""
   required_keys = ['test_name', 'report_blob_name', 'input_pattern',
-                   'expected_headlines']
+                   'expected_contents']
   test_file_path = os.path.join(os.getcwd(), _TEST_FOLDER)
   return run_tests_common.get_configs(test_file_path, required_keys)
 

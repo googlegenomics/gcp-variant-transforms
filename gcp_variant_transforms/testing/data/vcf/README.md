@@ -37,4 +37,10 @@ for the fields does not match the definition. Checkout fields `NS` and `DB`.
 
 The folder `preprocessor` is created to test vcf to bq preprocessor. The
 conflicting header definitions (`ID=GQ`), missing header definitions (`FT`), and
-malformed records (last variant) are created intentionally.
+malformed records (last variant) are created intentionally. To be more specific,
+`invalid-4.0.vcf` is a similar copy of `valid-4.0.vcf` with the following
+modifications:
+1. The type of field `ID=GQ` is changed from `Integer` to `Float`.
+2. The penultimate variant has replaced `HQ` with `FT` in the FORMAT, which is
+not defined in the header.
+3. The `POS` value is removed from the last variant.

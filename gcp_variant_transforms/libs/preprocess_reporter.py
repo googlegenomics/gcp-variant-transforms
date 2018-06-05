@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generates preprocess report.
+"""Generates preprocess report (sorted).
 
 The report is aimed to help the user to easily import the malformed/incompatible
 VCF files. It contains three parts and each of them reports one type of error.
@@ -166,7 +166,7 @@ def _append_inferred_headers_to_report(file_to_write, inferred_headers):
 
 def _append_malformed_records_to_report(file_to_write, malformed_records):
   # type: (file, Optional[List[MalformedVcfRecord]]) -> None
-  """Appends the human readable malformed records to the report.
+  """Appends the human readable malformed records (sorted) to the report.
 
   Output example:
   Malformed Records
@@ -175,9 +175,10 @@ def _append_malformed_records_to_report(file_to_write, malformed_records):
   """
   if malformed_records is not None:
     content_lines = []
-    for record in malformed_records:
+    sorted_malformed_records = sorted(malformed_records)
+    for record in sorted_malformed_records:
       content_lines.append(_DELIMITER.join([record.file_name,
-                                            record.line,
+                                            record.line.replace('\t', ' '),
                                             record.error]))
     _append_to_report(file_to_write, _InconsistencyType.MALFORMED_RECORDS,
                       _HeaderLine.MALFORMED_RECORDS_HEADER, content_lines)
@@ -189,7 +190,7 @@ def _generate_conflicting_headers_lines(
     category  # type: str
     ):
   # type: (...) -> List[str]
-  """Returns the conflicting headers lines for the report.
+  """Returns the conflicting headers lines (sorted) for the report.
 
   Each conflicting header record is structured into columns(TAB separated
   values): the ID, the category('FOMRAT' or 'INFO'), conflicting definitions,
@@ -204,24 +205,27 @@ def _generate_conflicting_headers_lines(
                     num=1 type=Integer   file2
   """
   content_lines = []
-  for field_id, definitions_to_files_map in conflicts.iteritems():
+  sorted_field_ids = sorted(conflicts.keys())
+  for field_id in sorted_field_ids:
+    sorted_definitions = sorted(conflicts.get(field_id).keys())
     first_item = True
-    for definition, file_names in definitions_to_files_map.iteritems():
+    for definition in sorted_definitions:
+      sorted_file_names = sorted(conflicts.get(field_id).get(definition))
       if first_item:
         row = [field_id,
                category,
                _format_definition(definition.num, definition.type),
-               file_names[0],
+               sorted_file_names[0],
                _extract_resolution(resolved_headers, field_id)]
         first_item = False
       else:
         row = [_PADDING_CHARACTER,
                _PADDING_CHARACTER,
                _format_definition(definition.num, definition.type),
-               file_names[0],
+               sorted_file_names[0],
                _PADDING_CHARACTER]
       content_lines.append(_DELIMITER.join(row))
-      for file_name in file_names[1:]:
+      for file_name in sorted_file_names[1:]:
         row = [_PADDING_CHARACTER,
                _PADDING_CHARACTER,
                _PADDING_CHARACTER,
@@ -233,7 +237,7 @@ def _generate_conflicting_headers_lines(
 
 def _generate_inferred_headers_lines(inferred_headers, category):
   # type: (Dict[str, Dict[str, Union[str, int]]], str) -> List[str]
-  """Returns the inferred headers lines for the report.
+  """Returns the inferred headers lines (sorted) for the report.
 
   The field ID, category (FORMAT or INFO), and the inferred header definitions
   are included in the contents.
@@ -241,7 +245,8 @@ def _generate_inferred_headers_lines(inferred_headers, category):
   GT    INFO    num=1 type=Float
   """
   content_lines = []
-  for field_id in inferred_headers.keys():
+  sorted_inferred_header_ids = sorted(inferred_headers.keys())
+  for field_id in sorted_inferred_header_ids:
     row = [field_id,
            category,
            _extract_resolution(inferred_headers, field_id)]

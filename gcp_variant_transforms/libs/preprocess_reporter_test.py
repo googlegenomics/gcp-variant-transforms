@@ -52,7 +52,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                           malformed_records)
       with FileSystems.open(file_path) as f:
         reader = f.readlines()
-        self.assertItemsEqual(reader, expected_content)
+        self.assertEqual(reader, expected_content)
 
   def test_report_no_conflicts(self):
     header_definitions = merge_header_definitions.VcfHeaderDefinitions()

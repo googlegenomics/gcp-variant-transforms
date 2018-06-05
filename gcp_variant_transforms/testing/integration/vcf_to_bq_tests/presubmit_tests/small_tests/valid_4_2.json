@@ -2,7 +2,7 @@
   "test_name": "valid-4-2",
   "table_name": "valid_4_2",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
-  "runner": "DataflowRunner",
+  "runner": "DirectRunner",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
