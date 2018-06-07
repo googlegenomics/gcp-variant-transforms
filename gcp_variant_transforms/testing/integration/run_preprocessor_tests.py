@@ -57,7 +57,8 @@ class PreprocessorTestCase(object):
                test_name,  # type: str
                input_pattern,  # type: str
                expected_contents,  # type: List[str]
-               blob_name,  # type: str
+               report_blob_name,  # type: str
+               header_blob_name=None,  # type: str
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -66,8 +67,8 @@ class PreprocessorTestCase(object):
     self._expected_contents = expected_contents
     suffix = '_integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
-    self._blob_name = ''.join([blob_name, suffix])
-    self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._blob_name])
+    self._report_blob_name = self._append_suffix(report_blob_name, suffix)
+    self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._report_blob_name])
     self._project = parser_args.project
     args = ['--input_pattern {}'.format(input_pattern),
             '--report_path {}'.format(self._report_path),
@@ -76,6 +77,14 @@ class PreprocessorTestCase(object):
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(
                 ''.join([test_name, suffix]).replace('_', '-'))]
+    self._header_blob_name = None
+    self._header_path = None
+    if header_blob_name:
+      self._header_blob_name = self._append_suffix(header_blob_name, suffix)
+      self._header_path = '/'.join(['gs:/',
+                                    _BUCKET_NAME,
+                                    self._header_blob_name])
+      args.append('--resolved_headers_path {}'.format(self._header_path))
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
@@ -88,24 +97,40 @@ class PreprocessorTestCase(object):
 
     - Checks that the report is generated.
     - Validates report's contents are the same as `expected_contents`.
+    - Checks that the resolved headers are generated if `header_blob_name` is
+      specified in the test.
     """
     client = storage.Client(self._project)
     bucket = client.get_bucket(_BUCKET_NAME)
-    blob = bucket.get_blob(self._blob_name)
-    if not blob.exists(client):
+    report_blob = bucket.get_blob(self._report_blob_name)
+    if not report_blob:
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {}'.format(self._report_path))
-    contents = blob.download_as_string()
-    expected_contents = ''.join(self._expected_contents)
+    contents = report_blob.download_as_string()
+    expected_contents = '\n'.join(self._expected_contents)
     if expected_contents != contents:
       raise run_tests_common.TestCaseFailure(
           'Contents mismatch: expected {}, got {}'.format(
               expected_contents, contents))
     if not self._keep_reports:
-      blob.delete()
+      report_blob.delete()
+
+    if self._header_blob_name:
+      resolved_headers_blob = bucket.get_blob(self._header_blob_name)
+      if not resolved_headers_blob:
+        raise run_tests_common.TestCaseFailure(
+            'The resolved header is not generated in {}'.format(
+                self._header_path))
+      if not self._keep_reports:
+        resolved_headers_blob.delete()
 
   def get_name(self):
     return self._name
+
+  def _append_suffix(self, file_path, suffix):
+    # type: (str, str) -> str
+    file_name, file_extension = os.path.splitext(file_path)
+    return ''.join([file_name, suffix, file_extension])
 
 
 def _get_args():
@@ -113,14 +138,15 @@ def _get_args():
   run_tests_common.add_args(parser)
   parser.add_argument('--keep_reports',
                       type=bool, default=False, nargs='?', const=True,
-                      help='If set, generated reports are not deleted.')
+                      help=('If set, generated reports and resolved headers '
+                            'are not deleted.'))
   return parser.parse_args()
 
 
 def _get_test_configs():
   # type: () -> List[Dict]
   """Gets all test configs in preprocessor_tests."""
-  required_keys = ['test_name', 'blob_name', 'input_pattern',
+  required_keys = ['test_name', 'report_blob_name', 'input_pattern',
                    'expected_contents']
   test_file_path = os.path.join(os.getcwd(), _TEST_FOLDER)
   return run_tests_common.get_configs(test_file_path, required_keys)

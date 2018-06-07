@@ -1,7 +1,8 @@
 {
-  "test_name": "no-conflicts",
+  "test_name": "option-resolved-headers-path",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
-  "report_blob_name": "temp/report_no_conflicts.tsv",
+  "header_blob_name": "temp/resolved_headers.vcf",
+  "report_blob_name": "temp/report_option_resolved_headers.tsv",
   "runner": "DirectRunner",
   "expected_contents": [
     "No Header Conflicts Found.",

@@ -1,0 +1,18 @@
+{
+  "test_name": "report-malformed-records",
+  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS-empty.vcf",
+  "report_all_conflicts": "True",
+  "report_blob_name": "temp/report_malformed_records.tsv",
+  "runner": "DirectRunner",
+  "expected_contents": [
+    "No Header Conflicts Found.",
+    "",
+    "No Undefined Headers Found.",
+    "",
+    "Malformed Records",
+    "File Path\tVariant Record\tError Message",
+    "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS-empty.vcf\t20  rs6054257 G A 29 PASS NS=3;DP=14;AF=0.5;DB;H2 GT:GQ:DP:HQ 0|0:48:1:51,51 1|0:48:8:51,51 1/1:43:5:.,.\tinvalid literal for int() with base 10: ''",
+    "",
+    ""
+  ]
+}
