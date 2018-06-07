@@ -2,9 +2,10 @@
   "test_name": "no-conflicts",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
   "report_blob_name": "temp/report_no_conflicts.tsv",
-  "runner": "DirectRunner",
+  "runner": "DataflowRunner",
   "expected_contents": [
-    "No Header Conflicts Found.\n",
-    "\n"
+    "No Header Conflicts Found.",
+    "",
+    ""
   ]
 }

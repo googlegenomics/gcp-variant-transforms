@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generates preprocess report (sorted).
+"""Generates preprocess report.
 
 The report is aimed to help the user to easily import the malformed/incompatible
 VCF files. It contains three parts and each of them reports one type of error.
@@ -175,8 +175,7 @@ def _append_malformed_records_to_report(file_to_write, malformed_records):
   """
   if malformed_records is not None:
     content_lines = []
-    sorted_malformed_records = sorted(malformed_records)
-    for record in sorted_malformed_records:
+    for record in sorted(malformed_records):
       content_lines.append(_DELIMITER.join([record.file_name,
                                             record.line.replace('\t', ' '),
                                             record.error]))
@@ -205,11 +204,9 @@ def _generate_conflicting_headers_lines(
                     num=1 type=Integer   file2
   """
   content_lines = []
-  sorted_field_ids = sorted(conflicts.keys())
-  for field_id in sorted_field_ids:
-    sorted_definitions = sorted(conflicts.get(field_id).keys())
+  for field_id in sorted(conflicts.keys()):
     first_item = True
-    for definition in sorted_definitions:
+    for definition in sorted(conflicts.get(field_id).keys()):
       sorted_file_names = sorted(conflicts.get(field_id).get(definition))
       if first_item:
         row = [field_id,
@@ -245,8 +242,7 @@ def _generate_inferred_headers_lines(inferred_headers, category):
   GT    INFO    num=1 type=Float
   """
   content_lines = []
-  sorted_inferred_header_ids = sorted(inferred_headers.keys())
-  for field_id in sorted_inferred_header_ids:
+  for field_id in sorted(inferred_headers.keys()):
     row = [field_id,
            category,
            _extract_resolution(inferred_headers, field_id)]

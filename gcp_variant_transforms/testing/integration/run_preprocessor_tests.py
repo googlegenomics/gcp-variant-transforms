@@ -58,6 +58,7 @@ class PreprocessorTestCase(object):
                input_pattern,  # type: str
                expected_contents,  # type: List[str]
                report_blob_name,  # type: str
+               header_blob_name=None,  # type: str
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -76,18 +77,16 @@ class PreprocessorTestCase(object):
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(
                 ''.join([test_name, suffix]).replace('_', '-'))]
-
     self._header_blob_name = ''
     self._header_path = ''
+    if header_blob_name:
+      self._header_blob_name = self._append_suffix(header_blob_name, suffix)
+      self._header_path = '/'.join(['gs:/',
+                                    _BUCKET_NAME,
+                                    self._header_blob_name])
+      args.append('--resolved_headers_path {}'.format(self._header_path))
     for k, v in kwargs.iteritems():
-      if k == 'header_blob_name':
-        self._header_blob_name = self._append_suffix(v, suffix)
-        self._header_path = '/'.join(['gs:/',
-                                      _BUCKET_NAME,
-                                      self._header_blob_name])
-        args.append('--resolved_headers_path {}'.format(self._header_path))
-      else:
-        args.append('--{} {}'.format(k, v))
+      args.append('--{} {}'.format(k, v))
 
     self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
         parser_args.project, parser_args.logging_location, parser_args.image,
@@ -97,9 +96,9 @@ class PreprocessorTestCase(object):
     """Validates the results.
 
     - Checks that the report is generated.
-    - Validates report's contents contain the strings in `expected_headlines`.
+    - Validates report's contents are the same as `expected_contents`.
     - Checks that the resolved headers are generated if `header_blob_name` is
-    specified in the test.
+      specified in the test.
     """
     client = storage.Client(self._project)
     bucket = client.get_bucket(_BUCKET_NAME)
@@ -108,7 +107,7 @@ class PreprocessorTestCase(object):
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {}'.format(self._report_path))
     contents = report_blob.download_as_string()
-    expected_contents = ''.join(self._expected_contents)
+    expected_contents = '\n'.join(self._expected_contents)
     if expected_contents != contents:
       raise run_tests_common.TestCaseFailure(
           'Contents mismatch: expected {}, got {}'.format(
