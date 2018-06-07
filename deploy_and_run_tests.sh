@@ -226,7 +226,7 @@ python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --temp_location "gs://${gs_dir}/temp" \
     --logging_location "gs://${gs_dir}/temp/logs" \
     --image "${full_image_name}" ${TEST_ARGUMENTS} &
-pid_vcf_to_bq=$!
+pid_vcf_to_bq="$!"
 if [[ -n "${run_preprocessor_tests}" ]]; then
   python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
       --project "${project}" \
@@ -235,8 +235,11 @@ if [[ -n "${run_preprocessor_tests}" ]]; then
       --logging_location "gs://${gs_dir}/temp/logs" \
       --image "${full_image_name}" &
 fi
-pid_preprocess=$!
-if wait $pid_vcf_to_bq && wait $pid_preprocess; then
+# `pid_preprocess` could be the same as `pid_vcf_to_bq` if preprocessor tests
+# are not run.
+pid_preprocess="$!"
+if wait "${pid_vcf_to_bq}" && wait "${pid_preprocess}"; then
   color_print "$0 succeeded!" "${GREEN}"
-else exit 1
+else
+  exit 1
 fi
