@@ -77,8 +77,8 @@ class PreprocessorTestCase(object):
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(
                 ''.join([test_name, suffix]).replace('_', '-'))]
-    self._header_blob_name = ''
-    self._header_path = ''
+    self._header_blob_name = None
+    self._header_path = None
     if header_blob_name:
       self._header_blob_name = self._append_suffix(header_blob_name, suffix)
       self._header_path = '/'.join(['gs:/',
