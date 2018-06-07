@@ -125,9 +125,3 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
     self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_run_not_set(self):
-    args = self._make_args(['--annotation_output_dir', 'gs://GOOD_DIR',
-                            '--vep_image_uri', 'AN_IMAGE',
-                            '--vep_cache_path', 'gs://VEP_CACHE'])
-    self.assertRaises(ValueError, self._options.validate, args)

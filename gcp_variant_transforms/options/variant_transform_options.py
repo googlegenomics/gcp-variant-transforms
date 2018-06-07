@@ -224,11 +224,12 @@ class AnnotationOptions(VariantTransformsOptions):
               'structure as input files with a suffix added to them.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default="",
+        default='gcr.io/gcp-variant-annotation/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
-        default="",
+        default=('gs://gcp-variant-annotation-vep_cache/'
+                 'vep_cache_homo_sapiens_GRCh38_91.tar.gz'),
         help=('The path for VEP cache on Google Cloud Storage.'))
     parser.add_argument(
         '--vep_info_field',
@@ -258,15 +259,6 @@ class AnnotationOptions(VariantTransformsOptions):
       if not vep_cache or not vep_cache.startswith('gs://'):
         raise ValueError('Flag {} should start with gs://, got {}'.format(
             AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
-    else:
-      for flag in [AnnotationOptions._VEP_IMAGE_FLAG,
-                   AnnotationOptions._VEP_CACHE_FLAG,
-                   AnnotationOptions._OUTPUT_DIR_FLAG]:
-        if flag not in args_dict:
-          raise AssertionError('Flag {} not found in args_dict.'.format(flag))
-        if args_dict[flag]:
-          raise ValueError('Flag {} is set but {} is not.'.format(
-              flag, AnnotationOptions._RUN_FLAG))
 
 
 class FilterOptions(VariantTransformsOptions):
