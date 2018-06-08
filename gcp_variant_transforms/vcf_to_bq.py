@@ -268,6 +268,7 @@ def run(argv=None):
              variant_merger,
              processed_variant_factory,
              append=known_args.append,
+             update_schema_on_append=known_args.update_schema_on_append,
              allow_incompatible_records=known_args.allow_incompatible_records,
              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
              num_bigquery_write_shards=known_args.num_bigquery_write_shards))
