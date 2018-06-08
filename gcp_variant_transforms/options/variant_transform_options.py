@@ -114,7 +114,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'overwritten. New records will be appended to those that '
               'already exist.'))
     parser.add_argument(
-        '--update_schema',
+        '--update_schema_on_append',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, BigQuery schema will be updated by combining the '
               'existing schema and the new schema if they are compatible. '
@@ -162,8 +162,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         raise
     # Ensuring given output table doesn't already exist to avoid overwriting it.
     if not parsed_args.append:
-      if parsed_args.update_schema:
-        raise ValueError('--update_schema requires --append to be true.')
+      if parsed_args.update_schema_on_append:
+        raise ValueError('--update_schema_on_append requires --append to be '
+                         'true.')
       try:
         client.tables.Get(bigquery.BigqueryTablesGetRequest(
             projectId=project_id,

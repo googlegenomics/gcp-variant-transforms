@@ -73,7 +73,7 @@ class VariantToBigQuery(beam.PTransform):
       variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
       proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
       append=False,  # type: bool
-      update_schema=False,  # type: bool
+      update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1  # type: int
@@ -93,8 +93,8 @@ class VariantToBigQuery(beam.PTransform):
         The latter functionality is what is needed here.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
-      update_schema: If true, BigQuery schema will be updated by combining the
-        existing schema and the new schema if they are compatible.
+      update_schema_on_append: If true, BigQuery schema will be updated by
+        combining the existing schema and the new schema if they are compatible.
       allow_incompatible_records: If true, field values are casted to Bigquery
 +       schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
@@ -119,7 +119,8 @@ class VariantToBigQuery(beam.PTransform):
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._num_bigquery_write_shards = num_bigquery_write_shards
-    self._update_bigquery_schema(update_schema)
+    if update_schema_on_append:
+      self._update_bigquery_schema_on_append()
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
@@ -160,11 +161,10 @@ class VariantToBigQuery(beam.PTransform):
                       if self._append
                       else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
 
-  def _update_bigquery_schema(self, update_schema):
+  def _update_bigquery_schema_on_append(self):
     # type: (bool) -> None
-    if not update_schema or not self._schema:
-      return
     # if table does not exist, do not need to update the schema.
+    # TODO (yifangchen): Move the logic into validate().
     output_table_re_match = re.match(
         r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
         self._output_table)
@@ -175,7 +175,7 @@ class VariantToBigQuery(beam.PTransform):
       project_id = output_table_re_match.group('project')
       dataset_id = output_table_re_match.group('dataset')
       table_id = output_table_re_match.group('table')
-      found_table = client.tables.Get(bigquery.BigqueryTablesGetRequest(
+      existing_table = client.tables.Get(bigquery.BigqueryTablesGetRequest(
           projectId=project_id,
           datasetId=dataset_id,
           tableId=table_id))
@@ -183,29 +183,35 @@ class VariantToBigQuery(beam.PTransform):
       return
 
     new_schema = bigquery.TableSchema()
-    new_schema.fields = _merge_field_schemas(self._schema.fields,
-                                             found_table.schema.fields)
-    original_schema = found_table.schema
-    found_table.schema = new_schema
+    new_schema.fields = _get_merged_field_schemas(existing_table.schema.fields,
+                                                  self._schema.fields)
+    existing_table.schema = new_schema
     try:
       client.tables.Update(bigquery.BigqueryTablesUpdateRequest(
           projectId=project_id,
           datasetId=dataset_id,
-          table=found_table,
+          table=existing_table,
           tableId=table_id))
-    except exceptions.HttpError:
-      found_table.schema = original_schema
+    except exceptions.HttpError as e:
+      raise RuntimeError('BigQuery schema update failed: %s' % str(e))
 
 
-def _merge_field_schemas(
+def _get_merged_field_schemas(
     field_schemas_1,  # type: List[bigquery.TableFieldSchema]
     field_schemas_2  # type: List[bigquery.TableFieldSchema]
     ):
   # type: (...) -> List[bigquery.TableFieldSchema]
   """Merges the `field_schemas_1` and `field_schemas_2`.
 
-  Raises an error if there are fields with the same name, but different modes or
-  different types.
+  Args:
+    field_schemas_1: A list of `TableFieldSchema`.
+    field_schemas_2: A list of `TableFieldSchema`.
+  Returns:
+    A new schema with new fields from `field_schemas_2` appended to
+    `field_schemas_1`.
+  Raises:
+    ValueError: If there are fields with the same name, but different modes or
+    different types.
   """
   existing_fields = {}  # type: Dict[str, bigquery.TableFieldSchema]
   merged_field_schemas = []  # type: List[bigquery.TableFieldSchema]
@@ -232,6 +238,6 @@ def _merge_field_schemas(
                                              field_schema.type))
       if (field_schema.type.lower() ==
           bigquery_util.TableFieldConstants.TYPE_RECORD):
-        existing_field_schema.fields = _merge_field_schemas(
+        existing_field_schema.fields = _get_merged_field_schemas(
             existing_field_schema.fields, field_schema.fields)
   return merged_field_schemas
