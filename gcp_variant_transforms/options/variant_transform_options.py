@@ -228,7 +228,7 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
-        default=('gs://gcp-variant-annotation-vep_cache/'
+        default=('gs://gcp-variant-annotation-vep-cache/'
                  'vep_cache_homo_sapiens_GRCh38_91.tar.gz'),
         help=('The path for VEP cache on Google Cloud Storage.'))
     parser.add_argument(
