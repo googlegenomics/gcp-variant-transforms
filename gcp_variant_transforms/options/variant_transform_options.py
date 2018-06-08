@@ -114,6 +114,12 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'overwritten. New records will be appended to those that '
               'already exist.'))
     parser.add_argument(
+        '--update_schema_on_append',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, BigQuery schema will be updated by combining the '
+              'existing schema and the new schema if they are compatible. '
+              'Requires append=True.'))
+    parser.add_argument(
         '--omit_empty_sample_calls',
         type='bool', default=False, nargs='?', const=True,
         help=("If true, samples that don't have a given call will be omitted."))
@@ -156,6 +162,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         raise
     # Ensuring given output table doesn't already exist to avoid overwriting it.
     if not parsed_args.append:
+      if parsed_args.update_schema_on_append:
+        raise ValueError('--update_schema_on_append requires --append to be '
+                         'true.')
       try:
         client.tables.Get(bigquery.BigqueryTablesGetRequest(
             projectId=project_id,
@@ -224,11 +233,12 @@ class AnnotationOptions(VariantTransformsOptions):
               'structure as input files with a suffix added to them.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default="",
+        default='gcr.io/gcp-variant-annotation/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
-        default="",
+        default=('gs://gcp-variant-annotation-vep-cache/'
+                 'vep_cache_homo_sapiens_GRCh38_91.tar.gz'),
         help=('The path for VEP cache on Google Cloud Storage.'))
     parser.add_argument(
         '--vep_info_field',
@@ -258,15 +268,6 @@ class AnnotationOptions(VariantTransformsOptions):
       if not vep_cache or not vep_cache.startswith('gs://'):
         raise ValueError('Flag {} should start with gs://, got {}'.format(
             AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
-    else:
-      for flag in [AnnotationOptions._VEP_IMAGE_FLAG,
-                   AnnotationOptions._VEP_CACHE_FLAG,
-                   AnnotationOptions._OUTPUT_DIR_FLAG]:
-        if flag not in args_dict:
-          raise AssertionError('Flag {} not found in args_dict.'.format(flag))
-        if args_dict[flag]:
-          raise ValueError('Flag {} is set but {} is not.'.format(
-              flag, AnnotationOptions._RUN_FLAG))
 
 
 class FilterOptions(VariantTransformsOptions):
