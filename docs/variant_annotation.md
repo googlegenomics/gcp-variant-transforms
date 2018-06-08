@@ -2,7 +2,7 @@
 
 ## Overview
 
-Tha annotation support in Variant Transforms has two goals:
+The annotation support in Variant Transforms has two goals:
 * First, we want to be able to properly parse annotation fields in input VCFs.
 * The second goal is to be able to annotate VCF files during the import process,
 using open annotation tools/databases like
@@ -71,6 +71,16 @@ table to mark ambiguous cases. This should be used only as a last resort.
 
 ## Running VEP through Variant Transforms
 
+### Summary
+
+You can run VEP on input VCF files before importing them into BigQuery. The
+minimum number of flags to enable this feature is `--run_annotation_pipeline`
+and `--annotation_output_dir [GCS_PATH]` where `[GCS_PATH]` is a path in a GCS
+bucket that your project owns.
+
+
+### Details
+
 While parsing annotation fields and breaking them into separate fields is a
 useful feature but it still requires pre-annotated VCFs. To address this need,
 we have started an effort to provide options to annotate input files as part of
@@ -87,20 +97,22 @@ enables the automatic annotation feature.
 * [`--annotation_output_dir`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L190)
 a path on Google Cloud Storage (GCS) where VEP output files are copied. The file
 hierarchy of input files is replicated at this location with the same file names
-followed by `_vep_output.vcf`.
+followed by `_vep_output.vcf`. Note that if this directory already exists, then
+Variant Transforms fails. This is to prevent unintentional overwriting of old
+annotated VCFs.
 
 * [`--vep_image_uri`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L196)
 the docker image for VEP created using the
 [Dockerfile in variant-annotation](https://github.com/googlegenomics/variant-annotation/tree/master/batch/vep)
-GitHub repo.
-<!-- TODO(bashir2): Add the location of the image we maintain. -->
+GitHub repo. By default `gcr.io/gcp-variant-annotation/vep_91` is used which is
+a public image that Google maintains (VEP version 91).
 
 * [`--vep_cache_path`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L200)
 the GCS location that has the compressed version of VEP cache. This file can be
 created using
 [build_vep_cache.sh](https://github.com/googlegenomics/variant-annotation/blob/master/batch/vep/build_vep_cache.sh)
-script.
-<!-- TODO(bashir2): Add the location of the cache we maintain. -->
+script. By default `gs://gcp-variant-annotation-vep_cache/vep_cache_homo_sapiens_GRCh38_91.tar.gz`
+is used which is good for human genome aligned with GRCh38 reference sequence.
 
 * [`--vep_info_field`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L204)
 by default, an INFO field called `CSQ_VT` is added to hold the new
@@ -113,6 +125,25 @@ For other parameters, like how many VMs to use or where the VMs should be
 located, the same parameters for
 [Dataflow pipeline execution](https://cloud.google.com/dataflow/pipelines/specifying-exec-params)
 are reused, e.g., `--num_workers`.
+
+### Caveats and troubleshooting
+
+Running VEP is slow especially if you have large VCF inputs. This is because in
+this first version of VEP integration with Variant Transforms, we are not
+sharding input files and so each input VCF is processed by one single VEP run.
+Therefor if your input VCFs are large, it is recommended to set `--num_workers`
+at least as big as number of input files.
+
+In the `annotation_output_dir`, beside output annotated VCFs, there is a `logs`
+directory which contains the logs from virtual machines on which VEP was run.
+If VEP fails, this is a good place to look for causes
+(in addition to usual Variant Transforms log files).
+
+Finally, the [`--check_ref`](https://ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_check_ref)
+option of VEP is enabled for these runs and the above log files contain a
+report of mismatches. If you are using the right VEP cache, there should be
+no mismatch.
+
 
 ## Sample Queries
 
