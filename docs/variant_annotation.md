@@ -141,8 +141,9 @@ If VEP fails, this is a good place to look for causes
 
 Finally, the [`--check_ref`](https://ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_check_ref)
 option of VEP is enabled for these runs and the above log files contain a
-report of mismatches. If you are using the right VEP cache, there should be
-no mismatch.
+report of variants that do not match the reference. If you are using the right
+VEP cache, there should be no mismatch. _Note that mismatches are dropped and
+hence are not present in the final BigQuery output table._
 
 
 ## Sample Queries
