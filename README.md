@@ -184,6 +184,7 @@ region in support of your project’s security and compliance needs. See
 * [Handling large inputs](docs/large_inputs.md)
 * [Appending data to existing tables](docs/data_append.md)
 * [Variant Annotation](docs/variant_annotation.md)
+* [Partitioning](docs/partitioning.md)
 * [Troubleshooting](docs/troubleshooting.md)
 
 ## Development
