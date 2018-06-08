@@ -131,7 +131,7 @@ are reused, e.g., `--num_workers`.
 Running VEP is slow especially if you have large VCF inputs. This is because in
 this first version of VEP integration with Variant Transforms, we are not
 sharding input files and so each input VCF is processed by one single VEP run.
-Therefor if your input VCFs are large, it is recommended to set `--num_workers`
+Therefore if your input VCFs are large, it is recommended to set `--num_workers`
 at least as big as number of input files.
 
 In the `annotation_output_dir`, beside output annotated VCFs, there is a `logs`
