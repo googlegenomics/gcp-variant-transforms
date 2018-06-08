@@ -1,0 +1,44 @@
+[
+  {
+    "test_name": "option-update-schema-on-append-step-1",
+    "table_name": "option_update_schema_on_append",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "runner": "DataflowRunner",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 5}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 3607195}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 3607203}
+      }
+    ]
+  },
+  {
+    "test_name": "option-update-schema-on-append-step-2",
+    "table_name": "option_update_schema_on_append",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
+    "runner": "DataflowRunner",
+    "append": true,
+    "update_schema": true,
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 18}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 26639124}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 26640255}
+      }
+    ]
+  }
+]

@@ -15,8 +15,10 @@
 r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
 To define a new integration test case, create a json file in
-gcp_variant_transforms/testing/integration directory and specify at least
-test_name, table_name, and input_pattern for the integration test.
+`gcp_variant_transforms/testing/integration/vcf_to_bq_tests` directory and
+specify at least test_name, table_name, and input_pattern for the integration
+test. You may add multiple test cases (Now at most two are supported) in one
+json file, and the second test case will run after the first one finishes.
 
 You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
@@ -27,7 +29,7 @@ python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
   --logging_location gs://mybucket/temp/integration_test_logs
 
 By default, it runs all integration tests inside
-`gcp_variant_transforms/testing/integration/`.
+`gcp_variant_transforms/testing/integration/vcf_to_bq_tests/presubmit_tests/`.
 
 To keep the tables that this test creates, use the --keep_tables option.
 
@@ -246,10 +248,11 @@ def _get_test_configs(run_presubmit_tests, run_all_tests):
                    'assertion_configs']
   test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests)
   test_configs = run_tests_common.get_configs(test_file_path, required_keys)
-  for test_config in test_configs:
-    assertion_configs = test_config['assertion_configs']
-    for assertion_config in assertion_configs:
-      _validate_assertion_config(assertion_config)
+  for test_case_configs in test_configs:
+    for test_config in test_case_configs:
+      assertion_configs = test_config['assertion_configs']
+      for assertion_config in assertion_configs:
+        _validate_assertion_config(assertion_config)
   return test_configs
 
 
@@ -276,17 +279,18 @@ def _validate_assertion_config(assertion_config):
 
 def main():
   args = _get_args()
-  test_case_configs = _get_test_configs(
+  test_configs = _get_test_configs(
       args.run_presubmit_tests, args.run_all_tests)
   with TestContextManager(args) as context:
     tests = []
-    for config in test_case_configs:
-      tests.append(VcfToBQTestCase(context, **config))
+    for test_case_configs in test_configs:
+      test_cases = []
+      for config in test_case_configs:
+        test_cases.append(VcfToBQTestCase(context, **config))
+      tests.append(test_cases)
     test_runner = run_tests_common.TestRunner(tests)
     if not context.revalidation_dataset_id:
       test_runner.run()
-    for test in tests:
-      test.validate_result()
   return test_runner.print_results()
 
 

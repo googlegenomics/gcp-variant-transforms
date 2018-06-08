@@ -156,15 +156,16 @@ def _get_test_configs():
 def main():
   """Runs the integration tests for preprocessor."""
   args = _get_args()
-  test_case_configs = _get_test_configs()
+  test_configs = _get_test_configs()
 
   tests = []
-  for config in test_case_configs:
-    tests.append(PreprocessorTestCase(args, **config))
+  for test_case_configs in test_configs:
+    test_cases = []
+    for config in test_case_configs:
+      test_cases.append(PreprocessorTestCase(args, **config))
+    tests.append(test_cases)
   test_runner = run_tests_common.TestRunner(tests)
   test_runner.run()
-  for test in tests:
-    test.validate_result()
   return test_runner.print_results()
 
 

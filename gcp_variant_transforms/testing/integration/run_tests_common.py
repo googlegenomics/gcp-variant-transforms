@@ -23,7 +23,7 @@ import argparse  # pylint: disable=unused-import
 import json
 import os
 import time
-from typing import Dict, List, Optional  # pylint: disable=unused-import
+from typing import Dict, List, Optional, Set, Union  # pylint: disable=unused-import
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
@@ -41,42 +41,57 @@ class TestRunner(object):
   """Runs the tests using pipelines API."""
 
   def __init__(self, tests):
-    # type: (List[Union[PreprocessorTestCase, VcfToBQTestCase]]) -> None
+    # type: (List[List[Union[PreprocessorTestCase, VcfToBQTestCase]]]) -> None
     self._tests = tests
     self._service = discovery.build(
         'genomics',
         'v1alpha2',
         credentials=GoogleCredentials.get_application_default())
-    self._operation_names = []  # type: List[str]
-    self._responses = []  # List[Dict]
+    self._operation_names_to_tests = {}  # type: Dict
+    self._test_names_to_dependent_tests = {}  # type: Dict
+    self._running_operation_names = set()  # type: Set[str]
+    for test_cases in tests:
+      if len(test_cases) > 2:
+        raise NotImplementedError
+      if len(test_cases) == 2:
+        self._test_names_to_dependent_tests.update(
+            {test_cases[0].get_name(): test_cases[1]})
 
   def run(self):
     """Runs all tests."""
-    for test in self._tests:
-      # The following pylint hint is needed because `pipelines` is a method that
-      # is dynamically added to the returned `service` object above. See
-      # `googleapiclient.discovery.Resource._set_service_methods`.
-      # pylint: disable=no-member
-      request = self._service.pipelines().run(body=test.pipeline_api_request)
-      operation_name = request.execute()['name']
-      self._operation_names.append(operation_name)
+    for test_cases in self._tests:
+      self._run_test(test_cases[0])
     self._wait_for_all_operations_done()
+
+  def _run_test(self, test_case):
+    # type: (Union[PreprocessorTestCase, VcfToBQTestCase]) -> None
+    # The following pylint hint is needed because `pipelines` is a method that
+    # is dynamically added to the returned `service` object above. See
+    # `googleapiclient.discovery.Resource._set_service_methods`.
+    # pylint: disable=no-member
+    request = self._service.pipelines().run(body=test_case.pipeline_api_request)
+    operation_name = request.execute()['name']
+    self._operation_names_to_tests.update({operation_name: test_case})
+    self._running_operation_names.add(operation_name)
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations of `_operation_names` are done."""
     # pylint: disable=no-member
     operations = self._service.operations()
-    running_operation_names = set(self._operation_names)
-    while running_operation_names:
+    while self._running_operation_names:
       time.sleep(10)
-      for operation_name in self._operation_names:
-        if operation_name in running_operation_names:
-          request = operations.get(name=operation_name)
-          response = request.execute()
-          if response['done']:
-            self._handle_failure(response)
-            self._responses.append(response)
-            running_operation_names.remove(operation_name)
+      copy_of_running_operation_names = set(self._running_operation_names)
+      for operation_name in copy_of_running_operation_names:
+        request = operations.get(name=operation_name)
+        response = request.execute()
+        if response['done']:
+          self._handle_failure(response)
+          self._operation_names_to_tests.get(operation_name).validate_result()
+          self._running_operation_names.remove(operation_name)
+          test_name = (self._operation_names_to_tests.get(operation_name).
+                       get_name())
+          if test_name in self._test_names_to_dependent_tests:
+            self._run_test(self._test_names_to_dependent_tests.get(test_name))
 
   def _handle_failure(self, response):
     """Raises errors if test case failed."""
@@ -90,8 +105,9 @@ class TestRunner(object):
 
   def print_results(self):
     """Prints results of test cases."""
-    for test in self._tests:
-      print '{} ...ok'.format(test.get_name())
+    for test_cases in self._tests:
+      for test_case in test_cases:
+        print '{} ...ok'.format(test_case.get_name())
     return 0
 
 
@@ -141,31 +157,37 @@ def add_args(parser):
 
 
 def get_configs(test_file_path, required_keys):
-  # type: (str, List[str]) -> List[Dict]
+  # type: (str, List[str]) -> List[List[Dict]]
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
   for root, _, files in os.walk(test_file_path):
     for filename in files:
       if filename.endswith('.json'):
-        test_configs.append(_load_test_config(os.path.join(root, filename),
-                                              required_keys))
+        test_configs.append(_load_test_configs(os.path.join(root, filename),
+                                               required_keys))
   if not test_configs:
     raise TestCaseFailure('Found no .json files in directory {}'.format(
         test_file_path))
   return test_configs
 
 
-def _load_test_config(filename, required_keys):
-  # type: (str, List[str]) -> str
+def _load_test_configs(filename, required_keys):
+  # type: (str, List[str]) -> List[Dict]
   """Loads an integration test JSON object from a file."""
   with open(filename, 'r') as f:
-    test = json.loads(f.read())
-    _validate_test(test, filename, required_keys)
-    return test
+    tests = json.loads(f.read())
+    # When there are multiple test cases in one JSON file, it is a list. Wrap
+    # the dictionary in a list if there is only one test case in one JSON file.
+    if not isinstance(tests, list):
+      tests = [tests]
+    _validate_test_configs(tests, filename, required_keys)
+    return tests
 
 
-def _validate_test(test, filename, required_keys):
+def _validate_test_configs(test_configs, filename, required_keys):
+  # type: (List[Dict], str, List[str]) -> None
   for key in required_keys:
-    if key not in test:
-      raise ValueError('Test case in {} is missing required key: {}'.format(
-          filename, key))
+    for test_config in test_configs:
+      if key not in test_config:
+        raise ValueError('Test case in {} is missing required key: {}'.format(
+            filename, key))
