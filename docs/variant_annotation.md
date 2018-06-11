@@ -111,7 +111,7 @@ a public image that Google maintains (VEP version 91).
 the GCS location that has the compressed version of VEP cache. This file can be
 created using
 [build_vep_cache.sh](https://github.com/googlegenomics/variant-annotation/blob/master/batch/vep/build_vep_cache.sh)
-script. By default `gs://gcp-variant-annotation-vep_cache/vep_cache_homo_sapiens_GRCh38_91.tar.gz`
+script. By default `gs://gcp-variant-annotation-vep-cache/vep_cache_homo_sapiens_GRCh38_91.tar.gz`
 is used which is good for human genome aligned with GRCh38 reference sequence.
 
 * [`--vep_info_field`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L204)
