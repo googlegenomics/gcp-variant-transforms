@@ -5,7 +5,7 @@
   "variant_merge_strategy": "MOVE_TO_CALLS",
   "info_keys_to_move_to_calls_regex": "^NS$",
   "runner": "DirectRunner",
-  "zones": "us-west1-b",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

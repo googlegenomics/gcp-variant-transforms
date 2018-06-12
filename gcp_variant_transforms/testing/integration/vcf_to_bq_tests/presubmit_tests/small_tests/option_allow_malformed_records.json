@@ -4,7 +4,7 @@
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS-empty.vcf",
   "allow_malformed_records": true,
   "runner": "DirectRunner",
-  "zones": "us-west1-b",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

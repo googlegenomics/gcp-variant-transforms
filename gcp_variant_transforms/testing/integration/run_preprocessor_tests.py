@@ -59,6 +59,7 @@ class PreprocessorTestCase(object):
                expected_contents,  # type: List[str]
                report_blob_name,  # type: str
                header_blob_name=None,  # type: str
+               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -90,7 +91,7 @@ class PreprocessorTestCase(object):
 
     self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
         parser_args.project, parser_args.logging_location, parser_args.image,
-        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, args)
+        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Validates the results.

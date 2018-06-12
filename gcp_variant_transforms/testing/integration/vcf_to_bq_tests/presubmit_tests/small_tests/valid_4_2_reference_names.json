@@ -3,8 +3,7 @@
   "table_name": "valid_4_2_reference_names",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
   "reference_names": "20 Y",
-  "runner": "DirectRunner",
-  "zones": "us-west1-b",
+  "runner": "DataflowRunner",
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

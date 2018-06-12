@@ -3,7 +3,7 @@
   "table_name": "merge_option_move_to_calls",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
   "runner": "DirectRunner",
-  "zones": "us-west1-b",
+  "zones": ["us-west1-b"],
   "variant_merge_strategy": "MOVE_TO_CALLS",
   "assertion_configs": [
     {

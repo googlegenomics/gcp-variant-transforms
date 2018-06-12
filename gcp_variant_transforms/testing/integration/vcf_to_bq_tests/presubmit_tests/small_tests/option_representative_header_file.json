@@ -4,7 +4,7 @@
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-AF-field-removed.vcf",
   "representative_header_file": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
   "runner": "DirectRunner",
-  "zones": "us-west1-b",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],
