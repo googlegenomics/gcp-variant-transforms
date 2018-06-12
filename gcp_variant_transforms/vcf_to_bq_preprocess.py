@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Pipeline for preprocessing the VCF files.
+"""Pipeline for preprocessing the VCF files.
 
 This pipeline is aimed to help the user to easily identify and further import
 the malformed/incompatible VCF files to BigQuery. It generates two files as the
@@ -56,6 +56,7 @@ from apache_beam import pvalue
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
+from gcp_variant_transforms.beam_io import vcf_file_size_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
@@ -66,6 +67,8 @@ from gcp_variant_transforms.transforms import merge_header_definitions
 
 _COMMAND_LINE_OPTIONS = [variant_transform_options.PreprocessOptions]
 
+# Number of lines from each VCF that should be read when estimating disk usage.
+_SNIPPET_READ_SIZE = 50
 
 def _get_inferred_headers(variants,  # type: pvalue.PCollection
                           merged_header  # type: pvalue.PCollection
@@ -73,7 +76,7 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
   # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
   inferred_headers = (variants
                       | 'FilterVariants' >> filter_variants.FilterVariants()
-                      | ' InferHeaderFields' >>
+                      | 'InferHeaderFields' >>
                       infer_headers.InferHeaderFields(
                           pvalue.AsSingleton(merged_header),
                           allow_incompatible_records=True,
@@ -85,6 +88,24 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
       | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
           allow_incompatible_records=True))
   return inferred_headers, merged_header
+
+
+# TODO(hanjohn): Add an e2e test
+def _estimate_disk_resources(p, input_pattern):
+  # type: (pvalue.PCollection, str) -> (pvalue.PCollection)
+  # TODO(hanjohn): Add support for `ReadAll` pattern for inputs with very large
+  # numbers of files.
+  result = (
+      p
+      | 'InputFilePattern' >> beam.Create([input_pattern])
+      | 'ReadFileSizeAndSampleVariants' >> vcf_file_size_io.EstimateVcfSize(
+          input_pattern, _SNIPPET_READ_SIZE)
+      | 'SumFileSizeEstimates' >> beam.CombineGlobally(
+          vcf_file_size_io.FileSizeInfoSumFn()))
+  result | ('PrintEstimate' >>  # pylint: disable=expression-not-assigned
+            beam.Map(lambda x: logging.info(
+                "Final estimate of encoded size: %d GB", x.encoded_size / 1e9)))
+  return result
 
 
 def run(argv=None):
@@ -103,6 +124,11 @@ def run(argv=None):
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
+
+    disk_usage_estimate = None
+    if known_args.estimate_disk_usage:
+      disk_usage_estimate = beam.pvalue.AsSingleton(
+          _estimate_disk_resources(p, known_args.input_pattern))
     if known_args.report_all_conflicts:
       if len(all_patterns) == 1:
         variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
@@ -120,6 +146,7 @@ def run(argv=None):
            | 'GenerateConflictsReport' >>
            beam.ParDo(preprocess_reporter.generate_report,
                       known_args.report_path,
+                      disk_usage_estimate,
                       beam.pvalue.AsSingleton(merged_headers),
                       beam.pvalue.AsSingleton(inferred_headers),
                       beam.pvalue.AsIter(malformed_records)))
@@ -128,6 +155,7 @@ def run(argv=None):
            | 'GenerateConflictsReport' >>
            beam.ParDo(preprocess_reporter.generate_report,
                       known_args.report_path,
+                      disk_usage_estimate,
                       beam.pvalue.AsSingleton(merged_headers)))
 
     if known_args.resolved_headers_path:
