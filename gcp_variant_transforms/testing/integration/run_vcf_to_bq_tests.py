@@ -58,7 +58,7 @@ _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
 
-class VcfToBQTestCase(object):
+class VcfToBQTestCase(run_tests_common.TestCaseInterface):
   """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,
@@ -242,7 +242,7 @@ def _get_args():
 
 
 def _get_test_configs(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> List[Dict]
+  # type: (bool, bool) -> List[List[Dict]]
   """Gets all test configs in integration directory and subdirectories."""
   required_keys = ['test_name', 'table_name', 'input_pattern',
                    'assertion_configs']
@@ -288,9 +288,9 @@ def main():
       for config in test_case_configs:
         test_cases.append(VcfToBQTestCase(context, **config))
       tests.append(test_cases)
-    test_runner = run_tests_common.TestRunner(tests)
-    if not context.revalidation_dataset_id:
-      test_runner.run()
+    test_runner = run_tests_common.TestRunner(tests,
+                                              context.revalidation_dataset_id)
+    test_runner.run()
   return test_runner.print_results()
 
 

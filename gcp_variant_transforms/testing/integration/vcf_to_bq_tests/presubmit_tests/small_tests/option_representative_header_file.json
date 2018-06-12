@@ -1,22 +1,24 @@
-{
-  "test_name": "option-representative-header-file",
-  "table_name": "option_representative_header_file",
-  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-AF-field-removed.vcf",
-  "representative_header_file": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
-  "runner": "DirectRunner",
-  "zones": ["us-west1-b"],
-  "assertion_configs": [
-    {
-      "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 5}
-    },
-    {
-      "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 3607195}
-    },
-    {
-      "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 3607203}
-    }
-  ]
-}
+[
+  {
+    "test_name": "option-representative-header-file",
+    "table_name": "option_representative_header_file",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-AF-field-removed.vcf",
+    "representative_header_file": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "runner": "DirectRunner",
+    "zones": ["us-west1-b"],
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 5}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 3607195}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 3607203}
+      }
+    ]
+  }
+]

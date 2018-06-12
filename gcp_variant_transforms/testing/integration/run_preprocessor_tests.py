@@ -49,7 +49,7 @@ _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
-class PreprocessorTestCase(object):
+class PreprocessorTestCase(run_tests_common.TestCaseInterface):
   """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,

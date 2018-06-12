@@ -1,46 +1,48 @@
-{
-  "test_name": "platinum-na12877-hg38-10k-lines",
-  "table_name": "platinum_NA12877_hg38_10K_lines",
-  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_NA12877_hg38_10K_lines_manual_vep_orig_output.vcf",
-  "annotation_fields": "CSQ",
-  "runner": "DataflowRunner",
-  "assertion_configs": [
-    {
-      "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 9953}
-    },
-    {
-      "query": [
-        "SELECT COUNT(0) AS num_annotation_sets ",
-        "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
-      ],
-      "expected_result": {"num_annotation_sets": 45770}
-    },
-    {
-      "query": [
-        "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
-        "FROM ( ",
-        "  SELECT start_position, reference_bases, A.alt, ",
-        "         COUNT(0) AS number_of_annotations ",
-        "  FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
-        "  GROUP BY 1, 2, 3",
-        ")"
-      ],
-      "expected_result": {"hash_sum": 143375297338}
-    },
-    {
-      "query": [
-        "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-        "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
-      ],
-      "expected_result": {"num_features": 1576}
-    },
-    {
-      "query": [
-        "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
-        "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
-      ],
-      "expected_result": {"num_symbol": 207}
-    }
-  ]
-}
+[
+  {
+    "test_name": "platinum-na12877-hg38-10k-lines",
+    "table_name": "platinum_NA12877_hg38_10K_lines",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_NA12877_hg38_10K_lines_manual_vep_orig_output.vcf",
+    "annotation_fields": "CSQ",
+    "runner": "DataflowRunner",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 9953}
+      },
+      {
+        "query": [
+          "SELECT COUNT(0) AS num_annotation_sets ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_annotation_sets": 45770}
+      },
+      {
+        "query": [
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "FROM ( ",
+          "  SELECT start_position, reference_bases, A.alt, ",
+          "         COUNT(0) AS number_of_annotations ",
+          "  FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
+          "  GROUP BY 1, 2, 3",
+          ")"
+        ],
+        "expected_result": {"hash_sum": 143375297338}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_features": 1576}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_symbol": 207}
+      }
+    ]
+  }
+]

@@ -23,13 +23,27 @@ import argparse  # pylint: disable=unused-import
 import json
 import os
 import time
-from typing import Dict, List, Optional, Set, Union  # pylint: disable=unused-import
+from collections import namedtuple
+from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 _DEFAULT_ZONES = ['us-east1-b']
+
+# `TestCaseState` saves current running test and the remaining tests in the same
+# test script (.json).
+TestCaseState = namedtuple('TestCaseState',
+                           ['running_test', 'remaining_tests'])
+
+
+class TestCaseInterface(object):
+  """Interface of an integration test case."""
+
+  def validate_result(self):
+    """Validates the result of the test case."""
+    raise NotImplementedError
 
 
 class TestCaseFailure(Exception):
@@ -40,58 +54,71 @@ class TestCaseFailure(Exception):
 class TestRunner(object):
   """Runs the tests using pipelines API."""
 
-  def __init__(self, tests):
-    # type: (List[List[Union[PreprocessorTestCase, VcfToBQTestCase]]]) -> None
+  def __init__(self, tests, revalidation=None):
+    # type: (List[List[TestCaseInterface]], str) -> None
+    """Initializes the TestRunner.
+
+    Args:
+      tests: All test cases.
+      revalidation: If not none, skip most of the test (including table creation
+        and populating for vcf_to_bq) and only do the result validation.
+    """
     self._tests = tests
     self._service = discovery.build(
         'genomics',
         'v1alpha2',
         credentials=GoogleCredentials.get_application_default())
-    self._operation_names_to_tests = {}  # type: Dict
-    self._test_names_to_dependent_tests = {}  # type: Dict
-    self._running_operation_names = set()  # type: Set[str]
-    for test_cases in tests:
-      if len(test_cases) > 2:
-        raise NotImplementedError
-      if len(test_cases) == 2:
-        self._test_names_to_dependent_tests.update(
-            {test_cases[0].get_name(): test_cases[1]})
+    self._revalidation = revalidation
+    self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
 
   def run(self):
     """Runs all tests."""
+    if self._revalidation:
+      for test_cases in self._tests:
+        for test_case in test_cases:
+          test_case.validate_result()
+          return
     for test_cases in self._tests:
-      self._run_test(test_cases[0])
+      self._run_test(test_cases)
     self._wait_for_all_operations_done()
 
-  def _run_test(self, test_case):
-    # type: (Union[PreprocessorTestCase, VcfToBQTestCase]) -> None
+  def _run_test(self, test_cases):
+    # type: (List[TestCaseInterface]) -> None
+    """Runs the first test case in `test_cases`.
+
+    The first test case and the remaining test cases form `TestCaseState` and
+    are added into `_operation_names_to_test_states` for future usage.
+    """
+
+    if not test_cases:
+      return
     # The following pylint hint is needed because `pipelines` is a method that
     # is dynamically added to the returned `service` object above. See
     # `googleapiclient.discovery.Resource._set_service_methods`.
     # pylint: disable=no-member
-    request = self._service.pipelines().run(body=test_case.pipeline_api_request)
+    request = self._service.pipelines().run(
+        body=test_cases[0].pipeline_api_request)
     operation_name = request.execute()['name']
-    self._operation_names_to_tests.update({operation_name: test_case})
-    self._running_operation_names.add(operation_name)
+    self._operation_names_to_test_states.update(
+        {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
 
   def _wait_for_all_operations_done(self):
-    """Waits until all operations of `_operation_names` are done."""
+    """Waits until all operations are done."""
     # pylint: disable=no-member
     operations = self._service.operations()
-    while self._running_operation_names:
+    while self._operation_names_to_test_states:
       time.sleep(10)
-      copy_of_running_operation_names = set(self._running_operation_names)
-      for operation_name in copy_of_running_operation_names:
+      running_operation_names = self._operation_names_to_test_states.keys()
+      for operation_name in running_operation_names:
         request = operations.get(name=operation_name)
         response = request.execute()
         if response['done']:
           self._handle_failure(response)
-          self._operation_names_to_tests.get(operation_name).validate_result()
-          self._running_operation_names.remove(operation_name)
-          test_name = (self._operation_names_to_tests.get(operation_name).
-                       get_name())
-          if test_name in self._test_names_to_dependent_tests:
-            self._run_test(self._test_names_to_dependent_tests.get(test_name))
+          test_case_state = self._operation_names_to_test_states.get(
+              operation_name)
+          del self._operation_names_to_test_states[operation_name]
+          test_case_state.running_test.validate_result()
+          self._run_test(test_case_state.remaining_tests)
 
   def _handle_failure(self, response):
     """Raises errors if test case failed."""
@@ -176,10 +203,6 @@ def _load_test_configs(filename, required_keys):
   """Loads an integration test JSON object from a file."""
   with open(filename, 'r') as f:
     tests = json.loads(f.read())
-    # When there are multiple test cases in one JSON file, it is a list. Wrap
-    # the dictionary in a list if there is only one test case in one JSON file.
-    if not isinstance(tests, list):
-      tests = [tests]
     _validate_test_configs(tests, filename, required_keys)
     return tests
 
