@@ -23,7 +23,7 @@ import argparse  # pylint: disable=unused-import
 import json
 import os
 import time
-from typing import Dict, List  # pylint: disable=unused-import
+from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
@@ -101,6 +101,7 @@ def form_pipeline_api_request(project,  # type: str
                               scopes,  # type: List[str]
                               pipeline_name,  # type: str
                               script_path,  # type: str
+                              zones,  # type: Optional[List[str]]
                               args  # type: List[str]
                              ):
   # type: (...) -> Dict
@@ -113,7 +114,7 @@ def form_pipeline_api_request(project,  # type: str
       'ephemeralPipeline': {
           'projectId': project,
           'name': pipeline_name,
-          'resources': {'zones': _DEFAULT_ZONES},
+          'resources': {'zones': zones or _DEFAULT_ZONES},
           'docker': {
               'imageName': image,
               'cmd': ' '.join([script_path] + args)

@@ -3,7 +3,8 @@
   "table_name": "infer_undefined_header_fields",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
   "infer_undefined_headers": "True",
-  "runner": "DataflowRunner",
+  "runner": "DirectRunner",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

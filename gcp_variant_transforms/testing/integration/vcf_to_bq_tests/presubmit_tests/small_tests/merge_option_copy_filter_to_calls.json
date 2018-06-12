@@ -4,7 +4,8 @@
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
   "variant_merge_strategy": "MOVE_TO_CALLS",
   "copy_filter_to_calls": true,
-  "runner": "DataflowRunner",
+  "runner": "DirectRunner",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

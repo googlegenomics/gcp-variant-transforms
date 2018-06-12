@@ -3,7 +3,8 @@
   "table_name": "incompatible_field_value",
   "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/incompatible-field-value.vcf",
   "allow_incompatible_records": "True",
-  "runner": "DataflowRunner",
+  "runner": "DirectRunner",
+  "zones": ["us-west1-b"],
   "assertion_configs": [
     {
       "query": ["NUM_ROWS_QUERY"],

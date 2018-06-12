@@ -65,6 +65,7 @@ class VcfToBQTestCase(object):
                table_name,  # type: str
                input_pattern,  # type: str
                assertion_configs,  # type: List[Dict]
+               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -88,7 +89,7 @@ class VcfToBQTestCase(object):
       args.append('--{} {}'.format(k, value))
     self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
         context.project, context.logging_location, context.image, _SCOPES,
-        _PIPELINE_NAME, _SCRIPT_PATH, args)
+        _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
