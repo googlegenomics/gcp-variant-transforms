@@ -156,6 +156,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
+  # Add a time suffix to ensure the job names and the merged headers files are
+  # unique in case multiple pipelines are run at the same time.
   merge_headers_job_name = '-'.join([
       _MERGE_HEADERS_JOB_NAME,
       datetime.datetime.now().strftime('%Y%m%d-%H%M%S')])
@@ -165,8 +167,6 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     google_cloud_options.job_name = merge_headers_job_name
 
   temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
-  # Add a time prefix to ensure files are unique in case multiple
-  # pipelines are run at the same time.
   temp_merged_headers_file_name = '-'.join([google_cloud_options.job_name,
                                             _MERGE_HEADERS_FILE_NAME])
   temp_merged_headers_file_path = filesystems.FileSystems.join(
