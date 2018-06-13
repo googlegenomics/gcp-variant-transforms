@@ -145,7 +145,7 @@ def _get_args():
 
 
 def _get_test_configs():
-  # type: () -> List[Dict]
+  # type: () -> List[List[Dict]]
   """Gets all test configs in preprocessor_tests."""
   required_keys = ['test_name', 'report_blob_name', 'input_pattern',
                    'expected_contents']

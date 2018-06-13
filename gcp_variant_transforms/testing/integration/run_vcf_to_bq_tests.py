@@ -288,8 +288,8 @@ def main():
       for config in test_case_configs:
         test_cases.append(VcfToBQTestCase(context, **config))
       tests.append(test_cases)
-    test_runner = run_tests_common.TestRunner(tests,
-                                              context.revalidation_dataset_id)
+    test_runner = run_tests_common.TestRunner(
+        tests, context.revalidation_dataset_id is not None)
     test_runner.run()
   return test_runner.print_results()
 

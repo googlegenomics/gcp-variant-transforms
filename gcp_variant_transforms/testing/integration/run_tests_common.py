@@ -54,33 +54,32 @@ class TestCaseFailure(Exception):
 class TestRunner(object):
   """Runs the tests using pipelines API."""
 
-  def __init__(self, tests, revalidation=None):
-    # type: (List[List[TestCaseInterface]], str) -> None
+  def __init__(self, tests, revalidate=False):
+    # type: (List[List[TestCaseInterface]], bool) -> None
     """Initializes the TestRunner.
 
     Args:
       tests: All test cases.
-      revalidation: If not none, skip most of the test (including table creation
-        and populating for vcf_to_bq) and only do the result validation.
+      revalidate: If True, only run the result validation part of the tests.
     """
     self._tests = tests
     self._service = discovery.build(
         'genomics',
         'v1alpha2',
         credentials=GoogleCredentials.get_application_default())
-    self._revalidation = revalidation
+    self._revalidate = revalidate
     self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
 
   def run(self):
     """Runs all tests."""
-    if self._revalidation:
+    if self._revalidate:
       for test_cases in self._tests:
         for test_case in test_cases:
           test_case.validate_result()
-          return
-    for test_cases in self._tests:
-      self._run_test(test_cases)
-    self._wait_for_all_operations_done()
+    else:
+      for test_cases in self._tests:
+        self._run_test(test_cases)
+      self._wait_for_all_operations_done()
 
   def _run_test(self, test_cases):
     # type: (List[TestCaseInterface]) -> None
@@ -89,7 +88,6 @@ class TestRunner(object):
     The first test case and the remaining test cases form `TestCaseState` and
     are added into `_operation_names_to_test_states` for future usage.
     """
-
     if not test_cases:
       return
     # The following pylint hint is needed because `pipelines` is a method that
