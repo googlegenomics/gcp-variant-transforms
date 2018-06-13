@@ -59,17 +59,34 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], 'A')},
+        info={'A1': vcfio.VariantInfo('some data', ''),
+              'A2': vcfio.VariantInfo(['data1', 'data2'], '')},
         calls=[
             vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
             vcfio.VariantCall(name='Sample2', genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
 
+  def _get_sample_header(self):
+    a1_info = parser._Info(
+        id=None,
+        num='1',
+        type=None,
+        desc='some desc',
+        source=None,
+        version=None)
+    a2_info = parser._Info(
+        id=None,
+        num='A',
+        type=None,
+        desc='some desc',
+        source=None,
+        version=None)
+    return vcf_header_io.VcfHeader(infos={'A1': a1_info, 'A2': a2_info})
+
   def test_create_processed_variant_no_change(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_io.VcfHeader()
+    header_fields = self._get_sample_header()
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -80,10 +97,13 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     # `proc_var` should be that INFO fields are copied to `_non_alt_info` map
     # and `_alternate_datas` are filled with alternate bases information only.
     proc_var_synthetic = processed_variant.ProcessedVariant(variant)
-    proc_var_synthetic._non_alt_info = {'A1': 'some data',
-                                        'A2': ['data1', 'data2']}
-    proc_var_synthetic._alternate_datas = [
-        processed_variant.AlternateBaseData(a) for a in ['A', 'TT']]
+    proc_var_synthetic._non_alt_info = {'A1': 'some data'}
+    alt1 = processed_variant.AlternateBaseData('A')
+    alt1._info['A2'] = 'data1'
+    alt2 = processed_variant.AlternateBaseData('TT')
+    alt2._info['A2'] = 'data2'
+    proc_var_synthetic._alternate_datas = [alt1, alt2]
+
     self.assertEqual([proc_var_synthetic], [proc_var])
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
@@ -95,7 +115,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_move_alt_info(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_io.VcfHeader()
+    header_fields = self._get_sample_header()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
         split_alternate_allele_info_fields=True)
@@ -111,7 +131,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     variant = self._get_sample_variant()
     variant.info['CSQ'] = vcfio.VariantInfo(
         data=['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3'],
-        field_count='.')
+        field_count='')
     csq_info = parser._Info(
         id=None,
         num='.',
@@ -119,7 +139,23 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         desc='some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
         source=None,
         version=None)
-    header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
+    a1_info = parser._Info(
+        id=None,
+        num='1',
+        type=None,
+        desc='some desc',
+        source=None,
+        version=None)
+    a2_info = parser._Info(
+        id=None,
+        num='A',
+        type=None,
+        desc='some desc',
+        source=None,
+        version=None)
+    header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info,
+                                                   'A1': a1_info,
+                                                   'A2': a2_info})
     return variant, header_fields
 
   def test_create_processed_variant_move_alt_info_and_annotation(self):
@@ -166,7 +202,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     variant.info['CSQ'] = vcfio.VariantInfo(
         data=['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3',
               'ATAT|C3|I3|S3|G3'],
-        field_count='.')
+        field_count='')
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -213,7 +249,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
             data=[
                 'SYMBOLIC|C1|I1|S1|G1', '[13|C2|I2|S2|G2', 'C[10|C3|I3|S3|G3',
                 'C[1|C3|I3|S3|G3'],  # The last one does not match any alts.
-            field_count='.')})
+            field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -260,7 +296,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         info={'CSQ': vcfio.VariantInfo(
             data=[
                 'T|C1|I1|S1|G1', 'C|C2|I2|S2|G2', 'CC|C3|I3|S3|G3'],
-            field_count='.')})
+            field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -307,7 +343,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         info={'CSQ': vcfio.VariantInfo(
             data=[
                 'CT|C1|I1|S1|G1', 'CC|C2|I2|S2|G2', 'CCC|C3|I3|S3|G3'],
-            field_count='.')})
+            field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -354,7 +390,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         info={'CSQ': vcfio.VariantInfo(
             data=[
                 'AA|C1|I1|S1|G1', 'AAA|C2|I2|S2|G2'],
-            field_count='.')})
+            field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -402,7 +438,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         info={'CSQ': vcfio.VariantInfo(
             data=[
                 'T|C1|I1|S1|G1', '-|C2|I2|S2|G2'],
-            field_count='.')})
+            field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -462,7 +498,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         info={'CSQ': vcfio.VariantInfo(
             data=[
                 'T|C1|I1|1', 'T|C2|I2|2', 'T|C3|I3|0', 'T|C4|I4|3',
-                'T|C5|I5|TEST', 'T|C6|I6|'], field_count='.')})
+                'T|C5|I5|TEST', 'T|C6|I6|'], field_count='')})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
