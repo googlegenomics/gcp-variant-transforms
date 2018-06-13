@@ -22,6 +22,7 @@ import unittest
 import mock
 
 from apache_beam.io.gcp.internal.clients import bigquery
+from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -154,14 +155,61 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     schema.fields.append(call_record)
     return schema
 
+  def _make_header(self, key_num_dict):
+    info_list = [
+        parser._Info(
+            id=None,
+            num='A',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='1',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='2',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='3',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='4',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None)]
+    infos_dict = {}
+    for k, v in key_num_dict.iteritems():
+      if v == 'A':
+        infos_dict[k] = info_list[0]
+      elif int(v) <= 4 and int(v) >= 1:
+        infos_dict[k] = info_list[int(v)]
+      else:
+        self.fail("given NUM value is not valid: " + v)
+    return vcf_header_io.VcfHeader(infos=infos_dict)
+
   def _get_row_list_from_variant(
-      self, variant, allow_incompatible_records=False,
+      self, variant, key_num_dict, allow_incompatible_records=False,
       omit_empty_sample_calls=False, **kwargs):
     # TODO(bashir2): To make this more of a "unit" test, we should create
     # ProcessedVariant instances directly (instead of Variant) and avoid calling
     # create_processed_variant here. Then we should also add cases that
     # have annotation fields.
-    header_fields = vcf_header_io.VcfHeader()
+    header_fields = self._make_header(key_num_dict)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
 
@@ -174,10 +222,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'IS': vcfio.VariantInfo('some data', '1'),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
+              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
+              'IS': vcfio.VariantInfo('some data', ''),
+              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -187,6 +235,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
                 info={'GQ': 10, 'FB': True}),
             vcfio.VariantCall(
                 name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -214,14 +263,16 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
              ColumnKeyConstants.CALLS_PHASESET: None}],
         'IS': 'some data',
         'ISR': ['data1', 'data2']}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_no_alternate_bases(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'IS': vcfio.VariantInfo('some data', '1'),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '2')})
+        info={'IS': vcfio.VariantInfo('some data', ''),
+              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')})
+    header_num_dict = {'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -232,12 +283,14 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'IS': 'some data',
         'ISR': ['data1', 'data2']}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_some_fields_set(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=None, end=123, reference_bases=None,
         alternate_bases=[], quality=20)
+    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: None,
@@ -246,10 +299,12 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.QUALITY: 20,
         ColumnKeyConstants.CALLS: []}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_no_field_set(self):
     variant = vcfio.Variant()
+    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: None,
         ColumnKeyConstants.START_POSITION: None,
@@ -257,16 +312,18 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: None,
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: []}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_null_repeated_fields(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'IIR': vcfio.VariantInfo([0, 1, None], '3'),
-              'IBR': vcfio.VariantInfo([True, None, False], '3'),
-              'IFR': vcfio.VariantInfo([0.1, 0.2, None, 0.4], '4'),
-              'ISR': vcfio.VariantInfo([None, 'data1', 'data2'], '3')})
+        info={'IIR': vcfio.VariantInfo([0, 1, None], ''),
+              'IBR': vcfio.VariantInfo([True, None, False], ''),
+              'IFR': vcfio.VariantInfo([0.1, 0.2, None, 0.4], ''),
+              'ISR': vcfio.VariantInfo([None, 'data1', 'data2'], '')})
+    header_num_dict = {'IIR': '3', 'IBR': '3', 'IFR': '4', 'ISR': '3'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -279,7 +336,8 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         'IBR': [True, False, False],
         'IFR': [0.1, 0.2, -sys.maxint, 0.4],
         'ISR': ['.', 'data1', 'data2']}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_unicode_fields(self):
     sample_unicode_str = u'\xc3\xb6'
@@ -287,9 +345,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[sample_unicode_str, sample_utf8_str],
-        info={'IS': vcfio.VariantInfo(sample_utf8_str, '1'),
+        info={'IS': vcfio.VariantInfo(sample_utf8_str, ''),
               'ISR': vcfio.VariantInfo(
-                  [sample_unicode_str, sample_utf8_str], '2')})
+                  [sample_unicode_str, sample_utf8_str], '')})
+    header_num_dict = {'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -300,15 +359,17 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'IS': sample_unicode_str,
         'ISR': [sample_unicode_str, sample_unicode_str]}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_nonstandard_float_values(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IF': vcfio.VariantInfo(float('inf'), '1'),
-              'IFR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], '3'),
-              'IF2': vcfio.VariantInfo(float('nan'), '1'),})
+        info={'IF': vcfio.VariantInfo(float('inf'), ''),
+              'IFR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], ''),
+              'IF2': vcfio.VariantInfo(float('nan'), ''),})
+    header_num_dict = {'IF': '1', 'IFR': '3', 'IF2': '1'}
     null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -320,14 +381,16 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         'IF': bigquery_util._INF_FLOAT_VALUE,
         'IFR': [-bigquery_util._INF_FLOAT_VALUE, null_replacement_value, 1.2],
         'IF2': None}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_nonstandard_fields_names(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[],
-        info={'IS': vcfio.VariantInfo('data1', '1'),
-              '_IS': vcfio.VariantInfo('data2', '2')})
+        info={'IS': vcfio.VariantInfo('data1', ''),
+              '_IS': vcfio.VariantInfo('data2', '')})
+    header_num_dict = {'IS': '1', '_IS': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -337,16 +400,17 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.CALLS: [],
         'IS': 'data1',
         'field__IS': 'data2'}
-    self.assertEqual([expected_row], self._get_row_list_from_variant(variant))
+    self.assertEqual([expected_row],
+                     self._get_row_list_from_variant(variant, header_num_dict))
 
   def test_sharded_rows(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'IS': vcfio.VariantInfo('some data', '1'),},
+        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
+              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
+              'IS': vcfio.VariantInfo('some data', ''),},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -357,6 +421,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample3', genotype=[1, 0],
                 info={'GQ': 30, 'FB': True})])
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1'}
     expected_rows = [
         {
             ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -406,7 +471,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     with mock.patch.object(bigquery_row_generator,
                            '_MAX_BIGQUERY_ROW_SIZE_BYTES',
                            len(json.dumps(expected_rows[0])) + 10):
-      self.assertEqual(expected_rows, self._get_row_list_from_variant(variant))
+      self.assertEqual(expected_rows,
+                       self._get_row_list_from_variant(variant,
+                                                       header_num_dict))
 
   def test_omit_empty_sample_calls(self):
     variant = vcfio.Variant(
@@ -423,7 +490,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE,
                                           vcfio.MISSING_GENOTYPE_VALUE])])
-
+    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -441,16 +508,19 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
 
     self.assertEqual(
         [expected_row],
-        self._get_row_list_from_variant(variant, omit_empty_sample_calls=True))
+        self._get_row_list_from_variant(variant,
+                                        header_num_dict,
+                                        omit_empty_sample_calls=True))
 
   def test_schema_conflict_in_info_field_type(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IB': vcfio.VariantInfo(data=1, field_count='1'),
-              'II': vcfio.VariantInfo(data=1.1, field_count='1'),
-              'IFR': vcfio.VariantInfo(data=[1, 2], field_count='2'),
-              'ISR': vcfio.VariantInfo(data=[1.0, 2.0], field_count='2')})
+        info={'IB': vcfio.VariantInfo(data=1, field_count=''),
+              'II': vcfio.VariantInfo(data=1.1, field_count=''),
+              'IFR': vcfio.VariantInfo(data=[1, 2], field_count=''),
+              'ISR': vcfio.VariantInfo(data=[1.0, 2.0], field_count='')})
+    header_num_dict = {'IB': '1', 'II': '1', 'IFR': '2', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -463,27 +533,29 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         'IFR': [1.0, 2.0],
         'ISR': ['1.0', '2.0']}
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, allow_incompatible_records=True))
+        variant, header_num_dict, allow_incompatible_records=True))
 
     with self.assertRaises(ValueError):
       variant = vcfio.Variant(
           reference_name='chr19', start=11, end=12, reference_bases='CT',
           alternate_bases=[], filters=[],
           # String cannot be casted to integer.
-          info={'II': vcfio.VariantInfo(data='1.1', field_count='1'),})
+          info={'II': vcfio.VariantInfo(data='1.1', field_count=''),})
+      header_num_dict = {'II': '1'}
       self._get_row_list_from_variant(
-          variant, allow_incompatible_records=True)
+          variant, header_num_dict, allow_incompatible_records=True)
       self.fail('String data for an integer schema must cause an exception')
 
   def test_schema_conflict_in_info_field_number(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IB': vcfio.VariantInfo(data=[1, 2], field_count='2'),
-              'IBR': vcfio.VariantInfo(data=1, field_count='1'),
-              'II': vcfio.VariantInfo(data=[10, 20], field_count='2'),
-              'IFR': vcfio.VariantInfo(data=1.1, field_count='1'),
-              'ISR': vcfio.VariantInfo(data='foo', field_count='1')},)
+        info={'IB': vcfio.VariantInfo(data=[1, 2], field_count=''),
+              'IBR': vcfio.VariantInfo(data=1, field_count=''),
+              'II': vcfio.VariantInfo(data=[10, 20], field_count=''),
+              'IFR': vcfio.VariantInfo(data=1.1, field_count=''),
+              'ISR': vcfio.VariantInfo(data='foo', field_count='')},)
+    header_num_dict = {'IB': '2', 'IBR': '1', 'II': '2', 'IFR': '1', 'ISR': '1'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -497,7 +569,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         'IFR': [1.1],
         'ISR': ['foo'],}
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, allow_incompatible_records=True))
+        variant, header_num_dict, allow_incompatible_records=True))
 
   def test_schema_conflict_in_format_field_type(self):
     variant = vcfio.Variant(
@@ -510,7 +582,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
                 info={'FB': 1, 'FI': True, 'FSR': [1.0, 2.0]})])
-
+    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -530,7 +602,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, allow_incompatible_records=True))
+        variant, header_num_dict, allow_incompatible_records=True))
 
     with self.assertRaises(ValueError):
       variant = vcfio.Variant(
@@ -542,7 +614,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
                   name='Sample1', genotype=[0, 1], phaseset='*',
                   info={'FI': 'string_for_int_field'}),],)
       self._get_row_list_from_variant(
-          variant, allow_incompatible_records=True)
+          variant, header_num_dict, allow_incompatible_records=True)
       self.fail('String data for an integer schema must cause an exception')
 
   def test_schema_conflict_in_format_field_number(self):
@@ -556,7 +628,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
                 info={'FB': [], 'FI': [], 'FSR': ''})])
-
+    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -576,4 +648,4 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, allow_incompatible_records=True))
+        variant, header_num_dict, allow_incompatible_records=True))
