@@ -173,7 +173,7 @@ validator to check the validity of the VCF files, or as a helper tool for
 
 You may need to constrain Cloud Dataflow job processing to a specific geographic
 region in support of your project’s security and compliance needs. See
-[Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
+[Setting zone/region doc](docs/setting_zone_region.md).
 
 
 ## Additional topics
