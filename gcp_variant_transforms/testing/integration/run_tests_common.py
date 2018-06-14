@@ -74,8 +74,9 @@ class TestRunner(object):
     """Runs all tests."""
     if self._revalidate:
       for test_cases in self._tests:
-        for test_case in test_cases:
-          test_case.validate_result()
+        # Only validates the last test case in one test script since the table
+        # created by one test case might be altered by the following up ones.
+        test_cases[-1].validate_result()
     else:
       for test_cases in self._tests:
         self._run_test(test_cases)
