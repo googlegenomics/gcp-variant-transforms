@@ -11,7 +11,7 @@ actions:
     imageUri: gcr.io/gcp-variant-transforms/gcp-variant-transforms
     #set the entrypoint
     entrypoint: /opt/gcp_variant_transforms/bin/vcf_to_bq
-    #provide the flagss and values
+    #provide the flags and values
     commands:
       - --network 
       - < network name >

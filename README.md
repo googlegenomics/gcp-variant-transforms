@@ -175,6 +175,11 @@ You may need to constrain Cloud Dataflow job processing to a specific geographic
 region in support of your project’s security and compliance needs. See
 [Running in particular zone/region doc](docs/running_in_particular_zone_region.md).
 
+## Running jobs in a particular VPC & Subnetwork
+
+You may need to constrain Cloud Dataflow job processing to a vpc, and subnetwork in support of your project’s security and compliance needs. See
+[Running in particular VPC & Subnetwork doc](docs/running_in_particular_vpc_subnet.md).
+
 
 ## Additional topics
 
