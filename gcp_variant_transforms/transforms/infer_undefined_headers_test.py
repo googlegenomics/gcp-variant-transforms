@@ -58,12 +58,12 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IS': vcfio.VariantInfo('some data', '1'),
-              'ISI': vcfio.VariantInfo('1', '1'),
-              'ISF': vcfio.VariantInfo('1.0', '1'),
-              'IF': vcfio.VariantInfo(1.0, '1'),
-              'IB': vcfio.VariantInfo(True, '0'),
-              'IA': vcfio.VariantInfo([0.1, 0.2], '2')},
+        info={'IS': 'some data',
+              'ISI': '1',
+              'ISF': '1.0',
+              'IF': 1.0,
+              'IB': True,
+              'IA': [0.1, 0.2]},
         calls=[vcfio.VariantCall(
             name='Sample1', genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]
@@ -74,7 +74,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'IS_2': vcfio.VariantInfo('some data', '1')},
+        info={'IS_2': 'some data'},
         calls=[vcfio.VariantCall(
             name='Sample1', genotype=[0, 1], phaseset='*', info={'FI_2': 20})]
     )

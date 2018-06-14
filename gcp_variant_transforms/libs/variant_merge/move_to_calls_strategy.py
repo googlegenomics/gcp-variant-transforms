@@ -83,7 +83,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
           bigquery_util.ColumnKeyConstants.QUALITY] = variant.quality
     for info_key, info_value in variant.info.iteritems():
       if self._should_move_info_key_to_calls(info_key):
-        additional_call_info[info_key] = info_value.data
+        additional_call_info[info_key] = info_value
     for call in variant.calls:
       call.info.update(additional_call_info)
 

@@ -154,10 +154,10 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
-              'IS': vcfio.VariantInfo('some data', ''),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')},
+        info={'IFR': [0.1, 0.2],
+              'IFR2': [0.2, 0.3],
+              'IS': 'some data',
+              'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -204,7 +204,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '')})
+        info={'II': 1234})
     header_num_dict = {'II': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
@@ -231,7 +231,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '')},
+        info={'II': 1234},
         calls=[
             vcfio.VariantCall(
                 name='EmptySample', genotype=[], phaseset='*',
@@ -252,9 +252,9 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=[], filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo(['0.1', '0.2'], ''),
-              'IS': vcfio.VariantInfo(1, ''),
-              'ISR': vcfio.VariantInfo(1, '')},
+        info={'IFR': ['0.1', '0.2'],
+              'IS': 1,
+              'ISR': 1},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',

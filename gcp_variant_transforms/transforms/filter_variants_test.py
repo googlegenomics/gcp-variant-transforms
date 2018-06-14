@@ -43,8 +43,8 @@ class FilterVariantsTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1'], quality=2,
         filters=['PASS'],
-        info={'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'A1': 'some data',
+              'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -58,8 +58,8 @@ class FilterVariantsTest(unittest.TestCase):
         reference_name='20', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1'], quality=20,
         filters=['q10'],
-        info={'A1': vcfio.VariantInfo('some data2', '2'),
-              'A3': vcfio.VariantInfo(['data3', 'data4'], '2')},
+        info={'A1': 'some data2',
+              'A3': ['data3', 'data4']},
         calls=[
             vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
             vcfio.VariantCall(

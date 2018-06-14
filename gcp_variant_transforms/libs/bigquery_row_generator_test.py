@@ -222,10 +222,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
-              'IS': vcfio.VariantInfo('some data', ''),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')},
+        info={'IFR': [0.1, 0.2],
+              'IFR2': [0.2, 0.3],
+              'IS': 'some data',
+              'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -270,8 +270,8 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'IS': vcfio.VariantInfo('some data', ''),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')})
+        info={'IS': 'some data',
+              'ISR': ['data1', 'data2']})
     header_num_dict = {'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -319,10 +319,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=['q10'],
-        info={'IIR': vcfio.VariantInfo([0, 1, None], ''),
-              'IBR': vcfio.VariantInfo([True, None, False], ''),
-              'IFR': vcfio.VariantInfo([0.1, 0.2, None, 0.4], ''),
-              'ISR': vcfio.VariantInfo([None, 'data1', 'data2'], '')})
+        info={'IIR': [0, 1, None],
+              'IBR': [True, None, False],
+              'IFR': [0.1, 0.2, None, 0.4],
+              'ISR': [None, 'data1', 'data2']})
     header_num_dict = {'IIR': '3', 'IBR': '3', 'IFR': '4', 'ISR': '3'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -345,9 +345,8 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[sample_unicode_str, sample_utf8_str],
-        info={'IS': vcfio.VariantInfo(sample_utf8_str, ''),
-              'ISR': vcfio.VariantInfo(
-                  [sample_unicode_str, sample_utf8_str], '')})
+        info={'IS': sample_utf8_str,
+              'ISR': [sample_unicode_str, sample_utf8_str]})
     header_num_dict = {'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -366,9 +365,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IF': vcfio.VariantInfo(float('inf'), ''),
-              'IFR': vcfio.VariantInfo([float('-inf'), float('nan'), 1.2], ''),
-              'IF2': vcfio.VariantInfo(float('nan'), ''),})
+        info={'IF': float('inf'),
+              'IFR': [float('-inf'), float('nan'), 1.2],
+              'IF2': float('nan')})
     header_num_dict = {'IF': '1', 'IFR': '3', 'IF2': '1'}
     null_replacement_value = -sys.maxint
     expected_row = {
@@ -388,8 +387,8 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[],
-        info={'IS': vcfio.VariantInfo('data1', ''),
-              '_IS': vcfio.VariantInfo('data2', '')})
+        info={'IS': 'data1',
+              '_IS': 'data2'})
     header_num_dict = {'IS': '1', '_IS': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -408,9 +407,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
-              'IS': vcfio.VariantInfo('some data', ''),},
+        info={'IFR': [0.1, 0.2],
+              'IFR2': [0.2, 0.3],
+              'IS': 'some data'},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -516,10 +515,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IB': vcfio.VariantInfo(data=1, field_count=''),
-              'II': vcfio.VariantInfo(data=1.1, field_count=''),
-              'IFR': vcfio.VariantInfo(data=[1, 2], field_count=''),
-              'ISR': vcfio.VariantInfo(data=[1.0, 2.0], field_count='')})
+        info={'IB': 1,
+              'II': 1.1,
+              'IFR': [1, 2],
+              'ISR': [1.0, 2.0]})
     header_num_dict = {'IB': '1', 'II': '1', 'IFR': '2', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -540,7 +539,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
           reference_name='chr19', start=11, end=12, reference_bases='CT',
           alternate_bases=[], filters=[],
           # String cannot be casted to integer.
-          info={'II': vcfio.VariantInfo(data='1.1', field_count=''),})
+          info={'II': '1.1'})
       header_num_dict = {'II': '1'}
       self._get_row_list_from_variant(
           variant, header_num_dict, allow_incompatible_records=True)
@@ -550,11 +549,11 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=[], filters=[],
-        info={'IB': vcfio.VariantInfo(data=[1, 2], field_count=''),
-              'IBR': vcfio.VariantInfo(data=1, field_count=''),
-              'II': vcfio.VariantInfo(data=[10, 20], field_count=''),
-              'IFR': vcfio.VariantInfo(data=1.1, field_count=''),
-              'ISR': vcfio.VariantInfo(data='foo', field_count='')},)
+        info={'IB': [1, 2],
+              'IBR': 1,
+              'II': [10, 20],
+              'IFR': 1.1,
+              'ISR': 'foo'},)
     header_num_dict = {'IB': '2', 'IBR': '1', 'II': '2', 'IFR': '1', 'ISR': '1'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',

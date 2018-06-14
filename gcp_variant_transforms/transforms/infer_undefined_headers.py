@@ -90,8 +90,7 @@ class _InferUndefinedHeaderFields(beam.DoFn):
       that is not defined in the header.
     """
     infos = {}
-    for info_field_key, variant_info in variant.info.iteritems():
-      info_field_value = variant_info.data
+    for info_field_key, info_field_value in variant.info.iteritems():
       if not defined_headers or info_field_key not in defined_headers.infos:
         if info_field_key in infos:
           raise ValueError(

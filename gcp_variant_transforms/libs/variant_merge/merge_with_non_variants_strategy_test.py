@@ -32,8 +32,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'A1': 'some data',
+              'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
@@ -43,8 +43,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs3'], quality=20,
         filters=['q10'],
-        info={'A1': vcfio.VariantInfo('some data2', '2'),
-              'A3': vcfio.VariantInfo(['data3', 'data4'], '2')},
+        info={'A1': 'some data2',
+              'A3': ['data3', 'data4']},
         calls=[
             vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
             vcfio.VariantCall(name='Sample4', genotype=[1, 0],
@@ -86,11 +86,9 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         merged_variant.calls)
     self.assertItemsEqual(['A1', 'A2', 'A3'], merged_variant.info.keys())
     self.assertTrue(
-        merged_variant.info['A1'].data in ('some data', 'some data2'))
-    self.assertEqual(vcfio.VariantInfo(['data1', 'data2'], '2'),
-                     merged_variant.info['A2'])
-    self.assertEqual(vcfio.VariantInfo(['data3', 'data4'], '2'),
-                     merged_variant.info['A3'])
+        merged_variant.info['A1'] in ('some data', 'some data2'))
+    self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
+    self.assertEqual(['data3', 'data4'], merged_variant.info['A3'])
 
   def test_get_merged_variants_move_quality_and_filter_to_calls(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
@@ -134,11 +132,9 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         merged_variant.calls)
     self.assertItemsEqual(['A1', 'A2', 'A3'], merged_variant.info.keys())
     self.assertTrue(
-        merged_variant.info['A1'].data in ('some data', 'some data2'))
-    self.assertEqual(vcfio.VariantInfo(['data1', 'data2'], '2'),
-                     merged_variant.info['A2'])
-    self.assertEqual(vcfio.VariantInfo(['data3', 'data4'], '2'),
-                     merged_variant.info['A3'])
+        merged_variant.info['A1'] in ('some data', 'some data2'))
+    self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
+    self.assertEqual(['data3', 'data4'], merged_variant.info['A3'])
 
   def test_get_merged_variants_move_info_to_calls(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(
@@ -170,10 +166,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                            info={'GQ': 20, 'A1': 'some data2'})],
         merged_variant.calls)
     self.assertItemsEqual(['A2', 'A3'], merged_variant.info.keys())
-    self.assertEqual(vcfio.VariantInfo(['data1', 'data2'], '2'),
-                     merged_variant.info['A2'])
-    self.assertEqual(vcfio.VariantInfo(['data3', 'data4'], '2'),
-                     merged_variant.info['A3'])
+    self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
+    self.assertEqual(['data3', 'data4'], merged_variant.info['A3'])
 
   def test_get_merged_variants_move_everything_to_calls(self):
     strategy = merge_with_non_variants_strategy.MergeWithNonVariantsStrategy(

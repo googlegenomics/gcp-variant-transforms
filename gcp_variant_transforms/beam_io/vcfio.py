@@ -35,7 +35,7 @@ from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
 __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
-           'VariantInfo', 'MalformedVcfRecord']
+           'MalformedVcfRecord']
 
 
 # TODO(bashir2): We should remove VariantInfo and instead use the raw 'data'
@@ -50,7 +50,8 @@ __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
 #   - 'A': one value per alternate allele.
 #   - 'G': one value for each possible genotype.
 #   - 'R': one value for each possible allele (including the reference).
-VariantInfo = namedtuple('VariantInfo', ['data', 'field_count'])
+#VariantInfo = namedtuple('VariantInfo', ['data', 'field_count'])
+
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
 # failed in.
@@ -81,7 +82,7 @@ class Variant(object):
                names=None,  # type: List[str]
                quality=None,  # type: float
                filters=None,  # type: List[str]
-               info=None,  # type: Dict[str, VariantInfo]
+               info=None,  # type: Dict[str, Any]
                calls=None  # type: List[VariantCall]
               ):
     # type: (...) -> None
@@ -102,7 +103,7 @@ class Variant(object):
       filters: A list of filters (normally quality filters) this variant has
         failed. `PASS` indicates this variant has passed all filters.
       info: A map of additional variant information. The key is specified
-        in the VCF record and the value is of type ``VariantInfo``.
+        in the VCF record and the value can be Any type .
       calls: The variant calls for this variant. Each one represents the
         determination of genotype with respect to this variant.
     """
@@ -186,7 +187,7 @@ class VariantCall(object):
   """
 
   def __init__(self, name=None, genotype=None, phaseset=None, info=None):
-    # type: (str, List[int], str, Dict[str, VariantInfo]) -> None
+    # type: (str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
 
     Args:
@@ -288,10 +289,10 @@ class _ToVcfRecordCoder(coders.Coder):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
     for k, v in variant.info.iteritems():
-      if v.data is True:
+      if v is True:
         encoded_infos.append(k)
       else:
-        encoded_infos.append('%s=%s' % (k, self._encode_value(v.data)))
+        encoded_infos.append('%s=%s' % (k, self._encode_value(v)))
     return ';'.join(encoded_infos)
 
   def _get_variant_format_keys(self, variant):
@@ -544,10 +545,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
       info = {}
       for k, v in record.INFO.iteritems():
         if k != END_INFO_KEY:
-          field_count = None
-          if k in infos:
-            field_count = self._get_field_count_as_string(infos[k].num)
-          info[k] = VariantInfo(data=v, field_count=field_count)
+          info[k] = v
 
       return info
 
