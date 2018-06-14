@@ -35,8 +35,7 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'A1': 'some data',
-              'A2': ['data1', 'data2']},
+        info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
@@ -46,8 +45,7 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs3'], quality=20,
         filters=['q10'],
-        info={'A1': 'some data2',
-              'A3': ['data3', 'data4']},
+        info={'A1': 'some data2', 'A3': ['data3', 'data4']},
         calls=[
             vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
             vcfio.VariantCall(name='Sample4', genotype=[1, 0],

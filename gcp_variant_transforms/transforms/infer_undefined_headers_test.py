@@ -58,12 +58,8 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IS': 'some data',
-              'ISI': '1',
-              'ISF': '1.0',
-              'IF': 1.0,
-              'IB': True,
-              'IA': [0.1, 0.2]},
+        info={'IS': 'some data', 'ISI': '1', 'ISF': '1.0',
+              'IF': 1.0, 'IB': True, 'IA': [0.1, 0.2]},
         calls=[vcfio.VariantCall(
             name='Sample1', genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]

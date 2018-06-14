@@ -242,7 +242,7 @@ class ProcessedVariantFactory(object):
     self._variant_counter.inc()
     for key, variant_info_data in variant.info.iteritems():
       if (self._header_fields.infos[key][_HeaderKeyConstants.NUM] ==
-          _FIELD_COUNT_ALTERNATE_ALLELE):
+          vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
         self._add_per_alt_info(proc_var, key, variant_info_data)
       elif key in self._annotation_field_set:
         self._annotation_processor.add_annotation_data(

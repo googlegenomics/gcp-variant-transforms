@@ -156,48 +156,18 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     return schema
 
   def _make_header(self, key_num_dict):
-    info_list = [
-        parser._Info(
-            id=None,
-            num='A',
-            type=None,
-            desc='some desc',
-            source=None,
-            version=None),
-        parser._Info(
-            id=None,
-            num='1',
-            type=None,
-            desc='some desc',
-            source=None,
-            version=None),
-        parser._Info(
-            id=None,
-            num='2',
-            type=None,
-            desc='some desc',
-            source=None,
-            version=None),
-        parser._Info(
-            id=None,
-            num='3',
-            type=None,
-            desc='some desc',
-            source=None,
-            version=None),
-        parser._Info(
-            id=None,
-            num='4',
-            type=None,
-            desc='some desc',
-            source=None,
-            version=None)]
     infos_dict = {}
     for k, v in key_num_dict.iteritems():
-      if v == 'A':
-        infos_dict[k] = info_list[0]
+      if v == '.':
+        infos_dict[k] = parser._Info(None, None, None, '', None, None)
+      elif v == 'A':
+        infos_dict[k] = parser._Info(None, -1, None, '', None, None)
+      elif v == 'G':
+        infos_dict[k] = parser._Info(None, -2, None, '', None, None)
+      elif v == 'R':
+        infos_dict[k] = parser._Info(None, -3, None, '', None, None)
       elif int(v) <= 4 and int(v) >= 1:
-        infos_dict[k] = info_list[int(v)]
+        infos_dict[k] = parser._Info(None, int(v), None, '', None, None)
       else:
         self.fail("given NUM value is not valid: " + v)
     return vcf_header_io.VcfHeader(infos=infos_dict)
