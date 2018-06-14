@@ -23,6 +23,7 @@ import argparse  # pylint: disable=unused-import
 import json
 import os
 import time
+from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 from googleapiclient import discovery
@@ -30,6 +31,19 @@ from oauth2client.client import GoogleCredentials
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 _DEFAULT_ZONES = ['us-east1-b']
+
+# `TestCaseState` saves current running test and the remaining tests in the same
+# test script (.json).
+TestCaseState = namedtuple('TestCaseState',
+                           ['running_test', 'remaining_tests'])
+
+
+class TestCaseInterface(object):
+  """Interface of an integration test case."""
+
+  def validate_result(self):
+    """Validates the result of the test case."""
+    raise NotImplementedError
 
 
 class TestCaseFailure(Exception):
@@ -40,43 +54,70 @@ class TestCaseFailure(Exception):
 class TestRunner(object):
   """Runs the tests using pipelines API."""
 
-  def __init__(self, tests):
-    # type: (List[Union[PreprocessorTestCase, VcfToBQTestCase]]) -> None
+  def __init__(self, tests, revalidate=False):
+    # type: (List[List[TestCaseInterface]], bool) -> None
+    """Initializes the TestRunner.
+
+    Args:
+      tests: All test cases.
+      revalidate: If True, only run the result validation part of the tests.
+    """
     self._tests = tests
     self._service = discovery.build(
         'genomics',
         'v1alpha2',
         credentials=GoogleCredentials.get_application_default())
-    self._operation_names = []  # type: List[str]
-    self._responses = []  # List[Dict]
+    self._revalidate = revalidate
+    self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
 
   def run(self):
     """Runs all tests."""
-    for test in self._tests:
-      # The following pylint hint is needed because `pipelines` is a method that
-      # is dynamically added to the returned `service` object above. See
-      # `googleapiclient.discovery.Resource._set_service_methods`.
-      # pylint: disable=no-member
-      request = self._service.pipelines().run(body=test.pipeline_api_request)
-      operation_name = request.execute()['name']
-      self._operation_names.append(operation_name)
-    self._wait_for_all_operations_done()
+    if self._revalidate:
+      for test_cases in self._tests:
+        # Only validates the last test case in one test script since the table
+        # created by one test case might be altered by the following up ones.
+        test_cases[-1].validate_result()
+    else:
+      for test_cases in self._tests:
+        self._run_test(test_cases)
+      self._wait_for_all_operations_done()
+
+  def _run_test(self, test_cases):
+    # type: (List[TestCaseInterface]) -> None
+    """Runs the first test case in `test_cases`.
+
+    The first test case and the remaining test cases form `TestCaseState` and
+    are added into `_operation_names_to_test_states` for future usage.
+    """
+    if not test_cases:
+      return
+    # The following pylint hint is needed because `pipelines` is a method that
+    # is dynamically added to the returned `service` object above. See
+    # `googleapiclient.discovery.Resource._set_service_methods`.
+    # pylint: disable=no-member
+    request = self._service.pipelines().run(
+        body=test_cases[0].pipeline_api_request)
+    operation_name = request.execute()['name']
+    self._operation_names_to_test_states.update(
+        {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
 
   def _wait_for_all_operations_done(self):
-    """Waits until all operations of `_operation_names` are done."""
+    """Waits until all operations are done."""
     # pylint: disable=no-member
     operations = self._service.operations()
-    running_operation_names = set(self._operation_names)
-    while running_operation_names:
+    while self._operation_names_to_test_states:
       time.sleep(10)
-      for operation_name in self._operation_names:
-        if operation_name in running_operation_names:
-          request = operations.get(name=operation_name)
-          response = request.execute()
-          if response['done']:
-            self._handle_failure(response)
-            self._responses.append(response)
-            running_operation_names.remove(operation_name)
+      running_operation_names = self._operation_names_to_test_states.keys()
+      for operation_name in running_operation_names:
+        request = operations.get(name=operation_name)
+        response = request.execute()
+        if response['done']:
+          self._handle_failure(response)
+          test_case_state = self._operation_names_to_test_states.get(
+              operation_name)
+          del self._operation_names_to_test_states[operation_name]
+          test_case_state.running_test.validate_result()
+          self._run_test(test_case_state.remaining_tests)
 
   def _handle_failure(self, response):
     """Raises errors if test case failed."""
@@ -90,8 +131,9 @@ class TestRunner(object):
 
   def print_results(self):
     """Prints results of test cases."""
-    for test in self._tests:
-      print '{} ...ok'.format(test.get_name())
+    for test_cases in self._tests:
+      for test_case in test_cases:
+        print '{} ...ok'.format(test_case.get_name())
     return 0
 
 
@@ -141,31 +183,33 @@ def add_args(parser):
 
 
 def get_configs(test_file_path, required_keys):
-  # type: (str, List[str]) -> List[Dict]
+  # type: (str, List[str]) -> List[List[Dict]]
   """Gets all test configs in integration directory and subdirectories."""
   test_configs = []
   for root, _, files in os.walk(test_file_path):
     for filename in files:
       if filename.endswith('.json'):
-        test_configs.append(_load_test_config(os.path.join(root, filename),
-                                              required_keys))
+        test_configs.append(_load_test_configs(os.path.join(root, filename),
+                                               required_keys))
   if not test_configs:
     raise TestCaseFailure('Found no .json files in directory {}'.format(
         test_file_path))
   return test_configs
 
 
-def _load_test_config(filename, required_keys):
-  # type: (str, List[str]) -> str
+def _load_test_configs(filename, required_keys):
+  # type: (str, List[str]) -> List[Dict]
   """Loads an integration test JSON object from a file."""
   with open(filename, 'r') as f:
-    test = json.loads(f.read())
-    _validate_test(test, filename, required_keys)
-    return test
+    tests = json.loads(f.read())
+    _validate_test_configs(tests, filename, required_keys)
+    return tests
 
 
-def _validate_test(test, filename, required_keys):
+def _validate_test_configs(test_configs, filename, required_keys):
+  # type: (List[Dict], str, List[str]) -> None
   for key in required_keys:
-    if key not in test:
-      raise ValueError('Test case in {} is missing required key: {}'.format(
-          filename, key))
+    for test_config in test_configs:
+      if key not in test_config:
+        raise ValueError('Test case in {} is missing required key: {}'.format(
+            filename, key))

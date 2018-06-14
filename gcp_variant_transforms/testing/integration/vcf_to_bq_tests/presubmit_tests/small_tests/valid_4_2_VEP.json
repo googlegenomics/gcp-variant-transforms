@@ -1,30 +1,32 @@
-{
-  "test_name": "valid-4-2-vep",
-  "table_name": "valid_4_2_VEP",
-  "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2_VEP.vcf",
-  "annotation_fields": "CSQ",
-  "runner": "DirectRunner",
-  "zones": ["us-west1-b"],
-  "assertion_configs": [
-    {
-      "query": ["NUM_ROWS_QUERY"],
-      "expected_result": {"num_rows": 11}
-    },
-    {
-      "query": ["SUM_START_QUERY"],
-      "expected_result": {"sum_start": 21801693}
-    },
-    {
-      "query": ["SUM_END_QUERY"],
-      "expected_result": {"sum_end": 21802814}
-    },
-    {
-      "query": [
-        "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-        "FROM {TABLE_NAME} AS t, t.alternate_bases as alts, alts.CSQ as CSQ ",
-        "WHERE start_position = 1110695 AND alts.alt = 'G'"
-      ],
-      "expected_result": {"num_features": 3}
-    }
-  ]
-}
+[
+  {
+    "test_name": "valid-4-2-vep",
+    "table_name": "valid_4_2_VEP",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2_VEP.vcf",
+    "annotation_fields": "CSQ",
+    "runner": "DirectRunner",
+    "zones": ["us-west1-b"],
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 11}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 21801693}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 21802814}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
+          "FROM {TABLE_NAME} AS t, t.alternate_bases as alts, alts.CSQ as CSQ ",
+          "WHERE start_position = 1110695 AND alts.alt = 'G'"
+        ],
+        "expected_result": {"num_features": 3}
+      }
+    ]
+  }
+]

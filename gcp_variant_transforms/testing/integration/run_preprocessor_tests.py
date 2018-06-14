@@ -49,7 +49,7 @@ _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
-class PreprocessorTestCase(object):
+class PreprocessorTestCase(run_tests_common.TestCaseInterface):
   """Test case that holds information to run in Pipelines API."""
 
   def __init__(self,
@@ -145,7 +145,7 @@ def _get_args():
 
 
 def _get_test_configs():
-  # type: () -> List[Dict]
+  # type: () -> List[List[Dict]]
   """Gets all test configs in preprocessor_tests."""
   required_keys = ['test_name', 'report_blob_name', 'input_pattern',
                    'expected_contents']
@@ -156,15 +156,16 @@ def _get_test_configs():
 def main():
   """Runs the integration tests for preprocessor."""
   args = _get_args()
-  test_case_configs = _get_test_configs()
+  test_configs = _get_test_configs()
 
   tests = []
-  for config in test_case_configs:
-    tests.append(PreprocessorTestCase(args, **config))
+  for test_case_configs in test_configs:
+    test_cases = []
+    for config in test_case_configs:
+      test_cases.append(PreprocessorTestCase(args, **config))
+    tests.append(test_cases)
   test_runner = run_tests_common.TestRunner(tests)
   test_runner.run()
-  for test in tests:
-    test.validate_result()
   return test_runner.print_results()
 
 
