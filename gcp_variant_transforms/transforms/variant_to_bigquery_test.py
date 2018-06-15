@@ -24,6 +24,7 @@ from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
+from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -101,15 +102,62 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     schema.fields.append(call_record)
     return schema
 
+  def _make_header(self, key_num_dict):
+    info_list = [
+        parser._Info(
+            id=None,
+            num='A',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='1',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='2',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='3',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None),
+        parser._Info(
+            id=None,
+            num='4',
+            type=None,
+            desc='some desc',
+            source=None,
+            version=None)]
+    infos_dict = {}
+    for k, v in key_num_dict.iteritems():
+      if v == 'A':
+        infos_dict[k] = info_list[0]
+      elif int(v) <= 4 and int(v) >= 1:
+        infos_dict[k] = info_list[int(v)]
+      else:
+        self.fail("given NUM value is not valid: " + v)
+    return vcf_header_io.VcfHeader(infos=infos_dict)
+
   def _get_sample_variant_1(self, split_alternate_allele_info_fields=True):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'IS': vcfio.VariantInfo('some data', '1'),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'IFR': vcfio.VariantInfo([0.1, 0.2], ''),
+              'IFR2': vcfio.VariantInfo([0.2, 0.3], ''),
+              'IS': vcfio.VariantInfo('some data', ''),
+              'ISR': vcfio.VariantInfo(['data1', 'data2'], '')},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -119,6 +167,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
                 info={'GQ': 10, 'FB': True}),
         ]
     )
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
     row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
            ColumnKeyConstants.START_POSITION: 11,
            ColumnKeyConstants.END_POSITION: 12,
@@ -149,13 +198,14 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
           {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT'}]
       row['IFR'] = [0.1, 0.2]
       row['IFR2'] = [0.2, 0.3]
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_2(self):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '1')})
+        info={'II': vcfio.VariantInfo(1234, '')})
+    header_num_dict = {'II': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -164,7 +214,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
            'II': 1234}
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_3(self):
     variant = vcfio.Variant(
@@ -175,18 +225,19 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.REFERENCE_BASES: None,
            ColumnKeyConstants.ALTERNATE_BASES: [],
            ColumnKeyConstants.CALLS: []}
-    return variant, row
+    return variant, row, {}
 
   def _get_sample_variant_with_empty_calls(self):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '1')},
+        info={'II': vcfio.VariantInfo(1234, '')},
         calls=[
             vcfio.VariantCall(
                 name='EmptySample', genotype=[], phaseset='*',
                 info={}),
         ])
+    header_num_dict = {'II': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -195,21 +246,22 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
            'II': 1234}
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_with_incompatible_records(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=[], filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo(['0.1', '0.2'], '2'),
-              'IS': vcfio.VariantInfo(1, '1'),
-              'ISR': vcfio.VariantInfo(1, '1')},
+        info={'IFR': vcfio.VariantInfo(['0.1', '0.2'], ''),
+              'IS': vcfio.VariantInfo(1, ''),
+              'ISR': vcfio.VariantInfo(1, '')},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10.0, 20.0]}),
         ]
     )
+    header_num_dict = {'IFR': '2', 'IS': '1', 'ISR': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
            ColumnKeyConstants.START_POSITION: 11,
            ColumnKeyConstants.END_POSITION: 12,
@@ -224,13 +276,16 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            'IFR': [0.1, 0.2],
            'IS': '1',
            'ISR': ['1']}
-    return variant, row
+    return variant, row, header_num_dict
 
   def test_convert_variant_to_bigquery_row(self):
-    variant_1, row_1 = self._get_sample_variant_1()
-    variant_2, row_2 = self._get_sample_variant_2()
-    variant_3, row_3 = self._get_sample_variant_3()
-    header_fields = vcf_header_io.VcfHeader()
+    variant_1, row_1, header_dic_1 = self._get_sample_variant_1()
+    variant_2, row_2, header_dic_2 = self._get_sample_variant_2()
+    variant_3, row_3, header_dic_3 = self._get_sample_variant_3()
+    header_dic = header_dic_1.copy()
+    header_dic.update(header_dic_2)
+    header_dic.update(header_dic_3)
+    header_fields = self._make_header(header_dic)
     proc_var_1 = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant_1)
     proc_var_2 = processed_variant.ProcessedVariantFactory(
@@ -247,8 +302,8 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_omit_empty_calls(self):
-    variant, row = self._get_sample_variant_with_empty_calls()
-    header_fields = vcf_header_io.VcfHeader()
+    variant, row, header_dic = self._get_sample_variant_with_empty_calls()
+    header_fields = self._make_header(header_dic)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)
@@ -261,8 +316,9 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_allow_incompatible_recoreds(self):
-    variant, row = self._get_sample_variant_with_incompatible_records()
-    header_fields = vcf_header_io.VcfHeader()
+    (variant, row,
+     header_dic) = self._get_sample_variant_with_incompatible_records()
+    header_fields = self._make_header(header_dic)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)
