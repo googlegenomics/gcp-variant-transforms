@@ -26,6 +26,7 @@ from gcp_variant_transforms.libs import processed_variant
 # This is intentionally breaking the style guide because without this the lines
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
+from gcp_variant_transforms.testing import vcf_header_util
 
 
 class _CounterSpy(metrics_util.CounterInterface):
@@ -66,28 +67,9 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
             vcfio.VariantCall(name='Sample2', genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
 
-  def _make_header(self, key_num_dict):
-    infos_dict = {}
-    for k, v in key_num_dict.iteritems():
-      if v == '.':
-        infos_dict[k] = parser._Info(
-            None, None, None,
-            'some desc Allele|Consequence|IMPACT|SYMBOL|Gene', None, None)
-      elif v == 'A':
-        infos_dict[k] = parser._Info(None, -1, None, '', None, None)
-      elif v == 'G':
-        infos_dict[k] = parser._Info(None, -2, None, '', None, None)
-      elif v == 'R':
-        infos_dict[k] = parser._Info(None, -3, None, '', None, None)
-      elif int(v) <= 4 and int(v) >= 1:
-        infos_dict[k] = parser._Info(None, int(v), None, '', None, None)
-      else:
-        self.fail("given NUM value is not valid: " + v)
-    return vcf_header_io.VcfHeader(infos=infos_dict)
-
   def test_create_processed_variant_no_change(self):
     variant = self._get_sample_variant()
-    header_fields = self._make_header({'A1': '1', 'A2': 'A'})
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -98,13 +80,10 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     # `proc_var` should be that INFO fields are copied to `_non_alt_info` map
     # and `_alternate_datas` are filled with alternate bases information only.
     proc_var_synthetic = processed_variant.ProcessedVariant(variant)
-    proc_var_synthetic._non_alt_info = {'A1': 'some data'}
-    alt1 = processed_variant.AlternateBaseData('A')
-    alt1._info['A2'] = 'data1'
-    alt2 = processed_variant.AlternateBaseData('TT')
-    alt2._info['A2'] = 'data2'
-    proc_var_synthetic._alternate_datas = [alt1, alt2]
-
+    proc_var_synthetic._non_alt_info = {'A1': 'some data',
+                                        'A2': ['data1', 'data2']}
+    proc_var_synthetic._alternate_datas = [
+        processed_variant.AlternateBaseData(a) for a in ['A', 'TT']]
     self.assertEqual([proc_var_synthetic], [proc_var])
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
@@ -116,7 +95,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_move_alt_info(self):
     variant = self._get_sample_variant()
-    header_fields = self._make_header({'A1': '1', 'A2': 'A'})
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
         split_alternate_allele_info_fields=True)
@@ -131,7 +110,11 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
   def _get_sample_variant_and_header_with_csq(self):
     variant = self._get_sample_variant()
     variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
-    header_fields = self._make_header({'CSQ': '.', 'A1': '1', 'A2': 'A'})
+    header_fields = vcf_header_util.make_header({'CSQ': '.',
+                                                 'A1': '1', 'A2': 'A'})
+    header_fields.infos['CSQ'][
+        vcf_header_io.VcfParserHeaderKeyConstants.DESC] = (
+            'some desc Allele|Consequence|IMPACT|SYMBOL|Gene')
     return variant, header_fields
 
   def test_create_processed_variant_move_alt_info_and_annotation(self):
@@ -221,7 +204,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         filters=['PASS'],
         info={'CSQ': [
             'SYMBOLIC|C1|I1|S1|G1', '[13|C2|I2|S2|G2', 'C[10|C3|I3|S3|G3',
-            'C[1|C3|I3|S3|G3']}) # The last one does not match any alts.
+            'C[1|C3|I3|S3|G3']})  # The last one does not match any alts.
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,

@@ -22,10 +22,8 @@ import unittest
 import mock
 
 from apache_beam.io.gcp.internal.clients import bigquery
-from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_util
@@ -34,6 +32,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
+from gcp_variant_transforms.testing import vcf_header_util
 
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
@@ -155,31 +154,14 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     schema.fields.append(call_record)
     return schema
 
-  def _make_header(self, key_num_dict):
-    infos_dict = {}
-    for k, v in key_num_dict.iteritems():
-      if v == '.':
-        infos_dict[k] = parser._Info(None, None, None, '', None, None)
-      elif v == 'A':
-        infos_dict[k] = parser._Info(None, -1, None, '', None, None)
-      elif v == 'G':
-        infos_dict[k] = parser._Info(None, -2, None, '', None, None)
-      elif v == 'R':
-        infos_dict[k] = parser._Info(None, -3, None, '', None, None)
-      elif int(v) <= 4 and int(v) >= 1:
-        infos_dict[k] = parser._Info(None, int(v), None, '', None, None)
-      else:
-        self.fail("given NUM value is not valid: " + v)
-    return vcf_header_io.VcfHeader(infos=infos_dict)
-
   def _get_row_list_from_variant(
-      self, variant, key_num_dict, allow_incompatible_records=False,
+      self, variant, header_num_dict=None, allow_incompatible_records=False,
       omit_empty_sample_calls=False, **kwargs):
     # TODO(bashir2): To make this more of a "unit" test, we should create
     # ProcessedVariant instances directly (instead of Variant) and avoid calling
     # create_processed_variant here. Then we should also add cases that
     # have annotation fields.
-    header_fields = self._make_header(key_num_dict)
+    header_fields = vcf_header_util.make_header(header_num_dict or {})
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
 
@@ -260,7 +242,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=None, end=123, reference_bases=None,
         alternate_bases=[], quality=20)
-    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: None,
@@ -270,11 +251,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.QUALITY: 20,
         ColumnKeyConstants.CALLS: []}
     self.assertEqual([expected_row],
-                     self._get_row_list_from_variant(variant, header_num_dict))
+                     self._get_row_list_from_variant(variant))
 
   def test_no_field_set(self):
     variant = vcfio.Variant()
-    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: None,
         ColumnKeyConstants.START_POSITION: None,
@@ -283,7 +263,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: []}
     self.assertEqual([expected_row],
-                     self._get_row_list_from_variant(variant, header_num_dict))
+                     self._get_row_list_from_variant(variant))
 
   def test_null_repeated_fields(self):
     variant = vcfio.Variant(
@@ -459,7 +439,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE,
                                           vcfio.MISSING_GENOTYPE_VALUE])])
-    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -478,7 +457,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     self.assertEqual(
         [expected_row],
         self._get_row_list_from_variant(variant,
-                                        header_num_dict,
                                         omit_empty_sample_calls=True))
 
   def test_schema_conflict_in_info_field_type(self):
@@ -551,7 +529,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
                 info={'FB': 1, 'FI': True, 'FSR': [1.0, 2.0]})])
-    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -571,7 +548,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, header_num_dict, allow_incompatible_records=True))
+        variant, allow_incompatible_records=True))
 
     with self.assertRaises(ValueError):
       variant = vcfio.Variant(
@@ -583,7 +560,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
                   name='Sample1', genotype=[0, 1], phaseset='*',
                   info={'FI': 'string_for_int_field'}),],)
       self._get_row_list_from_variant(
-          variant, header_num_dict, allow_incompatible_records=True)
+          variant, allow_incompatible_records=True)
       self.fail('String data for an integer schema must cause an exception')
 
   def test_schema_conflict_in_format_field_number(self):
@@ -597,7 +574,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             vcfio.VariantCall(
                 name='Sample2', genotype=[1, 0],
                 info={'FB': [], 'FI': [], 'FSR': ''})])
-    header_num_dict = {}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -617,4 +593,4 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     }
 
     self.assertEqual([expected_row], self._get_row_list_from_variant(
-        variant, header_num_dict, allow_incompatible_records=True))
+        variant, allow_incompatible_records=True))

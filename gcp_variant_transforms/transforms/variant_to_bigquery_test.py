@@ -24,16 +24,15 @@ from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
-from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
+from gcp_variant_transforms.testing import vcf_header_util
 from gcp_variant_transforms.transforms import variant_to_bigquery
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
@@ -101,23 +100,6 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         description='FORMAT foo desc'))
     schema.fields.append(call_record)
     return schema
-
-  def _make_header(self, key_num_dict):
-    infos_dict = {}
-    for k, v in key_num_dict.iteritems():
-      if v == '.':
-        infos_dict[k] = parser._Info(None, None, None, '', None, None)
-      elif v == 'A':
-        infos_dict[k] = parser._Info(None, -1, None, '', None, None)
-      elif v == 'G':
-        infos_dict[k] = parser._Info(None, -2, None, '', None, None)
-      elif v == 'R':
-        infos_dict[k] = parser._Info(None, -3, None, '', None, None)
-      elif int(v) <= 4 and int(v) >= 1:
-        infos_dict[k] = parser._Info(None, int(v), None, '', None, None)
-      else:
-        self.fail("given NUM value is not valid: " + v)
-    return vcf_header_io.VcfHeader(infos=infos_dict)
 
   def _get_sample_variant_1(self, split_alternate_allele_info_fields=True):
     variant = vcfio.Variant(
@@ -245,13 +227,13 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     return variant, row, header_num_dict
 
   def test_convert_variant_to_bigquery_row(self):
-    variant_1, row_1, header_dic_1 = self._get_sample_variant_1()
-    variant_2, row_2, header_dic_2 = self._get_sample_variant_2()
-    variant_3, row_3, header_dic_3 = self._get_sample_variant_3()
-    header_dic = header_dic_1.copy()
-    header_dic.update(header_dic_2)
-    header_dic.update(header_dic_3)
-    header_fields = self._make_header(header_dic)
+    variant_1, row_1, header_num_dict_1 = self._get_sample_variant_1()
+    variant_2, row_2, header_num_dict_2 = self._get_sample_variant_2()
+    variant_3, row_3, header_num_dict_3 = self._get_sample_variant_3()
+    header_num_dict = header_num_dict_1.copy()
+    header_num_dict.update(header_num_dict_2)
+    header_num_dict.update(header_num_dict_3)
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var_1 = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant_1)
     proc_var_2 = processed_variant.ProcessedVariantFactory(
@@ -268,8 +250,8 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_omit_empty_calls(self):
-    variant, row, header_dic = self._get_sample_variant_with_empty_calls()
-    header_fields = self._make_header(header_dic)
+    variant, row, header_num_dict = self._get_sample_variant_with_empty_calls()
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)
@@ -282,9 +264,9 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_allow_incompatible_recoreds(self):
-    (variant, row,
-     header_dic) = self._get_sample_variant_with_incompatible_records()
-    header_fields = self._make_header(header_dic)
+    variant, row, header_num_dict = (
+        self._get_sample_variant_with_incompatible_records())
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)

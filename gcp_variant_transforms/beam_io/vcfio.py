@@ -89,7 +89,7 @@ class Variant(object):
       filters: A list of filters (normally quality filters) this variant has
         failed. `PASS` indicates this variant has passed all filters.
       info: A map of additional variant information. The key is specified
-        in the VCF record and the value can be Any type .
+        in the VCF record and the value can be any type .
       calls: The variant calls for this variant. Each one represents the
         determination of genotype with respect to this variant.
     """
@@ -530,35 +530,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
           info[k] = v
 
       return info
-
-    def _get_field_count_as_string(self, field_count):
-      # type: (Optional[int]) -> Optional[str]
-      """Returns the string representation of field_count from PyVCF.
-
-      PyVCF converts field counts to an integer with some predefined constants
-      as specified in the vcf.parser.field_counts dict (e.g. 'A' is -1). This
-      method converts them back to their string representation to avoid having
-      direct dependency on the arbitrary PyVCF constants.
-
-      Args:
-        field_count: An integer representing the number of fields in INFO as
-          specified by PyVCF.
-
-      Returns:
-        A string representation of field_count (e.g. '-1' becomes 'A').
-
-      Raises:
-        ValueError: if the field_count is not valid.
-      """
-      if field_count is None:
-        return None
-      elif field_count >= 0:
-        return str(field_count)
-      field_count_to_string = {v: k for k, v in vcf.parser.field_counts.items()}
-      if field_count in field_count_to_string:
-        return field_count_to_string[field_count]
-      else:
-        raise ValueError('Invalid value for field_count: %d' % field_count)
 
     def _get_variant_calls(self, record, formats):
       calls = []
