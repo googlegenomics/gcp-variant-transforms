@@ -35,22 +35,9 @@ from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
 __all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
-           'VariantInfo', 'MalformedVcfRecord']
+           'MalformedVcfRecord']
 
 
-# TODO(bashir2): We should remove VariantInfo and instead use the raw 'data'
-# only; field_count does not need to be carried with the variant and should
-# be extracted from the header data wherever needed.
-#
-# Stores data about variant INFO fields. The type of 'data' is specified in the
-# VCF headers. 'field_count' is a string that specifies the number of fields
-# that the data type contains. Its value can either be a number representing a
-# constant number of fields, `None` indicating that the value is not set
-# (equivalent to '.' in the VCF file) or one of:
-#   - 'A': one value per alternate allele.
-#   - 'G': one value for each possible genotype.
-#   - 'R': one value for each possible allele (including the reference).
-VariantInfo = namedtuple('VariantInfo', ['data', 'field_count'])
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
 # failed in.
@@ -81,7 +68,7 @@ class Variant(object):
                names=None,  # type: List[str]
                quality=None,  # type: float
                filters=None,  # type: List[str]
-               info=None,  # type: Dict[str, VariantInfo]
+               info=None,  # type: Dict[str, Any]
                calls=None  # type: List[VariantCall]
               ):
     # type: (...) -> None
@@ -102,7 +89,7 @@ class Variant(object):
       filters: A list of filters (normally quality filters) this variant has
         failed. `PASS` indicates this variant has passed all filters.
       info: A map of additional variant information. The key is specified
-        in the VCF record and the value is of type ``VariantInfo``.
+        in the VCF record and the value can be any type .
       calls: The variant calls for this variant. Each one represents the
         determination of genotype with respect to this variant.
     """
@@ -186,7 +173,7 @@ class VariantCall(object):
   """
 
   def __init__(self, name=None, genotype=None, phaseset=None, info=None):
-    # type: (str, List[int], str, Dict[str, VariantInfo]) -> None
+    # type: (str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
 
     Args:
@@ -288,10 +275,10 @@ class _ToVcfRecordCoder(coders.Coder):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
     for k, v in variant.info.iteritems():
-      if v.data is True:
+      if v is True:
         encoded_infos.append(k)
       else:
-        encoded_infos.append('%s=%s' % (k, self._encode_value(v.data)))
+        encoded_infos.append('%s=%s' % (k, self._encode_value(v)))
     return ';'.join(encoded_infos)
 
   def _get_variant_format_keys(self, variant):
@@ -476,8 +463,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     def next(self):
       try:
         record = next(self._vcf_reader)
-        return self._convert_to_variant_record(record, self._vcf_reader.infos,
-                                               self._vcf_reader.formats)
+        return self._convert_to_variant_record(record, self._vcf_reader.formats)
       except (LookupError, ValueError) as e:
         if self._allow_malformed_records:
           logging.warning('VCF record read failed in %s for line %s: %s',
@@ -489,7 +475,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
     def _convert_to_variant_record(
         self,
         record,  # type: vcf.model._Record
-        infos,  # type: Dict[str, vcf.parser._Info]
         formats  # type: Dict[str, vcf.parser._Format]
         ):
       # type: (...) -> Variant
@@ -497,8 +482,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
       Args:
         record: An object containing info about a variant.
-        info: The PyVCF dict storing INFO extracted from the VCF header.
-          The key is the info key and the value is :class:`~vcf.parser._Info`.
         formats: The PyVCF dict storing FORMAT extracted from the VCF header.
           The key is the FORMAT key and the value is
           :class:`~vcf.parser._Format`.
@@ -519,7 +502,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
           names=record.ID.split(';') if record.ID else [],
           quality=record.QUAL,
           filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,
-          info=self._get_variant_info(record, infos),
+          info=self._get_variant_info(record),
           calls=self._get_variant_calls(record, formats))
 
     def _get_variant_end(self, record):
@@ -540,45 +523,13 @@ class _VcfSource(filebasedsource.FileBasedSource):
       # them to their string representations.
       return [str(r) for r in record.ALT if r] if record.ALT else []
 
-    def _get_variant_info(self, record, infos):
+    def _get_variant_info(self, record):
       info = {}
       for k, v in record.INFO.iteritems():
         if k != END_INFO_KEY:
-          field_count = None
-          if k in infos:
-            field_count = self._get_field_count_as_string(infos[k].num)
-          info[k] = VariantInfo(data=v, field_count=field_count)
+          info[k] = v
 
       return info
-
-    def _get_field_count_as_string(self, field_count):
-      # type: (Optional[int]) -> Optional[str]
-      """Returns the string representation of field_count from PyVCF.
-
-      PyVCF converts field counts to an integer with some predefined constants
-      as specified in the vcf.parser.field_counts dict (e.g. 'A' is -1). This
-      method converts them back to their string representation to avoid having
-      direct dependency on the arbitrary PyVCF constants.
-
-      Args:
-        field_count: An integer representing the number of fields in INFO as
-          specified by PyVCF.
-
-      Returns:
-        A string representation of field_count (e.g. '-1' becomes 'A').
-
-      Raises:
-        ValueError: if the field_count is not valid.
-      """
-      if field_count is None:
-        return None
-      elif field_count >= 0:
-        return str(field_count)
-      field_count_to_string = {v: k for k, v in vcf.parser.field_counts.items()}
-      if field_count in field_count_to_string:
-        return field_count_to_string[field_count]
-      else:
-        raise ValueError('Invalid value for field_count: %d' % field_count)
 
     def _get_variant_calls(self, record, formats):
       calls = []

@@ -26,13 +26,13 @@ from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
+from gcp_variant_transforms.testing import vcf_header_util
 from gcp_variant_transforms.transforms import variant_to_bigquery
 from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
 
@@ -106,10 +106,8 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo([0.1, 0.2], 'A'),
-              'IFR2': vcfio.VariantInfo([0.2, 0.3], 'A'),
-              'IS': vcfio.VariantInfo('some data', '1'),
-              'ISR': vcfio.VariantInfo(['data1', 'data2'], '2')},
+        info={'IFR': [0.1, 0.2], 'IFR2': [0.2, 0.3],
+              'IS': 'some data', 'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
@@ -119,6 +117,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
                 info={'GQ': 10, 'FB': True}),
         ]
     )
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
     row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
            ColumnKeyConstants.START_POSITION: 11,
            ColumnKeyConstants.END_POSITION: 12,
@@ -149,13 +148,14 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
           {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT'}]
       row['IFR'] = [0.1, 0.2]
       row['IFR2'] = [0.2, 0.3]
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_2(self):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '1')})
+        info={'II': 1234})
+    header_num_dict = {'II': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -164,7 +164,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
            'II': 1234}
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_3(self):
     variant = vcfio.Variant(
@@ -175,18 +175,19 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.REFERENCE_BASES: None,
            ColumnKeyConstants.ALTERNATE_BASES: [],
            ColumnKeyConstants.CALLS: []}
-    return variant, row
+    return variant, row, {}
 
   def _get_sample_variant_with_empty_calls(self):
     variant = vcfio.Variant(
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
-        info={'II': vcfio.VariantInfo(1234, '1')},
+        info={'II': 1234},
         calls=[
             vcfio.VariantCall(
                 name='EmptySample', genotype=[], phaseset='*',
                 info={}),
         ])
+    header_num_dict = {'II': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: '20',
            ColumnKeyConstants.START_POSITION: 123,
            ColumnKeyConstants.END_POSITION: 125,
@@ -195,21 +196,20 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.FILTER: ['q10', 's10'],
            ColumnKeyConstants.CALLS: [],
            'II': 1234}
-    return variant, row
+    return variant, row, header_num_dict
 
   def _get_sample_variant_with_incompatible_records(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=[], filters=['PASS'],
-        info={'IFR': vcfio.VariantInfo(['0.1', '0.2'], '2'),
-              'IS': vcfio.VariantInfo(1, '1'),
-              'ISR': vcfio.VariantInfo(1, '1')},
+        info={'IFR': ['0.1', '0.2'], 'IS': 1, 'ISR': 1},
         calls=[
             vcfio.VariantCall(
                 name='Sample1', genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10.0, 20.0]}),
         ]
     )
+    header_num_dict = {'IFR': '2', 'IS': '1', 'ISR': '1'}
     row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
            ColumnKeyConstants.START_POSITION: 11,
            ColumnKeyConstants.END_POSITION: 12,
@@ -224,13 +224,16 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            'IFR': [0.1, 0.2],
            'IS': '1',
            'ISR': ['1']}
-    return variant, row
+    return variant, row, header_num_dict
 
   def test_convert_variant_to_bigquery_row(self):
-    variant_1, row_1 = self._get_sample_variant_1()
-    variant_2, row_2 = self._get_sample_variant_2()
-    variant_3, row_3 = self._get_sample_variant_3()
-    header_fields = vcf_header_io.VcfHeader()
+    variant_1, row_1, header_num_dict_1 = self._get_sample_variant_1()
+    variant_2, row_2, header_num_dict_2 = self._get_sample_variant_2()
+    variant_3, row_3, header_num_dict_3 = self._get_sample_variant_3()
+    header_num_dict = header_num_dict_1.copy()
+    header_num_dict.update(header_num_dict_2)
+    header_num_dict.update(header_num_dict_3)
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var_1 = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant_1)
     proc_var_2 = processed_variant.ProcessedVariantFactory(
@@ -247,8 +250,8 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_omit_empty_calls(self):
-    variant, row = self._get_sample_variant_with_empty_calls()
-    header_fields = vcf_header_io.VcfHeader()
+    variant, row, header_num_dict = self._get_sample_variant_with_empty_calls()
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)
@@ -261,8 +264,9 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_allow_incompatible_recoreds(self):
-    variant, row = self._get_sample_variant_with_incompatible_records()
-    header_fields = vcf_header_io.VcfHeader()
+    variant, row, header_num_dict = (
+        self._get_sample_variant_with_incompatible_records())
+    header_fields = vcf_header_util.make_header(header_num_dict)
     proc_var = processed_variant.ProcessedVariantFactory(
         header_fields).create_processed_variant(variant)
     pipeline = TestPipeline(blocking=True)

@@ -240,17 +240,16 @@ class ProcessedVariantFactory(object):
     """
     proc_var = ProcessedVariant(variant)
     self._variant_counter.inc()
-    for key, variant_info in variant.info.iteritems():
-      # TODO(bashir2): field_count should be removed from VariantInfo and
-      # instead looked up from header_fields.
+    for key, variant_info_data in variant.info.iteritems():
       if (self._split_alternate_allele_info_fields and
-          variant_info.field_count == _FIELD_COUNT_ALTERNATE_ALLELE):
-        self._add_per_alt_info(proc_var, key, variant_info.data)
+          self._header_fields.infos[key][_HeaderKeyConstants.NUM] ==
+          vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
+        self._add_per_alt_info(proc_var, key, variant_info_data)
       elif key in self._annotation_field_set:
         self._annotation_processor.add_annotation_data(
-            proc_var, key, variant_info.data)
+            proc_var, key, variant_info_data)
       else:
-        proc_var._non_alt_info[key] = variant_info.data
+        proc_var._non_alt_info[key] = variant_info_data
     return proc_var
 
   def _add_per_alt_info(self, proc_var, field_name, variant_info_data):

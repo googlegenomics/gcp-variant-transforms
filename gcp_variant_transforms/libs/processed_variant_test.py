@@ -26,6 +26,7 @@ from gcp_variant_transforms.libs import processed_variant
 # This is intentionally breaking the style guide because without this the lines
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
+from gcp_variant_transforms.testing import vcf_header_util
 
 
 class _CounterSpy(metrics_util.CounterInterface):
@@ -59,8 +60,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
-        info={'A1': vcfio.VariantInfo('some data', '1'),
-              'A2': vcfio.VariantInfo(['data1', 'data2'], 'A')},
+        info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(name='Sample1', genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
@@ -69,7 +69,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_no_change(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_io.VcfHeader()
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -95,7 +95,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_processed_variant_move_alt_info(self):
     variant = self._get_sample_variant()
-    header_fields = vcf_header_io.VcfHeader()
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
         split_alternate_allele_info_fields=True)
@@ -109,17 +109,12 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def _get_sample_variant_and_header_with_csq(self):
     variant = self._get_sample_variant()
-    variant.info['CSQ'] = vcfio.VariantInfo(
-        data=['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3'],
-        field_count='.')
-    csq_info = parser._Info(
-        id=None,
-        num='.',
-        type=None,
-        desc='some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
-        source=None,
-        version=None)
-    header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
+    variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
+    header_fields = vcf_header_util.make_header({'CSQ': '.',
+                                                 'A1': '1', 'A2': 'A'})
+    header_fields.infos['CSQ'][
+        vcf_header_io.VcfParserHeaderKeyConstants.DESC] = (
+            'some desc Allele|Consequence|IMPACT|SYMBOL|Gene')
     return variant, header_fields
 
   def test_create_processed_variant_move_alt_info_and_annotation(self):
@@ -163,10 +158,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     # with the difference that it has an extra alt annotation which does not
     # match any alts.
     variant, header_fields = self._get_sample_variant_and_header_with_csq()
-    variant.info['CSQ'] = vcfio.VariantInfo(
-        data=['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3',
-              'ATAT|C3|I3|S3|G3'],
-        field_count='.')
+    variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2',
+                           'A|C3|I3|S3|G3', 'ATAT|C3|I3|S3|G3']
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -209,11 +202,9 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         alternate_bases=['<SYMBOLIC>', '[13:123457[.', 'C[10:10357[.'],
         names=['rs1'], quality=2,
         filters=['PASS'],
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'SYMBOLIC|C1|I1|S1|G1', '[13|C2|I2|S2|G2', 'C[10|C3|I3|S3|G3',
-                'C[1|C3|I3|S3|G3'],  # The last one does not match any alts.
-            field_count='.')})
+        info={'CSQ': [
+            'SYMBOLIC|C1|I1|S1|G1', '[13|C2|I2|S2|G2', 'C[10|C3|I3|S3|G3',
+            'C[1|C3|I3|S3|G3']})  # The last one does not match any alts.
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -257,10 +248,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         alternate_bases=['CT', 'CC', 'CCC'],
         names=['rs1'], quality=2,
         filters=['PASS'],
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'T|C1|I1|S1|G1', 'C|C2|I2|S2|G2', 'CC|C3|I3|S3|G3'],
-            field_count='.')})
+        info={'CSQ': ['T|C1|I1|S1|G1', 'C|C2|I2|S2|G2', 'CC|C3|I3|S3|G3']})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -304,10 +292,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         alternate_bases=['CCT', 'CCC', 'CCCC'],
         names=['rs1'], quality=2,
         filters=['PASS'],
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'CT|C1|I1|S1|G1', 'CC|C2|I2|S2|G2', 'CCC|C3|I3|S3|G3'],
-            field_count='.')})
+        info={'CSQ': ['CT|C1|I1|S1|G1', 'CC|C2|I2|S2|G2', 'CCC|C3|I3|S3|G3']})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -351,10 +336,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         alternate_bases=['AA', 'AAA'],
         names=['rs1'], quality=2,
         filters=['PASS'],
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'AA|C1|I1|S1|G1', 'AAA|C2|I2|S2|G2'],
-            field_count='.')})
+        info={'CSQ': ['AA|C1|I1|S1|G1', 'AAA|C2|I2|S2|G2']})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -399,10 +381,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         # Note that in the minimal mode, 'T' is an ambiguous annotation ALT
         # because it can map to either the 'CT' SNV or the 'CCT' insertion.
         # It is not ambiguous in the non-minimal mode (it only maps to `CT`).
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'T|C1|I1|S1|G1', '-|C2|I2|S2|G2'],
-            field_count='.')})
+        info={'CSQ': ['T|C1|I1|S1|G1', '-|C2|I2|S2|G2']})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
@@ -459,10 +438,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         # ALT because it can map to either the 'T' SNV or the 'CT' insertion.
         # But because there is ALLELE_NUM there should be no ambiguity.
         # The last four annotations have incorrect ALLELE_NUMs.
-        info={'CSQ': vcfio.VariantInfo(
-            data=[
-                'T|C1|I1|1', 'T|C2|I2|2', 'T|C3|I3|0', 'T|C4|I4|3',
-                'T|C5|I5|TEST', 'T|C6|I6|'], field_count='.')})
+        info={'CSQ': ['T|C1|I1|1', 'T|C2|I2|2', 'T|C3|I3|0', 'T|C4|I4|3',
+                      'T|C5|I5|TEST', 'T|C6|I6|']})
     counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
