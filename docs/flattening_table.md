@@ -44,6 +44,10 @@ Note that BigQuery throws the error
 do not include the additional `t.call AS call` statement in the `FROM` clause.
 Please see
 [this page](https://cloud.google.com/bigquery/docs/reference/standard-sql/migrating-from-legacy-sql#removing_repetition_with_flatten)
+for more details. Also, note that explicitly using `UNNEST` is not necessary as
+a fully-qualified path is used, but you may also use `UNNEST(call) AS call`
+instead of `t.call AS call`. Please see
+[here](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#field_path)
 for more details.
 
 You can include additional information for each call by adding them to the
