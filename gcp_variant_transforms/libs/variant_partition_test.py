@@ -154,6 +154,33 @@ class VariantPartitionTest(unittest.TestCase):
     self.assertEqual(partitioner.get_partition_name(6), 'chr3_02')
     self.assertEqual(partitioner.get_partition_name(7), 'all_remaining')
 
+  def test_config_get_partition_labels(self):
+    partitioner = variant_partition.VariantPartition(
+        'gcp_variant_transforms/testing/data/partition_configs/'
+        'residual_at_end.yaml')
+    self.assertFalse(partitioner.should_flatten())
+    self.assertEqual(partitioner.get_num_partitions(), 8)
+    for i in range(partitioner.get_num_partitions()):
+      self.assertTrue(partitioner.should_keep_partition(i))
+
+    self.assertEqual(partitioner.get_partition_labels(0),
+                     {'label-0': 'chr1-0-1000000'})
+    self.assertEqual(partitioner.get_partition_labels(1),
+                     {'label-0': 'chr1-1000000-2000000'})
+    self.assertEqual(partitioner.get_partition_labels(2),
+                     {'label-0': 'chr1-2000000-999999999'})
+    self.assertEqual(partitioner.get_partition_labels(3),
+                     {'label-0': 'chr2', 'label-1': 'chr2_alternate_name1',
+                      'label-2': 'chr2_alternate_name2', 'label-3': '2'})
+    self.assertEqual(partitioner.get_partition_labels(4),
+                     {'label-0': 'chr4', 'label-1': 'chr5',
+                      'label-2': 'chr6-1000000-2000000'})
+    self.assertEqual(partitioner.get_partition_labels(5),
+                     {'label-0': '3-0-500000'})
+    self.assertEqual(partitioner.get_partition_labels(6),
+                     {'label-0': '3-500000-1000000'})
+    self.assertEqual(partitioner.get_partition_labels(7),
+                     {'label-0': 'residual'})
 
   def test_config_non_existent_partition_name(self):
     partitioner = variant_partition.VariantPartition(
