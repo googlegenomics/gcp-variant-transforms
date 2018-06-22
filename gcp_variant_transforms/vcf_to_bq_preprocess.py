@@ -60,7 +60,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
-from gcp_variant_transforms.transforms import infer_undefined_headers
+from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_header_definitions
 
@@ -74,7 +74,7 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
   inferred_headers = (variants
                       | 'FilterVariants' >> filter_variants.FilterVariants()
                       | ' InferUndefinedHeaderFields' >>
-                      infer_undefined_headers.InferUndefinedHeaderFields(
+                      infer_headers.InferUndefinedHeaderFields(
                           pvalue.AsSingleton(merged_header)))
   merged_header = (
       (inferred_headers, merged_header)
