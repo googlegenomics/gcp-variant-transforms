@@ -19,8 +19,9 @@ VCF files. It contains three parts and each of them reports one type of error.
 - The first part reports the header fields that have conflicting definitions
   across multiple VCF files, by providing the conflicting definitions, the
   corresponding file paths, and the suggested resolutions.
-- The second part contains the undefined header fields and the inferred
-  definitions.
+- The second part contains the inferred definitions of the undefined header
+  fields and the defined fields but with conflicting values (e.g, the defined
+  num = integer, but the value found is float).
 - The last part contains the malformed records.
 TODO(allieychen): Eventually, it also contains the resource estimation.
 
@@ -33,7 +34,7 @@ DP    FORMAT      num=1 type=Float     file1         num=1 type=Float
                                        file2
                   num=1 type=Integer   file3
 
-Undefined Headers
+Inferred Headers
 ID    Category    Proposed Resolution
 GT    INFO        num=1 type=Float
 GQ    FORMAT      num=1 type=Float
@@ -62,14 +63,14 @@ _DELIMITER = '\t'
 class _InconsistencyType(object):
   """Inconsistency types that included in the report."""
   HEADER_CONFLICTS = 'Header Conflicts'
-  UNDEFINED_HEADERS = 'Undefined Headers'
+  INFERRED_HEADERS = 'Inferred Headers'
   MALFORMED_RECORDS = 'Malformed Records'
 
 
 class _HeaderLine(object):
   """Header lines for each error type."""
   CONFLICTS_HEADER = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution'
-  UNDEFINED_FIELD_HEADER = 'ID\tCategory\tProposed Resolution'
+  INFERRED_FIELD_HEADER = 'ID\tCategory\tProposed Resolution'
   MALFORMED_RECORDS_HEADER = 'File Path\tVariant Record\tError Message'
 
 
@@ -87,10 +88,10 @@ def generate_report(
     header_definitions: The container which contains all header definitions and
       the corresponding file names.
     file_path: The location where the report is saved.
-    resolved_headers: The ``VcfHeader`` that provides the resolutions for the
+    resolved_headers: The `VcfHeader` that provides the resolutions for the
       fields that have conflicting definitions.
-    inferred_headers: The ``VcfHeader`` that contains the inferred header
-      definitions of the undefined header fields.
+    inferred_headers: The `VcfHeader` that contains the inferred header
+      definitions of the undefined/mismatched header fields.
     malformed_records: A list of ``MalformedVcfRecord`` for which VCF parser
       failed.
   """
@@ -149,7 +150,7 @@ def _append_inferred_headers_to_report(file_to_write, inferred_headers):
   """Appends the human readable inferred headers to the report.
 
   Output example:
-  Undefined Headers
+  Inferred Headers
   ID    Category    Proposed Resolution
   GT    INFO        num=1 type=Float
   GQ    FORMAT      num=1 type=Float
@@ -160,8 +161,8 @@ def _append_inferred_headers_to_report(file_to_write, inferred_headers):
         inferred_headers.infos, vcf_header_io.HeaderTypeConstants.INFO))
     content_lines.extend(_generate_inferred_headers_lines(
         inferred_headers.formats, vcf_header_io.HeaderTypeConstants.FORMAT))
-    _append_to_report(file_to_write, _InconsistencyType.UNDEFINED_HEADERS,
-                      _HeaderLine.UNDEFINED_FIELD_HEADER, content_lines)
+    _append_to_report(file_to_write, _InconsistencyType.INFERRED_HEADERS,
+                      _HeaderLine.INFERRED_FIELD_HEADER, content_lines)
 
 
 def _append_malformed_records_to_report(file_to_write, malformed_records):

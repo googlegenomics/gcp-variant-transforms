@@ -1,9 +1,10 @@
 [
   {
-    "test_name": "infer-undefined-header-fields",
-    "table_name": "infer_undefined_header_fields",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
+    "test_name": "infer-header-fields",
+    "table_name": "infer_header_fields",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-header-fields.vcf",
     "infer_undefined_headers": "True",
+    "allow_incompatible_records": "True",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [

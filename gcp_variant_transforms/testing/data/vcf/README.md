@@ -29,8 +29,13 @@ variant call with `POS = 14370` is meant to merge across three files, while the
 call with `POS = 1234567` is designed to be merged for `merge1.vcf` and
 `merge2.vcf`.
 
-`infer-undefined-header-fields.vcf` is used to test the case where INFO and
-FORMAT field are not defined in VCF header.
+`infer-header-fields.vcf` is used to test the case where some INFO and FORMAT
+field are not defined in VCF header. Also, it contains conflicting header
+definition and field values. To be more specific, `AF` from INFO is defined as
+`Number=A, Type=Integer`, but in the second variant record it only provides one
+value for two alternates, and it is a float value. For the FORMAT, `DP` is
+defined as `Type=Integer`, but one value of DP field is float in the last
+variant record.
 
 `incompatible-field-value.vcf` is used to test the case where values provided
 for the fields does not match the definition. Checkout fields `NS` and `DB`.

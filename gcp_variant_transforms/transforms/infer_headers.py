@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A PTransform to infer undefined header fields."""
+"""A PTransform to infer undefined/mismatched header fields."""
 
 from __future__ import absolute_import
 
-from typing import Dict, Iterable, List, Optional, Union  # pylint: disable=unused-import
+from typing import Any, Dict, Iterable, List, Optional, Union  # pylint: disable=unused-import
 
 import apache_beam as beam
 
@@ -28,9 +28,21 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms import merge_headers
 
+_FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
-class _InferUndefinedHeaderFields(beam.DoFn):
-  """Extracts undefined header fields from ``Variant`` record."""
+# Alias for the header key/type constants to make referencing easier.
+_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+_HeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
+
+class _InferHeaderFields(beam.DoFn):
+  """Infers header fields from `Variant` records.
+
+  Two types of fields are inferred:
+  - The fields are undefined in the headers.
+  - The field definitions provided by the headers does not match the field
+    values.
+  """
 
   def _get_field_count(self, field_value):
     # type: (Union[List, bool, int, str]) -> Optional[int]
@@ -78,16 +90,108 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     except ValueError:
       return False
 
-  def _infer_undefined_info_fields(self, variant, defined_headers):
-    # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Info]
-    """Returns info fields not defined in the headers.
+  def _get_corrected_type(self, defined_type, value):
+    # type: (str, Any) -> str
+    """Returns the corrected type according to `defined_type` and `value`.
 
+    It handles one special case pyVCF cannot handle, i.e., the defined type is
+    `Integer`, but the provided value is float. In this case, correct the type
+    to be `Float`.
+    """
+    if defined_type != _HeaderTypeConstants.INTEGER:
+      return defined_type
+    if isinstance(value, float):
+      return _HeaderTypeConstants.FLOAT
+    if isinstance(value, list):
+      for item in value:
+        if (self._get_corrected_type(defined_type, item) ==
+            _HeaderTypeConstants.FLOAT):
+          return _HeaderTypeConstants.FLOAT
+      return defined_type
+    return defined_type
+
+  def _infer_mismatched_info_field(self,
+                                   field_key,  # type: str
+                                   field_value,  # type: Any
+                                   defined_header,  # type: Dict
+                                   num_alternate_bases  # type: int
+                                  ):
+    # type: (...) -> Optional[Info]
+    """Returns corrected info if there are mismatches.
+
+    Two mismatches are handled:
+    - Defined num is `A`, but the provided values do not have the same
+      cardinality as the alternate bases. Correct the num to be `None`.
+    - Defined type is `Integer`, but the provided value is float. Correct the
+      type to be `Float`.
+    Args:
+      field_key: the info field key.
+      field_value: the value of the field key given in the variant.
+      defined_header: The definition of `field_key` in the header.
+      num_alternate_bases: number of the alternate bases.
+    Returns:
+      Corrected info definition if there are mismatches.
+    """
+    corrected_num = defined_header.get(_HeaderKeyConstants.NUM)
+    if (corrected_num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE] and
+        len(field_value) != num_alternate_bases):
+      corrected_num = field_counts['.']
+
+    corrected_type = self._get_corrected_type(
+        defined_header.get(_HeaderKeyConstants.TYPE), field_value)
+
+    if (corrected_type != defined_header.get(_HeaderKeyConstants.TYPE) or
+        corrected_num != defined_header.get(_HeaderKeyConstants.NUM)):
+      return Info(field_key,
+                  corrected_num,
+                  corrected_type,
+                  defined_header.get(_HeaderKeyConstants.DESC),
+                  defined_header.get(_HeaderKeyConstants.SOURCE),
+                  defined_header.get(_HeaderKeyConstants.VERSION))
+    return None
+
+  def _infer_mismatched_format_field(self,
+                                     field_key,  # type: str
+                                     field_value,  # type: Any
+                                     defined_header  # type: Dict
+                                    ):
+    # type: (...) -> Optional[Format]
+    """Returns corrected format if there are mismatches.
+
+    One type of mismatches is handled:
+    - Defined type is `Integer`, but the provided value is float. Correct the
+      type to be `Float`.
+    Args:
+      field_key: the format field key.
+      field_value: the value of the field key given in the variant.
+      defined_header: The definition of `field_key` in the header.
+    Returns:
+      Corrected format definition if there are mismatches.
+    """
+    corrected_type = self._get_corrected_type(
+        defined_header.get(_HeaderKeyConstants.TYPE), field_value)
+    if corrected_type != defined_header.get(_HeaderKeyConstants.TYPE):
+      return Format(field_key,
+                    defined_header.get(_HeaderKeyConstants.NUM),
+                    corrected_type,
+                    defined_header.get(_HeaderKeyConstants.DESC))
+    return None
+
+  def _infer_info_fields(self, variant, defined_headers):
+    # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Info]
+    """Returns inferred info fields.
+
+    Two types of info fields are inferred:
+    - The info fields are undefined in the headers.
+    - The info fields' definitions provided by the header does not match the
+      field value.
     Args:
       variant: variant obj.
       defined_headers: header fields defined in header section of VCF files.
     Returns:
       A dict of (info_key(str), :class:`Info`) for any info field in `variant`
-      that is not defined in the header.
+      that is not defined in the header or the definition mismatches the field
+      values.
     """
     infos = {}
     for info_field_key, info_field_value in variant.info.iteritems():
@@ -102,18 +206,30 @@ class _InferUndefinedHeaderFields(beam.DoFn):
                                      '',  # NO_DESCRIPTION
                                      '',  # UNKNOWN_SOURCE
                                      '')  # UNKNOWN_VERSION
+      else:
+        corrected_info = self._infer_mismatched_info_field(
+            info_field_key, info_field_value,
+            defined_headers.infos.get(info_field_key),
+            len(variant.alternate_bases))
+        if corrected_info:
+          infos[info_field_key] = corrected_info
     return infos
 
-  def _infer_undefined_format_fields(self, variant, defined_headers):
+  def _infer_format_fields(self, variant, defined_headers):
     # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Format]
-    """Returns format fields not defined in the headers.
+    """Returns inferred format fields.
 
+    Two types of format fields are inferred:
+    - The format fields are undefined in the headers.
+    - The format definition provided by the headers does not match the field
+      values.
     Args:
       variant: variant obj.
       defined_headers: header fields defined in header section of VCF files.
     Returns:
       A dict of (format_key(str), :class:`Format`) for any format key in
-      `variant` that is not defined in the header.
+      `variant` that is not defined in the header or the definition mismatches
+      the field values.
     """
     formats = {}
     for call in variant.calls:
@@ -126,9 +242,16 @@ class _InferUndefinedHeaderFields(beam.DoFn):
           formats[format_key] = Format(format_key,
                                        self._get_field_count(format_value),
                                        self._get_field_type(format_value),
-                                       '') # NO_DESCRIPTION
+                                       '')  # NO_DESCRIPTION
       # No point in proceeding. All other calls have the same FORMAT.
       break
+    for call in variant.calls:
+      for format_key, format_value in call.info.iteritems():
+        if defined_headers and format_key in defined_headers.formats:
+          corrected_format = self._infer_mismatched_format_field(
+              format_key, format_value, defined_headers.formats.get(format_key))
+          if corrected_format:
+            formats[format_key] = corrected_format
     return formats
 
   def process(self,
@@ -140,28 +263,33 @@ class _InferUndefinedHeaderFields(beam.DoFn):
     Args:
       defined_headers: header fields defined in header section of VCF files.
     """
-    infos = self._infer_undefined_info_fields(variant, defined_headers)
-    formats = self._infer_undefined_format_fields(variant, defined_headers)
+    infos = self._infer_info_fields(variant, defined_headers)
+    formats = self._infer_format_fields(variant, defined_headers)
     yield vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
 
-class InferUndefinedHeaderFields(beam.PTransform):
-  """Extracts undefined header fields from ``Variant`` records."""
+class InferHeaderFields(beam.PTransform):
+  """Extracts inferred header fields from `Variant` records."""
 
-  def __init__(self, defined_headers):
-    # type: (vcf_header_io.VcfHeader) -> None
+  def __init__(self, defined_headers, allow_incompatible_records=False):
+    # type: (vcf_header_io.VcfHeader, bool) -> None
     """Initializes the transform.
     Args:
       defined_headers: Side input containing all the header fields (e.g., INFO,
         FORMAT) defined in the header section of the VCF files. This is used to
-        skip already defined header fields.
+        skip already defined header fields when infer undefined header fields.
+        Also, it is used to find and further infer the fields with mismatched
+        definition and value.
+      allow_incompatible_records: If true, header definition with type mismatch
+        (e.g., string vs float) are always resolved.
     """
     self._defined_headers = defined_headers
+    self._allow_incompatible_records = allow_incompatible_records
 
   def expand(self, pcoll):
     return (pcoll
-            | 'InferUndefinedHeaderFields' >> beam.ParDo(
-                _InferUndefinedHeaderFields(), self._defined_headers)
+            | 'InferHeaderFields' >> beam.ParDo(
+                _InferHeaderFields(), self._defined_headers)
             # TODO(nmousavi): Modify the MergeHeaders to resolve 1 vs '.'
             # mistmatch for headers extracted from variants.
             #
@@ -170,4 +298,5 @@ class InferUndefinedHeaderFields(beam.PTransform):
             # from variants, therefore we let the default value (True) for it
             # be used. Should this changes, we should modify the default value.
             | 'MergeHeaders' >> merge_headers.MergeHeaders(
-                split_alternate_allele_info_fields=True))
+                split_alternate_allele_info_fields=True,
+                allow_incompatible_records=self._allow_incompatible_records))
