@@ -345,8 +345,8 @@ class _AnnotationProcessor(object):
       if field not in header_fields.infos:
         raise ValueError('{} INFO not found in the header'.format(field))
       header_desc = header_fields.infos[field][_HeaderKeyConstants.DESC]
-      self._annotation_names_map[
-          field] = annotation_parser.extract_annotation_names(header_desc)
+      self._annotation_names_map[field] = (
+          annotation_parser.extract_annotation_names(header_desc))
     self._alt_match_counter = counter_factory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MATCH.value)
     self._alt_minimal_ambiguous_counter = counter_factory.create_counter(

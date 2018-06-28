@@ -43,14 +43,23 @@ _SYMBOLIC_ALT_RE = re.compile(r'^<(?P<ID>.*)>$')
 _BREAKEND_ALT_RE = (re.compile(
     r'^(?P<up_to_chr>.*([\[\]]).*):(?P<pos>.*)([\[\]]).*$'))
 
+
 class AnnotationParserException(Exception):
   pass
+
+
 class AlleleNumMissing(AnnotationParserException):
   pass
+
+
 class InvalidAlleleNumValue(AnnotationParserException):
   pass
+
+
 class AmbiguousAnnotationAllele(AnnotationParserException):
   pass
+
+
 class AnnotationAltNotFound(AnnotationParserException):
   pass
 
