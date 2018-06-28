@@ -37,6 +37,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs.annotation.vep import descriptions
 
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
@@ -296,8 +297,9 @@ class ProcessedVariantFactory(object):
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
-      annotation_names = _extract_annotation_names(
-          self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
+      annotation_names_map = self._annotation_processor._annotation_names_map
+      annotation_names = annotation_names_map[annot_field]
+      annotation_descs = self._annotation_processor._annotation_descriptions
       annotation_record = bigquery.TableFieldSchema(
           name=bigquery_util.get_bigquery_sanitized_field(annot_field),
           type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -320,9 +322,7 @@ class ProcessedVariantFactory(object):
             name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
             type=bigquery_util.TableFieldConstants.TYPE_STRING,
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-            # TODO(bashir2): Add descriptions of well known annotations, e.g.,
-            # from VEP.
-            description=''))
+            description=annotation_descs.get(annotation_name, '')))
       alternate_bases_record.fields.append(annotation_record)
     return alternate_bases_record
 
@@ -375,6 +375,7 @@ class _AnnotationProcessor(object):
       header_desc = header_fields.infos[field][_HeaderKeyConstants.DESC]
       self._annotation_names_map[field] = _extract_annotation_names(
           header_desc)
+    self._annotation_descriptions = descriptions.VEP_DESCRIPTIONS
     self._alt_match_counter = counter_factory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MATCH.value)
     self._alt_minimal_match_counter = counter_factory.create_counter(
