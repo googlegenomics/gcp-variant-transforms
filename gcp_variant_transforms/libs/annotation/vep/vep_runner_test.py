@@ -105,6 +105,9 @@ class VepRunnerTest(unittest.TestCase):
     test_instance = self._create_test_instance()
     log_path = test_instance._get_output_log_path(_OUTPUT_DIR, 0)
     self.assertEqual(log_path, _OUTPUT_DIR + '/logs/output_VM_0.log')
+    
+    log_path = test_instance._get_output_log_path(_OUTPUT_DIR + '/', 0)
+    self.assertEqual(log_path, _OUTPUT_DIR + '/logs/output_VM_0.log')
 
   def _validate_run_for_all_files(self):
     self._pipelines_spy.validate_calls([f[0] for f in _INPUT_FILES_WITH_SIZE])
