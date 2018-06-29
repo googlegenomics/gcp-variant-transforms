@@ -23,6 +23,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs.annotation import annotation_parser
 # This is intentionally breaking the style guide because without this the lines
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
@@ -130,16 +131,16 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'A', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C3',
+            {annotation_parser.ANNOTATION_ALT: 'A', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -148,7 +149,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 3)
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
@@ -171,16 +172,16 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {
         'A2': 'data1',
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'A', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'},
-            {processed_variant._ANNOTATION_ALT: 'A', 'Consequence': 'C3',
+            {annotation_parser.ANNOTATION_ALT: 'A', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {
         'A2': 'data2',
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: 'TT', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -189,7 +190,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 2)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 3)
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 1)
@@ -215,19 +216,19 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('<SYMBOLIC>')
     alt1._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'SYMBOLIC', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'SYMBOLIC', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('[13:123457[.')
     alt2._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: '[13', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: '[13', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('C[10:10357[.')
     alt3._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'C[10', 'Consequence': 'C3',
+            {annotation_parser.ANNOTATION_ALT: 'C[10', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -259,19 +260,19 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('CT')
     alt1._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'T', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'T', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('CC')
     alt2._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'C', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: 'C', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('CCC')
     alt3._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'CC', 'Consequence': 'C3',
+            {annotation_parser.ANNOTATION_ALT: 'CC', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -303,19 +304,19 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('CCT')
     alt1._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'CT', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'CT', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('CCC')
     alt2._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'CC', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: 'CC', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     alt3 = processed_variant.AlternateBaseData('CCCC')
     alt3._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'CCC', 'Consequence': 'C3',
+            {annotation_parser.ANNOTATION_ALT: 'CCC', 'Consequence': 'C3',
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -347,13 +348,13 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('AA')
     alt1._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'AA', 'Consequence': 'C1',
+            {annotation_parser.ANNOTATION_ALT: 'AA', 'Consequence': 'C1',
              'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
     }
     alt2 = processed_variant.AlternateBaseData('AAA')
     alt2._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'AAA', 'Consequence': 'C2',
+            {annotation_parser.ANNOTATION_ALT: 'AAA', 'Consequence': 'C2',
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -365,9 +366,6 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
-    self.assertEqual(
-        counter_factory.counter_map[
-            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 0)
 
   def test_create_processed_variant_annotation_alt_minimal(self):
     # The returned variant is ignored as we create a custom one next.
@@ -393,17 +391,11 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('CT')
     alt1._info = {}
     alt2 = processed_variant.AlternateBaseData('CCT')
-    alt2._info = {
-        'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'T',
-             processed_variant._ANNOTATION_ALT_AMBIGUOUS: True,
-             'Consequence': 'C1', 'IMPACT': 'I1', 'SYMBOL': 'S1', 'Gene': 'G1'}]
-    }
+    alt2._info = {}
     alt3 = processed_variant.AlternateBaseData('C')
     alt3._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: '-',
-             processed_variant._ANNOTATION_ALT_AMBIGUOUS: False,
+            {annotation_parser.ANNOTATION_ALT: '-',
              'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
@@ -411,13 +403,10 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
-        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 0)
+        CEnum.ANNOTATION_ALT_MATCH.value].get_value(), 1)
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
-    self.assertEqual(
-        counter_factory.counter_map[
-            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 2)
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 1)
@@ -452,13 +441,13 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1 = processed_variant.AlternateBaseData('T')
     alt1._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'T',
+            {annotation_parser.ANNOTATION_ALT: 'T',
              'Consequence': 'C1', 'IMPACT': 'I1', 'ALLELE_NUM': '1'}]
     }
     alt2 = processed_variant.AlternateBaseData('CT')
     alt2._info = {
         'CSQ': [
-            {processed_variant._ANNOTATION_ALT: 'T',
+            {annotation_parser.ANNOTATION_ALT: 'T',
              'Consequence': 'C2', 'IMPACT': 'I2', 'ALLELE_NUM': '2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
@@ -470,9 +459,6 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MISMATCH.value].get_value(), 0)
-    self.assertEqual(
-        counter_factory.counter_map[
-            CEnum.ANNOTATION_ALT_MINIMAL_MATCH.value].get_value(), 0)
     self.assertEqual(
         counter_factory.counter_map[
             CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 0)

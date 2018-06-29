@@ -31,7 +31,7 @@ from vcf.parser import field_counts
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.testing import asserts
-from gcp_variant_transforms.transforms import infer_undefined_headers
+from gcp_variant_transforms.transforms import infer_headers
 
 
 class InferUndefinedHeaderFieldsTest(unittest.TestCase):
@@ -83,7 +83,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant])
           | 'InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
+          infer_headers.InferUndefinedHeaderFields(
               defined_headers=None))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
@@ -111,7 +111,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant])
           | 'InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
+          infer_headers.InferUndefinedHeaderFields(
               pvalue.AsSingleton(vcf_headers_side_input)))
       expected = vcf_header_io.VcfHeader()
       assert_that(inferred_headers, equal_to([expected]))
@@ -125,7 +125,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant_1, variant_2])
           | 'InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
+          infer_headers.InferUndefinedHeaderFields(
               defined_headers=None))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
@@ -157,7 +157,7 @@ class InferUndefinedHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant_1, variant_2])
           | 'InferUndefinedHeaderFields' >>
-          infer_undefined_headers.InferUndefinedHeaderFields(
+          infer_headers.InferUndefinedHeaderFields(
               pvalue.AsSingleton(vcf_headers_side_input)))
 
       expected_infos = {'IS_2': Info('IS_2', 1, 'String', '', '', '')}
