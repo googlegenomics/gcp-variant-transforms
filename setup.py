@@ -18,7 +18,8 @@ import setuptools
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
-    'apache-beam[gcp]>=2.3',
+    # TODO(bashir2): Drop the <=2.4 condition once the build is fixed with 2.5.
+    'apache-beam[gcp]>=2.3,<=2.4',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.

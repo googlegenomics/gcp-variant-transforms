@@ -57,7 +57,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
-from gcp_variant_transforms.transforms import infer_undefined_headers
+from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import partition_variants
@@ -131,7 +131,7 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | ' InferUndefinedHeaderFields' >>
-      infer_undefined_headers.InferUndefinedHeaderFields(
+      infer_headers.InferUndefinedHeaderFields(
           pvalue.AsSingleton(merged_header)))
   merged_header = (
       (inferred_headers, merged_header)
