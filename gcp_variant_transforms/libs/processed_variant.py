@@ -24,10 +24,8 @@ from __future__ import absolute_import
 
 import enum
 import logging
-import re
 
-from collections import defaultdict
-from typing import Dict, List, Any, Tuple, Optional  # pylint: disable=unused-import
+from typing import Dict, List, Any  # pylint: disable=unused-import
 
 import vcf
 
@@ -37,23 +35,10 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs.annotation import annotation_parser
 
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
-
-# The representation of a deletion variant in VEP.
-_COMPLETELY_DELETED_ALT = '-'
-
-# The field name in the BigQuery table that holds annotation ALT.
-_ANNOTATION_ALT = 'allele'
-
-# The field name in the BigQuery table that indicates whether the annotation ALT
-# matching was ambiguous or not.
-_ANNOTATION_ALT_AMBIGUOUS = 'ambiguous_allele'
-
-# The annotation field that VEP uses to record the index of the alternate
-# allele (i.e., ALT) that an annotation list is for.
-_ALLELE_NUM_ANNOTATION = 'ALLELE_NUM'
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
@@ -63,7 +48,6 @@ _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 class _CounterEnum(enum.Enum):
   VARIANT = 'variant_counter'
   ANNOTATION_ALT_MATCH = 'annotation_alt_match_counter'
-  ANNOTATION_ALT_MINIMAL_MATCH = 'annotation_alt_minimal_match_counter'
   ANNOTATION_ALT_MINIMAL_AMBIGUOUS = 'annotation_alt_minimal_ambiguous_counter'
   ANNOTATION_ALT_MISMATCH = 'annotation_alt_mismatch_counter'
   ALLELE_NUM_MISSING = 'allele_num_missing'
@@ -296,7 +280,7 @@ class ProcessedVariantFactory(object):
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
-      annotation_names = _extract_annotation_names(
+      annotation_names = annotation_parser.extract_annotation_names(
           self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_record = bigquery.TableFieldSchema(
           name=bigquery_util.get_bigquery_sanitized_field(annot_field),
@@ -305,16 +289,10 @@ class ProcessedVariantFactory(object):
           description='List of {} annotations for this alternate.'.format(
               annot_field))
       annotation_record.fields.append(bigquery.TableFieldSchema(
-          name=_ANNOTATION_ALT,
+          name=annotation_parser.ANNOTATION_ALT,
           type=bigquery_util.TableFieldConstants.TYPE_STRING,
           mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
           description='The ALT part of the annotation field.'))
-      if self._minimal_match:
-        annotation_record.fields.append(bigquery.TableFieldSchema(
-            name=_ANNOTATION_ALT_AMBIGUOUS,
-            type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
-            mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-            description='Whether the annotation ALT matching was ambiguous.'))
       for annotation_name in annotation_names:
         annotation_record.fields.append(bigquery.TableFieldSchema(
             name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
@@ -341,12 +319,6 @@ class ProcessedVariantFactory(object):
 class _AnnotationProcessor(object):
   """This is for handling all annotation related logic for variants."""
 
-  # Regular expressions to identify symbolic and breakend ALTs used in
-  # annotation alt matching.
-  # Check the VCF spec for symbolic and breakend ALT formats.
-  _SYMBOLIC_ALT_RE = re.compile(r'^<(?P<ID>.*)>$')
-  _BREAKEND_ALT_RE = (re.compile(
-      r'^(?P<up_to_chr>.*([\[\]]).*):(?P<pos>.*)([\[\]]).*$'))
 
   def __init__(self,
                annotation_fields,  # type: List[str]
@@ -373,12 +345,10 @@ class _AnnotationProcessor(object):
       if field not in header_fields.infos:
         raise ValueError('{} INFO not found in the header'.format(field))
       header_desc = header_fields.infos[field][_HeaderKeyConstants.DESC]
-      self._annotation_names_map[field] = _extract_annotation_names(
-          header_desc)
+      self._annotation_names_map[field] = (
+          annotation_parser.extract_annotation_names(header_desc))
     self._alt_match_counter = counter_factory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MATCH.value)
-    self._alt_minimal_match_counter = counter_factory.create_counter(
-        _CounterEnum.ANNOTATION_ALT_MINIMAL_MATCH.value)
     self._alt_minimal_ambiguous_counter = counter_factory.create_counter(
         _CounterEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value)
     self._alt_mismatch_counter = counter_factory.create_counter(
@@ -416,283 +386,30 @@ class _AnnotationProcessor(object):
 
         Allele|Consequence|IMPACT|SYMBOL|Gene|...
     """
-    common_prefix = self._find_common_alt_ref_prefix_char(proc_var)
-    alt_annotation_map = self._convert_annotation_strs_to_alt_map(
-        annotation_field_name, data)
-    for alt_bases, annotations_list in alt_annotation_map.iteritems():
-      if self._use_allele_num:
-        # TODO(bashir2): This class needs a major refactoring which should be
-        # done as part of creating a class for holding annotation data. The
-        # choice of mapping annotation lists to their annotation ALT string
-        # needs to be revisited in case of using ALLELE_NUM.
-        for annotation_dict in annotations_list:
-          self._add_annotations_by_allele_num(
-              proc_var, annotation_dict, annotation_field_name)
-      else:
-        alt, ambiguous = self._find_matching_alt(
-            proc_var, common_prefix, alt_bases, annotation_field_name)
-        if alt:
-          if self._minimal_match:
-            self._add_ambiguous_fields(annotations_list, ambiguous)
-          alt._info[annotation_field_name] = annotations_list
-
-  def _find_common_alt_ref_prefix_char(self, proc_var):
-    # type: (ProcessedVariant) -> str
-    if not proc_var.reference_bases:
-      return ''
-    common_char = proc_var.reference_bases[0]
-    for alt in proc_var._alternate_datas:
-      if not alt.alternate_bases or alt.alternate_bases[0] != common_char:
-        return ''
-    return common_char
-
-  def _convert_annotation_strs_to_alt_map(
-      self, annotation_field_name, field_data):
-    # type: (str, List[str]) -> Dict[str, List[Dict[str, str]]]
-    """Given the list of annotation data, extracts ALTs and annotations.
-
-    Args:
-      annotation_field_name: The name of the annotation field, e.g., ANN or CSQ.
-      field_data: A list of data strings. One element of this list looks like:
-
-        G|upstream_gene_variant|MODIFIER|PSMF1|ENSG00000125818|...
-
-        This function splits these strings on '|', uses the first element (i.e.,
-        the ALT identifier) as the key and creates a dictionary for annotations,
-        e.g.,
-          Consequence: upstream_gene_variant
-          IMPACT: MODIFIER
-          SYMBOL: PSMF1
-          Gene: ENSG00000125818
-          ...
-        Note that a single ALT can have multiple annotation sets. That is why
-        the value elements in the returned map are lists of dictionaries.
-    """
-    # TODO(bashir2): Instead of a `Dict[str, List[Dict[str, str]]]` define a new
-    # class for holding annotation data.
-    if annotation_field_name not in self._annotation_names_map:
-      raise ValueError('{} not in annotation fields'.format(
-          annotation_field_name))
-    annotation_names = self._annotation_names_map[annotation_field_name]
-    alt_annotation_map = defaultdict(list)
-    for annotation_str in field_data:
-      annotations = _extract_annotation_list_with_alt(annotation_str)
-      alt_annotation_map[annotations[0]].append(
-          self._create_map(annotations, annotation_names))
-    return alt_annotation_map
-
-  def _create_map(self, annotations, annotation_names):
-    # type: (List[str], List[str]) -> Dict[str, str]
-    if len(annotation_names) != len(annotations) - 1:
-      raise ValueError('Expected {} annotations, got {}'.format(
-          len(annotation_names), len(annotations) - 1))
-    annotation_dict = {}
-    annotation_dict[_ANNOTATION_ALT] = annotations[0]
-    for index, name in enumerate(annotation_names):
-      annotation_dict[name] = annotations[index + 1]
-    return annotation_dict
-
-  def _add_ambiguous_fields(self, annotations_list, ambiguous):
-    # type: (List[Dict[str, str]], bool) -> None
-    for annotation_map in annotations_list:
-      annotation_map[_ANNOTATION_ALT_AMBIGUOUS] = ambiguous
-
-  def _find_matching_alt(self,
-                         proc_var,  # type: ProcessedVariant
-                         common_prefix,  # type: str
-                         alt_bases,  # type: str
-                         annotation_field_name  # type: str
-                        ):
-    # type: (...) -> Tuple[Optional[AlternateBaseData], bool]
-    """Searches among ALTs of `proc_var` to find one that matches `alt_bases`.
-
-    Args:
-      proc_var: The object to which the annotations are being added.
-      common_prefix: The common prefix of all ALTs and REF string.
-      alt_bases: The ALT part of annotation data. Note that this is not
-        necessarily equal to an ALT string in `proc_var` as the matching rules
-        are not always exact match.
-      annotations_list: The lists of annotation dictionaries. Each element of
-        this list is a map of annotation names to values, see the example in
-        `_convert_annotation_strs_to_alt_map` which creates these maps.
-      annotation_field_name: The name of the annotation field, e.g., ANN, CSQ.
-
-    Returns:
-      The `AlternateBaseData` object from proc_var that matches or None. It also
-        returns whether the matching was ambiguous or not.
-    """
-    found_alt = None
-    is_ambiguous = False
-    # This assumes that number of alternate bases and annotation segments
-    # are not too big. If this assumption is not true, we should replace the
-    # following loop with a hash table search and avoid the quadratic time.
-    for alt in proc_var._alternate_datas:
-      if self._alt_matches_annotation_alt(
-          common_prefix, alt.alternate_bases, alt_bases):
+    alt_list = [a.alternate_bases for a in proc_var._alternate_datas]
+    parser = annotation_parser.Parser(
+        proc_var.reference_bases, alt_list,
+        self._annotation_names_map[annotation_field_name], self._use_allele_num,
+        self._minimal_match)
+    for annotation_str in data:
+      try:
+        ind, annotation_map = parser.parse_and_match_alt(annotation_str)
         self._alt_match_counter.inc()
-        found_alt = alt
-        break
-    if not found_alt and self._minimal_match:
-      for alt in proc_var._alternate_datas:
-        if self._alt_matches_annotation_alt_minimal_mode(
-            proc_var.reference_bases or '', alt.alternate_bases, alt_bases):
-          if found_alt:
-            is_ambiguous = True
-            self._alt_minimal_ambiguous_counter.inc()
-            logging.warning(
-                'Annotation ALT %s of field %s matches both ALTs %s and %s '
-                'with reference bases %s at reference %s start %s', alt_bases,
-                annotation_field_name, found_alt.alternate_bases,
-                alt.alternate_bases, proc_var.reference_bases,
-                proc_var.reference_name, proc_var.start)
-          else:
-            self._alt_minimal_match_counter.inc()
-          found_alt = alt
-          # Note we do not `break` in this case because we want to know if this
-          # match was an ambiguous match or an exact one.
-    if not found_alt:
-      self._alt_mismatch_counter.inc()
-      logging.warning(
-          'Could not find matching alternate bases for %s in '
-          'annotation filed %s for variant at reference %s start %s', alt_bases,
-          annotation_field_name, proc_var.reference_name, proc_var.start)
-    return found_alt, is_ambiguous
-
-  def _alt_matches_annotation_alt(
-      self, common_prefix, alt_bases, annotation_alt):
-    # type: (str, str, str) -> bool
-    """Returns true if `alt_bases` matches `annotation_alt`
-
-    See the "VCF" and "Complex VCF entries" sections of
-    https://ensembl.org/info/docs/tools/vep/vep_formats.html
-    for details of prefix matching and indels. Some examples:
-    REF      ALT         annotation-ALT
-    A        T           T
-    AT       ATT,A       TT,-
-    A        <ID>        ID
-    A        .[13:123[   .[13
-    """
-    if not self._minimal_match:
-      # Check equality without the common prefix.
-      # Note according to VCF spec the length of this common prefix should be
-      # at most one. This string matching is skipped if in minimal_match mode.
-      # TODO(bashir2): This is a VEP specific issue and should be updated once
-      # we need to import annotations generated by other programs.
-      if alt_bases[len(common_prefix):] == annotation_alt:
-        return True
-      # Handling deletion.
-      if (len(common_prefix) == len(alt_bases)
-          and annotation_alt == _COMPLETELY_DELETED_ALT):
-        return True
-    # Handling symbolic ALTs.
-    id_match = self._SYMBOLIC_ALT_RE.match(alt_bases)
-    if id_match and id_match.group('ID') == annotation_alt:
-      return True
-    # Handling breakend ALTs.
-    # TODO(bashir2): Check if the following logic is documented anywhere! I
-    # could not find it explicitly in any documentation but that's how I saw
-    # VEP does it in some examples I ran.
-    breakend_match = self._BREAKEND_ALT_RE.match(alt_bases)
-    if breakend_match and breakend_match.group('up_to_chr') == annotation_alt:
-      return True
-    return False
-
-  def _alt_matches_annotation_alt_minimal_mode(
-      self, referece_bases, alt_bases, annotation_alt):
-    # type: (str, str, str) -> bool
-    """Returns true if ALTs match in the --minimal mode of VEP.
-
-    Note in the minimal mode, the matching can be non-deterministic, so this
-    should only be done if _alt_matches_annotation_alt which is deterministic
-    has not succeeded. For details of ALT matching in the --minimal mode of VEP,
-    see the "Complex VCF entries" sections of
-    https://useast.ensembl.org/info/docs/tools/vep/vep_formats.html
-    Basically, each ALT is independently checked with REF and the common prefix
-    and suffix is removed from ALT. The remaining part is the annotation ALT:
-    REF      ALT         annotation-ALT
-    A        T           T
-    AT       TT,A        T,-
-    C        CT,T        T               -> Note this is ambiguous.
-    """
-    if not alt_bases or not annotation_alt:
-      return False
-    # Finding common leading and trailing sub-strings of ALT and REF.
-    leading = 0
-    trailing = 0
-    min_len = min(len(alt_bases), len(referece_bases))
-    while (leading < min_len and
-           alt_bases[leading] == referece_bases[leading]):
-      leading += 1
-    while (trailing + leading < min_len and  # TODO check this condition
-           alt_bases[len(alt_bases) - trailing - 1] ==
-           referece_bases[len(referece_bases) - trailing - 1]):
-      trailing += 1
-    if alt_bases[leading:len(alt_bases) - trailing] == annotation_alt:
-      return True
-    if (leading + trailing == len(alt_bases) and
-        annotation_alt == _COMPLETELY_DELETED_ALT):
-      return True
-    return False
-
-  def _add_annotations_by_allele_num(
-      self, proc_var, annotation_dict, annotation_field_name):
-    # type: (ProcessedVariant, Dict[str, str], str) -> None
-    if _ALLELE_NUM_ANNOTATION not in annotation_dict:
-      self._allele_num_missing_counter.inc()
-      return
-    index_str = annotation_dict[_ALLELE_NUM_ANNOTATION]
-    try:
-      alt_index = int(index_str) - 1
-      alt_list = proc_var._alternate_datas
-      if alt_index >= len(alt_list) or alt_index < 0:
-        raise ValueError
-      alt = alt_list[alt_index]
-      self._alt_match_counter.inc()
-      if annotation_field_name not in alt._info:
-        alt._info[annotation_field_name] = [annotation_dict]
-      else:
-        alt._info[annotation_field_name].append(annotation_dict)
-    except ValueError:
-      self._allele_num_incorrect_counter.inc()
-
-
-def _extract_annotation_list_with_alt(annotation_str):
-  # type: (str) -> List[str]
-  """Extracts annotations from an annotation INFO field.
-
-  This works by dividing the `annotation_str` on '|'. The first element is
-  the alternate allele and the rest are the annotations. For example, for
-  'G|upstream_gene_variant|MODIFIER|PSMF1' as `annotation_str`, it returns
-  ['G', 'upstream_gene_variant', 'MODIFIER', 'PSMF1'].
-
-  Args:
-    annotation_str: The content of annotation field for one alt.
-
-  Returns:
-    The list of annotations with the first element being the alternate.
-  """
-  return annotation_str.split('|')
-
-
-def _extract_annotation_names(description):
-  # type: (str) -> List[str]
-  """Extracts annotation list from the description of an annotation INFO field.
-
-  This is similar to extract_extract_annotation_list_with_alt with the
-  difference that it ignores everything before the first '|'. For example, for
-  'some desc ... Format: Allele|Consequence|IMPACT|SYMBOL|Gene', it returns
-  ['Consequence', 'IMPACT', 'SYMBOL', 'Gene']
-
-  Args:
-    description: The "Description" part of the annotation INFO field
-      in the header of VCF.
-
-  Returns:
-    The list of annotation names.
-  """
-  annotation_names = _extract_annotation_list_with_alt(description)
-  if len(annotation_names) < 2:
-    raise ValueError(
-        'Expected at least one | in annotation description {}'.format(
-            description))
-  return annotation_names[1:]
+        alt_datas = proc_var._alternate_datas[ind]
+        if annotation_field_name not in alt_datas._info:
+          alt_datas._info[annotation_field_name] = [annotation_map]
+        else:
+          alt_datas._info[annotation_field_name].append(annotation_map)
+      except annotation_parser.AnnotationParserException as e:
+        logging.warning(
+            'Parsing of annotation field %s failed at reference %s start %d: '
+            '%s', annotation_field_name, proc_var.reference_name,
+            proc_var.start, str(e))
+        if isinstance(e, annotation_parser.AnnotationAltNotFound):
+          self._alt_mismatch_counter.inc()
+        elif isinstance(e, annotation_parser.AlleleNumMissing):
+          self._allele_num_missing_counter.inc()
+        elif isinstance(e, annotation_parser.InvalidAlleleNumValue):
+          self._allele_num_incorrect_counter.inc()
+        elif isinstance(e, annotation_parser.AmbiguousAnnotationAllele):
+          self._alt_minimal_ambiguous_counter.inc()
