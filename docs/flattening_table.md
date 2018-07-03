@@ -78,7 +78,7 @@ SELECT
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
-  call.genotype as genotype
+  call.genotype AS genotype
 ```
 
 ![Flatten call, genotype](images/flatten_call_flatten_genotype.png)
@@ -97,7 +97,7 @@ SELECT
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
-  call.genotype as genotype
+  call.genotype AS genotype
 ```
 
 ![Flatten call, genotype orig alt](images/flatten_call_flatten_genotype_orig_alt.png)
@@ -116,18 +116,19 @@ SELECT
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
-  call.genotype as genotype
+  call.genotype AS genotype
 ```
 
 ![Flatten call, genotype, alt](images/flatten_call_flatten_genotype_flatten_alt.png)
 
-Note that the semantics of the value of the `genotype` column is has changed
+Note that the semantics of the value of the `genotype` column has changed
 as each row only contains a single alternate allele. As a result, you may
 decide to reformat that column using
 `IF(genotype > 0, 1, genotype) AS alt_genotype`, which results to:
   * `0` implying reference match.
-  * `-1` implying not called.
   * `1` implying match to the particular alternate specified in the row.
+  * `-1` implying not called. Note that Variant Transforms uses `-1` to denote
+    genotypes that are not called (i.e. `.` in the VCF file).
 
 Finally, to only include the `alternate_bases.alt` column, you need to
 explicitly flatten on the `alternate_bases` record as well and use the index as
@@ -143,11 +144,11 @@ SELECT
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
-  call.genotype as genotype
+  call.genotype AS genotype
 LEFT JOIN
   t.alternate_bases AS alts WITH OFFSET AS a_index
 WHERE
-  genotype IN(a_index + 1, 0, -1)
+  genotype IN (a_index + 1, 0, -1)
 ```
 
 ![Flatten call, genotype, only alt](images/flatten_call_flatten_genotype_only_alt.png)
@@ -181,11 +182,11 @@ SELECT
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
-  call.genotype as genotype
+  call.genotype AS genotype
 LEFT JOIN
   t.alternate_bases AS alts WITH OFFSET AS a_index
 WHERE
-  genotype IN(a_index + 1, 0, -1)
+  genotype IN (a_index + 1, 0, -1)
 ```
 
 For other repeated fields, you may choose to either concatenate them as a single
