@@ -466,5 +466,25 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         counter_factory.counter_map[
             CEnum.ALLELE_NUM_INCORRECT.value].get_value(), 4)
 
+  def test_create_alt_bases_field_schema_descriptions(self):
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    for hfi in header_fields.infos.values():
+      hfi['type'] = 'string'
 
-# TODO(bashir2): Add tests for create_alt_record_for_schema.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'])
+    schema = factory.create_alt_bases_field_schema()
+    csq_field = [field for field in schema.fields if field.name == 'CSQ'][0]
+    name_desc_map = {'Consequence': 'Consequence type of this variant',
+                     'IMPACT': 'The impact modifier for the consequence type',
+                     'SYMBOL': 'The gene symbol',
+                     'Gene': 'Ensembl stable ID of affected gene',
+                     'allele': 'The ALT part of the annotation field.'}
+    for field in csq_field.fields:
+      self.assertEqual(field.description, name_desc_map[field.name])
+    alt_field = [field for field in schema.fields if field.name == 'alt'][0]
+    self.assertEqual(alt_field.description, 'Alternate base.')
+    a2_fields = [field for field in schema.fields if field.name == 'A2']
+    self.assertEqual(len(a2_fields), 1)

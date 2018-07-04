@@ -36,6 +36,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs.annotation import annotation_parser
+from gcp_variant_transforms.libs.annotation.vep import descriptions
 
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
@@ -282,6 +283,7 @@ class ProcessedVariantFactory(object):
         raise ValueError('Annotation field {} not found'.format(annot_field))
       annotation_names = annotation_parser.extract_annotation_names(
           self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
+      annotation_descs = descriptions.VEP_DESCRIPTIONS
       annotation_record = bigquery.TableFieldSchema(
           name=bigquery_util.get_bigquery_sanitized_field(annot_field),
           type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -298,9 +300,7 @@ class ProcessedVariantFactory(object):
             name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
             type=bigquery_util.TableFieldConstants.TYPE_STRING,
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-            # TODO(bashir2): Add descriptions of well known annotations, e.g.,
-            # from VEP.
-            description=''))
+            description=annotation_descs.get(annotation_name, '')))
       alternate_bases_record.fields.append(annotation_record)
     return alternate_bases_record
 
