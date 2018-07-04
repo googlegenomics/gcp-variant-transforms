@@ -471,12 +471,10 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     for hfi in header_fields.infos.values():
       hfi['type'] = 'string'
 
-    counter_factory = _CounterSpyFactory()
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,
         split_alternate_allele_info_fields=True,
-        annotation_fields=['CSQ'],
-        counter_factory=counter_factory)
+        annotation_fields=['CSQ'])
     schema = factory.create_alt_bases_field_schema()
     csq_field = [field for field in schema.fields if field.name == 'CSQ'][0]
     name_desc_map = {'Consequence': 'Consequence type of this variant',
@@ -488,3 +486,5 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
       self.assertEqual(field.description, name_desc_map[field.name])
     alt_field = [field for field in schema.fields if field.name == 'alt'][0]
     self.assertEqual(alt_field.description, 'Alternate base.')
+    a2_fields = [field for field in schema.fields if field.name == 'A2']
+    self.assertEqual(len(a2_fields), 1)
