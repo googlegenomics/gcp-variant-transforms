@@ -336,7 +336,8 @@ class VepRunner(object):
 
   def _get_output_log_path(self, output_dir, vm_index):
     # type: (str, int) -> str
-    return '{}/logs/output_VM_{}.log'.format(output_dir, vm_index)
+    log_filename = 'output_VM_{}.log'.format(vm_index)
+    return filesystems.FileSystems.join(output_dir, 'logs', log_filename)
 
   def _create_actions(self, input_file, output_file):
     # type: (str, str) -> List
