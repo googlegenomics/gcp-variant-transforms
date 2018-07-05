@@ -106,13 +106,14 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     report_blob = bucket.get_blob(self._report_blob_name)
     if not report_blob:
       raise run_tests_common.TestCaseFailure(
-          'Report is not generated in {}'.format(self._report_path))
+          'Report is not generated in {} in test {}'.format(self._report_path,
+                                                            self._name))
     contents = report_blob.download_as_string()
     expected_contents = '\n'.join(self._expected_contents)
     if expected_contents != contents:
       raise run_tests_common.TestCaseFailure(
-          'Contents mismatch: expected {}, got {}'.format(
-              expected_contents, contents))
+          'Contents mismatch: expected {}, got {} in test {}'.format(
+              expected_contents, contents, self._name))
     if not self._keep_reports:
       report_blob.delete()
 
@@ -120,8 +121,8 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
       resolved_headers_blob = bucket.get_blob(self._header_blob_name)
       if not resolved_headers_blob:
         raise run_tests_common.TestCaseFailure(
-            'The resolved header is not generated in {}'.format(
-                self._header_path))
+            'The resolved header is not generated in {} in test {}'.format(
+                self._header_path, self._name))
       if not self._keep_reports:
         resolved_headers_blob.delete()
 
