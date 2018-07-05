@@ -174,8 +174,8 @@ class PreprocessReporterTest(unittest.TestCase):
     expected = [
         'No Header Conflicts Found.\n',
         '\n',
-        preprocess_reporter._InconsistencyType.UNDEFINED_HEADERS + '\n',
-        preprocess_reporter._HeaderLine.UNDEFINED_FIELD_HEADER + '\n',
+        preprocess_reporter._InconsistencyType.INFERRED_HEADERS + '\n',
+        preprocess_reporter._HeaderLine.INFERRED_FIELD_HEADER + '\n',
         (preprocess_reporter._DELIMITER).join([
             'DP', 'FORMAT', 'num=2 type=Float\n']),
         '\n'
@@ -202,8 +202,8 @@ class PreprocessReporterTest(unittest.TestCase):
         (preprocess_reporter._DELIMITER).join([
             ' ', ' ', 'num=1 type=Integer', 'file2', ' \n']),
         '\n',
-        preprocess_reporter._InconsistencyType.UNDEFINED_HEADERS + '\n',
-        preprocess_reporter._HeaderLine.UNDEFINED_FIELD_HEADER + '\n',
+        preprocess_reporter._InconsistencyType.INFERRED_HEADERS + '\n',
+        preprocess_reporter._HeaderLine.INFERRED_FIELD_HEADER + '\n',
         (preprocess_reporter._DELIMITER).join([
             'DP', 'FORMAT', 'num=2 type=Float\n']),
         '\n'
@@ -222,7 +222,7 @@ class PreprocessReporterTest(unittest.TestCase):
     expected = [
         'No Header Conflicts Found.\n',
         '\n',
-        'No Undefined Headers Found.\n',
+        'No Inferred Headers Found.\n',
         '\n',
         preprocess_reporter._InconsistencyType.MALFORMED_RECORDS + '\n',
         preprocess_reporter._HeaderLine.MALFORMED_RECORDS_HEADER + '\n',
@@ -240,7 +240,7 @@ class PreprocessReporterTest(unittest.TestCase):
     expected = [
         'No Header Conflicts Found.\n',
         '\n',
-        'No Undefined Headers Found.\n',
+        'No Inferred Headers Found.\n',
         '\n',
         'No Malformed Records Found.\n',
         '\n'

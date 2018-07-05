@@ -11,7 +11,7 @@
       "GQ\tFORMAT\tnum=1 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/preprocessor/invalid-4.0.vcf\tnum=1 type=Float",
       " \t \tnum=1 type=Integer\tgs://gcp-variant-transforms-testfiles/small_tests/preprocessor/valid-4.0.vcf\t ",
       "",
-      "Undefined Headers",
+      "Inferred Headers",
       "ID\tCategory\tProposed Resolution",
       "FT\tFORMAT\tnum=None type=Integer",
       "",

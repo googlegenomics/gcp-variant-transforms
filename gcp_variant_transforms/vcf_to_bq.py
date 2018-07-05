@@ -130,9 +130,9 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
       _read_variants(pipeline, known_args)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
-      | ' InferUndefinedHeaderFields' >>
-      infer_headers.InferUndefinedHeaderFields(
-          pvalue.AsSingleton(merged_header)))
+      | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
+          pvalue.AsSingleton(merged_header),
+          known_args.allow_incompatible_records))
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()

@@ -9,7 +9,7 @@
     "expected_contents": [
       "No Header Conflicts Found.",
       "",
-      "No Undefined Headers Found.",
+      "No Inferred Headers Found.",
       "",
       "Malformed Records",
       "File Path\tVariant Record\tError Message",
