@@ -102,7 +102,7 @@ class _InferHeaderFields(beam.DoFn):
     (e.g. 2.0), the type will stay the same as `defined_type`.
     """
     if defined_type == _HeaderTypeConstants.INTEGER:
-      if isinstance(value, float) and not float(value).is_integer():
+      if isinstance(value, float) and not value.is_integer():
         return _HeaderTypeConstants.FLOAT
       if isinstance(value, list):
         for item in value:
