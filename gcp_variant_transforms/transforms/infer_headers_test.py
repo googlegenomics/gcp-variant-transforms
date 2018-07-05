@@ -110,6 +110,23 @@ class InferHeaderFieldsTest(unittest.TestCase):
     )
     return variant
 
+  def _get_sample_variant_info_ia_float_2_0_in_list(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='C',
+        alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
+        filters=['PASS'],
+        info={'IS': 'some data',
+              'ISI': '1',
+              'ISF': '1.0',
+              'IF': 1.0,
+              'IB': True,
+              'IA': [1, 2.0]},
+        calls=[vcfio.VariantCall(
+            name='Sample1', genotype=[0, 1], phaseset='*',
+            info={'FI': 20, 'FU': [10.0, 20.0]})]
+    )
+    return variant
+
   def _get_sample_variant_format_fi_float_value(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
@@ -218,13 +235,13 @@ class InferHeaderFieldsTest(unittest.TestCase):
       p.run()
 
   def test_infer_mismatched_info_field_no_mismatches(self):
-    variant = self._get_sample_variant_1()
+    variant = self._get_sample_variant_info_ia_float_2_0_in_list()
     infos = {'IS': Info('IS', 1, 'String', '', '', ''),
              'ISI': Info('ISI', 1, 'Integer', '', '', ''),
              'ISF': Info('ISF', 1, 'Float', '', '', ''),
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', 'A', 'Float', '', '', '')}
+             'IA': Info('IA', 'A', 'Integer', '', '', '')}
     infer_header_fields = infer_headers._InferHeaderFields()
     corrected_info = infer_header_fields._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),

@@ -94,20 +94,21 @@ class _InferHeaderFields(beam.DoFn):
     # type: (str, Any) -> str
     """Returns the corrected type according to `defined_type` and `value`.
 
-    It handles one special case pyVCF cannot handle, i.e., the defined type is
+    It handles one special case PyVCF cannot handle, i.e., the defined type is
     `Integer`, but the provided value is float. In this case, correct the type
     to be `Float`.
+
+    Note that if `value` is a float instance but with an integer value
+    (e.g. 2.0), the type will stay the same as `defined_type`.
     """
-    if defined_type != _HeaderTypeConstants.INTEGER:
-      return defined_type
-    if isinstance(value, float):
-      return _HeaderTypeConstants.FLOAT
-    if isinstance(value, list):
-      for item in value:
-        if (self._get_corrected_type(defined_type, item) ==
-            _HeaderTypeConstants.FLOAT):
-          return _HeaderTypeConstants.FLOAT
-      return defined_type
+    if defined_type == _HeaderTypeConstants.INTEGER:
+      if isinstance(value, float) and not float(value).is_integer():
+        return _HeaderTypeConstants.FLOAT
+      if isinstance(value, list):
+        for item in value:
+          corrected_type = self._get_corrected_type(defined_type, item)
+          if corrected_type != defined_type:
+            return corrected_type
     return defined_type
 
   def _infer_mismatched_info_field(self,
