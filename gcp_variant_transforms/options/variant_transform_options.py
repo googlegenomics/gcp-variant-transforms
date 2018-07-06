@@ -83,6 +83,7 @@ class VcfReadOptions(VariantTransformsOptions):
               'even if this is provided.'))
     parser.add_argument(
         '--infer_headers',
+        '--infer_undefined_headers',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, header fields (e.g. FORMAT, INFO) are not only '
               'extracted from header section of VCF files, but also from '
