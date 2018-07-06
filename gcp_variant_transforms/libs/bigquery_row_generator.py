@@ -190,7 +190,7 @@ class BigQueryRowGenerator(object):
       raise ValueError('BigQuery schema has no such field: {}.\n'
                        'This can happen if the field is not defined in '
                        'the VCF headers, or is not inferred automatically. '
-                       'Retry pipeline with --infer_undefined_headers.'
+                       'Retry pipeline with --infer_headers.'
                        .format(field_name))
     sanitized_field_data = bigquery_util.get_bigquery_sanitized_field(data)
     field_schema = schema_descriptor.get_field_descriptor(field_name)

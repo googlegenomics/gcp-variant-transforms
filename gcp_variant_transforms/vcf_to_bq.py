@@ -152,7 +152,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
 
   # Always run pipeline locally if data is small.
   if (pipeline_mode == vcf_to_bq_common.PipelineModes.SMALL and
-      not known_args.infer_undefined_headers):
+      not known_args.infer_headers):
     options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
@@ -178,7 +178,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
         headers,
         known_args.split_alternate_allele_info_fields,
         known_args.allow_incompatible_records)
-    if known_args.infer_undefined_headers:
+    if known_args.infer_headers:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path

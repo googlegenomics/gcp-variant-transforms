@@ -72,13 +72,13 @@ You can fix this by:
   `--representative_header_file <file_path>`, where you provide a merged view
   of all headers in all files. You can add any missing fields to that file.
   We are working on a tool to make this process easier and provide
-  recommandations for missing fields.
+  recommendations for missing fields.
 
-* Coming soon: Run the pipeline with `--infer_undefined_headers`. This will do
-  two passes on the data and will infer definition for undefined headers. You
-  do not need to make any changes to the VCF files or provide a representative
-  header file. However, running with this option adds ~30% more compute to the
-  pipeline.
+* Run the pipeline with `--infer_headers`. This will do two passes on the data
+  and will infer definition for undefined headers and mismatched headers (header
+  field definition does not match the field value). You do not need to make any
+  changes to the VCF files or provide a representative header file. However,
+  running with this option adds ~30% more compute to the pipeline.
 
 ## Error: "BigQuery schema has no such field"
 
