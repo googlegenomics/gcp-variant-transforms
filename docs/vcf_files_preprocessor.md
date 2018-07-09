@@ -39,57 +39,54 @@ preprocessor can also be run using docker or directly from the source.
 
 ### Using docker
 
-First, set up the preprocessor pipeline configurations shown below and save it
-as `vcf_to_bigquery_preprocess.yaml`. The parameters that you need to replace
-are:
+Run the script below and replace the following parameters:
 
-* `my_project`: This is your project name that contains the BigQuery dataset.
-* `gs://my_bucket/vcffiles/*.vcf`: A location in Google Cloud Storage where the
+* `PROJECT_ID`: This is your project ID where the job should run.
+* `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   analyze multiple files at once.
-* `report_path`: This can be any path in Google Cloud Storage that your project
+* `REPORT_PATH`: This can be any path in Google Cloud Storage that your project
   has write access to. It is used to store the report from the preprocessor
   tool.
-* `resolved_headers_path`: Optional. This can be any path in Google Cloud
+* `RESOLVED_HEADERS_PATH`: Optional. This can be any path in Google Cloud
   Storage that your project has write access to. It is used to store the
   resolved headers which can be further used as a representative header (via
   `--representative_header_file`) for the
   [VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery).
-* `gs://my_bucket/staging` and `gs://my_bucket/temp`: These can be any folder in
-  Google Cloud Storage that your project has write access to. These are used to
-  store temporary files needed for running the pipeline.
+* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 
-`report_all_conflicts` is optional. By default, the preprocessor reports the inconsistent
-header definitions across multiple VCF files. By setting this parameter to true,
-it also checks the undefined headers and the malformed records.
-
-```yaml
-name: vcf-to-bigquery-preprocess-pipeline
-docker:
-  imageName: gcr.io/gcp-variant-transforms/gcp-variant-transforms
-  cmd: |
-    ./opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
-      --project my_project \
-      --input_pattern gs://my_bucket/vcffiles/*.vcf \
-      --report_path gs://my_bucket/preprocess/report.tsv \
-      --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
-      --report_all_conflicts true \
-      --staging_location gs://my_bucket/staging \
-      --temp_location gs://my_bucket/temp \
-      --job_name vcf-to-bigquery-preprocess \
-      --runner DataflowRunner
-```
-
-Next, run the following command to launch the pipeline. Replace `my_project`
-with your project name, `gs://my_bucket/temp/runner_logs` with a Cloud Storage
-folder to store the logs from the pipeline.
+`report_all_conflicts` is optional. By default, the preprocessor reports the
+inconsistent header definitions across multiple VCF files. By setting this
+parameter to true, it also checks the undefined headers and the malformed
+records.
 
 ```bash
+#!/bin/bash
+# Parameters to replace:
+PROJECT_ID=PROJECT_ID
+INPUT_PATTERN=gs://BUCKET/*.vcf
+REPORT_PATH=gs://BUCKET/report.tsv
+RESOLVED_HEADERS_PATH=gs://BUCKET/resolved_headers.vcf
+TEMP_LOCATION=gs://BUCKET/temp
+
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
+  --project ${PROJECT_ID} \
+  --input_pattern ${INPUT_PATTERN} \
+  --report_path ${REPORT_PATH} \
+  --resolved_headers_path ${RESOLVED_HEADERS_PATH} \
+  --report_all_conflicts true \
+  --temp_location ${TEMP_LOCATION} \
+  --job_name vcf-to-bigquery-preprocess \
+  --runner DataflowRunner"
 gcloud alpha genomics pipelines run \
-    --project my_project \
-    --pipeline-file vcf_to_bigquery_preprocess.yaml \
-    --logging gs://my_bucket/temp/runner_logs \
-    --zones us-west1-b
+  --project "${PROJECT_ID}" \
+  --logging "${TEMP_LOCATION}/runner_logs_`date +%Y%m%d_%H%M%S`.log" \
+  --zones us-west1-b \
+  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
+  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  --command-line "${COMMAND}"
 ```
 
 ### Running from github
@@ -102,8 +99,8 @@ Example command for DirectRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --report_path gs://my_bucket/preprocess/report.tsv
-  --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
+  --report_path gs://BUCKET/report.tsv
+  --resolved_headers_path gs://BUCKET/resolved_headers.vcf \
   --report_all_conflicts true
 ```
 
@@ -111,13 +108,12 @@ Example command for DataflowRunner:
 
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
-  --input_pattern gs://my_bucket/vcffiles/*.vcf \
-  --report_path gs://my_bucket/preprocess/report.tsv \
-  --resolved_headers_path gs://my_bucket/preprocess/headers.vcf \
+  --input_pattern gs://BUCKET/*.vcf \
+  --report_path gs://BUCKET/report.tsv \
+  --resolved_headers_path gs://BUCKET/resolved_headers.vcf \
   --report_all_conflicts true \
-  --project my_project \
-  --staging_location gs://my_bucket/staging \
-  --temp_location gs://my_bucket/temp \
+  --project PROJECT_ID \
+  --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery-preprocess \
   --setup_file ./setup.py \
   --runner DataflowRunner

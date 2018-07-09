@@ -4,23 +4,15 @@
 
 For this, you need to specify zone and region in Dataflow API (as well as
 the Pipelines API if you are using Docker). For example, in order to restrict
-job processing to Europe, first update `vcf_to_bigquery.yaml` to use zone and
-region in Europe:
-
-```yaml
-name: vcf-to-bigquery-pipeline
-docker:
-  imageName: gcr.io/gcp-variant-transforms/gcp-variant-transforms
-  cmd: |
-    ./opt/gcp_variant_transforms/bin/vcf_to_bq ...\
-      --region europe-west1 \
-      --zone europe-west1-b
-
-```
-
-Then specify zone in the Pipelines API:
+job processing to Europe, update the zone and region as follows:
 
 ```bash
+# Dataflow API.
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ... \
+  --region europe-west1 \
+  --zone europe-west1-b"
+
+# Pipelines API.
 gcloud alpha genomics pipelines run ... \
     --zones europe-west1-b
 ```

@@ -45,51 +45,48 @@ data science with BigQuery.
 The easiest way to run the VCF to BigQuery pipeline is to use the
 [docker](https://www.docker.com/) image and run it with the
 [Google Genomics Pipelines API](https://cloud-dot-devsite.googleplex.com/genomics/pipelines)
-as it has the binaries and all dependencies pre-installed.
+as it has the binaries and all dependencies pre-installed. Please ensure you
+have the latest `gcloud` tool by running `gcloud components update` (more
+details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
 
-First, set up the pipeline configurations shown below and save it as
-`vcf_to_bigquery.yaml`. The parameters that you need to replace are:
+Run the script below and replace the following parameters:
 
-* `my_project`: This is your project name that contains the BigQuery dataset.
-* `gs://my_bucket/vcffiles/*.vcf`: A location in Google Cloud Storage where the
+* `PROJECT_ID`: This is your project ID that contains the BigQuery dataset.
+* `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
   [Variant Merging](docs/variant_merging.md) documentation if you want
   to merge samples across files. The pipeline supports gzip, bzip, and
   uncompressed VCF formats. However, it runs slower for compressed files as they
   cannot be sharded.
-* `my_bigquery_dataset`: Your BigQuery dataset to store the output.
-* `my_bigquery_table`: This can be any ID you like (e.g. vcf_test).
-* `gs://my_bucket/staging` and `gs://my_bucket/temp`: These can be any folder in
-  Google Cloud Storage that your project has write access to. These are used to
-  store temporary files needed for running the pipeline.
-
-```yaml
-name: vcf-to-bigquery-pipeline
-docker:
-  imageName: gcr.io/gcp-variant-transforms/gcp-variant-transforms
-  cmd: |
-    ./opt/gcp_variant_transforms/bin/vcf_to_bq \
-      --project my_project \
-      --input_pattern gs://my_bucket/vcffiles/*.vcf \
-      --output_table my_project:my_bigquery_dataset.my_bigquery_table \
-      --staging_location gs://my_bucket/staging \
-      --temp_location gs://my_bucket/temp \
-      --job_name vcf-to-bigquery \
-      --runner DataflowRunner
-```
-
-Next, run the following command to launch the pipeline. Replace `my_project`
-with your project name, `gs://my_bucket/temp/runner_logs` with a Cloud Storage
-folder to store the logs from the pipeline.
+* `OUTPUT_TABLE`: The full path to a BigQuery table to store the output.
+* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 
 ```bash
+#!/bin/bash
+# Parameters to replace:
+PROJECT_ID=PROJECT_ID
+INPUT_PATTERN=gs://BUCKET/*.vcf
+OUTPUT_TABLE=PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE
+TEMP_LOCATION=gs://BUCKET/temp
+
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq \
+  --project ${PROJECT_ID} \
+  --input_pattern ${INPUT_PATTERN} \
+  --output_table ${OUTPUT_TABLE} \
+  --temp_location ${TEMP_LOCATION} \
+  --job_name vcf-to-bigquery \
+  --runner DataflowRunner"
 gcloud alpha genomics pipelines run \
-    --project my_project \
-    --pipeline-file vcf_to_bigquery.yaml \
-    --logging gs://my_bucket/temp/runner_logs \
-    --zones us-west1-b \
-    --service-account-scopes https://www.googleapis.com/auth/bigquery
+  --project "${PROJECT_ID}" \
+  --logging "${TEMP_LOCATION}/runner_logs_`date +%Y%m%d_%H%M%S`.log" \
+  --zones us-west1-b \
+  --service-account-scopes \
+    https://www.googleapis.com/auth/bigquery,https://www.googleapis.com/auth/cloud-platform \
+  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  --command-line "${COMMAND}"
 ```
 
 Please note the operation ID returned by the above script. You can track the
@@ -101,7 +98,7 @@ gcloud alpha genomics operations describe <operation-id>
 
 The returned data will have `done: true` when the operation is done.
 A detailed description of the Operation resource can be found in the
-[API documentation](https://cloud.google.com/genomics/reference/rest/v1/operations)
+[API documentation](https://cloud.google.com/genomics/reference/rest/v2alpha1/projects.operations).
 
 The underlying pipeline uses
 [Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
@@ -142,18 +139,17 @@ Example command for DirectRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --output_table projectname:bigquerydataset.tablename
+  --output_table PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE
 ```
 
 Example command for DataflowRunner:
 
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
-  --input_pattern gs://my_bucket/vcffiles/*.vcf \
-  --output_table my_project:my_bigquery_dataset.my_bigquery_table \
-  --project my_project \
-  --staging_location gs://my_bucket/staging \
-  --temp_location gs://my_bucket/temp \
+  --input_pattern gs://BUCKET/*.vcf \
+  --output_table PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE \
+  --project PROJECT_ID \
+  --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery \
   --setup_file ./setup.py \
   --runner DataflowRunner
