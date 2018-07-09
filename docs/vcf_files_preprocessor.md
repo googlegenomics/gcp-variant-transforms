@@ -27,8 +27,9 @@ This tool generates a report that includes three types of inconsistencies:
   two kinds of the mismatches are handled:
   1. The defined field type is `Integer`, but the provided value is float.
      Correct the type to be `Float`.
-  2. Defined num is `A`, but the provided values do not have the same
-     cardinality as the alternate bases. Infer the num to be `None`.
+  2. Defined num is `A` (i.e. one value for each alternate base), but the
+     provided values do not have the same cardinality as the alternate bases.
+     Infer the num to be unknown (i.e. `.`).
 
 ## Running VCF files to BigQuery Preprocessor
 
