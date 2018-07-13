@@ -1,23 +1,24 @@
 [
   {
-    "test_name": "infer-undefined-header-fields",
-    "table_name": "infer_undefined_header_fields",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
-    "infer_undefined_headers": "True",
+    "test_name": "infer-header-fields",
+    "table_name": "infer_header_fields",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-header-fields.vcf",
+    "infer_headers": "True",
+    "allow_incompatible_records": "True",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 1}
+        "expected_result": {"num_rows": 3}
       },
       {
         "query": ["SELECT COUNT(AA) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 1}
+        "expected_result": {"cnt": 3}
       },
       {
         "query": ["SELECT COUNT(AF) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 1}
+        "expected_result": {"cnt": 3}
       },
       {
         "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
@@ -25,7 +26,7 @@
       },
       {
         "query": ["SELECT COUNT(DP) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 1}
+        "expected_result": {"cnt": 3}
       },
       {
         "query": ["SELECT COUNT(H2) AS cnt FROM {TABLE_NAME}"],
@@ -33,26 +34,26 @@
       },
       {
         "query": ["SELECT COUNT(NS) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 1}
+        "expected_result": {"cnt": 3}
       },
       {
         "query": [
           "SELECT SUM(HQ) AS sum FROM {TABLE_NAME} t, t.call as call,",
           "call.HQ as HQ"
         ],
-        "expected_result": {"sum": 204}
+        "expected_result": {"sum": 274}
       },
       {
         "query": [
           "SELECT SUM(call.GQ) AS sum FROM {TABLE_NAME} t, t.call as call"
         ],
-        "expected_result": {"sum": 139}
+        "expected_result": {"sum": 289}
       },
       {
         "query": [
           "SELECT SUM(call.DP) AS sum FROM {TABLE_NAME} t, t.call as call"
         ],
-        "expected_result": {"sum": 14}
+        "expected_result": {"sum": 33.2}
       }
     ]
   }

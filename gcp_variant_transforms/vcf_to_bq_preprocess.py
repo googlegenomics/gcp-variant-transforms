@@ -73,9 +73,11 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
   # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
   inferred_headers = (variants
                       | 'FilterVariants' >> filter_variants.FilterVariants()
-                      | ' InferUndefinedHeaderFields' >>
-                      infer_headers.InferUndefinedHeaderFields(
-                          pvalue.AsSingleton(merged_header)))
+                      | ' InferHeaderFields' >>
+                      infer_headers.InferHeaderFields(
+                          pvalue.AsSingleton(merged_header),
+                          allow_incompatible_records=True))
+
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()

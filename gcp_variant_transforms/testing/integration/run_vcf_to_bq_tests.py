@@ -99,7 +99,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     query_formatter = QueryFormatter(self._table_name)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
-      assertion = QueryAssertion(client, query, assertion_config[
+      assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
 
@@ -110,8 +110,10 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
 class QueryAssertion(object):
   """Runs a query and verifies that the output matches the expected result."""
 
-  def __init__(self, client, query, expected_result):
+  def __init__(self, client, test_name, query, expected_result):
+    # type: (bigquery.Client, str, str, Dict) -> None
     self._client = client
+    self._test_name = test_name
     self._query = query
     self._expected_result = expected_result
 
@@ -121,17 +123,18 @@ class QueryAssertion(object):
     rows = list(iterator)
     if len(rows) != 1:
       raise run_tests_common.TestCaseFailure(
-          'Expected one row in query result, got {}'.format(len(rows)))
+          'Expected one row in query result, got {} in test {}'.format(
+              len(rows), self._test_name))
     row = rows[0]
     if len(self._expected_result) != len(row):
       raise run_tests_common.TestCaseFailure(
-          'Expected {} columns in the query result, got {}'.format(
-              len(self._expected_result), len(row)))
+          'Expected {} columns in the query result, got {} in test {}'.format(
+              len(self._expected_result), len(row), self._test_name))
     for key in self._expected_result.keys():
       if self._expected_result[key] != row.get(key):
         raise run_tests_common.TestCaseFailure(
-            'Column {} mismatch: expected {}, got {}'.format(
-                key, self._expected_result[key], row.get(key)))
+            'Column {} mismatch: expected {}, got {} in test {}'.format(
+                key, self._expected_result[key], row.get(key), self._test_name))
 
 
 class QueryFormatter(object):

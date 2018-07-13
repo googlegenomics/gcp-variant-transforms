@@ -185,6 +185,7 @@ region in support of your project’s security and compliance needs. See
 * [Appending data to existing tables](docs/data_append.md)
 * [Variant Annotation](docs/variant_annotation.md)
 * [Partitioning](docs/partitioning.md)
+* [Flattening the BigQuery table](docs/flattening_table.md)
 * [Troubleshooting](docs/troubleshooting.md)
 
 ## Development

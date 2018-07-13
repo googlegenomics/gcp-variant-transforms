@@ -3,7 +3,7 @@
     "test_name": "test-1000-genomes-no-merge",
     "table_name": "test_1000_genomes_no_merge",
     "input_pattern": "gs://genomics-public-data/1000-genomes/vcf/*.vcf",
-    "infer_undefined_headers": "True",
+    "infer_headers": "True",
     "allow_incompatible_records": "True",
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-64",
