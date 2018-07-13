@@ -1,7 +1,3 @@
-# TODO (jessime) This has been copied from gnomad_genomes_GRCh37_chrX_head2500_run_vep.json
-# This file should be refactored to either de-duplicate code or reduced the tests here to only
-# keep necessary tests.
-
 [
   {
     "test_name": "gnomad-genomes-grch37-chr-x-head2500-run-vep",
@@ -12,26 +8,25 @@
     "runner": "DataflowRunner",
     "run_annotation_pipeline": "True",
     "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
-    "disk_size_gb": 150,
-    "num_workers": 1,
+    "num_workers": 2,
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 9953}
+        "expected_result": {"num_rows": 2337}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
-        "expected_result": {"num_annotation_sets": 45770}
+        "expected_result": {"num_annotation_sets": 21167}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_annotation_sets": 45770}
+        "expected_result": {"num_annotation_sets": 21059}
       },
       {
         "query": [
@@ -43,7 +38,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 143375297338}
+        "expected_result": {"hash_sum": 17184695290}
       },
       {
         "query": [
@@ -55,35 +50,35 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 143375297338}
+        "expected_result": {"hash_sum": 17180709457}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
-        "expected_result": {"num_features": 1576}
+        "expected_result": {"num_features": 74}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_features": 1576}
+        "expected_result": {"num_features": 71}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
-        "expected_result": {"num_symbol": 207}
+        "expected_result": {"num_symbol": 13}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_symbol": 207}
+        "expected_result": {"num_symbol": 13}
       }
     ]
   }
