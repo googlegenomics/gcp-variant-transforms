@@ -38,6 +38,8 @@ _INPUT_FILES_WITH_SIZE = [
     ('some/input/pattern/dir2/b', 100),
     ('some/input/pattern/dir2/c', 100),
 ]
+_SPECIES = 'homo_sapiens'
+_ASSEMBLY = 'GRCh38'
 _OUTPUT_DIR = 'gs://output/dir'
 _VEP_INFO_FIELD = 'TEST_FIELD'
 _IMAGE = 'gcr.io/image'
@@ -76,7 +78,8 @@ class VepRunnerTest(unittest.TestCase):
   def _create_test_instance(self, pipeline_args=None):
     # type: (List[str]) -> vep_runner.VepRunner
     test_object = vep_runner.VepRunner(
-        self._mock_service, _INPUT_PATTERN, _OUTPUT_DIR,
+        self._mock_service, _ASSEMBLY, _SPECIES,
+        _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
         pipeline_args or self._get_pipeline_args())
     return test_object

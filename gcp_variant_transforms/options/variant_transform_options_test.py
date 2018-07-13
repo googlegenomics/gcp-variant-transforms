@@ -32,8 +32,8 @@ def make_args(options, args):
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   options.add_arguments(parser)
-  namespace, remining_args = parser.parse_known_args(args)
-  assert not remining_args
+  namespace, remaining_args = parser.parse_known_args(args)
+  assert not remaining_args
   return namespace
 
 
@@ -125,3 +125,19 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
     self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_update_from_defaults(self):
+    args = self._make_args(['--vep_cache_path', ''])
+    args = self._options.update_from_defaults(args)
+    self.assertEqual(args.vep_cache_path,
+                     ('gs://gcp-variant-annotation-vep-cache/'
+                      'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
+    args = self._make_args(['--vep_cache_path', 'gs://VEP_CACHE'])
+    args = self._options.update_from_defaults(args)
+    self.assertEqual(args.vep_cache_path, 'gs://VEP_CACHE')
+    args = self._make_args(['--species', 'mouse',
+                            '--assembly', 'mm9'])
+    args = self._options.update_from_defaults(args)
+    self.assertEqual(args.vep_cache_path,
+                     ('gs://gcp-variant-annotation-vep-cache/'
+                      'vep_cache_mouse_mm9_91.tar.gz'))

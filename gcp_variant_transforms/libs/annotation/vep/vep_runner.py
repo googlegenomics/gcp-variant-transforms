@@ -76,10 +76,10 @@ def create_runner_and_update_args(known_args, pipeline_args):
   pipeline_service = discovery.build(
       'genomics', 'v2alpha1', credentials=credentials)
   runner = VepRunner(
-      pipeline_service, known_args.input_pattern,
-      known_args.annotation_output_dir, known_args.vep_info_field,
-      known_args.vep_image_uri, known_args.vep_cache_path,
-      known_args.vep_num_fork, pipeline_args)
+      pipeline_service, known_args.assembly, known_args.species,
+      known_args.input_pattern, known_args.annotation_output_dir,
+      known_args.vep_info_field, known_args.vep_image_uri,
+      known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args)
   known_args.input_pattern = runner.get_output_pattern()
   if known_args.annotation_fields:
     known_args.annotation_fields.append(known_args.vep_info_field)
@@ -102,6 +102,8 @@ class VepRunner(object):
   def __init__(
       self,
       pipeline_service,  # type: discovery.Resource
+      assembly,  # type: str
+      species,  # type: str
       input_pattern,  # type: str
       output_dir,  # type: str
       vep_info_field,  # tyep: str
@@ -128,6 +130,8 @@ class VepRunner(object):
         many and what type of workers to use, where to run, etc.
     """
     self._pipeline_service = pipeline_service
+    self._assembly = assembly
+    self._species = species
     self._vep_image_uri = vep_image_uri
     self._vep_cache_path = vep_cache_path
     self._vep_num_fork = vep_num_fork
@@ -157,6 +161,8 @@ class VepRunner(object):
                                   '/mnt/vep/vep_cache/')
             ],
             'environment': {
+                'GENOME_ASSEMBLY': self._assembly,
+                'SPECIES': self._species,
                 'VEP_CACHE': '/mnt/vep/vep_cache/{}'.format(
                     _get_base_name(self._vep_cache_path)),
                 'NUM_FORKS': str(self._vep_num_fork),

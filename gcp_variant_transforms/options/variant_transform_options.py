@@ -42,6 +42,10 @@ class VariantTransformsOptions(object):
     """Validates this group's options parsed from the command line."""
     pass
 
+  def update_from_defaults(self, parsed_args):
+    # type: (argparse.Namespace) -> None
+    """Modify final value of default options based on values of other flags."""
+    pass
 
 class VcfReadOptions(VariantTransformsOptions):
   """Options for reading VCF files."""
@@ -188,6 +192,8 @@ class AnnotationOptions(VariantTransformsOptions):
   _OUTPUT_DIR_FLAG = 'annotation_output_dir'
   _VEP_IMAGE_FLAG = 'vep_image_uri'
   _VEP_CACHE_FLAG = 'vep_cache_path'
+  _VEP_CACHE_BASE = ('gs://gcp-variant-annotation-vep-cache/'
+                     'vep_cache_{species}_{assembly}_91.tar.gz')
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
@@ -217,7 +223,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'matches so by default this is False but if the VCF files are '
               'generated with VEP in --minimal mode, then this option should '
               'be turned on. The ambiguous cases are logged and counted.'
-              'See the "Complext VCF Entries" of this doc for details:'
+              'See the "Complex VCF Entries" of this doc for details:'
               'http://www.ensembl.org/info/docs/tools/vep/online/'
               'VEP_web_documentation.pdf'))
     parser.add_argument(
@@ -227,7 +233,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
-        default="",
+        default='',
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
               'structure as input files with a suffix added to them.'))
@@ -237,13 +243,21 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
-        default=('gs://gcp-variant-annotation-vep-cache/'
-                 'vep_cache_homo_sapiens_GRCh38_91.tar.gz'),
-        help=('The path for VEP cache on Google Cloud Storage.'))
+        default='',
+        help=('The path for VEP cache on Google Cloud Storage. By default, '
+              'this will be set to gs://gcp-variant-annotation-vep-cache/'
+              'vep_cache_homo_sapiens_GRCh38_91.tar.gz, assuming neither the '
+              '`--species` nor the `--assembly` flags have been set. For '
+              'convenience, if either of those flags are provided, this path '
+              'will be automatically updated to reflect the new cache, '
+              'given values are a species and/or assembly we maintain. For '
+              'example, `--assembly GRCh37` is satisfactory for specifying our '
+              'gs://gcp-variant-annotation-vep-cache/'
+              'vep_cache_homo_sapiens_GRCh37_91.tar.gz cache.'))
     parser.add_argument(
         '--vep_info_field',
-        default="CSQ_VT",
-        help=('The name of the new INFO field for annotaitons.'))
+        default='CSQ_VT',
+        help=('The name of the new INFO field for annotations.'))
     parser.add_argument(
         '--vep_num_fork',
         type=int, default=2,
@@ -251,6 +265,18 @@ class AnnotationOptions(VariantTransformsOptions):
               'file. The default is chosen to be 2 because even on a single '
               'core machine using two processes should help interleaving I/O '
               'vs CPU bound work.'))
+    parser.add_argument(
+        '--assembly',
+        default='GRCh38',
+        help=('Genome assembly name to pass to vep. Setting this flag will be '
+              'reflected in `--{}`, if it is not also set.').format(
+                  AnnotationOptions._VEP_CACHE_FLAG))
+    parser.add_argument(
+        '--species',
+        default='homo_sapiens',
+        help=('Species name to pass to vep. Setting this flag will be '
+              'reflected in `--{}`, if it is not also set.').format(
+                  AnnotationOptions._VEP_CACHE_FLAG))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -269,6 +295,15 @@ class AnnotationOptions(VariantTransformsOptions):
         raise ValueError('Flag {} should start with gs://, got {}'.format(
             AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
 
+  def update_from_defaults(self, parsed_args):
+    # type: (argparse.Namespace) -> argparse.Namespace
+    args_dict = vars(parsed_args)
+    if not args_dict[AnnotationOptions._VEP_CACHE_FLAG]:
+      base = AnnotationOptions._VEP_CACHE_BASE
+      setattr(parsed_args,
+              AnnotationOptions._VEP_CACHE_FLAG,
+              base.format(assembly=parsed_args.assembly,
+                          species=parsed_args.species))
 
 class FilterOptions(VariantTransformsOptions):
   """Options for filtering Variant records."""
