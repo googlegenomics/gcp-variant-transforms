@@ -41,7 +41,7 @@ preprocessor can also be run using docker or directly from the source.
 
 Run the script below and replace the following parameters:
 
-* `PROJECT_ID`: This is your project ID where the job should run.
+* `GOOGLE_CLOUD_PROJECT`: This is your project ID where the job should run.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   analyze multiple files at once.
@@ -65,14 +65,14 @@ records.
 ```bash
 #!/bin/bash
 # Parameters to replace:
-PROJECT_ID=PROJECT_ID
+GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
 INPUT_PATTERN=gs://BUCKET/*.vcf
 REPORT_PATH=gs://BUCKET/report.tsv
 RESOLVED_HEADERS_PATH=gs://BUCKET/resolved_headers.vcf
 TEMP_LOCATION=gs://BUCKET/temp
 
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
-  --project ${PROJECT_ID} \
+  --project ${GOOGLE_CLOUD_PROJECT} \
   --input_pattern ${INPUT_PATTERN} \
   --report_path ${REPORT_PATH} \
   --resolved_headers_path ${RESOLVED_HEADERS_PATH} \
@@ -81,8 +81,8 @@ COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
   --job_name vcf-to-bigquery-preprocess \
   --runner DataflowRunner"
 gcloud alpha genomics pipelines run \
-  --project "${PROJECT_ID}" \
-  --logging "${TEMP_LOCATION}/runner_logs_`date +%Y%m%d_%H%M%S`.log" \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
   --zones us-west1-b \
   --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
   --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
@@ -112,7 +112,7 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --report_path gs://BUCKET/report.tsv \
   --resolved_headers_path gs://BUCKET/resolved_headers.vcf \
   --report_all_conflicts true \
-  --project PROJECT_ID \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
   --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery-preprocess \
   --setup_file ./setup.py \

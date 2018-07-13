@@ -51,7 +51,8 @@ details [here](https://cloud.google.com/sdk/gcloud/reference/components/update))
 
 Run the script below and replace the following parameters:
 
-* `PROJECT_ID`: This is your project ID that contains the BigQuery dataset.
+* `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
+  dataset.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
@@ -67,24 +68,23 @@ Run the script below and replace the following parameters:
 ```bash
 #!/bin/bash
 # Parameters to replace:
-PROJECT_ID=PROJECT_ID
+GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
 INPUT_PATTERN=gs://BUCKET/*.vcf
-OUTPUT_TABLE=PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE
+OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
 TEMP_LOCATION=gs://BUCKET/temp
 
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq \
-  --project ${PROJECT_ID} \
+  --project ${GOOGLE_CLOUD_PROJECT} \
   --input_pattern ${INPUT_PATTERN} \
   --output_table ${OUTPUT_TABLE} \
   --temp_location ${TEMP_LOCATION} \
   --job_name vcf-to-bigquery \
   --runner DataflowRunner"
 gcloud alpha genomics pipelines run \
-  --project "${PROJECT_ID}" \
-  --logging "${TEMP_LOCATION}/runner_logs_`date +%Y%m%d_%H%M%S`.log" \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
   --zones us-west1-b \
-  --service-account-scopes \
-    https://www.googleapis.com/auth/bigquery,https://www.googleapis.com/auth/cloud-platform \
+  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
   --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
   --command-line "${COMMAND}"
 ```
@@ -139,7 +139,7 @@ Example command for DirectRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --output_table PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE
+  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
 ```
 
 Example command for DataflowRunner:
@@ -147,8 +147,8 @@ Example command for DataflowRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gs://BUCKET/*.vcf \
-  --output_table PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE \
-  --project PROJECT_ID \
+  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
   --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery \
   --setup_file ./setup.py \
