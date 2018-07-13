@@ -42,10 +42,6 @@ class VariantTransformsOptions(object):
     """Validates this group's options parsed from the command line."""
     pass
 
-  def update_from_defaults(self, parsed_args):
-    # type: (argparse.Namespace) -> None
-    """Modify final value of default options based on values of other flags."""
-    pass
 
 class VcfReadOptions(VariantTransformsOptions):
   """Options for reading VCF files."""
@@ -194,8 +190,6 @@ class AnnotationOptions(VariantTransformsOptions):
   _OUTPUT_DIR_FLAG = 'annotation_output_dir'
   _VEP_IMAGE_FLAG = 'vep_image_uri'
   _VEP_CACHE_FLAG = 'vep_cache_path'
-  _VEP_CACHE_BASE = ('gs://gcp-variant-annotation-vep-cache/'
-                     'vep_cache_{species}_{assembly}_91.tar.gz')
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
@@ -249,12 +243,12 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('The path for VEP cache on Google Cloud Storage. By default, '
               'this will be set to gs://gcp-variant-annotation-vep-cache/'
               'vep_cache_homo_sapiens_GRCh38_91.tar.gz, assuming neither the '
-              '`--species` nor the `--assembly` flags have been set. For '
-              'convenience, if either of those flags are provided, this path '
-              'will be automatically updated to reflect the new cache, '
+              '`--vep_species` nor the `--vep_assembly` flags have been set. '
+              'For convenience, if either of those flags are provided, this '
+              'path will be automatically updated to reflect the new cache, '
               'given values are a species and/or assembly we maintain. For '
-              'example, `--assembly GRCh37` is satisfactory for specifying our '
-              'gs://gcp-variant-annotation-vep-cache/'
+              'example, `--vep_assembly GRCh37` is satisfactory for specifying '
+              'our gs://gcp-variant-annotation-vep-cache/'
               'vep_cache_homo_sapiens_GRCh37_91.tar.gz cache.'))
     parser.add_argument(
         '--vep_info_field',
@@ -268,16 +262,16 @@ class AnnotationOptions(VariantTransformsOptions):
               'core machine using two processes should help interleaving I/O '
               'vs CPU bound work.'))
     parser.add_argument(
-        '--assembly',
+        '--vep_assembly',
         default='GRCh38',
         help=('Genome assembly name to pass to vep. Setting this flag will be '
-              'reflected in `--{}`, if it is not also set.').format(
+              'reflected in the cache file used if --{} is not set.').format(
                   AnnotationOptions._VEP_CACHE_FLAG))
     parser.add_argument(
-        '--species',
+        '--vep_species',
         default='homo_sapiens',
         help=('Species name to pass to vep. Setting this flag will be '
-              'reflected in `--{}`, if it is not also set.').format(
+              'reflected in the cache file used if --{} is not set.').format(
                   AnnotationOptions._VEP_CACHE_FLAG))
 
   def validate(self, parsed_args):
@@ -293,19 +287,10 @@ class AnnotationOptions(VariantTransformsOptions):
         raise ValueError('Flag {} is not set.'.format(
             AnnotationOptions._VEP_IMAGE_FLAG))
       vep_cache = args_dict[AnnotationOptions._VEP_CACHE_FLAG]  # type: str
-      if not vep_cache or not vep_cache.startswith('gs://'):
+      if vep_cache and not vep_cache.startswith('gs://'):
         raise ValueError('Flag {} should start with gs://, got {}'.format(
             AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
 
-  def update_from_defaults(self, parsed_args):
-    # type: (argparse.Namespace) -> argparse.Namespace
-    args_dict = vars(parsed_args)
-    if not args_dict[AnnotationOptions._VEP_CACHE_FLAG]:
-      base = AnnotationOptions._VEP_CACHE_BASE
-      setattr(parsed_args,
-              AnnotationOptions._VEP_CACHE_FLAG,
-              base.format(assembly=parsed_args.assembly,
-                          species=parsed_args.species))
 
 class FilterOptions(VariantTransformsOptions):
   """Options for filtering Variant records."""

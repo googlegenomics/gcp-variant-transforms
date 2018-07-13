@@ -43,7 +43,7 @@ _ASSEMBLY = 'GRCh38'
 _OUTPUT_DIR = 'gs://output/dir'
 _VEP_INFO_FIELD = 'TEST_FIELD'
 _IMAGE = 'gcr.io/image'
-_CACHE = 'path/to/cache'
+_CACHE = 'gs://path/to/cache'
 _NUM_FORK = 8
 _PROJECT = 'test-project'
 _REGION = 'test-region'
@@ -99,6 +99,22 @@ class VepRunnerTest(unittest.TestCase):
     """This is to test object construction fails with incomplete arguments."""
     with self.assertRaisesRegexp(ValueError, '.*project.*'):
       self._create_test_instance(pipeline_args=['no_arguments'])
+
+  def test_make_vep_cache_path(self):
+    test_instance = self._create_test_instance()
+    self.assertEqual(test_instance._vep_cache_path, _CACHE)
+    test_instance = vep_runner.VepRunner(
+        self._mock_service, _SPECIES, _ASSEMBLY, _INPUT_PATTERN, _OUTPUT_DIR,
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+    self.assertEqual(test_instance._vep_cache_path,
+                     ('gs://gcp-variant-annotation-vep-cache/'
+                      'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
+    test_instance = vep_runner.VepRunner(
+        self._mock_service, 'mouse', 'mm9', _INPUT_PATTERN, _OUTPUT_DIR,
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+    self.assertEqual(test_instance._vep_cache_path,
+                     ('gs://gcp-variant-annotation-vep-cache/'
+                      'vep_cache_mouse_mm9_91.tar.gz'))
 
   def test_get_output_pattern(self):
     output_pattern = self._create_test_instance().get_output_pattern()

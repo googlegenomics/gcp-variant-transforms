@@ -58,7 +58,6 @@ def parse_args(argv, command_line_options):
     transform_options.add_arguments(parser)
   known_args, pipeline_args = parser.parse_known_args(argv)
   for transform_options in options:
-    transform_options.update_from_defaults(known_args)
     transform_options.validate(known_args)
   return known_args, pipeline_args
 

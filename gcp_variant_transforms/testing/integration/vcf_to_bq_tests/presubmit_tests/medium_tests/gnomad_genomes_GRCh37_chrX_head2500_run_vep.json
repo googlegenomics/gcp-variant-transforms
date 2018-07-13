@@ -1,13 +1,18 @@
+# TODO (jessime) This has been copied from gnomad_genomes_GRCh37_chrX_head2500_run_vep.json
+# This file should be refactored to either de-duplicate code or reduced the tests here to only
+# keep necessary tests.
+
 [
   {
-    "test_name": "gnomad-genomes-GRCh37-chrX-head2500-run-vep",
+    "test_name": "gnomad-genomes-grch37-chr-x-head2500-run-vep",
     "table_name": "gnomad_genomes_GRCh37_chrX_head2500_run_vep",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/gnomad_genomes_GRCh37_chrX_head2500.vcf",
     "annotation_fields": "CSQ",
-    "assembly": "GRCh37",
+    "vep_assembly": "GRCh37",
     "runner": "DataflowRunner",
     "run_annotation_pipeline": "True",
     "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
+    "disk_size_gb": 150,
     "num_workers": 1,
     "assertion_configs": [
       {
