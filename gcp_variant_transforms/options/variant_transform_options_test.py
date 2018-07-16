@@ -32,8 +32,8 @@ def make_args(options, args):
   parser = argparse.ArgumentParser()
   parser.register('type', 'bool', lambda v: v.lower() == 'true')
   options.add_arguments(parser)
-  namespace, remining_args = parser.parse_known_args(args)
-  assert not remining_args
+  namespace, remaining_args = parser.parse_known_args(args)
+  assert not remaining_args
   return namespace
 
 
