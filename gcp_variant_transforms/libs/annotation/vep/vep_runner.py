@@ -76,10 +76,10 @@ def create_runner_and_update_args(known_args, pipeline_args):
   pipeline_service = discovery.build(
       'genomics', 'v2alpha1', credentials=credentials)
   runner = VepRunner(
-      pipeline_service, known_args.input_pattern,
-      known_args.annotation_output_dir, known_args.vep_info_field,
-      known_args.vep_image_uri, known_args.vep_cache_path,
-      known_args.vep_num_fork, pipeline_args)
+      pipeline_service, known_args.vep_species, known_args.vep_assembly,
+      known_args.input_pattern, known_args.annotation_output_dir,
+      known_args.vep_info_field, known_args.vep_image_uri,
+      known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args)
   known_args.input_pattern = runner.get_output_pattern()
   if known_args.annotation_fields:
     known_args.annotation_fields.append(known_args.vep_info_field)
@@ -99,12 +99,17 @@ def create_runner_and_update_args(known_args, pipeline_args):
 class VepRunner(object):
   """A class for running vep through Pipelines API on a set of input files."""
 
+  _VEP_CACHE_BASE = ('gs://gcp-variant-annotation-vep-cache/'
+                     'vep_cache_{species}_{assembly}_91.tar.gz')
+
   def __init__(
       self,
       pipeline_service,  # type: discovery.Resource
+      species,  # type: str
+      assembly,  # type: str
       input_pattern,  # type: str
       output_dir,  # type: str
-      vep_info_field,  # tyep: str
+      vep_info_field,  # type: str
       vep_image_uri,  # type: str
       vep_cache_path,  # type: str
       vep_num_fork,  # type: int
@@ -128,14 +133,23 @@ class VepRunner(object):
         many and what type of workers to use, where to run, etc.
     """
     self._pipeline_service = pipeline_service
+    self._species = species
+    self._assembly = assembly
     self._vep_image_uri = vep_image_uri
-    self._vep_cache_path = vep_cache_path
+    self._vep_cache_path = self._make_vep_cache_path(vep_cache_path)
     self._vep_num_fork = vep_num_fork
     self._input_pattern = input_pattern
     self._output_dir = output_dir
     self._vep_info_field = vep_info_field
     self._process_pipeline_args(pipeline_args)
     self._running_operation_ids = []  # type: List[str]
+
+  def _make_vep_cache_path(self, vep_cache_path):
+    # type: (str) -> str
+    if not vep_cache_path:
+      vep_cache_path = VepRunner._VEP_CACHE_BASE.format(species=self._species,
+                                                        assembly=self._assembly)
+    return vep_cache_path
 
   def get_output_pattern(self):
     # type: () -> str
@@ -157,6 +171,8 @@ class VepRunner(object):
                                   '/mnt/vep/vep_cache/')
             ],
             'environment': {
+                'GENOME_ASSEMBLY': self._assembly,
+                'SPECIES': self._species,
                 'VEP_CACHE': '/mnt/vep/vep_cache/{}'.format(
                     _get_base_name(self._vep_cache_path)),
                 'NUM_FORKS': str(self._vep_num_fork),
