@@ -711,7 +711,7 @@ class WriteToVcf(PTransform):
     self._header = headers and '\n'.join([h.strip() for h in headers]) + '\n'
 
   def expand(self, pcoll):
-    return pcoll | 'Write to VCF' >> textio.WriteToText(
+    return pcoll | 'WriteToVCF' >> textio.WriteToText(
         self._file_path,
         append_trailing_newlines=False,
         num_shards=self._num_shards,

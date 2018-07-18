@@ -21,27 +21,29 @@ import apache_beam as beam
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 
-# Constants for column names in the BigQuery schema.
-BQ_COLUMN_KEY_CONSTANTS = [bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
-                           bigquery_util.ColumnKeyConstants.START_POSITION,
-                           bigquery_util.ColumnKeyConstants.END_POSITION,
-                           bigquery_util.ColumnKeyConstants.REFERENCE_BASES,
-                           bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
-                           bigquery_util.ColumnKeyConstants.NAMES,
-                           bigquery_util.ColumnKeyConstants.QUALITY,
-                           bigquery_util.ColumnKeyConstants.FILTER,
-                           bigquery_util.ColumnKeyConstants.CALLS]
+# Reserved constants for column names in the BigQuery schema.
+RESERVED_BQ_COLUMNS = [bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+                       bigquery_util.ColumnKeyConstants.START_POSITION,
+                       bigquery_util.ColumnKeyConstants.END_POSITION,
+                       bigquery_util.ColumnKeyConstants.REFERENCE_BASES,
+                       bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+                       bigquery_util.ColumnKeyConstants.NAMES,
+                       bigquery_util.ColumnKeyConstants.QUALITY,
+                       bigquery_util.ColumnKeyConstants.FILTER,
+                       bigquery_util.ColumnKeyConstants.CALLS]
 
-VARIANT_CALL_CONSTANTS = [bigquery_util.ColumnKeyConstants.CALLS_NAME,
-                          bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
-                          bigquery_util.ColumnKeyConstants.CALLS_PHASESET]
+RESERVED_VARIANT_CALL_COLUMNS = [
+    bigquery_util.ColumnKeyConstants.CALLS_NAME,
+    bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
+    bigquery_util.ColumnKeyConstants.CALLS_PHASESET
+]
 
 
 class BigQueryToVariant(beam.PTransform):
   """Transforms BigQuery table rows to PCollection of `Variant`."""
 
   def expand(self, pcoll):
-    return (pcoll | 'BigQuery to Variant' >> beam.Map(
+    return (pcoll | 'BigQueryToVariant' >> beam.Map(
         self._convert_bq_row_to_variant))
 
   def _convert_bq_row_to_variant(self, row):
@@ -63,24 +65,21 @@ class BigQueryToVariant(beam.PTransform):
 
   def _get_alternate_bases(self, alternate_base_records):
     # type: (List[Dict[str, Any]]) -> List[str]
-    alternate_bases = []
-    for record in alternate_base_records:
-      alternate_bases.append(
-          record[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT])
-    return alternate_bases
+    return [record[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT]
+            for record in alternate_base_records]
 
   def _get_variant_info(self, row):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     info = {}
     for key, value in row.iteritems():
-      if key not in BQ_COLUMN_KEY_CONSTANTS and self._is_value_valid(value):
+      if key not in RESERVED_BQ_COLUMNS and not self._is_null_or_empty(value):
         info.update({key: value})
     for alt_base in row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES]:
       for key, value in alt_base.iteritems():
         if (key != bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT and
-            self._is_value_valid(value)):
+            not self._is_null_or_empty(value)):
           if key not in info:
-            info.update({key: []})
+            info[key] = []
           info[key].append(value)
     return info
 
@@ -90,7 +89,8 @@ class BigQueryToVariant(beam.PTransform):
     for call_record in variant_call_records:
       info = {}
       for key, value in call_record.iteritems():
-        if key not in VARIANT_CALL_CONSTANTS and self._is_value_valid(value):
+        if (key not in RESERVED_VARIANT_CALL_COLUMNS and
+            not self._is_null_or_empty(value)):
           info.update({key: value})
       variant_call = vcfio.VariantCall(
           name=call_record[bigquery_util.ColumnKeyConstants.CALLS_NAME],
@@ -100,10 +100,10 @@ class BigQueryToVariant(beam.PTransform):
       variant_calls.append(variant_call)
     return variant_calls
 
-  def _is_value_valid(self, value):
+  def _is_null_or_empty(self, value):
     # type: (Any) -> bool
     if value is None:
-      return False
+      return True
     if isinstance(value, list) and not value:
-      return False
-    return True
+      return True
+    return False

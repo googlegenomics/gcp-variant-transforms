@@ -17,7 +17,7 @@
 import re
 import math
 import sys
-from typing import List  # pylint: disable=unused-import
+from typing import List, Tuple  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
 
@@ -75,6 +75,25 @@ _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 # A big number to represent infinite float values. The division by 10 is to
 # prevent unintentional overflows when doing subsequent operations.
 _INF_FLOAT_VALUE = sys.float_info.max / 10
+
+
+def parse_table_reference(input_table):
+  # type: (str) -> Tuple[str, str, str]
+  """Parses a table reference.
+
+  Args:
+    input_table: a table reference in the format of PROJECT:DATASET.TABLE.
+
+  Returns:
+    A tuple (PROJECT, DATASET, TABLE).
+  """
+  table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', input_table)
+  if not table_re_match:
+    raise ValueError('Expected a table reference (PROJECT:DATASET.TABLE) ')
+  return (table_re_match.group('project'),
+          table_re_match.group('dataset'),
+          table_re_match.group('table'))
 
 
 def get_bigquery_sanitized_field_name(field_name):

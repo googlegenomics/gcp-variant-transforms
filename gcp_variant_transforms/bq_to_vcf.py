@@ -41,10 +41,12 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 
-_COMMAND_LINE_OPTIONS = [variant_transform_options.BQtoVcfOptions]
+_BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`;'
+_COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 
 
 def run(argv=None):
@@ -54,15 +56,15 @@ def run(argv=None):
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
   bq_source = bigquery.BigQuerySource(
-      query=''.join(['select * from `',
-                     known_args.input_table.replace(':', '.', 1),
-                     '`']),
+      query=_BASE_QUERY_TEMPLATE.format(
+          INPUT_TABLE='.'.join(bigquery_util.parse_table_reference(
+              known_args.input_table))),
       validate=True,
       use_standard_sql=True)
 
   options = pipeline_options.PipelineOptions(pipeline_args)
   with beam.Pipeline(options=options) as p:
-    _ = (p | 'Read BigQuery ' >> beam.io.Read(bq_source)
+    _ = (p | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
          | bigquery_to_variant.BigQueryToVariant()
          | vcfio.WriteToVcf(known_args.output_file))
 

@@ -423,7 +423,7 @@ class PartitionOptions(VariantTransformsOptions):
               'homo_sapiens_default.yaml'))
 
 
-class BQtoVcfOptions(VariantTransformsOptions):
+class BigQueryToVcfOptions(VariantTransformsOptions):
   """Options for BigQuery to VCF pipelines."""
 
   def add_arguments(self, parser):
@@ -435,35 +435,5 @@ class BQtoVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--input_table',
         required=True,
-        help=('BigQuery table that will be downloaded. It must be in the '
+        help=('BigQuery table that will be loaded to VCF. It must be in the '
               'format of (PROJECT:DATASET.TABLE).'))
-
-  def validate(self, parsed_args, client=None):
-    # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
-    table_re_match = re.match(
-        r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
-        parsed_args.input_table)
-    if not table_re_match:
-      raise ValueError(
-          'Expected a table reference (PROJECT:DATASET.TABLE) '
-          'instead of {}.'.format(parsed_args.input_table))
-    if not client:
-      credentials = GoogleCredentials.get_application_default().create_scoped(
-          ['https://www.googleapis.com/auth/bigquery'])
-      client = bigquery.BigqueryV2(credentials=credentials)
-    project_id = table_re_match.group('project')
-    dataset_id = table_re_match.group('dataset')
-    table_id = table_re_match.group('table')
-    try:
-      client.tables.Get(bigquery.BigqueryTablesGetRequest(
-          projectId=project_id,
-          datasetId=dataset_id,
-          tableId=table_id))
-
-    except exceptions.HttpError as e:
-      if e.status_code == 404:
-        raise ValueError('Table %s:%s.%s does not exist.' %
-                         (project_id, dataset_id, table_id))
-      else:
-        # For the rest of the errors, use BigQuery error message.
-        raise
