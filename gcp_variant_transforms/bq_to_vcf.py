@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Pipeline for downloading BigQuery table to one VCF file.
+r"""Pipeline for downloading BigQuery table to one VCF file. [EXPERIMENTAL]
 
 Run locally:
 python -m gcp_variant_transforms.bq_to_vcf \

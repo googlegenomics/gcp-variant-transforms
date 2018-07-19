@@ -46,6 +46,7 @@ class BigQueryToVariant(beam.PTransform):
     return (pcoll | 'BigQueryToVariant' >> beam.Map(
         self._convert_bq_row_to_variant))
 
+  # TODO (yifangchen): Move this to a separate module so that it can be reused.
   def _convert_bq_row_to_variant(self, row):
     # type: (Dict[str, Any]) -> vcfio.Variant
     return vcfio.Variant(
