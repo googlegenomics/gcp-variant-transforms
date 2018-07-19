@@ -421,3 +421,19 @@ class PartitionOptions(VariantTransformsOptions):
               'by chromosome (one table per chromosome) which is located at: '
               'gcp_variant_transforms/data/partition_configs/'
               'homo_sapiens_default.yaml'))
+
+
+class BigQueryToVcfOptions(VariantTransformsOptions):
+  """Options for BigQuery to VCF pipelines."""
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        '--output_file',
+        required=True,
+        help='The full path of the VCF file to store the result.')
+    parser.add_argument(
+        '--input_table',
+        required=True,
+        help=('BigQuery table that will be loaded to VCF. It must be in the '
+              'format of (PROJECT:DATASET.TABLE).'))
