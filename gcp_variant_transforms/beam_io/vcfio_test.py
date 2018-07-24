@@ -831,6 +831,14 @@ class VcfSinkTest(unittest.TestCase):
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
 
+  def test_empty_sample_calls(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.calls.append(
+        VariantCall(name='Sample2', genotype=-1))
+    expected = '.	.	.	.	.	.	.	.	GT	.\n'
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
+
   def test_missing_genotype(self):
     coder = self._get_coder()
     variant = Variant()
