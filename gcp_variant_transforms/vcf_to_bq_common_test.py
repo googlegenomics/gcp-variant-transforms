@@ -87,3 +87,21 @@ class DataProcessorTest(unittest.TestCase):
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(vcf_to_bq_common.get_pipeline_mode(args.input_pattern),
                        PipelineModes.MEDIUM)
+
+  def test_fail_on_unrecognized_flags_1(self):
+    pipeline_args = ['--project',
+                     'gcp-variant-transforms-test',
+                     '--staging_location',
+                     'gs://integration_test_runs/staging',
+                     '--unknown_flag',
+                     'some value']
+    with self.assertRaises(ValueError):
+      vcf_to_bq_common._raise_error_on_unrecognized_flags(pipeline_args)
+
+  def test_fail_on_unrecognized_flags_2(self):
+    pipeline_args = ['--project',
+                     'gcp-variant-transforms-test',
+                     '--staging_location',
+                     'gs://integration_test_runs/staging']
+
+    vcf_to_bq_common._raise_error_on_unrecognized_flags(pipeline_args)
