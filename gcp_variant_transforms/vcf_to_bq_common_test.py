@@ -88,7 +88,7 @@ class DataProcessorTest(unittest.TestCase):
       self.assertEqual(vcf_to_bq_common.get_pipeline_mode(args.input_pattern),
                        PipelineModes.MEDIUM)
 
-  def test_fail_on_unrecognized_flags_1(self):
+  def test_fail_on_unrecognized_flags(self):
     pipeline_args = ['--project',
                      'gcp-variant-transforms-test',
                      '--staging_location',
@@ -98,7 +98,7 @@ class DataProcessorTest(unittest.TestCase):
     with self.assertRaises(ValueError):
       vcf_to_bq_common._raise_error_on_unrecognized_flags(pipeline_args)
 
-  def test_fail_on_unrecognized_flags_2(self):
+  def test_fail_on_unrecognized_flags_no_failure(self):
     pipeline_args = ['--project',
                      'gcp-variant-transforms-test',
                      '--staging_location',
