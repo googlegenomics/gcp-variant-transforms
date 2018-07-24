@@ -25,6 +25,7 @@ import enum
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystems
+from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
@@ -33,6 +34,7 @@ from gcp_variant_transforms.transforms import merge_headers
 # headers will be merged in beam.
 _SMALL_DATA_THRESHOLD = 100
 _LARGE_DATA_THRESHOLD = 50000
+_COMMAND_LINE_ARG_PREFIX = '-'
 
 
 class PipelineModes(enum.Enum):
@@ -59,6 +61,7 @@ def parse_args(argv, command_line_options):
   known_args, pipeline_args = parser.parse_known_args(argv)
   for transform_options in options:
     transform_options.validate(known_args)
+  _raise_error_on_unrecognized_flags(pipeline_args)
   return known_args, pipeline_args
 
 
@@ -115,3 +118,21 @@ def write_headers(merged_header, file_path):
   """Writes a PCollection of ``VcfHeader`` to location ``file_path``."""
   _ = (merged_header | 'WriteHeaders' >>
        vcf_header_io.WriteVcfHeaders(file_path))
+
+
+def _raise_error_on_unrecognized_flags(pipeline_args):
+  # type: (List[str]) -> None
+  """Raises an error if there are unrecognized flags."""
+  options = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
+  for flag in _get_flag_names(pipeline_args):
+    # Cannot use exact match since the argparse allows long options to be
+    # abbreviated to a prefix.
+    if not any(option.startswith(flag) for option in options):
+      raise ValueError('The flag {} is unrecognized.'.format(flag))
+
+
+def _get_flag_names(pipeline_args):
+  # type: (List[str]) -> List[str]
+  """Returns a list of flag names that starts with `COMMAND_LINE_ARG_PREFIX`."""
+  return [arg.lstrip(_COMMAND_LINE_ARG_PREFIX) for arg in pipeline_args
+          if arg.startswith(_COMMAND_LINE_ARG_PREFIX)]
