@@ -321,6 +321,8 @@ class _ToVcfRecordCoder(coders.Coder):
 
   def _encode_genotype(self, genotype, phaseset):
     """Encodes the genotype of a :class:`VariantCall` for a VCF file line."""
+    if genotype == MISSING_GENOTYPE_VALUE:
+      return MISSING_FIELD_VALUE
     encoded_genotype = []
     for allele in genotype:
       if allele == MISSING_GENOTYPE_VALUE:

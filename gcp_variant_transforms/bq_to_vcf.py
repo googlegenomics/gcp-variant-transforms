@@ -44,6 +44,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
+from gcp_variant_transforms.transforms import densify_variants
 
 _BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`;'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
@@ -66,6 +67,7 @@ def run(argv=None):
   with beam.Pipeline(options=options) as p:
     _ = (p | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
          | bigquery_to_variant.BigQueryToVariant()
+         | densify_variants.DensifyVariants()
          | vcfio.WriteToVcf(known_args.output_file))
 
 
