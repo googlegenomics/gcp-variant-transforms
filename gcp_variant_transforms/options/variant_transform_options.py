@@ -438,9 +438,13 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--output_file',
         required=True,
-        help='The full path of the VCF file to store the result.')
+        help='The path of the VCF file to store the result inside the bucket.')
     parser.add_argument(
         '--input_table',
         required=True,
         help=('BigQuery table that will be loaded to VCF. It must be in the '
               'format of (PROJECT:DATASET.TABLE).'))
+    parser.add_argument(
+        '--bucket_name',
+        required=True,
+        help='The bucket name where the VCF file will be stored in GCS.')

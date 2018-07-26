@@ -16,8 +16,6 @@
 
 from __future__ import absolute_import
 
-import glob
-import gzip
 import logging
 import os
 import tempfile
@@ -784,21 +782,21 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_coder(self):
-    return vcfio._ToVcfRecordCoder()
+  def _get_vcf_data_writer(self):
+    return vcfio._WriteVcfDataLinesFn('')
 
   def test_to_vcf_line(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     for variant, line in zip(self.variants, self.variant_lines):
       self._assert_variant_lines_equal(
-          coder.encode(variant), line)
+          writer._variant_to_vcf_line(variant), line)
     empty_variant = vcfio.Variant()
     empty_line = '\t'.join(['.' for _ in range(9)])
-    self._assert_variant_lines_equal(
-        coder.encode(empty_variant), empty_line)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(empty_variant),
+                                     empty_line)
 
   def test_missing_info_key(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample1', genotype=[0, 1], info={'GQ': 10, 'AF': 20}))
@@ -807,101 +805,58 @@ class VcfSinkTest(unittest.TestCase):
     expected = ('.	.	.	.	.	.	.	.	GT:AF:GQ	0/1:20:10	'
                 '0/1:20:.\n')
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
   def test_info_list(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[0, 1], info={'LI': [1, None, 3]}))
     expected = '.	.	.	.	.	.	.	.	GT:LI	0/1:1,.,3\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
   def test_info_field_count(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.info['NS'] = 3
     variant.info['AF'] = [0.333, 0.667]
     variant.info['DB'] = True
     expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
   def test_empty_sample_calls(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.calls.append(
         VariantCall(name='Sample2', genotype=-1))
     expected = '.	.	.	.	.	.	.	.	GT	.\n'
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
   def test_missing_genotype(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
     expected = '.	.	.	.	.	.	.	.	GT	1/.\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
   def test_triploid_genotype(self):
-    coder = self._get_coder()
+    writer = self._get_vcf_data_writer()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[1, 0, 1]))
     expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
-
-  def test_write_dataflow(self):
-    pipeline = TestPipeline()
-    pcoll = pipeline | beam.Create(self.variants)
-    _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
-    pipeline.run()
-
-    read_result = []
-    for file_name in glob.glob(self.path + '*'):
-      with open(file_name, 'r') as f:
-        read_result.extend(f.read().splitlines())
-
-    for actual, expected in zip(read_result, self.variant_lines):
-      self._assert_variant_lines_equal(actual, expected)
-
-  def test_write_dataflow_auto_compression(self):
-    pipeline = TestPipeline()
-    pcoll = pipeline | beam.Create(self.variants)
-    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
-        self.path + '.gz',
-        compression_type=CompressionTypes.AUTO)
-    pipeline.run()
-
-    read_result = []
-    for file_name in glob.glob(self.path + '*'):
-      with gzip.GzipFile(file_name, 'r') as f:
-        read_result.extend(f.read().splitlines())
-
-    for actual, expected in zip(read_result, self.variant_lines):
-      self._assert_variant_lines_equal(actual, expected)
-
-  def test_write_dataflow_header(self):
-    pipeline = TestPipeline()
-    pcoll = pipeline | 'Create' >> beam.Create(self.variants)
-    headers = ['foo\n']
-    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
-        self.path + '.gz',
-        compression_type=CompressionTypes.AUTO,
-        headers=headers)
-    pipeline.run()
-
-    read_result = []
-    for file_name in glob.glob(self.path + '*'):
-      with gzip.GzipFile(file_name, 'r') as f:
-        read_result.extend(f.read().splitlines())
-
-    self.assertEqual(read_result[0], 'foo')
-    for actual, expected in zip(read_result[1:], self.variant_lines):
-      self._assert_variant_lines_equal(actual, expected)
+    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
+                                     expected)
 
 
 if __name__ == '__main__':
