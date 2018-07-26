@@ -34,7 +34,6 @@ from gcp_variant_transforms.transforms import merge_headers
 # headers will be merged in beam.
 _SMALL_DATA_THRESHOLD = 100
 _LARGE_DATA_THRESHOLD = 50000
-_COMMAND_LINE_ARG_PREFIX = '-'
 
 
 class PipelineModes(enum.Enum):
@@ -123,16 +122,10 @@ def write_headers(merged_header, file_path):
 def _raise_error_on_unrecognized_flags(pipeline_args):
   # type: (List[str]) -> None
   """Raises an error if there are unrecognized flags."""
-  options = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
-  for flag in _get_flag_names(pipeline_args):
-    # Cannot use exact match since the argparse allows long options to be
-    # abbreviated to a prefix.
-    if not any(option.startswith(flag) for option in options):
-      raise ValueError('The flag {} is unrecognized.'.format(flag))
-
-
-def _get_flag_names(pipeline_args):
-  # type: (List[str]) -> List[str]
-  """Returns a list of flag names that starts with `COMMAND_LINE_ARG_PREFIX`."""
-  return [arg.lstrip(_COMMAND_LINE_ARG_PREFIX) for arg in pipeline_args
-          if arg.startswith(_COMMAND_LINE_ARG_PREFIX)]
+  parser = argparse.ArgumentParser()
+  for cls in pipeline_options.PipelineOptions.__subclasses__():
+    if '_add_argparse_args' in cls.__dict__:
+      cls._add_argparse_args(parser)
+  _, unknown = parser.parse_known_args(pipeline_args)
+  if unknown:
+    raise ValueError('Unrecognized flag(s): {}'.format(unknown))
