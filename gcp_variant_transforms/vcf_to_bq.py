@@ -221,7 +221,8 @@ def run(argv=None):
       counter_factory)
 
   partitioner = None
-  if known_args.optimize_for_large_inputs or known_args.partition_config_path:
+  if ((known_args.optimize_for_large_inputs and variant_merger) or
+      known_args.partition_config_path):
     partitioner = variant_partition.VariantPartition(
         known_args.partition_config_path)
 
