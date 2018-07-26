@@ -2,7 +2,7 @@
 
 The Variant Transforms pipeline can process hunderds of thousands of files,
 millions of samples, and billions of records. There are a few settings that
-may need to be adjusted depending on the size of the dataset. Each of these
+may need to be adjusted depending on the size of the input files. Each of these
 settings are explained in the sections below.
 
 Default settings:
@@ -18,7 +18,7 @@ Default settings:
   --partition_config_path <default None> \
 ```
 
-## Important note about adjusting quota
+### Important note about adjusting quota
 
 Compute Engine enforces quota on maximum amount of resources that can be used
 at any time for variety of reasons. Please see
@@ -33,7 +33,13 @@ The main Compute Engine quotas to be adjusted are:
 * `Persistent Disk SSD (GB)`: Only needed if `--worker_disk_type` is set to SSD.
   Required quota size is the same as `Persistent Disk Standard`.
 
-## `--optimize_for_large_inputs`
+Note that the value assigned to these quotas will be the upper limit of
+available resources for your job. For example, if the quota for
+`In-use IP addresses` is 20, but you try to run with `--max_num_workers 20`,
+your job will be running with at most 10 workers because that's all your GCP
+project is allowed to use.
+
+### `--optimize_for_large_inputs`
 
 This flag should be set to true when loading more than 50,000 files and/or
 [merging](variant_merging.md) is enabled for a large number (>3 billion)
@@ -41,14 +47,14 @@ of variants. This flag optimizes the Dataflow pipeline for large inputs, which
 can save significant cost/time, but the additional overhead may hurt cost/time
 for small inputs.
 
-## `--max_num_workers`
+### `--max_num_workers`
 
 By default, Dataflow uses its autoscaling algorithm to adjust the number of
-workers assigned to each job. You may adjust the maximum number of workers using
-`--max_num_workers`. You may also use `--num_workers` to specify the initial
-number of workers to assign to the job.
+workers assigned to each job (limited by the Compute Engine quota). You may
+adjust the maximum number of workers using `--max_num_workers`. You may also use
+`--num_workers` to specify the initial number of workers to assign to the job.
 
-## `--worker_machine_type`
+### `--worker_machine_type`
 
 By default, Dataflow uses the `n1-standard-1` machine, which has 1 vCPU and
 3.75GB of RAM. You may need to request a larger machine for large datasets.
@@ -64,12 +70,12 @@ enabled.
 
 Using a large number of workers may not always be possible due to disk and
 IP quotas. As a result, we recommend using SSDs (see
-[`--worker_disk_type`](#--worker_disk_type)) when choosing a large (more than
-`n1-standard-8`) machine, which yields higher disk IOPS and can avoid idle CPU
-cycles. Note that disk is significantly cheaper than CPU, so always try to
-optimize for high CPU utilization rather than disk usage.
+[`--worker_disk_type`](#--worker_disk_type)) when choosing a large (
+`n1-standard-16` or larger) machine, which yields higher disk IOPS and can avoid
+idle CPU cycles. Note that disk is significantly cheaper than CPU, so always try
+to optimize for high CPU utilization rather than disk usage.
 
-## `--disk_size_gb`
+### `--disk_size_gb`
 
 By default, each worker has 250GB of disk. The aggregate amount of disk space
 from all workers must be at least as large as the uncompressed size of all VCF
@@ -84,7 +90,7 @@ In addition, if [merging](variant_merging.md) or
 need more disk per worker (e.g. 500GB) as the same variants need to be
 aggregated together on one machine.
 
-## `--worker_disk_type`
+### `--worker_disk_type`
 
 SSDs provide significantly more IOPS than standard persistent disks, but are
 more expensive. However, when choosing a large machine (e.g. `n1-standard-16`),
@@ -100,7 +106,7 @@ Set
 `--worker_disk_type compute.googleapis.com/projects//zones//diskTypes/pd-ssd`
 to use SSDs.
 
-## `--num_bigquery_write_shards`
+### `--num_bigquery_write_shards`
 
 Currently, the write operation to BigQuery in Dataflow is performed as a
 postprocessing step after the main transforms are done. As a workaround for
@@ -112,14 +118,17 @@ loading large (>5TB) data to BigQuery at once.
 
 As a result, we recommend setting `--num_bigquery_write_shards 20` when loading
 any data that has more than 1 billion rows (after merging) or 1TB of final
-output. Note that using a larger value (e.g. 50) can cause BigQuery write to
+output. You may use a smaller number of write shards (e.g. 5) when using
+[partitioned output](#--partition_config_path) as each partition also acts as a
+"shard". Note that using a larger value (e.g. 50) can cause BigQuery write to
 fail as there is a maximum limit on the number of concurrent writes per table.
 
-## `--partition_config_path`
+### `--partition_config_path`
 
 Partitioning the output can save significant query costs once the data is in
-BigQuery. It can also optimize the pipeline (e.g. it natively shards the
-BigQuery output per partition and merging can also occur per partition).
+BigQuery. It can also optimize the cost/time of the pipeline (e.g. it natively
+shards the BigQuery output per partition and merging can also occur per
+partition).
 
 As a result, we recommend setting the partition config for very large data
 where possible. Please see the [documentation](partitioning.md) for more
