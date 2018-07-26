@@ -34,7 +34,6 @@ from gcp_variant_transforms.transforms import merge_headers
 # headers will be merged in beam.
 _SMALL_DATA_THRESHOLD = 100
 _LARGE_DATA_THRESHOLD = 50000
-_COMMAND_LINE_ARG_PREFIX = '-'
 
 
 class PipelineModes(enum.Enum):
@@ -129,4 +128,4 @@ def _raise_error_on_unrecognized_flags(pipeline_args):
       cls._add_argparse_args(parser)
   _, unknown = parser.parse_known_args(pipeline_args)
   if unknown:
-    raise ValueError('The flag {} is unrecognized.'.format(unknown))
+    raise ValueError('Unrecognized flag(s): {}'.format(unknown))
