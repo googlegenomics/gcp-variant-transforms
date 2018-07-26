@@ -48,7 +48,7 @@ The main Compute Engine quotas to be adjusted are:
 
 Note that the value assigned to these quotas will be the upper limit of
 available resources for your job. For example, if the quota for
-`In-use IP addresses` is 20, but you try to run with `--max_num_workers 20`,
+`In-use IP addresses` is 10, but you try to run with `--max_num_workers 20`,
 your job will be running with at most 10 workers because that's all your GCP
 project is allowed to use.
 
