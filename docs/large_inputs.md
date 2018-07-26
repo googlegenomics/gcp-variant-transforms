@@ -18,7 +18,20 @@ Default settings:
   --partition_config_path <default None> \
 ```
 
-### Important note about adjusting quota
+### Important notes
+
+#### Running preprocessor/validator tool
+
+Since processing large inputs can take a long time and can be costly, we highly
+recommend running the [preprocessor/validator tool](vcf_files_preprocessor.md)
+prior to loading the full VCF to BigQuery pipeline to find out about any
+invalid/inconsistent records. This can avoid failures due to invalid records
+and can save time/cost. Depending on the quality of the input files, you may
+consider running with `--report_all_conflicts` to get the full report (it takes
+longer, but is more accurate and is highly recommended when you're not sure
+about the quality of the input files).
+
+#### Adjusting quota
 
 Compute Engine enforces quota on maximum amount of resources that can be used
 at any time for variety of reasons. Please see
