@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 
+import logging
 from typing import Any, Dict, Iterable, List, Optional, Union  # pylint: disable=unused-import
 
 import apache_beam as beam
@@ -199,8 +200,10 @@ class _InferHeaderFields(beam.DoFn):
       if not defined_headers or info_field_key not in defined_headers.infos:
         if info_field_key in infos:
           raise ValueError(
-              'Invalid VCF file. Duplicate INFO field in variant {}'.format(
-                  variant))
+              'Duplicate INFO field "{}" in variant "{}"'.format(
+                  info_field_key, variant))
+        logging.warning('Undefined INFO field "%s" in variant "%s"',
+                        info_field_key, str(variant))
         infos[info_field_key] = Info(info_field_key,
                                      self._get_field_count(info_field_value),
                                      self._get_field_type(info_field_value),
@@ -208,11 +211,17 @@ class _InferHeaderFields(beam.DoFn):
                                      '',  # UNKNOWN_SOURCE
                                      '')  # UNKNOWN_VERSION
       else:
+        defined_header = defined_headers.infos.get(info_field_key)
         corrected_info = self._infer_mismatched_info_field(
             info_field_key, info_field_value,
-            defined_headers.infos.get(info_field_key),
-            len(variant.alternate_bases))
+            defined_header, len(variant.alternate_bases))
         if corrected_info:
+          logging.warning(
+              'Incorrect INFO field "%s". Defined as "type=%s,num=%s", '
+              'got "%s", in variant "%s"',
+              info_field_key, defined_header.get(_HeaderKeyConstants.TYPE),
+              str(defined_header.get(_HeaderKeyConstants.NUM)),
+              str(info_field_value), str(variant))
           infos[info_field_key] = corrected_info
     return infos
 
@@ -238,8 +247,10 @@ class _InferHeaderFields(beam.DoFn):
         if not defined_headers or format_key not in defined_headers.formats:
           if format_key in formats:
             raise ValueError(
-                'Invalid VCF file. Duplicate FORMAT field in variant {}'.format(
-                    variant))
+                'Duplicate FORMAT field "{}" in variant "{}"'.format(
+                    format_key, variant))
+          logging.warning('Undefined FORMAT field "%s" in variant "%s"',
+                          format_key, str(variant))
           formats[format_key] = Format(format_key,
                                        self._get_field_count(format_value),
                                        self._get_field_type(format_value),
@@ -249,9 +260,16 @@ class _InferHeaderFields(beam.DoFn):
     for call in variant.calls:
       for format_key, format_value in call.info.iteritems():
         if defined_headers and format_key in defined_headers.formats:
+          defined_header = defined_headers.formats.get(format_key)
           corrected_format = self._infer_mismatched_format_field(
-              format_key, format_value, defined_headers.formats.get(format_key))
+              format_key, format_value, defined_header)
           if corrected_format:
+            logging.warning(
+                'Incorrect FORMAT field "%s". Defined as "type=%s,num=%s", '
+                'got "%s" in variant "%s"',
+                format_key, defined_header.get(_HeaderKeyConstants.TYPE),
+                str(defined_header.get(_HeaderKeyConstants.NUM)),
+                str(format_value), str(variant))
             formats[format_key] = corrected_format
     return formats
 
