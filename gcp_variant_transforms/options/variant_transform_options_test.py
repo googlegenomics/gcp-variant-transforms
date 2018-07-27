@@ -37,6 +37,30 @@ def make_args(options, args):
   return namespace
 
 
+class VcfReadOptionsTest(unittest.TestCase):
+  """Tests cases for the VcfReadOptions class."""
+
+  def setUp(self):
+    self._options = variant_transform_options.VcfReadOptions()
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    return make_args(self._options, args)
+
+  def test_failure_for_conflicting_flags(self):
+    args = self._make_args(['--input_pattern', 'gs://some_pattern',
+                            '--infer_headers',
+                            '--representative_header_file', 'gs://some_file'])
+
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors(self):
+    args = self._make_args(['--input_pattern', 'gs://some_pattern',
+                            '--representative_header_file', 'gs://some_file'])
+
+    self._options.validate(args)
+
+
 class BigQueryWriteOptionsTest(unittest.TestCase):
   """Tests cases for the BigQueryWriteOptions class."""
 

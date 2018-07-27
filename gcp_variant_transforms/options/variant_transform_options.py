@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import logging
 import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
@@ -95,10 +94,9 @@ class VcfReadOptions(VariantTransformsOptions):
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
     if parsed_args.infer_headers and parsed_args.representative_header_file:
-      logging.warning('Both --infer_headers and --representative_header_file '
-                      'are passed! In this case, --infer_headers will be '
-                      'ignored and the header values from the '
-                      'representative_header_file will be used.')
+      raise ValueError('Both --infer_headers and --representative_header_file '
+                       'are passed! Please double check and choose at most one '
+                       'of them.')
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):
