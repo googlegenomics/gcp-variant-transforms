@@ -211,13 +211,17 @@ class _InferHeaderFields(beam.DoFn):
                                      '',  # UNKNOWN_SOURCE
                                      '')  # UNKNOWN_VERSION
       else:
+        defined_header = defined_headers.infos.get(info_field_key)
         corrected_info = self._infer_mismatched_info_field(
             info_field_key, info_field_value,
-            defined_headers.infos.get(info_field_key),
-            len(variant.alternate_bases))
+            defined_header, len(variant.alternate_bases))
         if corrected_info:
-          logging.warning('Incorrect INFO field "%s" in variant "%s"',
-                          info_field_key, str(variant))
+          logging.warning(
+              'Incorrect INFO field "%s". Defined as "type=%s,num=%s", '
+              'got "%s", in variant "%s"',
+              info_field_key, defined_header.get(_HeaderKeyConstants.TYPE),
+              str(defined_header.get(_HeaderKeyConstants.NUM)),
+              str(info_field_value), str(variant))
           infos[info_field_key] = corrected_info
     return infos
 
@@ -256,11 +260,16 @@ class _InferHeaderFields(beam.DoFn):
     for call in variant.calls:
       for format_key, format_value in call.info.iteritems():
         if defined_headers and format_key in defined_headers.formats:
+          defined_header = defined_headers.formats.get(format_key)
           corrected_format = self._infer_mismatched_format_field(
-              format_key, format_value, defined_headers.formats.get(format_key))
+              format_key, format_value, defined_header)
           if corrected_format:
-            logging.warning('Incorrect FORMAT field "%s" in variant "%s"',
-                            format_key, str(variant))
+            logging.warning(
+                'Incorrect FORMAT field "%s". Defined as "type=%s,num=%s", '
+                'got "%s" in variant "%s"',
+                format_key, defined_header.get(_HeaderKeyConstants.TYPE),
+                str(defined_header.get(_HeaderKeyConstants.NUM)),
+                str(format_value), str(variant))
             formats[format_key] = corrected_format
     return formats
 
