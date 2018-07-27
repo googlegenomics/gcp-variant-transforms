@@ -241,10 +241,10 @@ class ProcessedVariantFactory(object):
     # type: (ProcessedVariant, str, vcfio.VariantInfo) -> None
     if len(variant_info_data) != len(proc_var._alternate_datas):
       raise ValueError(
-          'Per alternate INFO field {} does not have same cardinality as '
-          ' number of alternates: {} vs {}'.format(
+          'Per alternate INFO field "{}" does not have same cardinality as '
+          ' number of alternates: {} vs {} in variant: "{}"'.format(
               field_name, len(variant_info_data),
-              len(proc_var._alternate_datas)))
+              len(proc_var._alternate_datas), proc_var))
     for alt_index, info in enumerate(variant_info_data):
       proc_var._alternate_datas[alt_index]._info[field_name] = info
 
