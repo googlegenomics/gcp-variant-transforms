@@ -91,6 +91,13 @@ class VcfReadOptions(VariantTransformsOptions):
               'variants not defined in the header sections, or the definition '
               'of the the header fields do not match the field values.'))
 
+  def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
+    if parsed_args.infer_headers and parsed_args.representative_header_file:
+      raise ValueError('Both --infer_headers and --representative_header_file '
+                       'are passed! Please double check and choose at most one '
+                       'of them.')
+
 
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
