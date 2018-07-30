@@ -35,6 +35,8 @@ from gcp_variant_transforms.transforms import merge_headers
 _SMALL_DATA_THRESHOLD = 100
 _LARGE_DATA_THRESHOLD = 50000
 
+_DATAFLOW_RUNNER_ARG_VALUE = 'DataflowRunner'
+
 
 class PipelineModes(enum.Enum):
   """An Enum specifying the mode of the pipeline based on the data size."""
@@ -60,7 +62,7 @@ def parse_args(argv, command_line_options):
   known_args, pipeline_args = parser.parse_known_args(argv)
   for transform_options in options:
     transform_options.validate(known_args)
-  _raise_error_on_unrecognized_flags(pipeline_args)
+  _raise_error_on_invalid_flags(pipeline_args)
   return known_args, pipeline_args
 
 
@@ -119,13 +121,17 @@ def write_headers(merged_header, file_path):
        vcf_header_io.WriteVcfHeaders(file_path))
 
 
-def _raise_error_on_unrecognized_flags(pipeline_args):
+def _raise_error_on_invalid_flags(pipeline_args):
   # type: (List[str]) -> None
   """Raises an error if there are unrecognized flags."""
   parser = argparse.ArgumentParser()
   for cls in pipeline_options.PipelineOptions.__subclasses__():
     if '_add_argparse_args' in cls.__dict__:
       cls._add_argparse_args(parser)
-  _, unknown = parser.parse_known_args(pipeline_args)
+  known_pipeline_args, unknown = parser.parse_known_args(pipeline_args)
   if unknown:
     raise ValueError('Unrecognized flag(s): {}'.format(unknown))
+  if (known_pipeline_args.runner == _DATAFLOW_RUNNER_ARG_VALUE and
+      not known_pipeline_args.setup_file):
+    raise ValueError('The --setup_file flag is required for DataflowRunner. '
+                     'Please provide a path to the setup.py file.')
