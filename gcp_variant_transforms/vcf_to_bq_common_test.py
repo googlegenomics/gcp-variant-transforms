@@ -25,7 +25,7 @@ from gcp_variant_transforms.vcf_to_bq_common import PipelineModes
 
 
 class VcfToBqCommonTest(unittest.TestCase):
-  """Tests cases for the ``general_process`` script."""
+  """Tests cases for the ``vcf_to_bq_common`` script."""
 
   def _create_mock_args(self, **args):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
