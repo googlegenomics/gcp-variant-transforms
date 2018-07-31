@@ -199,6 +199,9 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
   Lists that contain strings are also sanitized according to the
   ``_get_bigquery_sanitized_string`` method.
 
+  Note that if the values in the list are dictionaries (e.g., annotation field
+  value), the list is not sanitized.
+
   Args:
     input_list: List to sanitize.
     null_numeric_value_replacement: Value to use instead of null for
@@ -217,6 +220,8 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
       null_replacement_value = False
     elif isinstance(i, (int, long, float)):
       null_replacement_value = null_numeric_value_replacement
+    elif isinstance(i, dict):
+      return input_list  # Do not sanitize dictionary.
     else:
       raise ValueError('Unsupported value for input: %s' % str(i))
     break  # Assumption is that all fields have the same type.
