@@ -49,7 +49,7 @@ class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
 
   def encode(self, variant):
-    # type: (Variant) -> str
+    # type: (vcf_parser.Variant) -> str
     """Converts a :class:`Variant` object back to a VCF line."""
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)

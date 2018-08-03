@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parses VCF files (version 4.x) and converts them to Variant objects.
-
+"""A source for parsing VCF files (version 4.x) to convert them to Variant objs.
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
@@ -45,7 +44,6 @@ MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 
 class Variant(object):
   """A class to store info about a genomic variant.
-
   Each object corresponds to a single record in a VCF file.
   """
 
@@ -63,7 +61,6 @@ class Variant(object):
               ):
     # type: (...) -> None
     """Initialize the ``Variant`` object.
-
     Args:
       reference_name: The reference on which this variant occurs (such as
         `chr20` or `X`).
@@ -157,7 +154,6 @@ class Variant(object):
 
 class VariantCall(object):
   """A class to store info about a variant call.
-
   A call represents the determination of genotype with respect to a particular
   variant. It may include associated information such as quality and phasing.
   """
@@ -165,7 +161,6 @@ class VariantCall(object):
   def __init__(self, name=None, genotype=None, phaseset=None, info=None):
     # type: (str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
-
     Args:
       name: The name of the call.
       genotype: The genotype of this variant call as specified by the VCF
@@ -220,19 +215,15 @@ class VariantCall(object):
 
 class VcfParser(object):
   """Base abstract class for defining a VCF file parser.
-
   Derived classes must implement two methods:
     _init_with_header: must initialize parser with given header lines.
     _get_variant: given a line of VCF file, returns a Variant object.
-
   Objects of the derived classed will be an iterator of records:
-
   ```
   record_iterator = DerivedVcfParser(...)
   for record in record_iterator:
     yield record
   ```
-
   """
 
   def __init__(self,
@@ -267,8 +258,7 @@ class VcfParser(object):
 
   def _process_header_lines(self, header_lines):
     """Processes header lines from text source and initializes the parser.
-
-    Note, this method will be automatically called by textio._TextSource().
+    Note: this method will be automatically called by textio._TextSource().
     """
     if self._representative_header_lines:
       # Replace header lines with given representative header lines.
@@ -278,16 +268,21 @@ class VcfParser(object):
     self._init_with_header(header_lines)
 
   def next(self):
-    for text_line in self._text_lines:
-      # Skipping empty lines.
-      if text_line and text_line.strip():
-        record = self._get_variant(text_line)
-        if isinstance(record, Variant) or self._allow_malformed_records:
-          return record
+    text_line = next(self._text_lines).strip()
+    while not text_line:  # skip empty lines.
+      # This natively raises StopIteration if end of file is reached.
+      text_line = next(self._text_lines).strip()
+    record = self._get_variant(text_line)
+    if isinstance(record, Variant):
+      return record
+    elif isinstance(record, MalformedVcfRecord):
+      if self._allow_malformed_records:
+        return record
+      else:
         raise ValueError('VCF record read failed in %s for line %s: %s' %
                          (self._file_name, text_line, str(record.error)))
-
-    raise StopIteration
+    else:
+      raise ValueError('Unrecognized record type: %s.' % str(type(record)))
 
   def __iter__(self):
     return self
@@ -295,19 +290,18 @@ class VcfParser(object):
   def _init_with_header(self, header_lines):
     # type: (List[str]) -> None
     """Initializes the parser specific settings with the given header_lines.
-
-    Note, this method will be automatically called by _process_header_lines().
+    Note: this method will be called by _process_header_lines().
     """
     raise NotImplementedError
 
   def _get_variant(self, data_line):
     # type: (str) -> Variant
     """Converts a single data_line of a VCF file into a Variant object.
-
-    In case something goes wronge it must return a MalformedVcfRecord object.
-    Note, this method will be called by next(), one line at a time.
+    In case something goes wrong it must return a MalformedVcfRecord object.
+    Note: this method will be called by next(), one line at a time.
     """
     raise NotImplementedError
+
 
 class PyVcfParser(VcfParser):
   """An Iterator for processing a single VCF file using PyVcf."""
@@ -360,12 +354,11 @@ class PyVcfParser(VcfParser):
     for header in self._header_lines:
       yield header
     # Continue to process the next line indefinitely. The next line is set
-    # inside _get_variant() and this method is indirectly called in get_record.
+    # inside _get_variant() and this method is indirectly called in get_variant.
     while True:
       # PyVCF has explicit str() calls when parsing INFO fields, which fails
       # with UTF-8 decoded strings. Encode the line back to UTF-8.
-      if self._next_line_to_process is not None:
-        yield self._next_line_to_process.encode('utf-8')
+      yield self._next_line_to_process.encode('utf-8')
 
   def _convert_to_variant(
       self,
@@ -374,16 +367,13 @@ class PyVcfParser(VcfParser):
       ):
     # type: (...) -> Variant
     """Converts the PyVCF record to a :class:`Variant` object.
-
     Args:
       record: An object containing info about a variant.
       formats: The PyVCF dict storing FORMAT extracted from the VCF header.
         The key is the FORMAT key and the value is
         :class:`~vcf.parser._Format`.
-
     Returns:
       A :class:`Variant` object from the given record.
-
     Raises:
       ValueError: if ``record`` is semantically invalid.
     """
