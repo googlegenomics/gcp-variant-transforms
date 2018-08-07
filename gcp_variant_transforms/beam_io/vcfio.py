@@ -171,6 +171,124 @@ class _ToVcfRecordCoder(coders.Coder):
     return MISSING_FIELD_VALUE
 
 
+class _ToVcfRecordCoder(coders.Coder):
+  """Coder for encoding :class:`Variant` objects as VCF text lines."""
+
+  def encode(self, variant):
+    # type: (Variant) -> str
+    """Converts a :class:`Variant` object back to a VCF line."""
+    encoded_info = self._encode_variant_info(variant)
+    format_keys = self._get_variant_format_keys(variant)
+    encoded_calls = self._encode_variant_calls(variant, format_keys)
+
+    columns = [
+        variant.reference_name,
+        None if variant.start is None else variant.start + 1,
+        ';'.join(variant.names),
+        variant.reference_bases,
+        ','.join(variant.alternate_bases),
+        variant.quality,
+        ';'.join(variant.filters),
+        encoded_info,
+        ':'.join(format_keys),
+    ]
+    if encoded_calls:
+      columns.append(encoded_calls)
+    columns = [self._encode_value(c) for c in columns]
+
+    return '\t'.join(columns) + '\n'
+
+  def _encode_value(self, value):
+    """Encodes a single :class:`Variant` column value for a VCF file line."""
+    if not value and value != 0:
+      return MISSING_FIELD_VALUE
+    elif isinstance(value, list):
+      return ','.join([self._encode_value(x) for x in value])
+    return str(value)
+
+  def _encode_variant_info(self, variant):
+    """Encodes the info of a :class:`Variant` for a VCF file line."""
+    encoded_infos = []
+    # Set END in info if it doesn't match start+len(reference_bases). This is
+    # usually the case for non-variant regions.
+    if (variant.start is not None
+        and variant.reference_bases
+        and variant.end
+        and variant.start + len(variant.reference_bases) != variant.end):
+      encoded_infos.append('END=%d' % variant.end)
+    # Set all other fields of info.
+    for k, v in variant.info.iteritems():
+      if v is True:
+        encoded_infos.append(k)
+      else:
+        encoded_infos.append('%s=%s' % (k, self._encode_value(v)))
+    return ';'.join(encoded_infos)
+
+  def _get_variant_format_keys(self, variant):
+    """Gets the format keys of a :class:`Variant`."""
+    if not variant.calls:
+      return []
+
+    format_keys = [GENOTYPE_FORMAT_KEY]
+    for call in variant.calls:
+      # If any calls have a set phaseset that is not `DEFAULT_PHASESET_VALUE`,
+      # the key will be added to the format field.
+      if self._is_alternate_phaseset(call.phaseset):
+        format_keys.append(PHASESET_FORMAT_KEY)
+      format_keys.extend([k for k in call.info])
+
+    # Sort all keys and remove duplicates after GENOTYPE_FORMAT_KEY
+    format_keys[1:] = sorted(list(set(format_keys[1:])))
+
+    return format_keys
+
+  def _encode_variant_calls(self, variant, format_keys):
+    """Encodes the calls of a :class:`Variant` in a VCF line."""
+    # Ensure that genotype is always the first key in format_keys
+    assert not format_keys or format_keys[0] == GENOTYPE_FORMAT_KEY
+    encoded_calls = []
+    for call in variant.calls:
+      encoded_call_info = [self._encode_genotype(call.genotype, call.phaseset)]
+      for key in format_keys[1:]:
+        if key == PHASESET_FORMAT_KEY:
+          encoded_call_info.append(self._encode_phaseset(call.phaseset))
+        else:
+          encoded_call_info.append(self._encode_call_info_value(call.info, key))
+
+      encoded_calls.append(':'.join(encoded_call_info))
+
+    return '\t'.join(encoded_calls)
+
+  def _encode_genotype(self, genotype, phaseset):
+    """Encodes the genotype of a :class:`VariantCall` for a VCF file line."""
+    if genotype == MISSING_GENOTYPE_VALUE:
+      return MISSING_FIELD_VALUE
+    encoded_genotype = []
+    for allele in genotype:
+      if allele == MISSING_GENOTYPE_VALUE:
+        encoded_genotype.append(MISSING_FIELD_VALUE)
+      else:
+        encoded_genotype.append(self._encode_value(allele))
+
+    phase_char = '|' if phaseset else '/'
+    return phase_char.join(encoded_genotype) or MISSING_FIELD_VALUE
+
+  def _encode_phaseset(self, phaseset):
+    """Encodes the phaseset of a :class:`VariantCall` for a VCF file line."""
+    if self._is_alternate_phaseset(phaseset):
+      return phaseset
+    return MISSING_FIELD_VALUE
+
+  def _is_alternate_phaseset(self, phaseset):
+    return phaseset and phaseset != DEFAULT_PHASESET_VALUE
+
+  def _encode_call_info_value(self, info, key):
+    """Encodes the info of a :class:`VariantCall` for a VCF file line."""
+    if key in info:
+      return self._encode_value(info[key])
+    return MISSING_FIELD_VALUE
+
+
 class _VcfSource(filebasedsource.FileBasedSource):
   """A source for reading VCF files.
 
@@ -328,6 +446,7 @@ class ReadAllFromVcf(PTransform):
     return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
+
 class WriteToVcf(PTransform):
   """A PTransform for writing to VCF files."""
 
@@ -370,3 +489,22 @@ class WriteToVcf(PTransform):
         coder=_ToVcfRecordCoder(),
         compression_type=self._compression_type,
         header=self._header)
+
+
+class _WriteVcfDataLinesFn(beam.DoFn):
+  """A function that writes variants to one VCF file."""
+
+  def process(self, file_path_and_variants, *args, **kwargs):
+    # type: (tuple[str, list]) -> None
+    file_path, variants = file_path_and_variants
+    coder = _ToVcfRecordCoder()
+    with filesystems.FileSystems.create(file_path) as file_to_write:
+      for variant in variants:
+        file_to_write.write(coder.encode(variant))
+
+
+class WriteVcfDataLines(PTransform):
+  """A PTransform for writing VCF data lines."""
+
+  def expand(self, pcoll):
+    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())

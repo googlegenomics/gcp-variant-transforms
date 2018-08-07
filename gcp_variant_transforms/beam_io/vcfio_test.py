@@ -782,21 +782,21 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_vcf_data_writer(self):
-    return vcfio._WriteVcfDataLinesFn('')
+  def _get_coder(self):
+    return vcfio._ToVcfRecordCoder()
 
   def test_to_vcf_line(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     for variant, line in zip(self.variants, self.variant_lines):
       self._assert_variant_lines_equal(
-          writer._variant_to_vcf_line(variant), line)
+          coder.encode(variant), line)
     empty_variant = vcfio.Variant()
     empty_line = '\t'.join(['.' for _ in range(9)])
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(empty_variant),
-                                     empty_line)
+    self._assert_variant_lines_equal(
+        coder.encode(empty_variant), empty_line)
 
   def test_missing_info_key(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample1', genotype=[0, 1], info={'GQ': 10, 'AF': 20}))
@@ -805,58 +805,52 @@ class VcfSinkTest(unittest.TestCase):
     expected = ('.	.	.	.	.	.	.	.	GT:AF:GQ	0/1:20:10	'
                 '0/1:20:.\n')
 
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
   def test_info_list(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[0, 1], info={'LI': [1, None, 3]}))
     expected = '.	.	.	.	.	.	.	.	GT:LI	0/1:1,.,3\n'
 
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
   def test_info_field_count(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.info['NS'] = 3
     variant.info['AF'] = [0.333, 0.667]
     variant.info['DB'] = True
     expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
 
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
   def test_empty_sample_calls(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.calls.append(
         VariantCall(name='Sample2', genotype=-1))
     expected = '.	.	.	.	.	.	.	.	GT	.\n'
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
   def test_missing_genotype(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
     expected = '.	.	.	.	.	.	.	.	GT	1/.\n'
 
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
   def test_triploid_genotype(self):
-    writer = self._get_vcf_data_writer()
+    coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
         name='Sample', genotype=[1, 0, 1]))
     expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
 
-    self._assert_variant_lines_equal(writer._variant_to_vcf_line(variant),
-                                     expected)
+    self._assert_variant_lines_equal(coder.encode(variant), expected)
 
 
 if __name__ == '__main__':

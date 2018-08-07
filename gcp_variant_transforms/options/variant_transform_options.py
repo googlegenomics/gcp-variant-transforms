@@ -438,13 +438,17 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--output_file',
         required=True,
-        help='The path of the VCF file to store the result inside the bucket.')
+        help='The full path of the VCF file to store the result.')
     parser.add_argument(
         '--input_table',
         required=True,
         help=('BigQuery table that will be loaded to VCF. It must be in the '
               'format of (PROJECT:DATASET.TABLE).'))
     parser.add_argument(
-        '--bucket_name',
-        required=True,
-        help='The bucket name where the VCF file will be stored in GCS.')
+        '--number_of_bases_per_shard',
+        type=int, default=10000,
+        help=('The maximum number of base pairs per chromosome to include in a '
+              'single VCF file (one shard). A shard is a collection of data '
+              'within a contiguous region of the genome. This parameter will '
+              'have an impact on memory requirements since the data in a '
+              'single shard must be sorted.'))
