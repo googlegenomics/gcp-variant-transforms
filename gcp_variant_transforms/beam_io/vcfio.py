@@ -19,6 +19,9 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
+from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
+import logging
+from collections import namedtuple
 from functools import partial
 
 import vcf
@@ -446,7 +449,6 @@ class ReadAllFromVcf(PTransform):
     return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
-
 class WriteToVcf(PTransform):
   """A PTransform for writing to VCF files."""
 
@@ -494,13 +496,14 @@ class WriteToVcf(PTransform):
 class _WriteVcfDataLinesFn(beam.DoFn):
   """A function that writes variants to one VCF file."""
 
-  def process(self, file_path_and_variants, *args, **kwargs):
-    # type: (tuple[str, list]) -> None
-    file_path, variants = file_path_and_variants
-    coder = _ToVcfRecordCoder()
+  def __init__(self):
+    self._coder = _ToVcfRecordCoder()
+
+  def process(self, (file_path, variants), *args, **kwargs):
+    # type: (Tuple[str, List[Variant]]) -> None
     with filesystems.FileSystems.create(file_path) as file_to_write:
       for variant in variants:
-        file_to_write.write(coder.encode(variant))
+        file_to_write.write(self._coder.encode(variant))
 
 
 class WriteVcfDataLines(PTransform):

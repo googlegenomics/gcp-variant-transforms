@@ -16,6 +16,8 @@
 
 from __future__ import absolute_import
 
+import glob
+import gzip
 import logging
 import os
 import tempfile
@@ -851,6 +853,55 @@ class VcfSinkTest(unittest.TestCase):
     expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_write_dataflow(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | beam.Create(self.variants)
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with open(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    for actual, expected in zip(read_result, self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
+
+  def test_write_dataflow_auto_compression(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | beam.Create(self.variants)
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
+        self.path + '.gz',
+        compression_type=CompressionTypes.AUTO)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with gzip.GzipFile(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    for actual, expected in zip(read_result, self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
+
+  def test_write_dataflow_header(self):
+    pipeline = TestPipeline()
+    pcoll = pipeline | 'Create' >> beam.Create(self.variants)
+    headers = ['foo\n']
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
+        self.path + '.gz',
+        compression_type=CompressionTypes.AUTO,
+        headers=headers)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with gzip.GzipFile(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    self.assertEqual(read_result[0], 'foo')
+    for actual, expected in zip(read_result[1:], self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
 
 
 if __name__ == '__main__':
