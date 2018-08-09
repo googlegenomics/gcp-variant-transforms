@@ -17,7 +17,6 @@
 from __future__ import absolute_import
 
 import json
-import sys
 import unittest
 import mock
 
@@ -282,9 +281,10 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.FILTER: ['q10'],
         ColumnKeyConstants.CALLS: [],
-        'IIR': [0, 1, -sys.maxint],
+        'IIR': [0, 1, bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT],
         'IBR': [True, False, False],
-        'IFR': [0.1, 0.2, -sys.maxint, 0.4],
+        'IFR': [0.1, 0.2, bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+                0.4],
         'ISR': ['.', 'data1', 'data2']}
     self.assertEqual([expected_row],
                      self._get_row_list_from_variant(variant, header_num_dict))
@@ -323,7 +323,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
               'IF3': [float('-inf'), float('nan'), float('inf'), 1.2]},
     )
     header_num_dict = {'IF': '1', 'IFR': '3', 'IF2': '1', 'IF3': 'A'}
-    null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
@@ -344,7 +343,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             }
         ],
         'IF': bigquery_util._INF_FLOAT_VALUE,
-        'IFR': [-bigquery_util._INF_FLOAT_VALUE, null_replacement_value, 1.2],
+        'IFR': [-bigquery_util._INF_FLOAT_VALUE,
+                bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+                1.2],
         'IF2': None
     }
     self.assertEqual([expected_row],
