@@ -25,7 +25,7 @@ from __future__ import absolute_import
 import enum
 import logging
 
-from typing import Dict, List, Any  # pylint: disable=unused-import
+from typing import Any, Dict, List, Set  # pylint: disable=unused-import
 
 import vcf
 
@@ -153,13 +153,15 @@ class AlternateBaseData(object):
     # Note that `_info` also holds the split annotation fields. For those
     # fields, the value in the `_info` dict has a list of dicts itself.
     self._info = {}  # type: Dict[str, Any]
+    self._annotation_field_names = set()  # type: Set[str]
 
   def __repr__(self):
     return ', '.join([str(self._alt_bases), str(self._info)])
 
   def __eq__(self, other):
     return (isinstance(other, AlternateBaseData) and
-            vars(self) == vars(other))
+            self._alt_bases == other._alt_bases and
+            self._info == other._info)
 
   @property
   def alternate_bases(self):
@@ -171,9 +173,14 @@ class AlternateBaseData(object):
     # type: () -> Dict[str, Any]
     return self._info
 
+  @property
+  def annotation_field_names(self):
+    # type: () -> Set[str]
+    return self._annotation_field_names
+
 
 class ProcessedVariantFactory(object):
-  """Factory class for creating `ProcessedVaraint` instances.
+  """Factory class for creating `ProcessedVariant` instances.
 
   This is the only right way for creating ProcessedVariants in production code.
   It uses the header information to process INFO fields and split them between
@@ -226,13 +233,13 @@ class ProcessedVariantFactory(object):
     proc_var = ProcessedVariant(variant)
     self._variant_counter.inc()
     for key, variant_info_data in variant.info.iteritems():
-      if (self._split_alternate_allele_info_fields and
-          self._header_fields.infos[key][_HeaderKeyConstants.NUM] ==
-          vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
-        self._add_per_alt_info(proc_var, key, variant_info_data)
-      elif key in self._annotation_field_set:
+      if key in self._annotation_field_set:
         self._annotation_processor.add_annotation_data(
             proc_var, key, variant_info_data)
+      elif (self._split_alternate_allele_info_fields and
+            self._header_fields.infos[key][_HeaderKeyConstants.NUM] ==
+            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
+        self._add_per_alt_info(proc_var, key, variant_info_data)
       else:
         proc_var._non_alt_info[key] = variant_info_data
     return proc_var
@@ -400,6 +407,7 @@ class _AnnotationProcessor(object):
           alt_datas._info[annotation_field_name] = [annotation_map]
         else:
           alt_datas._info[annotation_field_name].append(annotation_map)
+        alt_datas.annotation_field_names.add(annotation_field_name)
       except annotation_parser.AnnotationParserException as e:
         logging.warning(
             'Parsing of annotation field %s failed at reference %s start %d: '

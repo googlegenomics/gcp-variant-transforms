@@ -314,22 +314,39 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
   def test_nonstandard_float_values(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
-        alternate_bases=[], filters=[],
+        alternate_bases=['A', 'C', 'T', 'TC'], filters=[],
+        calls=[vcfio.VariantCall(name='Sample1', genotype=[0, 1], phaseset='*',
+                                 info={'GQ': float('inf')})],
         info={'IF': float('inf'),
               'IFR': [float('-inf'), float('nan'), 1.2],
-              'IF2': float('nan')})
-    header_num_dict = {'IF': '1', 'IFR': '3', 'IF2': '1'}
+              'IF2': float('nan'),
+              'IF3': [float('-inf'), float('nan'), float('inf'), 1.2]},
+    )
+    header_num_dict = {'IF': '1', 'IFR': '3', 'IF2': '1', 'IF3': 'A'}
     null_replacement_value = -sys.maxint
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
         ColumnKeyConstants.START_POSITION: 11,
         ColumnKeyConstants.END_POSITION: 12,
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
-        ColumnKeyConstants.ALTERNATE_BASES: [],
-        ColumnKeyConstants.CALLS: [],
+        ColumnKeyConstants.ALTERNATE_BASES: [
+            {'IF3': -bigquery_util._INF_FLOAT_VALUE, 'alt': 'A'},
+            {'IF3': None, 'alt': 'C'},
+            {'IF3': bigquery_util._INF_FLOAT_VALUE, 'alt': 'T'},
+            {'IF3': 1.2, 'alt': 'TC'}
+        ],
+        ColumnKeyConstants.CALLS: [
+            {
+                ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+                ColumnKeyConstants.CALLS_PHASESET: '*',
+                'GQ': bigquery_util._INF_FLOAT_VALUE
+            }
+        ],
         'IF': bigquery_util._INF_FLOAT_VALUE,
         'IFR': [-bigquery_util._INF_FLOAT_VALUE, null_replacement_value, 1.2],
-        'IF2': None}
+        'IF2': None
+    }
     self.assertEqual([expected_row],
                      self._get_row_list_from_variant(variant, header_num_dict))
 
