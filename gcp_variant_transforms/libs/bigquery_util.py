@@ -188,7 +188,7 @@ def _get_bigquery_sanitized_list(input_list, null_numeric_value_replacement):
   """Returns sanitized list according to BigQuery restrictions.
 
   Null values are replaced with reasonable defaults since the
-  BgiQuery API does not allow null values in lists (note that the entire
+  BigQuery API does not allow null values in lists (note that the entire
   list is allowed to be null). For instance, [0, None, 1] becomes
   [0, ``null_numeric_value_replacement``, 1].
   Null value replacements are:
