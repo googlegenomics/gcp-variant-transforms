@@ -53,6 +53,17 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
     return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
+  def _get_sample_header_fields_with_annotation(self):
+    header = self._get_sample_header_fields()
+    header.infos['CSQ_VT'] = OrderedDict([
+        ('id', 'CSQ_VT'),
+        ('num', -1),
+        ('type', 'String'),
+        ('desc', 'Annotations from VEP. Format: Allele|Gene|Position|Score'),
+        ('source', 'src'),
+        ('version', 'v')])
+    return header
+
   def _get_sample_variant_1(self):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
@@ -398,6 +409,148 @@ class InferHeaderFieldsTest(unittest.TestCase):
                           'FU': Format('FU', None, 'Float', '')}
       expected = vcf_header_io.VcfHeader(infos=expected_infos,
                                          formats=expected_formats)
+      assert_that(inferred_headers,
+                  asserts.header_fields_equal_ignore_order([expected]))
+      p.run()
+
+  def test_infer_annotation_types_no_conflicts(self):
+    anno_fields = ['CSQ_VT']
+    header = self._get_sample_header_fields_with_annotation()
+    variant = self._get_sample_variant_1()
+    variant.info['CSQ_VT'] = ['A|GENE1|100|1.2', 'TT|GENE1|101|1.3']
+    infer_annotation_types = infer_headers._InferAnnotationTypes()
+    new_header = next(infer_annotation_types.process(
+        variant, header, anno_fields))
+    expected = vcf_header_io.VcfHeader(infos={
+        'CSQ_VT_Allele_TYPE':
+        Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Gene_TYPE':
+        Info('CSQ_VT_Gene_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Position_TYPE':
+        Info('CSQ_VT_Position_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_VT_Score_TYPE':
+        Info('CSQ_VT_Score_TYPE', 1, 'Float', '', '', '')})
+    self.assertEqual(expected, new_header)
+    return new_header, expected
+
+  def test_infer_annotation_types_with_conflicts(self):
+    anno_fields = ['CSQ_VT']
+    header = self._get_sample_header_fields_with_annotation()
+    variant = self._get_sample_variant_1()
+    variant.info['CSQ_VT'] = ['A|1|100|1.2',
+                              'A|2|101|1.3',
+                              'A|1.2|start|0',
+                              'TT|1.3|end|7']
+    infer_annotation_types = infer_headers._InferAnnotationTypes()
+    new_header = next(infer_annotation_types.process(
+        variant, header, anno_fields))
+    expected = vcf_header_io.VcfHeader(infos={
+        'CSQ_VT_Allele_TYPE':
+        Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Gene_TYPE':
+        Info('CSQ_VT_Gene_TYPE', 1, 'Float', '', '', ''),
+        'CSQ_VT_Position_TYPE':
+        Info('CSQ_VT_Position_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Score_TYPE':
+        Info('CSQ_VT_Score_TYPE', 1, 'Float', '', '', '')})
+    self.assertEqual(expected, new_header)
+
+  def test_infer_annotation_types_with_missing(self):
+    anno_fields = ['CSQ_VT']
+    header = self._get_sample_header_fields_with_annotation()
+    variant = self._get_sample_variant_1()
+    variant.info['CSQ_VT'] = ['A||100|',
+                              'A||101|1.3',
+                              'A|||1.4',
+                              'TT|||']
+    infer_annotation_types = infer_headers._InferAnnotationTypes()
+    new_header = next(infer_annotation_types.process(
+        variant, header, anno_fields))
+    expected = vcf_header_io.VcfHeader(infos={
+        'CSQ_VT_Allele_TYPE':
+        Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Gene_TYPE':
+        Info('CSQ_VT_Gene_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_VT_Position_TYPE':
+        Info('CSQ_VT_Position_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_VT_Score_TYPE':
+        Info('CSQ_VT_Score_TYPE', 1, 'Float', '', '', '')})
+    self.assertEqual(expected, new_header)
+
+    variant.info['CSQ_VT'] = []
+    new_header = next(infer_annotation_types.process(
+        variant, header, anno_fields))
+    expected = vcf_header_io.VcfHeader()
+    self.assertEqual(expected, new_header)
+
+  def test_infer_annotation_types_with_multiple_annotation_fields(self):
+    anno_fields = ['CSQ_VT', 'CSQ']
+    header = self._get_sample_header_fields_with_annotation()
+    header.infos['CSQ'] = OrderedDict([
+        ('id', 'CSQ'),
+        ('num', -1),
+        ('type', 'String'),
+        ('desc', 'Annotations from VEP. Format: Allele|Gene|Position|Score'),
+        ('source', 'src'),
+        ('version', 'v')])
+    variant = self._get_sample_variant_1()
+    variant.info['CSQ_VT'] = ['A|1|100|1.2',
+                              'A|2|101|1.3']
+    variant.info['CSQ'] = ['A|1|100|1.2',
+                           'A|2|101|1.3']
+    infer_annotation_types = infer_headers._InferAnnotationTypes()
+    new_header = next(infer_annotation_types.process(
+        variant, header, anno_fields))
+    expected = vcf_header_io.VcfHeader(infos={
+        'CSQ_VT_Allele_TYPE':
+        Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Gene_TYPE':
+        Info('CSQ_VT_Gene_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_VT_Position_TYPE':
+        Info('CSQ_VT_Position_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_VT_Score_TYPE':
+        Info('CSQ_VT_Score_TYPE', 1, 'Float', '', '', ''),
+        'CSQ_Allele_TYPE':
+        Info('CSQ_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_Gene_TYPE':
+        Info('CSQ_Gene_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_Position_TYPE':
+        Info('CSQ_Position_TYPE', 1, 'Integer', '', '', ''),
+        'CSQ_Score_TYPE':
+        Info('CSQ_Score_TYPE', 1, 'Float', '', '', '')
+    })
+    self.assertEqual(dict(expected.infos), dict(new_header.infos))
+
+  def test_infer_annotation_pipeline(self):
+    anno_fields = ['CSQ_VT']
+    header = self._get_sample_header_fields_with_annotation()
+    variant1 = self._get_sample_variant_1()
+    variant1.info['CSQ_VT'] = ['A|1|100|1.2',
+                               'A|2|101|1.3',
+                               'A|12|start|0',
+                               'TT|13|end|7']
+    variant2 = self._get_sample_variant_1()
+    variant2.info['CSQ_VT'] = ['A|1|100|',
+                               'A|2|101|',
+                               'A|1.2|102|0',
+                               'TT|1.3|103|7']
+    expected = vcf_header_io.VcfHeader(infos={
+        'CSQ_VT_Allele_TYPE':
+        Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Gene_TYPE':
+        Info('CSQ_VT_Gene_TYPE', 1, 'Float', '', '', ''),
+        'CSQ_VT_Position_TYPE':
+        Info('CSQ_VT_Position_TYPE', 1, 'String', '', '', ''),
+        'CSQ_VT_Score_TYPE':
+        Info('CSQ_VT_Score_TYPE', 1, 'Float', '', '', '')})
+
+    with TestPipeline() as p:
+      inferred_headers = (
+          p
+          | Create([variant1, variant2])
+          | 'InferAnnotationTypes' >>
+          infer_headers.InferAnnotationTypes(defined_headers=header,
+                                             annotation_fields=anno_fields))
       assert_that(inferred_headers,
                   asserts.header_fields_equal_ignore_order([expected]))
       p.run()

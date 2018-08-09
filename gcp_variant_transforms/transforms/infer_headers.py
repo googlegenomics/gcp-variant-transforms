@@ -28,6 +28,8 @@ from vcf.parser import field_counts
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.transforms import merge_headers
+from gcp_variant_transforms.libs.annotation import annotation_parser
+from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
@@ -310,12 +312,96 @@ class InferHeaderFields(beam.PTransform):
             | 'InferHeaderFields' >> beam.ParDo(
                 _InferHeaderFields(), self._defined_headers)
             # TODO(nmousavi): Modify the MergeHeaders to resolve 1 vs '.'
-            # mistmatch for headers extracted from variants.
+            # mismatch for headers extracted from variants.
             #
-            # Note: argument `split_alternate_allele_info_fileds` is not
+            # Note: argument `split_alternate_allele_info_fields` is not
             # relevant here since no fields with `Number=A` will be extracted
             # from variants, therefore we let the default value (True) for it
             # be used. Should this changes, we should modify the default value.
             | 'MergeHeaders' >> merge_headers.MergeHeaders(
                 split_alternate_allele_info_fields=True,
                 allow_incompatible_records=self._allow_incompatible_records))
+
+
+class _InferAnnotationTypes(_InferHeaderFields):
+  """Calculates types of annotation fields from `Variant` records.
+
+  All annotation headers in each annotation field are converted to Info header
+  lines where the new ID corresponds to the given annotation field and header,
+  and the new TYPE corresponds to inferred type of the original header. Since
+  each variant potentially contains multiple values for each annotation header,
+  a small 'merge' of value types is performed before VcfHeader creation for each
+  variant.
+  """
+
+  def process(self,
+              variant,  # type: vcfio.Variant
+              defined_headers,  # type: vcf_header_io.VcfHeader
+              annotation_fields  # type: List[str]
+             ):
+    # type: (...) -> Iterable[vcf_header_io.VcfHeader]
+    """
+    Args:
+      defined_headers: header fields defined in header section of VCF files.
+      annotation_fields: list of info fields treated as annotation fields
+        (e.g. ['CSQ_VT'])
+
+    Yields:
+      inferred_header_infos: A VcfHeader with info fields documenting newly
+        inferred annotation types
+    """
+    infos = {}
+    resolver = vcf_field_conflict_resolver.FieldConflictResolver(
+        resolve_always=True)
+    for field in annotation_fields:
+      if field not in variant.info:
+        continue
+      annotation_headers = annotation_parser.extract_annotation_names(
+          defined_headers.infos[field][
+              vcf_header_io.VcfParserHeaderKeyConstants.DESC], with_alt=True)
+      annotation_values = [annotation_parser.extract_annotation_list_with_alt(
+          annotation) for annotation in variant.info[field]]
+      annotation_values = zip(*annotation_values)
+      for header, values in zip(annotation_headers, annotation_values):
+        variant_merged_type = vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
+        for v in values:
+          if v != '':
+            variant_merged_type = resolver.resolve_attribute_conflict(
+                vcf_header_io.VcfParserHeaderKeyConstants.TYPE,
+                variant_merged_type,
+                self._get_field_type(v))
+        key_id = vcf_header_io.BASE_TYPE_KEY.format(field, header)
+        infos[key_id] = Info(key_id,
+                             1,
+                             variant_merged_type,
+                             '',  # NO_DESCRIPTION
+                             '',  # UNKNOWN_SOURCE
+                             '')  # UNKNOWN_VERSION
+    inferred_header_infos = vcf_header_io.VcfHeader(infos=infos)
+    yield inferred_header_infos
+
+
+class InferAnnotationTypes(beam.PTransform):
+  """Calculates types of annotation fields from `Variant` records."""
+
+  def __init__(self, defined_headers, annotation_fields):
+    # type: (vcf_header_io.VcfHeader) -> None
+    """Initializes the transform.
+    Args:
+      defined_headers: Side input containing all the header fields (e.g., INFO,
+        FORMAT) defined in the header section of the VCF files.
+      annotation_fields: list of info fields treated as annotation fields
+        (e.g. ['CSQ_VT'])
+    """
+    self._defined_headers = defined_headers
+    self.annotation_fields = annotation_fields
+
+  def expand(self, pcoll):
+    return (pcoll
+            | 'InferAnnotationTypes' >> beam.ParDo(
+                _InferAnnotationTypes(),
+                self._defined_headers,
+                self.annotation_fields)
+            | 'MergeHeaders' >> merge_headers.MergeHeaders(
+                split_alternate_allele_info_fields=True,
+                allow_incompatible_records=True))

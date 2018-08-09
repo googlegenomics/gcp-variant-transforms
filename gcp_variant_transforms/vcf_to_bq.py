@@ -121,24 +121,44 @@ def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
     raise ValueError('Merge strategy is not supported.')
 
 
+def _do_inferred_merge(inferred_headers, merged_header, known_args, label):
+  flatten_label = 'Flatten{}'.format(label)
+  merge_label = 'Merge{}FromVcfAndVariants'.format(label)
+  merged_header = (
+      (inferred_headers, merged_header)
+      | flatten_label >> beam.Flatten()
+      | merge_label >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
+  return merged_header
+
+
 def _add_inferred_headers(pipeline,  # type: beam.Pipeline
                           known_args,  # type: argparse.Namespace
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> pvalue.PCollection
-  inferred_headers = (
-      _read_variants(pipeline, known_args)
-      | 'FilterVariants' >> filter_variants.FilterVariants(
-          reference_names=known_args.reference_names)
-      | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
-          pvalue.AsSingleton(merged_header),
-          known_args.allow_incompatible_records))
-  merged_header = (
-      (inferred_headers, merged_header)
-      | beam.Flatten()
-      | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
-          known_args.split_alternate_allele_info_fields,
-          known_args.allow_incompatible_records))
+  filtered_variants = (_read_variants(pipeline, known_args)
+                       | 'FilterVariants' >> filter_variants.FilterVariants(
+                           reference_names=known_args.reference_names))
+  if known_args.infer_headers:
+    inferred_headers = (filtered_variants | 'InferHeaderFields' >>
+                        infer_headers.InferHeaderFields(
+                            pvalue.AsSingleton(merged_header),
+                            known_args.allow_incompatible_records))
+    merged_header = _do_inferred_merge(inferred_headers,
+                                       merged_header,
+                                       known_args,
+                                       'Headers')
+  if known_args.infer_annotation_types:
+    inferred_headers = (filtered_variants | 'InferAnnotationTypes' >>
+                        infer_headers.InferAnnotationTypes(
+                            pvalue.AsSingleton(merged_header),
+                            known_args.annotation_fields))
+    merged_header = _do_inferred_merge(inferred_headers,
+                                       merged_header,
+                                       known_args,
+                                       'Types')
   return merged_header
 
 
@@ -178,7 +198,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
         headers,
         known_args.split_alternate_allele_info_fields,
         known_args.allow_incompatible_records)
-    if known_args.infer_headers:
+    if known_args.infer_headers or known_args.infer_annotation_types:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path

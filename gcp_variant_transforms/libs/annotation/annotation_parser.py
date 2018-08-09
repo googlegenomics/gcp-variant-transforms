@@ -144,7 +144,7 @@ class Parser(object):
       ValueError: In a few other error cases, the exception message should be
         descriptive enough.
     """
-    annotations = _extract_annotation_list_with_alt(annotation_str)
+    annotations = extract_annotation_list_with_alt(annotation_str)
     annotation_map = self._create_map(annotations)
     alt_ind = self._find_alt_index(annotation_map)
     return alt_ind, annotation_map
@@ -301,7 +301,7 @@ class Parser(object):
       raise InvalidAlleleNumValue(e)
 
 
-def _extract_annotation_list_with_alt(annotation_str):
+def extract_annotation_list_with_alt(annotation_str):
   # type: (str) -> List[str]
   """Extracts annotations from an annotation INFO field.
 
@@ -319,25 +319,31 @@ def _extract_annotation_list_with_alt(annotation_str):
   return annotation_str.split('|')
 
 
-def extract_annotation_names(description):
+def extract_annotation_names(description, with_alt=False):
   # type: (str) -> List[str]
   """Extracts annotation list from the description of an annotation INFO field.
 
-  This is similar to extract_extract_annotation_list_with_alt with the
-  difference that it ignores everything before the first '|'. For example, for
+  This is similar to extract_annotation_list_with_alt with the difference
+  that it ignores everything before the final whitespace, and can ignore the
+   field before the first '|'. For example, for
   'some desc ... Format: Allele|Consequence|IMPACT|SYMBOL|Gene', it returns
-  ['Consequence', 'IMPACT', 'SYMBOL', 'Gene']
+  ['Consequence', 'IMPACT', 'SYMBOL', 'Gene'] by default, and returns
+  ['Allele', 'Consequence', 'IMPACT', 'SYMBOL', 'Gene'] if `with_alt` is set to
+  True.
 
   Args:
     description: The "Description" part of the annotation INFO field
       in the header of VCF.
+    with_alt: Flag indicating if the first field should be returned
 
   Returns:
     The list of annotation names.
   """
-  annotation_names = _extract_annotation_list_with_alt(description)
+  description = description.split()[-1]
+  annotation_names = extract_annotation_list_with_alt(description)
   if len(annotation_names) < 2:
     raise ValueError(
         'Expected at least one | in annotation description {}'.format(
             description))
-  return annotation_names[1:]
+  index = 0 if with_alt else 1
+  return annotation_names[index:]

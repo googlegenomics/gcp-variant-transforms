@@ -280,6 +280,11 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('Species name to pass to vep. Setting this flag will be '
               'reflected in the cache file used if --{} is not set.').format(
                   AnnotationOptions._VEP_CACHE_FLAG))
+    parser.add_argument(
+        '--infer_annotation_types',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, all annotation fields will have proper corresponding '
+              'types in BigQuery. By default, annotation fields are STRING.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None

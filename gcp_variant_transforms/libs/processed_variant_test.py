@@ -14,6 +14,7 @@
 
 from __future__ import absolute_import
 from typing import Dict  # pylint: disable=unused-import
+from collections import OrderedDict
 
 import unittest
 
@@ -488,3 +489,52 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(alt_field.description, 'Alternate base.')
     a2_fields = [field for field in schema.fields if field.name == 'A2']
     self.assertEqual(len(a2_fields), 1)
+
+  def test_create_alt_bases_field_schema_types(self):
+    _, header_fields = self._get_sample_variant_and_header_with_csq()
+    for hfi in header_fields.infos.values():
+      hfi['type'] = 'String'
+    header_fields.infos.update({
+        'CSQ_Allele_TYPE':
+        OrderedDict([('id', 'CSQ_Allele_TYPE'),
+                     ('num', 1),
+                     ('type', 'String'),
+                     ('desc', None),
+                     ('source', None),
+                     ('version', None)]),
+        'CSQ_Consequence_TYPE':
+        OrderedDict([('id', 'CSQ_Consequence_TYPE'),
+                     ('num', 1),
+                     ('type', 'Integer'),
+                     ('desc', None),
+                     ('source', None),
+                     ('version', None)]),
+        'CSQ_IMPACT_TYPE':
+        OrderedDict([('id', 'CSQ_IMPACT_TYPE'),
+                     ('num', 1),
+                     ('type', 'Integer'),
+                     ('desc', None),
+                     ('source', None),
+                     ('version', None)]),
+        'CSQ_SYMBOL_TYPE':
+        OrderedDict([('id', 'CSQ_SYMBOL_TYPE'),
+                     ('num', 1),
+                     ('type', 'Float'),
+                     ('desc', None),
+                     ('source', None),
+                     ('version', None)])})
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'])
+    schema = factory.create_alt_bases_field_schema()
+    csq_field = [field for field in schema.fields if field.name == 'CSQ'][0]
+
+    expected_name_type_map = {'CSQ': 'record',
+                              'allele': 'string',
+                              'Consequence': 'integer',
+                              'IMPACT': 'integer',
+                              'SYMBOL': 'float',
+                              'Gene': 'string'}
+    for field in csq_field.fields:
+      self.assertEqual(field.type, expected_name_type_map[field.name])

@@ -215,6 +215,7 @@ class ProcessedVariantFactory(object):
         annotation_fields, self._header_fields, cfactory, use_allele_num,
         minimal_match)
     self._minimal_match = minimal_match
+    self.info_type_keys_set = set()
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -290,15 +291,29 @@ class ProcessedVariantFactory(object):
           mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
           description='List of {} annotations for this alternate.'.format(
               annot_field))
+      anno_alt_upper = annotation_parser.ANNOTATION_ALT.capitalize()
+      type_key = vcf_header_io.BASE_TYPE_KEY.format(annot_field, anno_alt_upper)
+      self.info_type_keys_set.add(type_key)
       annotation_record.fields.append(bigquery.TableFieldSchema(
           name=annotation_parser.ANNOTATION_ALT,
           type=bigquery_util.TableFieldConstants.TYPE_STRING,
           mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
           description='The ALT part of the annotation field.'))
       for annotation_name in annotation_names:
+        type_key = vcf_header_io.BASE_TYPE_KEY.format(annot_field,
+                                                      annotation_name)
+        self.info_type_keys_set.add(type_key)
+        if type_key in self._header_fields.infos:
+          vcf_type = self._header_fields.infos[type_key][
+              vcf_header_io.VcfParserHeaderKeyConstants.TYPE]
+        else:
+          vcf_type = vcf_header_io.VcfHeaderFieldTypeConstants.STRING
+          logging.warning(('Annotation field %s has no corresponding header '
+                           'field with id %s to specify type. Using type %s '
+                           'instead.'), annotation_name, type_key, vcf_type)
         annotation_record.fields.append(bigquery.TableFieldSchema(
             name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
-            type=bigquery_util.TableFieldConstants.TYPE_STRING,
+            type=bigquery_util.get_bigquery_type_from_vcf_type(vcf_type),
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
             description=annotation_descs.get(annotation_name, '')))
       alternate_bases_record.fields.append(annotation_record)

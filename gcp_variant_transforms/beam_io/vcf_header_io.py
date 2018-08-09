@@ -32,6 +32,9 @@ from apache_beam.transforms import PTransform
 from gcp_variant_transforms.beam_io import vcfio
 
 
+BASE_TYPE_KEY = '{}_{}_TYPE'
+
+
 class VcfHeaderFieldTypeConstants(object):
   """Constants for types from VCF header."""
   FLOAT = 'Float'
