@@ -31,8 +31,7 @@ In addition, the schema from Variant Transforms has the following properties:
   but values within the record must each have a value). For instance, if a
   VCF INFO field is `1,.,2`, we cannot load `1,null,2` to BigQuery and need to
   use a numeric replacement for the null value. The replacement value is
-  currently set to `-sys.maxint` (equal to `-9223372036854775807` on
-  64-bit machines).
+  currently set to `-2^31` (equal to `-2147483648`).
   [Issue #68](https://github.com/googlegenomics/gcp-variant-transforms/issues/68)
   tracks the feature to make this value configurable. The alternative is to
   convert such values to a string and use `.` to represent the null value.

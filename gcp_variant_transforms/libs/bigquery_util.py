@@ -75,7 +75,7 @@ _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 # A big number to represent infinite float values. The division by 10 is to
 # prevent unintentional overflows when doing subsequent operations.
 _INF_FLOAT_VALUE = sys.float_info.max / 10
-_DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -pow(2, 32)
+_DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -2 ^ 31
 
 
 def parse_table_reference(input_table):
