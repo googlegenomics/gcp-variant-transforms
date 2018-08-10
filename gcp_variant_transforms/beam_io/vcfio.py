@@ -32,6 +32,7 @@ from apache_beam.transforms import PTransform
 from gcp_variant_transforms.beam_io import vcf_parser
 
 # All other modules depend on vcfio for the following const values.
+# In order to keep the current setting we re-declared them here.
 MalformedVcfRecord = vcf_parser.MalformedVcfRecord
 MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
 PASS_FILTER = vcf_parser.PASS_FILTER
@@ -44,15 +45,11 @@ Variant = vcf_parser.Variant
 VariantCall = vcf_parser.VariantCall
 
 
-__all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'MalformedVcfRecord']
-
-
-
 class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
 
   def encode(self, variant):
-    # type: (vcf_parser.Variant) -> str
+    # type: (Variant) -> str
     """Converts a :class:`Variant` object back to a VCF line."""
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
@@ -202,7 +199,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    record_iterator = vcf_parser.PyvcfParser(
+    record_iterator = vcf_parser.PyVcfParser(
         file_name,
         range_tracker,
         self._pattern,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A source for parsing VCF files (version 4.x) to convert them to Variant objs.
+"""Parses VCF files (version 4.x) and converts them to Variant objects.
 
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
@@ -26,8 +26,6 @@ import vcf
 
 from apache_beam.coders import coders
 from apache_beam.io import textio
-
-__all__ = ['Variant', 'VariantCall', 'VcfParser', 'PyvcfParser']
 
 
 # Stores data about failed VCF record reads. `line` is the text line that
@@ -221,17 +219,20 @@ class VariantCall(object):
 
 
 class VcfParser(object):
-  """Base abstract class for defining a vcf file parser.
+  """Base abstract class for defining a VCF file parser.
 
   Derived classes must implement two methods:
-    _init_with_header: must initial parser with given header lines (List[str]).
-    _get_record: give a line of vcf file, returns a Variant object.
+    _init_with_header: must initialize parser with given header lines.
+    _get_variant: given a line of VCF file, returns a Variant object.
 
   Objects of the derived classed will be an iterator of records:
 
-    record_iterator = DerivedVcfParser(...)
-    for record in record_iterator:
-      yield record
+  ```
+  record_iterator = DerivedVcfParser(...)
+  for record in record_iterator:
+    yield record
+  ```
+
   """
 
   def __init__(self,
@@ -246,13 +247,10 @@ class VcfParser(object):
     # type: (...) -> None
     # If `representative_header_lines` is given, header lines in `file_name`
     # are ignored; refer to _process_header_lines() logic.
-    self._header_lines = []
     self._representative_header_lines = representative_header_lines
-    self._current_line = None
     self._file_name = file_name
     self._allow_malformed_records = allow_malformed_records
 
-    self._header_processed = False
     text_source = textio._TextSource(
         file_pattern,
         0,  # min_bundle_size
@@ -268,19 +266,27 @@ class VcfParser(object):
                                                 range_tracker)
 
   def _process_header_lines(self, header_lines):
-    """ This method will be automatically called by textio._TextSource()."""
+    """Processes header lines from text source and initializes the parser.
+
+    Note, this method will be automatically called by textio._TextSource().
+    """
     if self._representative_header_lines:
       # Replace header lines with given representative header lines.
       # We need to keep the last line of the header from the file because it
       # contains the sample IDs, which is unique per file.
-      self._init_with_header(self._representative_header_lines +
-                             header_lines[-1:])
-    else:
-      self._init_with_header(header_lines)
+      header_lines = self._representative_header_lines + header_lines[-1:]
+    self._init_with_header(header_lines)
 
   def next(self):
     for text_line in self._text_lines:
-      return self._get_record(text_line)
+      # Skipping empty lines.
+      if text_line and text_line.strip():
+        record = self._get_variant(text_line)
+        if isinstance(record, Variant) or self._allow_malformed_records:
+          return record
+        raise ValueError('VCF record read failed in %s for line %s: %s' %
+                         (self._file_name, text_line, str(record.error)))
+
     raise StopIteration
 
   def __iter__(self):
@@ -288,16 +294,23 @@ class VcfParser(object):
 
   def _init_with_header(self, header_lines):
     # type: (List[str]) -> None
-    """ This method will be called by _process_header_lines()."""
+    """Initializes the parser specific settings with the given header_lines.
+
+    Note, this method will be automatically called by _process_header_lines().
+    """
     raise NotImplementedError
 
-  def _get_record(self, line):
+  def _get_variant(self, data_line):
     # type: (str) -> Variant
-    """ This method will be called by next(), one line at a time."""
+    """Converts a single data_line of a VCF file into a Variant object.
+
+    In case something goes wronge it must return a MalformedVcfRecord object.
+    Note, this method will be called by next(), one line at a time.
+    """
     raise NotImplementedError
 
-class PyvcfParser(VcfParser):
-  """An Iterator for processing a single VCF file using pyvcf."""
+class PyVcfParser(VcfParser):
+  """An Iterator for processing a single VCF file using PyVcf."""
 
   def __init__(self,
                file_name,  # type: str
@@ -309,13 +322,15 @@ class PyvcfParser(VcfParser):
                **kwargs  # type: **str
               ):
     # type: (...) -> None
-    super(PyvcfParser, self).__init__(file_name,
+    super(PyVcfParser, self).__init__(file_name,
                                       range_tracker,
                                       file_pattern,
                                       compression_type,
                                       allow_malformed_records,
                                       representative_header_lines,
                                       **kwargs)
+    self._header_lines = []
+    self._next_line_to_process = None
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
 
@@ -327,34 +342,32 @@ class PyvcfParser(VcfParser):
       raise ValueError(
           'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
 
-  def _line_generator(self):
-    header_processed = False
-    if not header_processed and self._header_lines:
-      for header in self._header_lines:
-        self._current_line = header
-        yield self._current_line
-      header_processed = True
-    # Infinit loop; VcfParser.next() rasies StopIteration when EOF is reached.
-    while self._current_line:
-      # PyVCF has explicit str() calls when parsing INFO fields, which fails
-      # with UTF-8 decoded strings. Encode the line back to UTF-8.
-      yield self._current_line.encode('utf-8')
-
-  def _get_record(self, line):
+  def _get_variant(self, data_line):
     # _line_generator will consume this line.
-    self._current_line = line
+    self._next_line_to_process = data_line
     try:
       record = next(self._vcf_reader)
-      return self._convert_to_variant_record(record, self._vcf_reader.formats)
+      return self._convert_to_variant(record, self._vcf_reader.formats)
     except (LookupError, ValueError) as e:
-      if self._allow_malformed_records:
-        logging.warning('VCF record read failed in %s for line %s: %s',
-                        self._file_name, self._current_line, str(e))
-        return MalformedVcfRecord(self._file_name, self._current_line, str(e))
+      logging.warning('VCF record read failed in %s for line %s: %s',
+                      self._file_name, data_line, str(e))
+      return MalformedVcfRecord(self._file_name, data_line, str(e))
 
-      raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
+  def _line_generator(self):
+    if not self._header_lines:
+      raise ValueError(
+          'Missing _header_lines, PyVcf needs header to initialize its parser.')
+    for header in self._header_lines:
+      yield header
+    # Continue to process the next line indefinitely. The next line is set
+    # inside _get_variant() and this method is indirectly called in get_record.
+    while True:
+      # PyVCF has explicit str() calls when parsing INFO fields, which fails
+      # with UTF-8 decoded strings. Encode the line back to UTF-8.
+      if self._next_line_to_process is not None:
+        yield self._next_line_to_process.encode('utf-8')
 
-  def _convert_to_variant_record(
+  def _convert_to_variant(
       self,
       record,  # type: vcf.model._Record
       formats  # type: Dict[str, vcf.parser._Format]
@@ -398,7 +411,7 @@ class PyvcfParser(VcfParser):
       return end_info_value[0]
     else:
       raise ValueError('Invalid END INFO field in record: {}'.format(
-          self._current_line))
+          self._next_line_to_process))
 
   def _get_variant_alternate_bases(self, record):
     # ALT fields are classes in PyVCF (e.g. Substitution), so need convert
@@ -445,5 +458,4 @@ class PyvcfParser(VcfParser):
           data = [data]
         call.info[field] = data
       calls.append(call)
-
     return calls

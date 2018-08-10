@@ -295,13 +295,20 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(9900, len(read_data_gz))
 
   def test_single_file_no_records(self):
-    self.assertEqual(
-        [], self._create_temp_file_and_read_records(['']))
-    self.assertEqual(
-        [], self._create_temp_file_and_read_records(['\n', '\r\n', '\n']))
-    self.assertEqual(
-        [], self._create_temp_file_and_read_records(_SAMPLE_HEADER_LINES))
+    for content in [[' '], ['', '\n'], ['\n', '\r\n', '\n']]:
+      with TempDir() as tempdir, self.assertRaises(ValueError):
+        self._read_records(self._create_temp_vcf_file(content, tempdir))
+        self.fail('File with missing header lines must fail.')
+    # For empty file textio._TextSource does not yield anything so no failure.
+    self.assertEqual([], self._create_temp_file_and_read_records(['']))
 
+  def test_single_file_only_header(self):
+    self.assertEqual(
+        [], self._create_temp_file_and_read_records([' ', ''],
+                                                    _SAMPLE_HEADER_LINES))
+    self.assertEqual(
+        [], self._create_temp_file_and_read_records(['\n', '\r\n', '\n', ' \n'],
+                                                    _SAMPLE_HEADER_LINES))
   def _default_variant_call(self):
     return vcfio.VariantCall(
         name='Sample1', genotype=[1, 0],
@@ -378,7 +385,6 @@ class VcfSourceTest(unittest.TestCase):
       with TempDir() as tempdir:
         self._read_records(self._create_temp_vcf_file(content, tempdir),
                            allow_malformed_records=True)
-
     # Invalid headers should still raise errors
     for content in invalid_headers:
       with TempDir() as tempdir, self.assertRaises(ValueError):
