@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A source for parsing VCF files (version 4.x) to convert them to Variant objs.
+"""Parses VCF files (version 4.x) and converts them to Variant objects.
+
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
@@ -44,6 +45,7 @@ MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 
 class Variant(object):
   """A class to store info about a genomic variant.
+
   Each object corresponds to a single record in a VCF file.
   """
 
@@ -154,6 +156,7 @@ class Variant(object):
 
 class VariantCall(object):
   """A class to store info about a variant call.
+
   A call represents the determination of genotype with respect to a particular
   variant. It may include associated information such as quality and phasing.
   """
@@ -215,6 +218,7 @@ class VariantCall(object):
 
 class VcfParser(object):
   """Base abstract class for defining a VCF file parser.
+
   Derived classes must implement two methods:
     _init_with_header: must initialize parser with given header lines.
     _get_variant: given a line of VCF file, returns a Variant object.
@@ -249,8 +253,9 @@ class VcfParser(object):
         True,  # strip_trailing_newlines
         coders.StrUtf8Coder(),  # coder
         validate=False,
-        header_processor_fns=(lambda x: x.startswith('#'),
-                              self._process_header_lines),
+        header_processor_fns=(
+            lambda x: not x.strip() or x.startswith('#'),
+            self._process_header_lines),
         **kwargs)
 
     self._text_lines = text_source.read_records(self._file_name,
@@ -325,6 +330,7 @@ class PyVcfParser(VcfParser):
                                       **kwargs)
     self._header_lines = []
     self._next_line_to_process = None
+    self._current_line = None
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
 
@@ -348,17 +354,20 @@ class PyVcfParser(VcfParser):
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
   def _line_generator(self):
-    if not self._header_lines:
-      raise ValueError(
-          'Missing _header_lines, PyVcf needs header to initialize its parser.')
     for header in self._header_lines:
       yield header
     # Continue to process the next line indefinitely. The next line is set
     # inside _get_variant() and this method is indirectly called in get_variant.
-    while True:
+    while self._next_line_to_process:
+      self._current_line = self._next_line_to_process
+      self._next_line_to_process = None
       # PyVCF has explicit str() calls when parsing INFO fields, which fails
       # with UTF-8 decoded strings. Encode the line back to UTF-8.
-      yield self._next_line_to_process.encode('utf-8')
+      yield self._current_line.encode('utf-8')
+      # Making sure _get_variant() assigned a new value before consuming it.
+      assert self._next_line_to_process is not None, (
+          'Internal error: A data line is requested to be processed more than' +
+          'once. Please file a bug if you see this!')
 
   def _convert_to_variant(
       self,
@@ -401,7 +410,7 @@ class PyVcfParser(VcfParser):
       return end_info_value[0]
     else:
       raise ValueError('Invalid END INFO field in record: {}'.format(
-          self._next_line_to_process))
+          self._current_line))
 
   def _get_variant_alternate_bases(self, record):
     # ALT fields are classes in PyVCF (e.g. Substitution), so need convert

@@ -295,20 +295,11 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(9900, len(read_data_gz))
 
   def test_single_file_no_records(self):
-    for content in [[' '], ['', '\n'], ['\n', '\r\n', '\n']]:
-      with TempDir() as tempdir, self.assertRaises(ValueError):
-        self._read_records(self._create_temp_vcf_file(content, tempdir))
-        self.fail('File with missing header lines must fail.')
-    # For empty file textio._TextSource does not yield anything so no failure.
-    self.assertEqual([], self._create_temp_file_and_read_records(['']))
+    for content in [[''], [' '], ['', ' ', '\n'], ['\n', '\r\n', '\n']]:
+      self.assertEqual([], self._create_temp_file_and_read_records(content))
+      self.assertEqual([], self._create_temp_file_and_read_records(
+          content, _SAMPLE_HEADER_LINES))
 
-  def test_single_file_only_header(self):
-    self.assertEqual(
-        [], self._create_temp_file_and_read_records([' ', ''],
-                                                    _SAMPLE_HEADER_LINES))
-    self.assertEqual(
-        [], self._create_temp_file_and_read_records(['\n', '\r\n', '\n', ' \n'],
-                                                    _SAMPLE_HEADER_LINES))
   def _default_variant_call(self):
     return vcfio.VariantCall(
         name='Sample1', genotype=[1, 0],
