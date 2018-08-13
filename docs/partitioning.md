@@ -41,7 +41,7 @@ Output table is partitioned based on the *partition config file* which can be
 set using `--partition_config_path` flag. The config file is formatted as
 a [`YAML`](https://en.wikipedia.org/wiki/YAML) file and has a straight forward
 structure. [Here](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml)
-you can see a config file which splits output table into 26 tables, one for
+you can see a config file which splits output table into 25 tables, one for
 each chromosome plus an extra [residual partition](#residual-partition). We
 recommend using this config file as default for human samples by adding:
 `--partition_config_path gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml`
