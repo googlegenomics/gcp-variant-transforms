@@ -159,6 +159,13 @@ include any record that does not have an alternate base. You may choose to use
 `t.alternate_bases AS alts WITH OFFSET AS a_index` in the `FROM` clause) to
 only include records that have at least one alternate base.
 
+Also note that when using this query, there will be extra rows for the genotype
+0 after flattening in the particular case where there's a multi-allelic site 
+(multiple alternate bases). This is because this `LEFT JOIN` is effectively
+doing a `CROSS JOIN` between each genotype and the alternate bases and
+then filtering by `a_index`, thus while the nonzero genotypes will be 
+filtered due to `a_index + 1`, the genotype of 0 will be allowed for all 
+combinations of an alternate_base and this 0 genotype.
 
 ## Example query for flattening BigQuery table
 
