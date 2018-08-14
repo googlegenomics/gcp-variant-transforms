@@ -75,6 +75,7 @@ _FALLBACK_FIELD_NAME_PREFIX = 'field_'
 # A big number to represent infinite float values. The division by 10 is to
 # prevent unintentional overflows when doing subsequent operations.
 _INF_FLOAT_VALUE = sys.float_info.max / 10
+_DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -2 ^ 31
 
 
 def parse_table_reference(input_table):
@@ -142,7 +143,9 @@ def get_python_type_from_bigquery_type(bigquery_type):
 
 
 def get_bigquery_sanitized_field(
-    field, null_numeric_value_replacement=-sys.maxint):
+    field,
+    null_numeric_value_replacement=_DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT
+    ):
   # type: (Any, int) ->  Any
   """Returns sanitized field according to BigQuery restrictions.
 

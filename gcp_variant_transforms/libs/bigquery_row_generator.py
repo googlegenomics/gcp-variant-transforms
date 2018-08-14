@@ -162,9 +162,9 @@ class BigQueryRowGenerator(object):
       alt_record = {bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT:
                     alt.alternate_bases}
       for key, data in alt.info.iteritems():
-        if key not in alt.annotation_field_names:
-          alt_record[bigquery_util.get_bigquery_sanitized_field_name(key)] = (
-              bigquery_util.get_bigquery_sanitized_field(data))
+        alt_record[bigquery_util.get_bigquery_sanitized_field_name(key)] = (
+            data if key in alt.annotation_field_names else
+            bigquery_util.get_bigquery_sanitized_field(data))
       row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
     # Add info.
     for key, data in variant.non_alt_info.iteritems():
