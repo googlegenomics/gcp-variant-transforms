@@ -76,7 +76,8 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
                       | ' InferHeaderFields' >>
                       infer_headers.InferHeaderFields(
                           pvalue.AsSingleton(merged_header),
-                          allow_incompatible_records=True))
+                          allow_incompatible_records=True,
+                          infer_headers=True))
 
   merged_header = (
       (inferred_headers, merged_header)

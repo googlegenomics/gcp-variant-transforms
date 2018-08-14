@@ -162,7 +162,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant])
           | 'InferHeaderFields' >>
-          infer_headers.InferHeaderFields(defined_headers=None))
+          infer_headers.InferHeaderFields(defined_headers=None,
+                                          infer_headers=True))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
                         'ISI': Info('ISI', 1, 'Integer', '', '', ''),
@@ -190,7 +191,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
           | Create([variant])
           | 'InferHeaderFields' >>
           infer_headers.InferHeaderFields(
-              pvalue.AsSingleton(vcf_headers_side_input)))
+              pvalue.AsSingleton(vcf_headers_side_input),
+              infer_headers=True))
       expected = vcf_header_io.VcfHeader()
       assert_that(inferred_headers, equal_to([expected]))
       p.run()
@@ -203,7 +205,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant_1, variant_2])
           | 'InferHeaderFields' >>
-          infer_headers.InferHeaderFields(defined_headers=None))
+          infer_headers.InferHeaderFields(defined_headers=None,
+                                          infer_headers=True))
 
       expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
                         'ISI': Info('ISI', 1, 'Integer', '', '', ''),
@@ -235,7 +238,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
           | Create([variant_1, variant_2])
           | 'InferHeaderFields' >>
           infer_headers.InferHeaderFields(
-              pvalue.AsSingleton(vcf_headers_side_input)))
+              pvalue.AsSingleton(vcf_headers_side_input),
+              infer_headers=True))
 
       expected_infos = {'IS_2': Info('IS_2', 1, 'String', '', '', '')}
       expected_formats = {'FI_2': Format('FI_2', 1, 'Integer', '')}
@@ -253,7 +257,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', 'A', 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     corrected_info = infer_header_fields._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
@@ -268,7 +272,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', -1, 'Float', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     corrected_info = infer_header_fields._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
@@ -284,7 +288,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', None, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     corrected_info = infer_header_fields._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
@@ -301,7 +305,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', None, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     corrected_info = infer_header_fields._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
@@ -318,7 +322,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'IF': Info('IF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', -1, 'Float', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     inferred_infos = infer_header_fields._infer_info_fields(
         variant, vcf_header_io.VcfHeader(infos=infos))
     self.assertEqual({}, inferred_infos)
@@ -330,7 +334,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
              'ISF': Info('ISF', 1, 'Float', '', '', ''),
              'IB': Info('IB', 0, 'Flag', '', '', ''),
              'IA': Info('IA', -1, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     inferred_infos = infer_header_fields._infer_info_fields(
         variant, vcf_header_io.VcfHeader(infos=infos))
     expected_infos = {'IF': Info('IF', 1, 'Float', '', '', ''),
@@ -345,7 +349,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
         ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     corrected_format = infer_header_fields._infer_mismatched_format_field(
         'FI', variant.calls[0].info.get('FI'),
         vcf_header_io.VcfHeader(formats=formats).formats.get('FI'))
@@ -360,7 +364,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
         ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     header = infer_header_fields._infer_format_fields(
         variant, vcf_header_io.VcfHeader(formats=formats))
     self.assertEqual({}, header)
@@ -372,7 +376,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('FI', Format('FI', 2, 'Integer', 'desc')),
         ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields()
+    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
     inferred_formats = infer_header_fields._infer_format_fields(
         variant, vcf_header_io.VcfHeader(formats=formats))
     expected_formats = {'FI': Format('FI', 2, 'Float', 'desc'),
@@ -401,7 +405,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
           infer_headers.InferHeaderFields(
               defined_headers=vcf_header_io.VcfHeader(infos=infos,
                                                       formats=formats),
-              allow_incompatible_records=True))
+              allow_incompatible_records=True,
+              infer_headers=True))
 
       expected_infos = {'IA': Info('IA', None, 'Float', '', '', ''),
                         'IF': Info('IF', 1, 'Float', '', '', '')}
@@ -418,9 +423,10 @@ class InferHeaderFieldsTest(unittest.TestCase):
     header = self._get_sample_header_fields_with_annotation()
     variant = self._get_sample_variant_1()
     variant.info['CSQ_VT'] = ['A|GENE1|100|1.2', 'TT|GENE1|101|1.3']
-    infer_annotation_types = infer_headers._InferAnnotationTypes()
-    new_header = next(infer_annotation_types.process(
-        variant, header, anno_fields))
+    infer_header_fields = infer_headers._InferHeaderFields(anno_fields,
+                                                           False,
+                                                           True)
+    new_header = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader(infos={
         'CSQ_VT_Allele_TYPE':
         Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
@@ -441,9 +447,10 @@ class InferHeaderFieldsTest(unittest.TestCase):
                               'A|2|101|1.3',
                               'A|1.2|start|0',
                               'TT|1.3|end|7']
-    infer_annotation_types = infer_headers._InferAnnotationTypes()
-    new_header = next(infer_annotation_types.process(
-        variant, header, anno_fields))
+    infer_header_fields = infer_headers._InferHeaderFields(anno_fields,
+                                                           False,
+                                                           True)
+    new_header = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader(infos={
         'CSQ_VT_Allele_TYPE':
         Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
@@ -463,9 +470,10 @@ class InferHeaderFieldsTest(unittest.TestCase):
                               'A||101|1.3',
                               'A|||1.4',
                               'TT|||']
-    infer_annotation_types = infer_headers._InferAnnotationTypes()
-    new_header = next(infer_annotation_types.process(
-        variant, header, anno_fields))
+    infer_header_fields = infer_headers._InferHeaderFields(anno_fields,
+                                                           False,
+                                                           True)
+    new_header = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader(infos={
         'CSQ_VT_Allele_TYPE':
         Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
@@ -478,8 +486,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
     self.assertEqual(expected, new_header)
 
     variant.info['CSQ_VT'] = []
-    new_header = next(infer_annotation_types.process(
-        variant, header, anno_fields))
+    new_header = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader()
     self.assertEqual(expected, new_header)
 
@@ -498,9 +505,10 @@ class InferHeaderFieldsTest(unittest.TestCase):
                               'A|2|101|1.3']
     variant.info['CSQ'] = ['A|1|100|1.2',
                            'A|2|101|1.3']
-    infer_annotation_types = infer_headers._InferAnnotationTypes()
-    new_header = next(infer_annotation_types.process(
-        variant, header, anno_fields))
+    infer_header_fields = infer_headers._InferHeaderFields(anno_fields,
+                                                           False,
+                                                           True)
+    new_header = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader(infos={
         'CSQ_VT_Allele_TYPE':
         Info('CSQ_VT_Allele_TYPE', 1, 'String', '', '', ''),
@@ -549,8 +557,11 @@ class InferHeaderFieldsTest(unittest.TestCase):
           p
           | Create([variant1, variant2])
           | 'InferAnnotationTypes' >>
-          infer_headers.InferAnnotationTypes(defined_headers=header,
-                                             annotation_fields=anno_fields))
+          infer_headers.InferHeaderFields(defined_headers=header,
+                                          annotation_fields=anno_fields,
+                                          allow_incompatible_records=True,
+                                          infer_headers=False,
+                                          infer_annotation_types=True))
       assert_that(inferred_headers,
                   asserts.header_fields_equal_ignore_order([expected]))
       p.run()

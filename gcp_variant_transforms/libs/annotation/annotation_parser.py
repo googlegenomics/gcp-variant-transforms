@@ -320,12 +320,12 @@ def extract_annotation_list_with_alt(annotation_str):
 
 
 def extract_annotation_names(description, with_alt=False):
-  # type: (str) -> List[str]
+  # type: (str, bool) -> List[str]
   """Extracts annotation list from the description of an annotation INFO field.
 
   This is similar to extract_annotation_list_with_alt with the difference
   that it ignores everything before the final whitespace, and can ignore the
-   field before the first '|'. For example, for
+  field before the first '|'. For example, for
   'some desc ... Format: Allele|Consequence|IMPACT|SYMBOL|Gene', it returns
   ['Consequence', 'IMPACT', 'SYMBOL', 'Gene'] by default, and returns
   ['Allele', 'Consequence', 'IMPACT', 'SYMBOL', 'Gene'] if `with_alt` is set to

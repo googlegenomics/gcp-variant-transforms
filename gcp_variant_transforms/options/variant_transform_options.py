@@ -89,7 +89,9 @@ class VcfReadOptions(VariantTransformsOptions):
               'extracted from header section of VCF files, but also from '
               'variants. This is useful when there are header fields in '
               'variants not defined in the header sections, or the definition '
-              'of the the header fields do not match the field values.'))
+              'of the the header fields do not match the field values. Note: '
+              'setting this flag or `--infer_annotation_types` incurs a '
+              'performance penalty of an extra pass over all variants.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -283,8 +285,11 @@ class AnnotationOptions(VariantTransformsOptions):
     parser.add_argument(
         '--infer_annotation_types',
         type='bool', default=False, nargs='?', const=True,
-        help=('If true, all annotation fields will have proper corresponding '
-              'types in BigQuery. By default, annotation fields are STRING.'))
+        help=('If true, all annotation fields will have BigQuery schema type '
+              'information inferred from the contents of the variants. By '
+              'default, annotation fields are STRING. Note: setting this flag '
+              'or `infer_headers` incurs a performance penalty of an extra '
+              'pass over all variants.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
