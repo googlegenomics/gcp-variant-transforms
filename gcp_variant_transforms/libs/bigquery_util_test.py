@@ -58,13 +58,18 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.get_python_type_from_bigquery_type, 'DUMMY')
 
   def test_get_bigquery_sanitized_field(self):
+    sanitizer = bigquery_util.BigQueryFieldSanitizer(None)
     self.assertEqual(u'valid',
-                     bigquery_util.get_bigquery_sanitized_field('valid'))
+                     sanitizer.get_sanitized_field('valid'))
     self.assertRaises(
         ValueError,
-        bigquery_util.get_bigquery_sanitized_field, '\x81DUMMY')
+        sanitizer.get_sanitized_field, '\x81DUMMY')
     self.assertEqual([1, 2],
-                     bigquery_util.get_bigquery_sanitized_field([1, 2]))
+                     sanitizer.get_sanitized_field([1, 2]))
+    self.assertEqual(
+        [1, bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT, 2],
+        sanitizer.get_sanitized_field([1, None, 2]))
+
+    sanitizer_2 = bigquery_util.BigQueryFieldSanitizer(-1)
     self.assertEqual([1, -1, 2],
-                     bigquery_util.get_bigquery_sanitized_field(
-                         [1, None, 2], null_numeric_value_replacement=-1))
+                     sanitizer_2.get_sanitized_field([1, None, 2]))

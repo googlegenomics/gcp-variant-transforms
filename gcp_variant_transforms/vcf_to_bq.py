@@ -273,7 +273,9 @@ def run(argv=None):
              update_schema_on_append=known_args.update_schema_on_append,
              allow_incompatible_records=known_args.allow_incompatible_records,
              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-             num_bigquery_write_shards=known_args.num_bigquery_write_shards))
+             num_bigquery_write_shards=known_args.num_bigquery_write_shards,
+             null_numeric_value_replacement=
+             known_args.null_numeric_value_replacement))
 
   result = pipeline.run()
   result.wait_until_finish()

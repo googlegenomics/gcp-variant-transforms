@@ -21,6 +21,8 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
+from gcp_variant_transforms.libs import bigquery_util
+
 
 class VariantTransformsOptions(object):
   """Base class for defining groups of options for Variant Transforms.
@@ -141,6 +143,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'It is recommended to use 20 for loading large inputs without '
               'merging. Use a smaller value (2 or 3) if both merging and '
               'optimize_for_large_inputs are enabled.'))
+    parser.add_argument(
+        '--null_numeric_value_replacement',
+        type=int,
+        default=bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+        help=('Value to use instead of null for numeric (float/int/long) lists.'
+              'For instance, [0, None, 1] will become '
+              '[0, `null_numeric_value_replacement`, 1].'))
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None

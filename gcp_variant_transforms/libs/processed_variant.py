@@ -282,7 +282,7 @@ class ProcessedVariantFactory(object):
               type=bigquery_util.get_bigquery_type_from_vcf_type(
                   field[_HeaderKeyConstants.TYPE]),
               mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-              description=bigquery_util.get_bigquery_sanitized_field(
+              description=bigquery_util.get_bigquery_sanitized_string(
                   field[_HeaderKeyConstants.DESC])))
 
     for annot_field in self._annotation_field_set:
@@ -292,7 +292,7 @@ class ProcessedVariantFactory(object):
           self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_descs = descriptions.VEP_DESCRIPTIONS
       annotation_record = bigquery.TableFieldSchema(
-          name=bigquery_util.get_bigquery_sanitized_field(annot_field),
+          name=bigquery_util.get_bigquery_sanitized_field_name(annot_field),
           type=bigquery_util.TableFieldConstants.TYPE_RECORD,
           mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
           description='List of {} annotations for this alternate.'.format(
@@ -304,7 +304,8 @@ class ProcessedVariantFactory(object):
           description='The ALT part of the annotation field.'))
       for annotation_name in annotation_names:
         annotation_record.fields.append(bigquery.TableFieldSchema(
-            name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
+            name=bigquery_util.get_bigquery_sanitized_field_name(
+                annotation_name),
             type=bigquery_util.TableFieldConstants.TYPE_STRING,
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
             description=annotation_descs.get(annotation_name, '')))

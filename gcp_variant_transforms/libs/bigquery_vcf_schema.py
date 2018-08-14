@@ -127,7 +127,7 @@ def generate_schema_from_header_fields(
             field[_HeaderKeyConstants.TYPE]),
         mode=bigquery_util.get_bigquery_mode_from_vcf_num(
             field[_HeaderKeyConstants.NUM]),
-        description=bigquery_util.get_bigquery_sanitized_field(
+        description=bigquery_util.get_bigquery_sanitized_string(
             field[_HeaderKeyConstants.DESC])))
   schema.fields.append(calls_record)
 
@@ -144,7 +144,7 @@ def generate_schema_from_header_fields(
             field[_HeaderKeyConstants.TYPE]),
         mode=bigquery_util.get_bigquery_mode_from_vcf_num(
             field[_HeaderKeyConstants.NUM]),
-        description=bigquery_util.get_bigquery_sanitized_field(
+        description=bigquery_util.get_bigquery_sanitized_string(
             field[_HeaderKeyConstants.DESC])))
     info_keys.add(key)
   if variant_merger:
