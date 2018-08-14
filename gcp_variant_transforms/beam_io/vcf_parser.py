@@ -63,6 +63,7 @@ class Variant(object):
               ):
     # type: (...) -> None
     """Initialize the ``Variant`` object.
+
     Args:
       reference_name: The reference on which this variant occurs (such as
         `chr20` or `X`).
@@ -164,6 +165,7 @@ class VariantCall(object):
   def __init__(self, name=None, genotype=None, phaseset=None, info=None):
     # type: (str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
+
     Args:
       name: The name of the call.
       genotype: The genotype of this variant call as specified by the VCF
@@ -263,6 +265,7 @@ class VcfParser(object):
 
   def _process_header_lines(self, header_lines):
     """Processes header lines from text source and initializes the parser.
+
     Note: this method will be automatically called by textio._TextSource().
     """
     if self._representative_header_lines:
@@ -295,6 +298,7 @@ class VcfParser(object):
   def _init_with_header(self, header_lines):
     # type: (List[str]) -> None
     """Initializes the parser specific settings with the given header_lines.
+
     Note: this method will be called by _process_header_lines().
     """
     raise NotImplementedError
@@ -302,6 +306,7 @@ class VcfParser(object):
   def _get_variant(self, data_line):
     # type: (str) -> Variant
     """Converts a single data_line of a VCF file into a Variant object.
+
     In case something goes wrong it must return a MalformedVcfRecord object.
     Note: this method will be called by next(), one line at a time.
     """
@@ -366,7 +371,7 @@ class PyVcfParser(VcfParser):
       yield self._current_line.encode('utf-8')
       # Making sure _get_variant() assigned a new value before consuming it.
       assert self._next_line_to_process is not None, (
-          'Internal error: A data line is requested to be processed more than' +
+          'Internal error: A data line is requested to be processed more than '
           'once. Please file a bug if you see this!')
 
   def _convert_to_variant(
@@ -376,6 +381,7 @@ class PyVcfParser(VcfParser):
       ):
     # type: (...) -> Variant
     """Converts the PyVCF record to a :class:`Variant` object.
+
     Args:
       record: An object containing info about a variant.
       formats: The PyVCF dict storing FORMAT extracted from the VCF header.
