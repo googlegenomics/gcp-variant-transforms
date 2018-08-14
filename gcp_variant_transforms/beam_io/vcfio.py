@@ -507,7 +507,11 @@ class _WriteVcfDataLinesFn(beam.DoFn):
 
 
 class WriteVcfDataLines(PTransform):
-  """A PTransform for writing VCF data lines."""
+  """A PTransform for writing VCF data lines.
 
+  This PTransform takes PCollection<`file_path`, `variants`> as input, and
+  writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
+  PCollection<`Variant`> as input, and writes all variants to the same file.
+  """
   def expand(self, pcoll):
     return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())

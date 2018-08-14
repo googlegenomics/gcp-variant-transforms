@@ -32,7 +32,6 @@ python -m gcp_variant_transforms.bq_to_vcf \
 """
 
 import logging
-import os
 import sys
 from datetime import datetime
 from typing import Iterable, List, Tuple  # pylint: disable=unused-import
@@ -80,8 +79,12 @@ def run(argv=None):
                       bq_to_vcf_temp_folder)
 
 
-def _bigquery_to_vcf_shards(known_args, options, bq_to_vcf_temp_folder):
-  # type: (argparse.Namespace, pipeline_options.PipelineOptions, str) -> None
+def _bigquery_to_vcf_shards(
+    known_args,  # type: argparse.Namespace
+    beam_pipeline_options,  # type: pipeline_options.PipelineOptions
+    bq_to_vcf_temp_folder  # type: str
+    ):
+  # type: (...) -> None
   """Runs BigQuery to VCF shards pipelines.
 
   It reads the variants from BigQuery table, groups a collection of variants
@@ -99,7 +102,7 @@ def _bigquery_to_vcf_shards(known_args, options, bq_to_vcf_temp_folder):
       validate=True,
       use_standard_sql=True)
 
-  with beam.Pipeline(options=options) as p:
+  with beam.Pipeline(options=beam_pipeline_options) as p:
     _ = (p | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
          | bigquery_to_variant.BigQueryToVariant()
          | densify_variants.DensifyVariants()
@@ -173,7 +176,7 @@ def _compose_vcf_shards_to_one(bucket, blob_prefix):
   new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')
   for blobs_chunk in (_break_list_in_chunks(blobs_to_be_composed,
                                             _MAX_NUM_OF_BLOBS_PER_COMPOSE)):
-    _, file_name = os.path.split(blobs_chunk[0].name)
+    _, file_name = filesystems.FileSystems.split(blobs_chunk[0].name)
     composed_file_name = ''.join([new_blob_prefix + file_name])
     output_file_blob = bucket.blob(composed_file_name)
     output_file_blob.content_type = 'text/plain'
