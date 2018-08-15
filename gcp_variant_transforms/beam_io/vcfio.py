@@ -19,10 +19,13 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
+from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
 from functools import partial
 
+import apache_beam as beam
 from apache_beam.coders import coders
 from apache_beam.io import filebasedsource
+from apache_beam.io import filesystems
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import textio
 from apache_beam.io.filesystem import CompressionTypes
@@ -365,3 +368,27 @@ class WriteToVcf(PTransform):
         coder=_ToVcfRecordCoder(),
         compression_type=self._compression_type,
         header=self._header)
+
+
+class _WriteVcfDataLinesFn(beam.DoFn):
+  """A function that writes variants to one VCF file."""
+
+  def __init__(self):
+    self._coder = _ToVcfRecordCoder()
+
+  def process(self, (file_path, variants), *args, **kwargs):
+    # type: (Tuple[str, List[Variant]]) -> None
+    with filesystems.FileSystems.create(file_path) as file_to_write:
+      for variant in variants:
+        file_to_write.write(self._coder.encode(variant))
+
+
+class WriteVcfDataLines(PTransform):
+  """A PTransform for writing VCF data lines.
+
+  This PTransform takes PCollection<`file_path`, `variants`> as input, and
+  writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
+  PCollection<`Variant`> as input, and writes all variants to the same file.
+  """
+  def expand(self, pcoll):
+    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())
