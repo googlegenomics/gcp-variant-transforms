@@ -120,11 +120,6 @@
        - "chrY"
        - "y"
 -  partition:
-     partition_name: "chrM"
-     regions:
-       - "chrM"
-       - "m"
--  partition:
      partition_name: "residual"
      regions:
        - "residual"
