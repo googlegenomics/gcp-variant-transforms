@@ -14,10 +14,13 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
-import re
+import logging
 import math
+import re
 import sys
 from typing import List, Tuple  # pylint: disable=unused-import
+
+from google.cloud import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
 
@@ -96,6 +99,35 @@ def parse_table_reference(input_table):
           table_re_match.group('dataset'),
           table_re_match.group('table'))
 
+
+def label_tables(output_table, partitioner):
+  # type: (str, VariantPartition) -> None
+  """Adds labels to the freshly created BigQuery tables."""
+  output_table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', output_table)
+  if not output_table_re_match:
+    raise ValueError('Expected a table reference (PROJECT:DATASET.TABLE) '
+                     'instead of {}.'.format(output_table))
+  project_id = output_table_re_match.group('project')
+  dataset_id = output_table_re_match.group('dataset')
+  table_prefix = output_table_re_match.group('table')
+
+  client = bigquery.Client(project=project_id)
+  for i in range(partitioner.get_num_partitions()):
+    if not partitioner.should_keep_partition(i):
+      continue
+    table_id = table_prefix + '_' + partitioner.get_partition_name(i)
+    table = client.get_table(client.dataset(dataset_id).table(table_id))
+
+    if table.labels != {}:
+      logging.warning('Table %s has some labels which might be erased: %s',
+                      table_id, table.labels)
+    table.labels = partitioner.get_partition_labels(i)
+    table = client.update_table(table, ['labels'])  # API request
+    if table.labels != partitioner.get_partition_labels(i):
+      logging.warning('Some of the labels were not added to the table %s, '
+                      'expected %s, got %s', table_id,
+                      partitioner.get_partition_labels(i), table.labels)
 
 def get_bigquery_sanitized_field_name(field_name):
   # type: (str) -> str

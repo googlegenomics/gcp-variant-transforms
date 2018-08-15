@@ -47,6 +47,7 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
@@ -280,6 +281,8 @@ def run(argv=None):
 
   metrics_util.log_all_counters(result)
 
+  if partitioner and not partitioner.should_flatten():
+    bigquery_util.label_tables(known_args.output_table, partitioner)
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)

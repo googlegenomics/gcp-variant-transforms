@@ -53,7 +53,7 @@ _REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
 # A special literal for identifying residual partition's region name.
 _RESIDUAL_REGION_LITERAL = 'residual'
 _UNDEFINED_PARTITION_INDEX = -1
-
+_LABEL_KEY_PREFIX = 'label-'
 
 class _ChromosomePartitioner(object):
   """Assigns partition indices to multiple regions inside a chromosome.
@@ -116,6 +116,7 @@ class VariantPartition(object):
     self._should_keep_residual_partition = False
     self._ref_name_to_partitions_map = defaultdict(_ChromosomePartitioner)
     self._partition_names = {}
+    self._labels = {}
 
     if config_file_path:
       self._config_file_path_given = True
@@ -175,6 +176,12 @@ class VariantPartition(object):
       return (len(regions) == 1 and
               regions[0].strip().lower() == _RESIDUAL_REGION_LITERAL)
 
+    def _convert_to_label(region):
+      # type: (str) -> str
+      """Converts a region string to a valid label value."""
+      # Labels can contain only lowercase, numeric, underscore, and dashe.
+      return re.sub(r'[^a-z0-9\-_]', '', region.lower().replace(':', '-'))
+
     partition_configs = self._validate_config(config_file_path)
 
     self._num_partitions = len(partition_configs)
@@ -183,12 +190,17 @@ class VariantPartition(object):
       self._partition_names[partition_index] = (
           partition.get('partition_name').strip())
       regions = partition.get('regions', None)
+      labels_dict = {}
+      label_index = 0
 
       if _is_residual_partition(regions):
         if self._residual_partition_index != _UNDEFINED_PARTITION_INDEX:
           raise ValueError('There must be only one residual partition.')
         self._residual_partition_index = partition_index
         self._should_keep_residual_partition = True
+        labels_dict[_LABEL_KEY_PREFIX +
+                    str(label_index)] = _RESIDUAL_REGION_LITERAL
+        self._labels[partition_index] = labels_dict
         continue
 
       for r in regions:
@@ -205,6 +217,10 @@ class VariantPartition(object):
           end = sys.maxint
         self._ref_name_to_partitions_map[ref_name].add_region(
             start, end, partition_index)
+        # Add this region as a label to the label dict.
+        labels_dict[_LABEL_KEY_PREFIX + str(label_index)] = _convert_to_label(r)
+        label_index += 1
+      self._labels[partition_index] = labels_dict
 
     if self._residual_partition_index == _UNDEFINED_PARTITION_INDEX:
       # We add an extra dummy partition for residuals.
@@ -300,5 +316,16 @@ class VariantPartition(object):
             'Given partition index {} is outside of expected range: '
             '[0, {}]'.format(partition_index, self._num_partitions))
       return self._partition_names[partition_index]
+    else:
+      return None
+
+  def get_partition_labels(self, partition_index):
+    # type: (int) -> Dict[str, str]
+    if self._config_file_path_given:
+      if partition_index >= self._num_partitions or partition_index < 0:
+        raise ValueError(
+            'Given partition index {} is outside of expected range: '
+            '[0, {}]'.format(partition_index, self._num_partitions))
+      return self._labels[partition_index]
     else:
       return None
