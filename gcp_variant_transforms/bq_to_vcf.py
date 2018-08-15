@@ -144,7 +144,9 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
       pipeline. The files written will begin with this prefix, followed by the
       `file_name`.
   """
-  file_path = '/'.join([file_path_prefix, file_name])
+  # pylint: disable=redefined-outer-name,reimported
+  from apache_beam.io import filesystems
+  file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
 
 
