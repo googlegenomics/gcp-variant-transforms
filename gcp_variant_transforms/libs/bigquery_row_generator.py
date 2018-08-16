@@ -18,10 +18,11 @@ from __future__ import absolute_import
 
 import copy
 import json
-from typing import Dict, Any  # pylint: disable=unused-import
+from typing import Any, Dict  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
@@ -35,6 +36,7 @@ _MAX_BIGQUERY_ROW_SIZE_BYTES = 10 * 1024 * 1024 - 10 * 1024
 # Number of bytes to add to the object size when concatenating calls (i.e.
 # to account for ", "). We use 5 bytes to be conservative.
 _JSON_CONCATENATION_OVERHEAD_BYTES = 5
+_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
 
 class BigQueryRowGenerator(object):
@@ -45,10 +47,13 @@ class BigQueryRowGenerator(object):
       schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
       conflict_resolver=None,
       # type: vcf_field_conflict_resolver.ConflictResolver
+      null_numeric_value_replacement=None  # type: int
       ):
     # type: (...) -> None
     self._schema_descriptor = schema_descriptor
     self._conflict_resolver = conflict_resolver
+    self._bigquery_field_sanitizer = bigquery_sanitizer.FieldSanitizer(
+        null_numeric_value_replacement)
 
   def get_rows(self,
                variant,
@@ -124,7 +129,7 @@ class BigQueryRowGenerator(object):
     """
     call_record = {
         bigquery_util.ColumnKeyConstants.CALLS_NAME:
-            bigquery_util.get_bigquery_sanitized_field(call.name),
+            self._bigquery_field_sanitizer.get_sanitized_field(call.name),
         bigquery_util.ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
         bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE: call.genotype or []
     }
@@ -150,21 +155,21 @@ class BigQueryRowGenerator(object):
     }  # type: Dict[str, Any]
     if variant.names:
       row[bigquery_util.ColumnKeyConstants.NAMES] = (
-          bigquery_util.get_bigquery_sanitized_field(variant.names))
+          self._bigquery_field_sanitizer.get_sanitized_field(variant.names))
     if variant.quality is not None:
       row[bigquery_util.ColumnKeyConstants.QUALITY] = variant.quality
     if variant.filters:
       row[bigquery_util.ColumnKeyConstants.FILTER] = (
-          bigquery_util.get_bigquery_sanitized_field(variant.filters))
+          self._bigquery_field_sanitizer.get_sanitized_field(variant.filters))
     # Add alternate bases.
     row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES] = []
     for alt in variant.alternate_data_list:
       alt_record = {bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT:
                     alt.alternate_bases}
       for key, data in alt.info.iteritems():
-        alt_record[bigquery_util.get_bigquery_sanitized_field_name(key)] = (
+        alt_record[_BigQuerySchemaSanitizer.get_sanitized_field_name(key)] = (
             data if key in alt.annotation_field_names else
-            bigquery_util.get_bigquery_sanitized_field(data))
+            self._bigquery_field_sanitizer.get_sanitized_field(data))
       row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
     # Add info.
     for key, data in variant.non_alt_info.iteritems():
@@ -187,14 +192,15 @@ class BigQueryRowGenerator(object):
     # type: (...) -> (str, Any)
     if data is None:
       return None, None
-    field_name = bigquery_util.get_bigquery_sanitized_field_name(key)
+    field_name = _BigQuerySchemaSanitizer.get_sanitized_field_name(key)
     if not schema_descriptor.has_simple_field(field_name):
       raise ValueError('BigQuery schema has no such field: {}.\n'
                        'This can happen if the field is not defined in '
                        'the VCF headers, or is not inferred automatically. '
                        'Retry pipeline with --infer_headers.'
                        .format(field_name))
-    sanitized_field_data = bigquery_util.get_bigquery_sanitized_field(data)
+    sanitized_field_data = self._bigquery_field_sanitizer.get_sanitized_field(
+        data)
     field_schema = schema_descriptor.get_field_descriptor(field_name)
     field_data, is_compatible = self._check_and_resolve_schema_compatibility(
         field_schema, sanitized_field_data)

@@ -19,11 +19,13 @@ from __future__ import absolute_import
 from typing import Dict, Any  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
+
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
@@ -122,12 +124,12 @@ def generate_schema_from_header_fields(
     if key in (vcfio.GENOTYPE_FORMAT_KEY, vcfio.PHASESET_FORMAT_KEY):
       continue
     calls_record.fields.append(bigquery.TableFieldSchema(
-        name=bigquery_util.get_bigquery_sanitized_field_name(key),
+        name=bigquery_sanitizer.SchemaSanitizer.get_sanitized_field_name(key),
         type=bigquery_util.get_bigquery_type_from_vcf_type(
             field[_HeaderKeyConstants.TYPE]),
         mode=bigquery_util.get_bigquery_mode_from_vcf_num(
             field[_HeaderKeyConstants.NUM]),
-        description=bigquery_util.get_bigquery_sanitized_field(
+        description=bigquery_sanitizer.SchemaSanitizer.get_sanitized_string(
             field[_HeaderKeyConstants.DESC])))
   schema.fields.append(calls_record)
 
@@ -139,12 +141,12 @@ def generate_schema_from_header_fields(
         proc_variant_factory.info_is_in_alt_bases(key)):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
-        name=bigquery_util.get_bigquery_sanitized_field_name(key),
+        name=bigquery_sanitizer.SchemaSanitizer.get_sanitized_field_name(key),
         type=bigquery_util.get_bigquery_type_from_vcf_type(
             field[_HeaderKeyConstants.TYPE]),
         mode=bigquery_util.get_bigquery_mode_from_vcf_num(
             field[_HeaderKeyConstants.NUM]),
-        description=bigquery_util.get_bigquery_sanitized_field(
+        description=bigquery_sanitizer.SchemaSanitizer.get_sanitized_string(
             field[_HeaderKeyConstants.DESC])))
     info_keys.add(key)
   if variant_merger:

@@ -30,10 +30,9 @@ In addition, the schema from Variant Transforms has the following properties:
   does not allow null values in repeated fields (the entire record can be null,
   but values within the record must each have a value). For instance, if a
   VCF INFO field is `1,.,2`, we cannot load `1,null,2` to BigQuery and need to
-  use a numeric replacement for the null value. The replacement value is
-  currently set to `-2^31` (equal to `-2147483648`).
-  [Issue #68](https://github.com/googlegenomics/gcp-variant-transforms/issues/68)
-  tracks the feature to make this value configurable. The alternative is to
-  convert such values to a string and use `.` to represent the null value.
+  use a numeric replacement for the null value. By default, the replacement
+  value is set to `-2^31` (equal to `-2147483648`). You can also use
+  `--null_numeric_value_replacement` to customize this value. The alternative is
+  to convert such values to a string and use `.` to represent the null value.
   To do this, please change the header to specify the type as `String`.
 

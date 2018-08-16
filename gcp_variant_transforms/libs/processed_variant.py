@@ -35,6 +35,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
 
@@ -43,6 +44,7 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
 
 # Counter names
@@ -278,11 +280,11 @@ class ProcessedVariantFactory(object):
         if (field[_HeaderKeyConstants.NUM] ==
             vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
           alternate_bases_record.fields.append(bigquery.TableFieldSchema(
-              name=bigquery_util.get_bigquery_sanitized_field_name(key),
+              name=_BigQuerySchemaSanitizer.get_sanitized_field_name(key),
               type=bigquery_util.get_bigquery_type_from_vcf_type(
                   field[_HeaderKeyConstants.TYPE]),
               mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-              description=bigquery_util.get_bigquery_sanitized_field(
+              description=_BigQuerySchemaSanitizer.get_sanitized_string(
                   field[_HeaderKeyConstants.DESC])))
 
     for annot_field in self._annotation_field_set:
@@ -292,7 +294,7 @@ class ProcessedVariantFactory(object):
           self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_descs = descriptions.VEP_DESCRIPTIONS
       annotation_record = bigquery.TableFieldSchema(
-          name=bigquery_util.get_bigquery_sanitized_field(annot_field),
+          name=_BigQuerySchemaSanitizer.get_sanitized_field_name(annot_field),
           type=bigquery_util.TableFieldConstants.TYPE_RECORD,
           mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
           description='List of {} annotations for this alternate.'.format(
@@ -304,7 +306,8 @@ class ProcessedVariantFactory(object):
           description='The ALT part of the annotation field.'))
       for annotation_name in annotation_names:
         annotation_record.fields.append(bigquery.TableFieldSchema(
-            name=bigquery_util.get_bigquery_sanitized_field(annotation_name),
+            name=_BigQuerySchemaSanitizer.get_sanitized_field_name(
+                annotation_name),
             type=bigquery_util.TableFieldConstants.TYPE_STRING,
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
             description=annotation_descs.get(annotation_name, '')))
