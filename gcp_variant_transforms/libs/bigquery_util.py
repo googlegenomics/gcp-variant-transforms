@@ -15,11 +15,7 @@
 """Constants and simple utility functions related to BigQuery."""
 
 import re
-import math
-import sys
-from typing import List, Optional, Tuple  # pylint: disable=unused-import
-
-from gcp_variant_transforms.beam_io import vcfio
+from typing import Tuple  # pylint: disable=unused-import
 
 
 class ColumnKeyConstants(object):
@@ -68,15 +64,6 @@ _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
     TableFieldConstants.TYPE_BOOLEAN: bool,
 }
 
-# Prefix to use when the first character of the field name is not [a-zA-Z]
-# as required by BigQuery.
-_FALLBACK_FIELD_NAME_PREFIX = 'field_'
-
-# A big number to represent infinite float values. The division by 10 is to
-# prevent unintentional overflows when doing subsequent operations.
-_INF_FLOAT_VALUE = sys.float_info.max / 10
-_DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -2 ^ 31
-
 
 def parse_table_reference(input_table):
   # type: (str) -> Tuple[str, str, str]
@@ -95,27 +82,6 @@ def parse_table_reference(input_table):
   return (table_re_match.group('project'),
           table_re_match.group('dataset'),
           table_re_match.group('table'))
-
-
-def get_bigquery_sanitized_field_name(field_name):
-  # type: (str) -> str
-  """Returns the sanitized field name according to BigQuery restrictions.
-
-  BigQuery field names must follow `[a-zA-Z][a-zA-Z0-9_]*`. This method converts
-  any unsupported characters to an underscore. Also, if the first character does
-  not match `[a-zA-Z]`, it prepends ``_FALLBACK_FIELD_NAME_PREFIX`` to the name.
-
-  Args:
-    field_name (str): Name of the field to sanitize.
-  Returns:
-    Sanitized field name with unsupported characters replaced with an
-    underscore. It also prepends the name with ``_FALLBACK_FIELD_NAME_PREFIX``
-    if the first character does not match `[a-zA-Z]`.
-  """
-  assert field_name  # field_name must not be empty by this stage.
-  if not re.match('[a-zA-Z]', field_name[0]):
-    field_name = _FALLBACK_FIELD_NAME_PREFIX + field_name
-  return re.sub('[^a-zA-Z0-9_]', '_', field_name)
 
 
 def get_bigquery_type_from_vcf_type(vcf_type):
@@ -140,139 +106,3 @@ def get_python_type_from_bigquery_type(bigquery_type):
   if bigquery_type not in _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP:
     raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
   return _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP[bigquery_type]
-
-
-def get_bigquery_sanitized_string(input_str):
-  """Returns a unicode string as BigQuery API does not support UTF-8 strings."""
-  try:
-    return (input_str if isinstance(input_str, unicode)
-            else input_str.decode('utf-8'))
-  except UnicodeDecodeError:
-    raise ValueError('input_str is not UTF-8: %s ' % (input_str))
-
-
-class BigQueryFieldSanitizer(object):
-  """Class to sanitize field according to BigQuery restrictions."""
-
-  def __init__(self, null_numeric_value_replacement):
-    # type: (Optional[int]) -> None
-    """Initializes a `BigQueryFieldSanitizer`.
-
-    Args:
-      null_numeric_value_replacement: Value to use instead of null for
-        numeric (float/int/long) lists. For instance, [0, None, 1] will become
-        [0, `null_numeric_value_replacement`, 1].
-    """
-    self._null_numeric_value_replacement = (
-        null_numeric_value_replacement or
-        _DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT)
-
-  def get_sanitized_field(self, field):
-    # type: (Any) ->  Any
-    """Returns sanitized field according to BigQuery restrictions.
-
-    This method only sanitizes lists and strings. It returns the same `field`
-    for all other types (including None).
-
-    For lists, null values are replaced with reasonable defaults since the
-    BigQuery API does not allow null values in lists (note that the entire
-    list is allowed to be null). For instance, [0, None, 1] becomes
-    [0, `null_numeric_value_replacement`, 1].
-    Null value replacements are:
-      - `False` for bool.
-      - `.` for string (null string values should not exist in Variants parsed
-        using PyVCF though).
-      - `null_numeric_value_replacement` for float/int/long.
-
-    For strings, it returns its unicode representation. The BigQuery API does
-    not support strings that are UTF-8 encoded.
-
-    Args:
-      field: Field to sanitize. It can be of any type.
-
-    Raises:
-      ValueError: If the field could not be sanitized (e.g. unsupported types in
-        lists).
-    """
-    if not field:
-      return field
-    if isinstance(field, basestring):
-      return self._get_sanitized_string(field)
-    elif isinstance(field, float):
-      return self._get_sanitized_float(field)
-    elif isinstance(field, list):
-      return self._get_sanitized_list(field)
-    else:
-      return field
-
-  def _get_sanitized_list(self, input_list):
-    # type: (List) -> List
-    """Returns sanitized list according to BigQuery restrictions.
-
-    Null values are replaced with reasonable defaults since the
-    BigQuery API does not allow null values in lists (note that the entire
-    list is allowed to be null). For instance, [0, None, 1] becomes
-    [0, `null_numeric_value_replacement`, 1].
-    Null value replacements are:
-      - `False` for bool.
-      - `.` for string (null string values should not exist in Variants parsed
-        using PyVCF though).
-      - `null_numeric_value_replacement` for float/int/long.
-    Lists that contain strings are also sanitized according to the
-    `_get_sanitized_string` method.
-
-    Args:
-      input_list: List to sanitize.
-
-    Raises:
-      ValueError: If a list contains unsupported values. Supported types are
-        basestring, bool, int, long, and float.
-    """
-    null_replacement_value = None
-    for i in input_list:
-      if i is None:
-        continue
-      if isinstance(i, basestring):
-        null_replacement_value = vcfio.MISSING_FIELD_VALUE
-      elif isinstance(i, bool):
-        null_replacement_value = False
-      elif isinstance(i, (int, long, float)):
-        null_replacement_value = self._null_numeric_value_replacement
-      else:
-        raise ValueError('Unsupported value for input: %s' % str(i))
-      break  # Assumption is that all fields have the same type.
-    if null_replacement_value is None:  # Implies everything was None.
-      return []
-    sanitized_list = []
-    for i in input_list:
-      if i is None:
-        i = null_replacement_value
-      elif isinstance(i, basestring):
-        i = get_bigquery_sanitized_string(i)
-      elif isinstance(i, float):
-        sanitized_float = self._get_sanitized_float(i)
-        i = (sanitized_float if sanitized_float is not None
-             else null_replacement_value)
-      sanitized_list.append(i)
-    return sanitized_list
-
-  def _get_sanitized_float(self, input_float):
-    """Returns a sanitized float for BigQuery.
-
-    This method replaces INF and -INF with positive and negative numbers with
-    huge absolute values, and replaces NaN with None. It returns the same value
-    for all other values.
-    """
-    if input_float == float('inf'):
-      return _INF_FLOAT_VALUE
-    elif input_float == float('-inf'):
-      return -_INF_FLOAT_VALUE
-    elif math.isnan(input_float):
-      return None
-    else:
-      return input_float
-
-  def _get_sanitized_string(self, input_str):
-    # type: (str) -> unicode
-    """Returns a unicode string."""
-    return get_bigquery_sanitized_string(input_str)

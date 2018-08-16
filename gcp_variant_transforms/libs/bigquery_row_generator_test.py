@@ -25,7 +25,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_row_generator
-from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -281,9 +281,13 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.FILTER: ['q10'],
         ColumnKeyConstants.CALLS: [],
-        'IIR': [0, 1, bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT],
+        'IIR': [0,
+                1,
+                bigquery_sanitizer._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT],
         'IBR': [True, False, False],
-        'IFR': [0.1, 0.2, bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+        'IFR': [0.1,
+                0.2,
+                bigquery_sanitizer._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
                 0.4],
         'ISR': ['.', 'data1', 'data2']}
     self.assertEqual([expected_row],
@@ -329,9 +333,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.END_POSITION: 12,
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [
-            {'IF3': -bigquery_util._INF_FLOAT_VALUE, 'alt': 'A'},
+            {'IF3': -bigquery_sanitizer._INF_FLOAT_VALUE, 'alt': 'A'},
             {'IF3': None, 'alt': 'C'},
-            {'IF3': bigquery_util._INF_FLOAT_VALUE, 'alt': 'T'},
+            {'IF3': bigquery_sanitizer._INF_FLOAT_VALUE, 'alt': 'T'},
             {'IF3': 1.2, 'alt': 'TC'}
         ],
         ColumnKeyConstants.CALLS: [
@@ -339,12 +343,12 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
                 ColumnKeyConstants.CALLS_NAME: 'Sample1',
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
-                'GQ': bigquery_util._INF_FLOAT_VALUE
+                'GQ': bigquery_sanitizer._INF_FLOAT_VALUE
             }
         ],
-        'IF': bigquery_util._INF_FLOAT_VALUE,
-        'IFR': [-bigquery_util._INF_FLOAT_VALUE,
-                bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+        'IF': bigquery_sanitizer._INF_FLOAT_VALUE,
+        'IFR': [-bigquery_sanitizer._INF_FLOAT_VALUE,
+                bigquery_sanitizer._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
                 1.2],
         'IF2': None
     }

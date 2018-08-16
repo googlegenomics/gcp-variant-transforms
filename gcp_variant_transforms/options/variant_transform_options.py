@@ -21,7 +21,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
-from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import bigquery_sanitizer
 
 
 class VariantTransformsOptions(object):
@@ -146,7 +146,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--null_numeric_value_replacement',
         type=int,
-        default=bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
+        default=bigquery_sanitizer._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT,
         help=('Value to use instead of null for numeric (float/int/long) lists.'
               'For instance, [0, None, 1] will become '
               '[0, `null_numeric_value_replacement`, 1].'))

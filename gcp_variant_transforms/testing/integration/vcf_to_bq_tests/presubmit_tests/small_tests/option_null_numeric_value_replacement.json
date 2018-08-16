@@ -3,7 +3,7 @@
     "test_name": "option-null-numeric-value-replacement",
     "table_name": "option_null_numeric_value_replacement",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
-    "null_numeric_value_replacement":100000,
+    "null_numeric_value_replacement": 100000,
     "split_alternate_allele_info_fields": false,
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],
