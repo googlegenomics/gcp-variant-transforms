@@ -150,6 +150,8 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
         file_name, compression_type=self._compression_type) as file_to_read:
       while True:
         record = file_to_read.readline()
+        while not record or not record.strip():  # Skip empty lines.
+          record = file_to_read.readline()
         if record and record.startswith('#'):
           yield record
         else:

@@ -18,15 +18,8 @@ import unittest
 
 from gcp_variant_transforms.libs import bigquery_util
 
-class BigqueryUtilTest(unittest.TestCase):
 
-  def test_get_bigquery_sanitized_field_name(self):
-    self.assertEqual('AA',
-                     bigquery_util.get_bigquery_sanitized_field_name('AA'))
-    self.assertEqual('field__AA',
-                     bigquery_util.get_bigquery_sanitized_field_name('_AA'))
-    self.assertEqual('field_1A1A',
-                     bigquery_util.get_bigquery_sanitized_field_name('1A1A'))
+class BigqueryUtilTest(unittest.TestCase):
 
   def test_get_bigquery_type_from_vcf_type(self):
     self.assertEqual(bigquery_util.TableFieldConstants.TYPE_INTEGER,
@@ -56,15 +49,3 @@ class BigqueryUtilTest(unittest.TestCase):
     self.assertRaises(
         ValueError,
         bigquery_util.get_python_type_from_bigquery_type, 'DUMMY')
-
-  def test_get_bigquery_sanitized_field(self):
-    self.assertEqual(u'valid',
-                     bigquery_util.get_bigquery_sanitized_field('valid'))
-    self.assertRaises(
-        ValueError,
-        bigquery_util.get_bigquery_sanitized_field, '\x81DUMMY')
-    self.assertEqual([1, 2],
-                     bigquery_util.get_bigquery_sanitized_field([1, 2]))
-    self.assertEqual([1, -1, 2],
-                     bigquery_util.get_bigquery_sanitized_field(
-                         [1, None, 2], null_numeric_value_replacement=-1))

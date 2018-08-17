@@ -19,213 +19,33 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
-from typing import Dict, Iterable, List, Optional  # pylint: disable=unused-import
-import logging
-from collections import namedtuple
+from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
 from functools import partial
 
-import vcf
-
+import apache_beam as beam
 from apache_beam.coders import coders
 from apache_beam.io import filebasedsource
+from apache_beam.io import filesystems
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import textio
 from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
-__all__ = ['ReadFromVcf', 'ReadAllFromVcf', 'Variant', 'VariantCall',
-           'MalformedVcfRecord']
+from gcp_variant_transforms.beam_io import vcf_parser
 
-
-# Stores data about failed VCF record reads. `line` is the text line that
-# caused the failed read and `file_name` is the name of the file that the read
-# failed in.
-MalformedVcfRecord = namedtuple('MalformedVcfRecord',
-                                ['file_name', 'line', 'error'])
-MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
-PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
-END_INFO_KEY = 'END'  # The info key that explicitly specifies end of a record.
-GENOTYPE_FORMAT_KEY = 'GT'  # The genotype format key in a call.
-PHASESET_FORMAT_KEY = 'PS'  # The phaseset format key.
-DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
-                              # no 'PS' is present.
-MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
-
-
-class Variant(object):
-  """A class to store info about a genomic variant.
-
-  Each object corresponds to a single record in a VCF file.
-  """
-
-  def __init__(self,
-               reference_name=None,  # type: str
-               start=None,  # type: int
-               end=None,  # type: int
-               reference_bases=None,  # type: str
-               alternate_bases=None,  # type: List[str]
-               names=None,  # type: List[str]
-               quality=None,  # type: float
-               filters=None,  # type: List[str]
-               info=None,  # type: Dict[str, Any]
-               calls=None  # type: List[VariantCall]
-              ):
-    # type: (...) -> None
-    """Initialize the ``Variant`` object.
-
-    Args:
-      reference_name: The reference on which this variant occurs (such as
-        `chr20` or `X`).
-      start: The position at which this variant occurs (0-based). Corresponds to
-        the first base of the string of reference bases.
-      end: The end position (0-based) of this variant. Corresponds to the first
-        base after the last base in the reference allele.
-      reference_bases: The reference bases for this variant.
-      alternate_bases: The bases that appear instead of the reference bases.
-      names: Names for the variant, for example a RefSNP ID.
-      quality: Phred-scaled quality score (-10log10 prob(call is wrong)).
-        Higher values imply better quality.
-      filters: A list of filters (normally quality filters) this variant has
-        failed. `PASS` indicates this variant has passed all filters.
-      info: A map of additional variant information. The key is specified
-        in the VCF record and the value can be any type .
-      calls: The variant calls for this variant. Each one represents the
-        determination of genotype with respect to this variant.
-    """
-    self.reference_name = reference_name
-    self.start = start
-    self.end = end
-    self.reference_bases = reference_bases
-    self.alternate_bases = alternate_bases or []
-    self.names = names or []
-    self.quality = quality
-    self.filters = filters or []
-    self.info = info or {}
-    self.calls = calls or []
-
-  def __eq__(self, other):
-    return (isinstance(other, Variant) and
-            vars(self) == vars(other))
-
-  def __repr__(self):
-    return ', '.join(
-        [str(s) for s in [self.reference_name,
-                          self.start,
-                          self.end,
-                          self.reference_bases,
-                          self.alternate_bases,
-                          self.names,
-                          self.quality,
-                          self.filters,
-                          self.info,
-                          self.calls]])
-
-  def __lt__(self, other):
-    if not isinstance(other, Variant):
-      return NotImplemented
-
-    # Elements should first be sorted by reference_name, start, end.
-    # Ordering of other members is not important, but must be
-    # deterministic.
-    if self.reference_name != other.reference_name:
-      return self.reference_name < other.reference_name
-    elif self.start != other.start:
-      return self.start < other.start
-    elif self.end != other.end:
-      return self.end < other.end
-
-    self_vars = vars(self)
-    other_vars = vars(other)
-    for key in sorted(self_vars):
-      if self_vars[key] != other_vars[key]:
-        return self_vars[key] < other_vars[key]
-
-    return False
-
-  def __le__(self, other):
-    if not isinstance(other, Variant):
-      return NotImplemented
-
-    return self < other or self == other
-
-  def __ne__(self, other):
-    return not self == other
-
-  def __gt__(self, other):
-    if not isinstance(other, Variant):
-      return NotImplemented
-
-    return other < self
-
-  def __ge__(self, other):
-    if not isinstance(other, Variant):
-      return NotImplemented
-
-    return other <= self
-
-
-class VariantCall(object):
-  """A class to store info about a variant call.
-
-  A call represents the determination of genotype with respect to a particular
-  variant. It may include associated information such as quality and phasing.
-  """
-
-  def __init__(self, name=None, genotype=None, phaseset=None, info=None):
-    # type: (str, List[int], str, Dict[str, Any]) -> None
-    """Initialize the :class:`VariantCall` object.
-
-    Args:
-      name: The name of the call.
-      genotype: The genotype of this variant call as specified by the VCF
-        schema. The values are either `0` representing the reference, or a
-        1-based index into alternate bases. Ordering is only important if
-        `phaseset` is present. If a genotype is not called (that is, a `.` is
-        present in the GT string), -1 is used.
-      phaseset: If this field is present, this variant call's genotype ordering
-        implies the phase of the bases and is consistent with any other variant
-        calls in the same reference sequence which have the same phaseset value.
-        If the genotype data was phased but no phase set was specified, this
-        field will be set to `*`.
-      info: A map of additional variant call information. The key is specified
-        in the VCF record and the type of the value is specified by the VCF
-        header FORMAT.
-    """
-    self.name = name
-    self.genotype = genotype or []
-    self.phaseset = phaseset
-    self.info = info or {}
-
-  def __eq__(self, other):
-    return ((self.name, self.genotype, self.phaseset, self.info) ==
-            (other.name, other.genotype, other.phaseset, other.info))
-
-  def __lt__(self, other):
-    if self.name != other.name:
-      return self.name < other.name
-    elif self.genotype != other.genotype:
-      return self.genotype < other.genotype
-    elif self.phaseset != other.phaseset:
-      return self.phaseset < other.phaseset
-    else:
-      return self.info < other.info
-
-  def __le__(self, other):
-    return self < other or self == other
-
-  def __gt__(self, other):
-    return other < self
-
-  def __ge__(self, other):
-    return other <= self
-
-  def __ne__(self, other):
-    return not self == other
-
-  def __repr__(self):
-    return ', '.join(
-        [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
+# All other modules depend on vcfio for the following const values.
+# In order to keep the current setting we re-declared them here.
+MalformedVcfRecord = vcf_parser.MalformedVcfRecord
+MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
+PASS_FILTER = vcf_parser.PASS_FILTER
+END_INFO_KEY = vcf_parser.END_INFO_KEY
+GENOTYPE_FORMAT_KEY = vcf_parser.GENOTYPE_FORMAT_KEY
+PHASESET_FORMAT_KEY = vcf_parser.PHASESET_FORMAT_KEY
+DEFAULT_PHASESET_VALUE = vcf_parser.DEFAULT_PHASESET_VALUE
+MISSING_GENOTYPE_VALUE = vcf_parser.MISSING_GENOTYPE_VALUE
+Variant = vcf_parser.Variant
+VariantCall = vcf_parser.VariantCall
 
 
 class _ToVcfRecordCoder(coders.Coder):
@@ -382,7 +202,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    record_iterator = _VcfSource._VcfRecordIterator(
+    record_iterator = vcf_parser.PyVcfParser(
         file_name,
         range_tracker,
         self._pattern,
@@ -393,180 +213,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
         skip_header_lines=0)
 
     # Convert iterator to generator to abstract behavior
-    for line in record_iterator:
-      yield line
-
-  class _VcfRecordIterator(object):
-    """An Iterator for processing a single VCF file."""
-
-    def __init__(self,
-                 file_name,  # type: str
-                 range_tracker,  # type: range_trackers.OffsetRangeTracker
-                 file_pattern,  # type: str
-                 compression_type,  # type: str
-                 allow_malformed_records,  # type: bool
-                 representative_header_lines=None,  # type:  List[str]
-                 **kwargs  # type: **str
-                ):
-      # type: (...) -> None
-      # If `representative_header_lines` is given, header lines in `file_name`
-      # are ignored.
-      self._header_lines = []
-      self._representative_header_lines = representative_header_lines
-      self._last_record = None
-      self._file_name = file_name
-      self._allow_malformed_records = allow_malformed_records
-
-      text_source = textio._TextSource(
-          file_pattern,
-          0,  # min_bundle_size
-          compression_type,
-          True,  # strip_trailing_newlines
-          coders.StrUtf8Coder(),  # coder
-          validate=False,
-          header_processor_fns=(lambda x: x.startswith('#'),
-                                self._store_header_lines),
-          **kwargs)
-
-      self._text_lines = text_source.read_records(self._file_name,
-                                                  range_tracker)
-      try:
-        self._vcf_reader = vcf.Reader(fsock=self._create_generator())
-      except SyntaxError as e:
-        raise ValueError(
-            'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
-
-    def _store_header_lines(self, header_lines):
-      if self._representative_header_lines:
-        # Replace header lines with given representative header lines.
-        # We need to keep the last line of the header from the file because it
-        # contains the sample IDs, which is unique per file.
-        self._header_lines = (
-            self._representative_header_lines + header_lines[-1:])
-      else:
-        self._header_lines = header_lines
-
-    def _create_generator(self):
-      header_processed = False
-      for text_line in self._text_lines:
-        if not header_processed and self._header_lines:
-          for header in self._header_lines:
-            self._last_record = header
-            yield self._last_record
-          header_processed = True
-        # PyVCF has explicit str() calls when parsing INFO fields, which fails
-        # with UTF-8 decoded strings. Encode the line back to UTF-8.
-        self._last_record = text_line.encode('utf-8')
-        yield self._last_record
-
-    def __iter__(self):
-      return self
-
-    def next(self):
-      try:
-        record = next(self._vcf_reader)
-        return self._convert_to_variant_record(record, self._vcf_reader.formats)
-      except (LookupError, ValueError) as e:
-        if self._allow_malformed_records:
-          logging.warning('VCF record read failed in %s for line %s: %s',
-                          self._file_name, self._last_record, str(e))
-          return MalformedVcfRecord(self._file_name, self._last_record, str(e))
-
-        raise ValueError('Invalid record in VCF file. Error: %s' % str(e))
-
-    def _convert_to_variant_record(
-        self,
-        record,  # type: vcf.model._Record
-        formats  # type: Dict[str, vcf.parser._Format]
-        ):
-      # type: (...) -> Variant
-      """Converts the PyVCF record to a :class:`Variant` object.
-
-      Args:
-        record: An object containing info about a variant.
-        formats: The PyVCF dict storing FORMAT extracted from the VCF header.
-          The key is the FORMAT key and the value is
-          :class:`~vcf.parser._Format`.
-
-      Returns:
-        A :class:`Variant` object from the given record.
-
-      Raises:
-        ValueError: if ``record`` is semantically invalid.
-      """
-      return Variant(
-          reference_name=record.CHROM,
-          start=record.start,
-          end=self._get_variant_end(record),
-          reference_bases=(
-              record.REF if record.REF != MISSING_FIELD_VALUE else None),
-          alternate_bases=self._get_variant_alternate_bases(record),
-          names=record.ID.split(';') if record.ID else [],
-          quality=record.QUAL,
-          filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,
-          info=self._get_variant_info(record),
-          calls=self._get_variant_calls(record, formats))
-
-    def _get_variant_end(self, record):
-      if END_INFO_KEY not in record.INFO:
-        return record.end
-      end_info_value = record.INFO[END_INFO_KEY]
-      if isinstance(end_info_value, (int, long)):
-        return end_info_value
-      if (isinstance(end_info_value, list) and len(end_info_value) == 1 and
-          isinstance(end_info_value[0], (int, long))):
-        return end_info_value[0]
-      else:
-        raise ValueError('Invalid END INFO field in record: {}'.format(
-            self._last_record))
-
-    def _get_variant_alternate_bases(self, record):
-      # ALT fields are classes in PyVCF (e.g. Substitution), so need convert
-      # them to their string representations.
-      return [str(r) for r in record.ALT if r] if record.ALT else []
-
-    def _get_variant_info(self, record):
-      info = {}
-      for k, v in record.INFO.iteritems():
-        if k != END_INFO_KEY:
-          info[k] = v
-
-      return info
-
-    def _get_variant_calls(self, record, formats):
-      calls = []
-      for sample in record.samples:
-        call = VariantCall()
-        call.name = sample.sample
-        for allele in sample.gt_alleles or [MISSING_GENOTYPE_VALUE]:
-          if allele is None:
-            allele = MISSING_GENOTYPE_VALUE
-          call.genotype.append(int(allele))
-        phaseset_from_format = (getattr(sample.data, PHASESET_FORMAT_KEY)
-                                if PHASESET_FORMAT_KEY in sample.data._fields
-                                else None)
-        # Note: Call is considered phased if it contains the 'PS' key regardless
-        # of whether it uses '|'.
-        if phaseset_from_format or sample.phased:
-          call.phaseset = (str(phaseset_from_format) if phaseset_from_format
-                           else DEFAULT_PHASESET_VALUE)
-        for field in sample.data._fields:
-          # Genotype and phaseset (if present) are already included.
-          if field in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
-            continue
-          data = getattr(sample.data, field)
-          # Convert single values to a list for cases where the number of fields
-          # is unknown. This is to ensure consistent types across all records.
-          # Note: this is already done for INFO fields in PyVCF.
-          if (field in formats and
-              formats[field].num not in (0, 1) and
-              isinstance(data, (int, float, long, basestring, bool))):
-            data = [data]
-          call.info[field] = data
-        calls.append(call)
-
-      return calls
-
+    for record in record_iterator:
+      yield record
 
 class ReadFromVcf(PTransform):
   """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading VCF
@@ -720,3 +368,27 @@ class WriteToVcf(PTransform):
         coder=_ToVcfRecordCoder(),
         compression_type=self._compression_type,
         header=self._header)
+
+
+class _WriteVcfDataLinesFn(beam.DoFn):
+  """A function that writes variants to one VCF file."""
+
+  def __init__(self):
+    self._coder = _ToVcfRecordCoder()
+
+  def process(self, (file_path, variants), *args, **kwargs):
+    # type: (Tuple[str, List[Variant]]) -> None
+    with filesystems.FileSystems.create(file_path) as file_to_write:
+      for variant in variants:
+        file_to_write.write(self._coder.encode(variant))
+
+
+class WriteVcfDataLines(PTransform):
+  """A PTransform for writing VCF data lines.
+
+  This PTransform takes PCollection<`file_path`, `variants`> as input, and
+  writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
+  PCollection<`Variant`> as input, and writes all variants to the same file.
+  """
+  def expand(self, pcoll):
+    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())

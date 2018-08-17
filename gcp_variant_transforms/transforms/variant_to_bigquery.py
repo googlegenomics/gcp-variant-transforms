@@ -76,7 +76,8 @@ class VariantToBigQuery(beam.PTransform):
       update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      num_bigquery_write_shards=1  # type: int
+      num_bigquery_write_shards=1,  # type: int
+      null_numeric_value_replacement=None  # type: int
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -101,6 +102,10 @@ class VariantToBigQuery(beam.PTransform):
         will be omitted.
       num_bigquery_write_shards: If > 1, we will limit number of sources which
         are used for writing to the output BigQuery table.
+      null_numeric_value_replacement: the value to use instead of null for
+        numeric (float/int/long) lists. For instance, [0, None, 1] will become
+        [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
+        to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
     """
     self._output_table = output_table
     self._header_fields = header_fields
@@ -114,7 +119,8 @@ class VariantToBigQuery(beam.PTransform):
     self._bigquery_row_generator = bigquery_row_generator.BigQueryRowGenerator(
         bigquery_schema_descriptor.SchemaDescriptor(self._schema),
         vcf_field_conflict_resolver.FieldConflictResolver(
-            resolve_always=allow_incompatible_records))
+            resolve_always=allow_incompatible_records),
+        null_numeric_value_replacement)
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
