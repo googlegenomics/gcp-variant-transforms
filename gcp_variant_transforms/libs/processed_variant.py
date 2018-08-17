@@ -37,7 +37,7 @@ from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
-
+from gcp_variant_transforms.transforms import infer_headers
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
@@ -289,11 +289,10 @@ class ProcessedVariantFactory(object):
               description=bigquery_util.get_bigquery_sanitized_field(
                   field[_HeaderKeyConstants.DESC])))
 
+    annotation_info_type_keys = self.gen_annotation_info_type_keys()
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
-      annotation_names = annotation_parser.extract_annotation_names(
-          self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_descs = descriptions.VEP_DESCRIPTIONS
       annotation_record = bigquery.TableFieldSchema(
           name=bigquery_util.get_bigquery_sanitized_field(annot_field),
@@ -306,8 +305,7 @@ class ProcessedVariantFactory(object):
           type=bigquery_util.TableFieldConstants.TYPE_STRING,
           mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
           description='The ALT part of the annotation field.'))
-      gen_type_keys = self._type_keys_from_names(annotation_names, annot_field)
-      for annotation_name, type_key in zip(annotation_names, gen_type_keys):
+      for annotation_name, type_key in annotation_info_type_keys:
         if type_key in self._header_fields.infos:
           vcf_type = self._header_fields.infos[type_key][
               vcf_header_io.VcfParserHeaderKeyConstants.TYPE]
@@ -325,28 +323,20 @@ class ProcessedVariantFactory(object):
       alternate_bases_record.fields.append(annotation_record)
     return alternate_bases_record
 
-  def _type_keys_from_names(self, annotation_names, annot_field):
-    #  type: (List[str], str) -> str
-    for annotation_name in annotation_names:
-      type_key = vcf_header_io.BASE_TYPE_KEY.format(annot_field,
-                                                    annotation_name)
-      yield type_key
-
-  def gen_all_info_type_keys(self):
+  def gen_annotation_info_type_keys(self):
     #  type: () -> str
     """Generates all possible key IDs for annotation type info fields
 
     Yields:
       type_key: IDs for info fields added during inferring annotation types
     """
-    anno_alt_upper = annotation_parser.ANNOTATION_ALT.capitalize()
     for annot_field in self._annotation_field_set:
-      type_key = vcf_header_io.BASE_TYPE_KEY.format(annot_field, anno_alt_upper)
-      yield type_key
       annotation_names = annotation_parser.extract_annotation_names(
           self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
-      for type_key in self._type_keys_from_names(annotation_names, annot_field):
-        yield type_key
+      for name in annotation_names:
+        type_key = infer_headers.get_inferred_annotation_type_header_key()
+        type_key = type_key.format(annot_field, name)
+        yield name, type_key
 
   def info_is_in_alt_bases(self, info_field_name):
     # type: (str) -> bool

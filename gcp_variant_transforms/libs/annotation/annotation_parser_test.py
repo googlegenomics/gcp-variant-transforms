@@ -37,9 +37,6 @@ class AnnotationParserTest(unittest.TestCase):
     annotation_str = 'some desc Format: Allele|Consequence|IMPACT|SYMBOL'
     name_list = annotation_parser.extract_annotation_names(annotation_str)
     self.assertEqual(name_list, ['Consequence', 'IMPACT', 'SYMBOL'])
-    name_list = annotation_parser.extract_annotation_names(annotation_str,
-                                                           with_alt=True)
-    self.assertEqual(name_list, ['Allele', 'Consequence', 'IMPACT', 'SYMBOL'])
 
   def test_extract_annotation_names_error(self):
     annotation_str = 'some desc-Consequence-IMPACT-SYMBOL-Gene'

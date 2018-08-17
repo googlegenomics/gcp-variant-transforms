@@ -133,11 +133,13 @@ def generate_schema_from_header_fields(
 
   # Add info fields.
   info_keys = set()
+  info_type_keys_set = set(key for name, key in
+                           proc_variant_factory.gen_annotation_info_type_keys())
   for key, field in header_fields.infos.iteritems():
     # END info is already included by modifying the end_position.
     if (key == vcfio.END_INFO_KEY or
         proc_variant_factory.info_is_in_alt_bases(key) or
-        key in set(proc_variant_factory.gen_all_info_type_keys())):
+        key in info_type_keys_set):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=bigquery_util.get_bigquery_sanitized_field_name(key),

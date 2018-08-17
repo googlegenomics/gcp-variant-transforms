@@ -126,16 +126,18 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> pvalue.PCollection
+  annotation_fields_to_infer = []
+  if known_args.annotation_fields and known_args.infer_annotation_types:
+    annotation_fields_to_infer = known_args.annotation_fields
   inferred_headers = (
       _read_variants(pipeline, known_args)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
           pvalue.AsSingleton(merged_header),
-          known_args.annotation_fields,
+          annotation_fields_to_infer,
           known_args.allow_incompatible_records,
-          known_args.infer_headers,
-          known_args.infer_annotation_types))
+          known_args.infer_headers))
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()

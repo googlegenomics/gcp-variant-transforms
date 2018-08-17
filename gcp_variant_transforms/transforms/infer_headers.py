@@ -32,6 +32,7 @@ from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+_BASE_ANNOTATION_TYPE_KEY = '{}_{}_TYPE'
 
 # Alias for the header key/type constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
@@ -53,24 +54,20 @@ class _InferHeaderFields(beam.DoFn):
 
   def __init__(
       self,
-      annotation_fields=None,  # type: Union[None, List[str]]
+      annotation_fields_to_infer=None,  # type: Optional[List[str]]
       infer_headers=False,  # type: bool
-      infer_annotation_types=False  # type: bool
       ):
     """
     Args:
-      annotation_fields: list of info fields treated as annotation fields
-        (e.g. ['CSQ_VT'])
+      annotation_fields_to_infer: list of info fields treated as annotation
+        fields (e.g. ['CSQ_VT'])
       infer_headers: If true, header fields are inferred from variant data.
-      infer_annotation_type: If true, annotation field types are inferred from
-        variant data and stored as additional headers.
     """
     # type: (...) -> None
-    if annotation_fields is None:
-      annotation_fields = []
-    self._annotation_fields = annotation_fields
+    if annotation_fields_to_infer is None:
+      annotation_fields_to_infer = []
+    self._annotation_fields_to_infer = annotation_fields_to_infer
     self._infer_headers = infer_headers
-    self._infer_annotation_types = infer_annotation_types
 
   def _get_field_count(self, field_value):
     # type: (Union[List, bool, int, str]) -> Optional[int]
@@ -216,7 +213,7 @@ class _InferHeaderFields(beam.DoFn):
       field value.
     Args:
       variant: variant obj.
-      infos: dict of (info_key(str), :class:`Info`) for any info field in
+      infos: dict of (info_key, Info) for any info field in
         `variant` that is not defined in the header or the definition mismatches
         the field values.
       defined_headers: header fields defined in header section of VCF files.
@@ -249,7 +246,15 @@ class _InferHeaderFields(beam.DoFn):
               str(info_field_value), str(variant))
           infos[info_field_key] = corrected_info
 
-  def _infer_type_info_fields(self, variant, infos, defined_headers):
+  def _check_annotation_lists_lengths(self, names, values):
+    lengths = set(len(v) for v in values)
+    lengths.add(len(names))
+    if len(lengths) != 1:
+      error = ('Annotation lists have inconsistent lengths: {}.\nnames={}\n'
+               'values={}').format(lengths, names, values)
+      raise ValueError(error)
+
+  def _infer_annotation_type_info_fields(self, variant, infos, defined_headers):
     # type: (vcfio.Variant, Dict[str, Info], vcf_header_io.VcfHeader) -> None
     """Updates `infos` with inferred annotation type info fields.
 
@@ -261,23 +266,24 @@ class _InferHeaderFields(beam.DoFn):
     creation for each variant.
     Args:
       variant: variant obj.
-      infos: dict of (info_key(str), :class:`Info`) for any info field in
+      infos: dict of (info_key, Info) for any info field in
         `variant` that is not defined in the header or the definition mismatches
         the field values.
       defined_headers: header fields defined in header section of VCF files.
     """
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
         resolve_always=True)
-    for field in self._annotation_fields:
+    for field in self._annotation_fields_to_infer:
       if field not in variant.info:
         continue
-      annotation_headers = annotation_parser.extract_annotation_names(
+      annotation_names = annotation_parser.extract_annotation_names(
           defined_headers.infos[field][
-              vcf_header_io.VcfParserHeaderKeyConstants.DESC], with_alt=True)
+              vcf_header_io.VcfParserHeaderKeyConstants.DESC])
       annotation_values = [annotation_parser.extract_annotation_list_with_alt(
-          annotation) for annotation in variant.info[field]]
+          annotation)[1:] for annotation in variant.info[field]]
+      self._check_annotation_lists_lengths(annotation_names, annotation_values)
       annotation_values = zip(*annotation_values)
-      for header, values in zip(annotation_headers, annotation_values):
+      for name, values in zip(annotation_names, annotation_values):
         variant_merged_type = vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER
         for v in values:
           if v != '':
@@ -285,11 +291,12 @@ class _InferHeaderFields(beam.DoFn):
                 vcf_header_io.VcfParserHeaderKeyConstants.TYPE,
                 variant_merged_type,
                 self._get_field_type(v))
-        key_id = vcf_header_io.BASE_TYPE_KEY.format(field, header)
+        key_id = get_inferred_annotation_type_header_key().format(field, name)
         infos[key_id] = Info(key_id,
                              1,
                              variant_merged_type,
-                             '',  # NO_DESCRIPTION
+                             ('Inferred type field for annotation {}.'.format(
+                                 name)),
                              '',  # UNKNOWN_SOURCE
                              '')  # UNKNOWN_VERSION
 
@@ -304,15 +311,15 @@ class _InferHeaderFields(beam.DoFn):
       variant: variant obj.
       defined_headers: header fields defined in header section of VCF files.
     Returns:
-      infos: dict of (info_key(str), :class:`Info`) for any info field in
+      infos: dict of (info_key, Info) for any info field in
         `variant` that is not defined in the header or the definition mismatches
         the field values.
     """
     infos = {}
     if self._infer_headers:
       self._infer_standard_info_fields(variant, infos, defined_headers)
-    if self._infer_annotation_types:
-      self._infer_type_info_fields(variant, infos, defined_headers)
+    if self._annotation_fields_to_infer:
+      self._infer_annotation_type_info_fields(variant, infos, defined_headers)
     return infos
 
   def _infer_format_fields(self, variant, defined_headers):
@@ -327,11 +334,13 @@ class _InferHeaderFields(beam.DoFn):
       variant: variant obj.
       defined_headers: header fields defined in header section of VCF files.
     Returns:
-      A dict of (format_key(str), :class:`Format`) for any format key in
+      A dict of (format_key, Format) for any format key in
       `variant` that is not defined in the header or the definition mismatches
       the field values.
     """
     formats = {}
+    #Because this function can be called when --infer_headers is False, we may
+    #want to exit early. This does not drop all format fields.
     if not self._infer_headers:
       return formats
     for call in variant.calls:
@@ -384,11 +393,10 @@ class InferHeaderFields(beam.PTransform):
 
   def __init__(
       self,
-      defined_headers,  # type: Union[None, vcf_header_io.VcfHeader]
-      annotation_fields=None,  #type: Union[None, List[str]]
+      defined_headers,  # type: Optional[vcf_header_io.VcfHeader]
+      annotation_fields_to_infer=None,  #type: Optional[List[str]]
       allow_incompatible_records=False,  # type: bool
       infer_headers=False,  # type: bool
-      infer_annotation_types=False,  # type: bool
       ):
     """Initializes the transform.
     Args:
@@ -397,27 +405,22 @@ class InferHeaderFields(beam.PTransform):
         skip already defined header fields when infer undefined header fields.
         Also, it is used to find and further infer the fields with mismatched
         definition and value.
-      annotation_fields: list of info fields treated as annotation fields
-        (e.g. ['CSQ_VT'])
+      annotation_fields_to_infer: list of info fields treated as annotation
+        fields (e.g. ['CSQ', 'CSQ_VT'])
       allow_incompatible_records: If true, header definition with type mismatch
         (e.g., string vs float) are always resolved.
       infer_headers: If true, header fields are inferred from variant data.
-      infer_annotation_type: If true, annotation field types are inferred from
-        variant data and stored as additional headers.
-      TODO (jessime) add docs
     """
     self._defined_headers = defined_headers
-    self._annotation_fields = annotation_fields
+    self._annotation_fields_to_infer = annotation_fields_to_infer
     self._allow_incompatible_records = allow_incompatible_records
     self._infer_headers = infer_headers
-    self._infer_annotation_types = infer_annotation_types
 
   def expand(self, pcoll):
     return (pcoll
             | 'InferHeaderFields' >> beam.ParDo(
-                _InferHeaderFields(self._annotation_fields,
-                                   self._infer_headers,
-                                   self._infer_annotation_types),
+                _InferHeaderFields(self._annotation_fields_to_infer,
+                                   self._infer_headers),
                 self._defined_headers)
             # TODO(nmousavi): Modify the MergeHeaders to resolve 1 vs '.'
             # mismatch for headers extracted from variants.
@@ -429,3 +432,7 @@ class InferHeaderFields(beam.PTransform):
             | 'MergeHeaders' >> merge_headers.MergeHeaders(
                 split_alternate_allele_info_fields=True,
                 allow_incompatible_records=self._allow_incompatible_records))
+
+
+def get_inferred_annotation_type_header_key():
+  return _BASE_ANNOTATION_TYPE_KEY
