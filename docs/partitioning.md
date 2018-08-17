@@ -122,3 +122,39 @@ Using the `residual` partition you can make sure your output tables will include
 variants, you can simply remove the last partition from your config file. In
 that case you will have only 2 tables as output and variants that did not match
 to those two partitions will be dropped from the final output.
+
+#### Filtering Variants
+Partitioning can be used for filtering out unwanted variants from the output
+table, this will significantly reduce the cost of queries in cases where only a
+small region of genome is under study. By providing a config file that includes
+the details of the region of interest and does not have a residual partition
+the output BigQuery table will contain only the desired variants. This
+filtering not only reduces the cost of running Variant Transforms but also it
+will reduce the cost of running queries on the output table significantly.
+
+### Comparing Variant Transforms' Partitioning to BigQuery's Clustering
+BigQuery announced **[clustering](https://cloud.google.com/bigquery/docs/clustered-tables)** at GCPNEXT2018 ([a relevant blog post](https://medium.com/@hoffa/bigquery-optimized-cluster-your-tables-65e2f684594b)).
+This new feature can be used in addition/instead of Variant Transform's
+partitioning in order to reduce the cost of queries. By clustering your tables
+you can still run queries to process the entire dataset without modifying your
+existing queries. Also you can sort up to 4 nested columns, for example
+`CLUSTER BY reference_name, start_position, end_position`. Clustering can be
+very effective in reducing the costs, however, it has a few limitations:
+ * Clustering does not offer 'guarantees' on the cost (a best effort reduction).
+ * It needs a one time clustering step which can take a few hours for large datasets.
+ * If you append data to an existing table it will become partially sorted. you need to regularly re-clustering your table.
+
+On the other hand, Variant Transforms partitioning provides a cost guarantee.
+For example, by separating tables based on the `reference_name` you are
+guaranteed that each chromosome's query will only process variants of that
+chromosome. Also, you can append new rows to your existing tables and still
+enjoy the same guarantee.
+
+In our experimental studies,  we found out the most effective way to reduce the
+cost of queries, specially *the point lookup queries*, is a hybrid approach:
+specify the hotspots in the config file so that their variants end up in
+separate tables, but also add clustering to each table and sort based on
+`start_position` and `end_position` to further optimize your queries. This is
+a very effective strategy specially when having only 1 output table makes the
+clustering step very long and practically impossible.
+table for range queries.
