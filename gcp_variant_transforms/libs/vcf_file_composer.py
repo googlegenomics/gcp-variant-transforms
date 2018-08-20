@@ -25,30 +25,33 @@ from google.cloud import storage
 _MAX_NUM_OF_BLOBS_PER_COMPOSE = 32
 
 
-def compose_temp_files(project, output_file, bq_to_vcf_temp_folder):
-  # type: (str, str, str) -> None
-  """Composes intermediate files to one VCF file.
+def compose_vcf_data_files(project,  # type: str
+                           vcf_data_files_folder,  # type: str
+                           output_file,  # type: str
+                           delete=True  # type: bool
+                          ):
+  # type: (...) -> None
+  """Composes multiple VCF data files to one VCF data file.
 
-  It composes VCF data shards to one VCF data file and deletes the intermediate
-  VCF shards.
-  TODO(allieychen): Eventually, it further consolidates the meta information,
-  data header line, and the composed VCF data file into the `output_file`.
+  It composes VCF data shards to one VCF data file and deletes the original VCF
+  data files if `delete` is True.
 
   Args:
     project: The project name.
+    vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
-    bq_to_vcf_temp_folder: The folder that contains all BigQuery to VCF pipeline
-     temp files.
+    delete: If true, delete the original VCF data files.
   """
-  bucket_name, blob_prefix = gcsio.parse_gcs_path(bq_to_vcf_temp_folder)
+  bucket_name, blob_prefix = gcsio.parse_gcs_path(vcf_data_files_folder)
   client = storage.Client(project)
   bucket = client.get_bucket(bucket_name)
   multi_process_composer = MultiProcessComposer(project, bucket_name,
                                                 blob_prefix)
-  composed_vcf_data_file = multi_process_composer.run()
+  composed_vcf_data_file = multi_process_composer.get_composed_blob()
   output_file_blob = _create_blob(client, output_file)
   output_file_blob.rewrite(composed_vcf_data_file)
-  bucket.delete_blobs(bucket.list_blobs(prefix=blob_prefix))
+  if delete:
+    bucket.delete_blobs(bucket.list_blobs(prefix=blob_prefix))
 
 
 def _compose_files(project, bucket_name, blob_names, composite_name):
@@ -80,11 +83,9 @@ def _create_blob(client, file_path):
 class MultiProcessComposer(object):
   """Class to compose (a large number of) files in GCS in parallel."""
 
-  _NUM_PROCS = 63
-
   def __init__(self, project, bucket_name, blob_prefix):
     # type: (str, str, str) -> None
-    """Initialize a `MultiProcessComposer`.
+    """Initializes a `MultiProcessComposer`.
 
     This class composes all blobs that start with `blob_prefix` to one.
 
@@ -92,7 +93,7 @@ class MultiProcessComposer(object):
       project: The project name.
       bucket_name: The name of the bucket where the blob components and the new
         composite are saved.
-      blob_prefix: The prefix used to filter blobs. Only the VCF files with this
+      blob_prefix: The prefix used to filter blobs. Only the blobs with this
         prefix will be composed.
     """
     self._project = project
@@ -100,42 +101,42 @@ class MultiProcessComposer(object):
     self._blob_prefix = blob_prefix
     self._bucket = storage.Client(project).get_bucket(bucket_name)
 
-  def run(self):
+  def get_composed_blob(self):
     # type: () -> storage.Blob
     """Returns the final blob that all blobs composed to."""
-    return self._compose_vcf_shards_to_one(self._blob_prefix)
+    return self._compose_blobs_to_one(self._blob_prefix)
 
-  def _compose_vcf_shards_to_one(self, blob_prefix):
+  def _compose_blobs_to_one(self, blob_prefix):
     # type: (str) -> storage.Blob
-    """Composes multiple VCF shards in GCS to one.
+    """Composes multiple blobs with prefix `blob_prefix` in GCS to one.
 
     Note that Cloud Storage allows to compose up to 32 objects. This method
-    composes the VCF files recursively until there is only one file.
+    composes the blobs recursively until there is only one file.
 
     Args:
-      blob_prefix: the prefix used to filter blobs. Only the VCF files with this
+      blob_prefix: the prefix used to filter blobs. Only the files with this
         prefix will be composed.
 
     Returns:
-      The final blob that all VCFs composed to.
+      The final blob that all blobs with `blob_prefix` composed to.
     """
     blobs_to_be_composed = list(self._bucket.list_blobs(prefix=blob_prefix))
     if len(blobs_to_be_composed) == 1:
       return blobs_to_be_composed[0]
     new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')
 
-    proc_pool = multiprocessing.Pool(processes=self._NUM_PROCS)
+    proc_pool = multiprocessing.Pool()
     for blob_names in self._break_list_in_chunks(blobs_to_be_composed,
                                                  _MAX_NUM_OF_BLOBS_PER_COMPOSE):
       _, file_name = filesystems.FileSystems.split(blob_names[0])
-      new_blob_name = ''.join([new_blob_prefix + file_name])
+      new_blob_name = ''.join([new_blob_prefix, file_name])
       proc_pool.apply_async(func=_compose_files, args=(self._project,
                                                        self._bucket_name,
                                                        blob_names,
                                                        new_blob_name))
     proc_pool.close()
     proc_pool.join()
-    return self._compose_vcf_shards_to_one(new_blob_prefix)
+    return self._compose_blobs_to_one(new_blob_prefix)
 
   def _break_list_in_chunks(self, blob_list, chunk_size):
     # type: (List, int) -> Iterable[List[str]]

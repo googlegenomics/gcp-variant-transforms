@@ -44,7 +44,7 @@ from apache_beam.options import pipeline_options
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import bq_to_vcf_temp_files_composer
+from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import densify_variants
@@ -71,9 +71,12 @@ def run(argv=None):
       google_cloud_options.temp_location, shards_folder)
 
   _bigquery_to_vcf_shards(known_args, options, bq_to_vcf_temp_folder)
-  bq_to_vcf_temp_files_composer.compose_temp_files(google_cloud_options.project,
-                                                   known_args.output_file,
-                                                   bq_to_vcf_temp_folder)
+  vcf_file_composer.compose_vcf_data_files(google_cloud_options.project,
+                                           bq_to_vcf_temp_folder,
+                                           known_args.output_file)
+
+  # TODO(allieychen): Eventually, it further consolidates the meta information,
+  # data header line, and the composed VCF data file into the `output_file`.
 
 
 def _bigquery_to_vcf_shards(
