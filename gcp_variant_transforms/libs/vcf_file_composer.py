@@ -22,6 +22,7 @@ from apache_beam.io.gcp import gcsio
 
 from google.cloud import storage
 
+# Cloud Storage allows to compose up to 32 objects.
 _MAX_NUM_OF_BLOBS_PER_COMPOSE = 32
 
 
@@ -130,10 +131,9 @@ class MultiProcessComposer(object):
                                                  _MAX_NUM_OF_BLOBS_PER_COMPOSE):
       _, file_name = filesystems.FileSystems.split(blob_names[0])
       new_blob_name = ''.join([new_blob_prefix, file_name])
-      proc_pool.apply_async(func=_compose_files, args=(self._project,
-                                                       self._bucket_name,
-                                                       blob_names,
-                                                       new_blob_name))
+      proc_pool.apply_async(
+          func=_compose_files,
+          args=(self._project, self._bucket_name, blob_names, new_blob_name))
     proc_pool.close()
     proc_pool.join()
     return self._compose_blobs_to_one(new_blob_prefix)
