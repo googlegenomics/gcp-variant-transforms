@@ -1,52 +1,155 @@
-# Partitioning output tables
-
+# Reducing cost of queries on BigQuery
 The [pricing model of BigQuery](https://cloud.google.com/bigquery/pricing#queries)
 is based on the total data processed in the columns selected by each query
 regardless of filtering criteria specified by `WHERE` or `LIMIT` conditions.
-As a result, partitioning the output table can reduce query costs significantly
-if only a particular region of the genome is being processed.
+For example, if you want to process only variants of chromosome 1 in a table
+containing entire genome variants, you would write a query like:
 
-Let us elaborate this using a more concrete example. If you want to query
-variants in chromosome 1 from a BigQuery table that contains variants from
-the entire genome, you would write a query like:
 ```
 SELECT ...
 FROM imported_table
 WHERE reference_name = 'chr1' AND ...
 ```
 
-In the above example, BigQuery actually processes all variants even though the
-query only considers variants on chromosome 1. You would also get charged for
-the entire size of the columns accessed in the SELECT clause. With partitioning,
-the data would be split into smaller tables, each containing variants of one
-chromosome. In that case the above query can be written as:
-```
-SELECT ...
-FROM bigquery_table_chr1
-WHERE ...
-```
-The second query will cost a fraction of the first query as it only processes
-variants in chromosome 1.
+In this example BigQuery processes all variants even though the query is
+limited to the variants on chromosome 1. This query will cost the entire size
+of the columns being accessed in the SELECT clause, regardless of the `WHERE`
+clause. This extra cost can add up to a significant amount, specially if a few
+*hot spots* in the genome are being queried regularly.
 
-Note that partitioning can be done at a more fine grained level and does not have
-to be limited to chromosomes. For example, a partition can be defined as a
-region of interest on a particular chromosome which will be heavily queried.
-In the following section we will explain how you could use
-Variant Transforms to easily partition your output to match your future
-requirements.
+We are offering three solutions for situations like this: one solution is using
+BigQuery [clustering](https://cloud.google.com/bigquery/docs/clustered-tables),
+another solution is using Variant Transforms' native partitioning, and a third
+hybrid solution.
+
+## Solution 1: BigQuery clustering
+[BigQuery clustering](https://cloud.google.com/bigquery/docs/clustered-tables)
+is a technique for automatically organizing a table  based on the
+contents of one or more columns in the table’s schema. Clustered columns
+are used to colocate related data. More specifically, BigQuery sorts the data
+based on the values of the clustered columns and organizes the data into
+multiple blocks in BigQuery storage.
+
+Clustering can improve the performance of certain types of queries such as
+queries that use filter clauses and queries that aggregate data of clustered
+columns. When you submit such a query, BigQuery uses the sorted blocks to
+eliminate scans of unnecessary data. Similarly, performance of aggregation
+queries is improved because the sorted blocks colocate rows with similar values.
+For more information about clustering please refer to this
+[blog post](https://medium.com/@hoffa/bigquery-optimized-cluster-your-tables-65e2f684594b).
+
+As a concrete example, consider the following query which is finding all
+variants in *BRCA1* gene in a table that contains all
+[1000 genomes](https://en.wikipedia.org/wiki/1000_Genomes_Project) variants:
+
+```
+SELECT * from `1000genomes`
+WHERE reference_name = '17'
+  AND start_position >= 41197694
+  AND end_position <= 41276113
+```
+
+Running this query will process the entire table, which is 5.37 TB. Running the
+same query on a clustered table (based on 3 columns: `reference_name,
+start_position, end_position`) will process only 551.09 MB. In terms
+of actual price (as of today BigQuery costs $5 per TB), we are looking at
+reduction from $26.85 to $0.0026. You may try this out in the publicly hosted
+[1000 genomes table](https://bigquery.cloud.google.com/table/bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220) on GCP.
+
+For quick reference, you can cluster your table using a query like this:
+
+```
+#standardSql
+CREATE TABLE `clustered_table`
+PARTITION BY partition_date_please_ignore
+CLUSTER BY reference_name, start_position, end_position AS (
+  SELECT *, DATE('1980-01-01') partition_date_please_ignore
+  FROM `original_table`
+)
+```
+
+Since clustering currently is only supported for partitioned tables, in this
+query first we add a dummy `DATE` column to our table. By Partitioning table
+using this `DATE` column, we are able to cluster it based on the values of
+`reference_name, start_position, end_position` columns.
+
+Clustering can be very effective in reducing the cost of queries, however,
+it has a few limitations:
+ * Clustering does not offer any *guarantees* on the cost (it's a best effort
+ reduction).
+ * It needs a one time clustering step which can take a few hours for large
+ datasets.
+ * If you append data to an existing clustered table it will become partially
+ sorted. So you need to regularly re-cluster your table.
+
+## Solution 2: Partitioning output table
+
+The second solution for reducing the cost of queries is to use Variant
+Transforms' native partitioning. Variant transforms is able to split the output
+table into several smaller tables, each containing variants of a specific region of a
+genome. For example, you can have one output table per chromosome, in that
+case the above query can be written as:
+
+```
+SELECT * from `1000genomes_chr17`
+WHERE start_position >= 41197694
+  AND end_position <= 41276113
+```
+
+Note that condition on the `reference_name` is removed since we know this table,
+as its name suggests, only contains the variants of 17th chromosome.
+
+By splitting output tables based on the `reference_name` you are
+guaranteed that per-chromosome queries will only process variants of the
+chromosome under study. Also, appending new rows to existing tables does not
+impact this guarantee on the cost, unlike the BigQuery clustering solution.
+
+This solution has some limitations comparing to clustering. For example, you
+will be charged for processing of a whole chromosome's table even if only a
+small region is being processed. As an example, the previous query, will cost
+152 GB or $0.74. This is significantly less than the original cost without
+partitioning but it's more than clustering cost.
+
+You could define your partitions to be more fine grained and have multiple
+tables per chromosome. However, you need to anticipate how your future queries
+are going to be in order to optimize your output partitions. Since in many
+use cases it not obvious to anticipate future queries, we offer the
+third solution as the most practical and cost effective solution.
+
+## Solution 3: Hybrid Solution
+
+This solution combines two previous solutions to offer the benefits of both.
+Using the Variant Transforms' native partitioning, the output table will be
+split into several smaller tables (perhaps one table per chromosome) and then
+each table will be clustered based on the `start_position, end_position`
+columns to further optimize them for running queries.
+
+Using this technique the *BRCA1 query* will cost 226 MB or $0.0011 which is more
+than half of the clustering cost. In our experiments, we found that the most
+effective way to reduce query cost, especially for point lookup queries, is
+this hybrid solution.
+
+If you append new rows to your clustered table and your table gradually becomes
+partially sorted, you still have a strict guarantee that your query cost will
+be limited to the size of the partitioned table ($0.74 in this case).
+Also, partitioning output table into several smaller tables reduces the initial
+clustering time significantly.
+
+In the following section we will explain how you could use Variant Transforms
+to easily partition your output table to minimize the cost of your queries.
 
 ## Partition Config files
 
-Output table is partitioned based on the *partition config file* which can be
-set using `--partition_config_path` flag. The config file is formatted as
-a [`YAML`](https://en.wikipedia.org/wiki/YAML) file and has a straight forward
-structure. [Here](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml)
-you can see a config file which splits output table into 25 tables, one for
-each chromosome plus an extra [residual partition](#residual-partition). We
+Solution #2 or #3 require a *partition config file* to specify the output
+tables. The config file is set using the `--partition_config_path` flag and is
+formatted as a [`YAML`](https://en.wikipedia.org/wiki/YAML) file with a straight
+forward structure. [Here](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml)
+you can find a config file that splits output table into 25 tables, one per
+chromosome plus an extra [residual partition](#residual-partition). We
 recommend using this config file as default for human samples by adding:
 `--partition_config_path gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml`
+flag to your variant transforms command. Here is a snippet of that file:
 
-Here is a snippet of that file:
 ```
 -  partition:
      partition_name: "chr1"
@@ -69,28 +172,29 @@ variants will be available at
 suffix for your table names. Here, for simplicity, we used the same string
 (`chr1`) for both `reference_name` matching and table name suffix.
 
-As we mentioned earlier, partitioning can be done at a more fine grained level and does not have
-to be limited to chromosomes. For example, the following defines two
-partitions that contain variants of chromosome X:
+As we mentioned earlier, partitioning can be done at a more fine grained level
+and does not have to be limited to chromosomes. For example, the following
+config defines two partitions that contain variants of chromosome X:
 ```
 -  partition:
-     partition_name: "chrX_01"
+     partition_name: "chrX_part1"
      regions:
        - "chrX:0-100,000,000"
 -  partition:
-     partition_name: "chrX_02"
+     partition_name: "chrX_part2"
      regions:
        - "chrX:100,000,000-999,999,999"
 ```
 If the *start position* of a variant on chromosome X is less than `100,000,000`
-it will be assigned to `chrX_01` otherwise it will be assigned to `chrX_02`.
+it will be assigned to `chrX_part1` table otherwise it will be assigned to
+`chrX_part2` table.
 
 ### Residual Partition
 All partitions defined in a config file follow the same principal, variants will
-be assigned to them based on their `regions`. The only exception is the `residual`
-partition, this partition acts as *default
-partition* meaning that all variants that were not assigned to any partition
-will end up in this partition. For example consider the following config file:
+be assigned to them based on their defined `regions`. The only exception is the
+`residual` partition, this partition acts as *default partition* meaning that
+all variants that were not assigned to any partition will end up in this
+partition. For example consider the following config file:
 ```
 -  partition:
      partition_name: "first_50M"
@@ -111,50 +215,20 @@ will end up in this partition. For example consider the following config file:
 ```
 
 This config file splits all the variants into 3 tables:
- * `first_50M`: all variants of `chr1`, `chr2`, and `chr3` whose start position is `< 50M`
- * `second_50M`: all variants of `chr1`, `chr2`, and `chr3` whose start position is `>= 50M` and `< 100M`
- * `all_remaining`: all remaining variants including:
-   * All variants of `chr1`, `chr2`, and `chr3` whose start position is `>= 100M`
+ * `first_50M`: all variants of `chr1`, `chr2`, and `chr3` whose start position
+ is `< 50M`
+ * `second_50M`: all variants of `chr1`, `chr2`, and `chr3` whose start position
+ is `>= 50M` and `< 100M`
+ * `all_remaining`: all remaining variants. This includes:
+   * All variants of `chr1`, `chr2`, and `chr3` with start position `>= 100M`
    * All variants of other chromosomes.
 
 Using the `residual` partition you can make sure your output tables will include
 *all* input variants. However, if in your analysis you don't need the residual
 variants, you can simply remove the last partition from your config file. In
-that case you will have only 2 tables as output and variants that did not match
-to those two partitions will be dropped from the final output.
+the case of previous example, you will have only 2 tables as output and variants
+that did not match to those two partitions will be dropped from the final output.
 
-#### Filtering Variants
-Partitioning can be used for filtering out unwanted variants from the output
-table, this will significantly reduce the cost of queries in cases where only a
-small region of genome is under study. By providing a config file that includes
-the details of the region of interest and does not have a residual partition
-the output BigQuery table will contain only the desired variants. This
-filtering not only reduces the cost of running Variant Transforms but also it
-will reduce the cost of running queries on the output table significantly.
-
-### Comparing Variant Transforms' Partitioning to BigQuery's Clustering
-BigQuery announced **[clustering](https://cloud.google.com/bigquery/docs/clustered-tables)** at GCPNEXT2018 ([a relevant blog post](https://medium.com/@hoffa/bigquery-optimized-cluster-your-tables-65e2f684594b)).
-This new feature can be used in addition/instead of Variant Transform's
-partitioning in order to reduce the cost of queries. By clustering your tables
-you can still run queries to process the entire dataset without modifying your
-existing queries. Also you can sort up to 4 nested columns, for example
-`CLUSTER BY reference_name, start_position, end_position`. Clustering can be
-very effective in reducing the costs, however, it has a few limitations:
- * Clustering does not offer 'guarantees' on the cost (a best effort reduction).
- * It needs a one time clustering step which can take a few hours for large datasets.
- * If you append data to an existing table it will become partially sorted. you need to regularly re-clustering your table.
-
-On the other hand, Variant Transforms partitioning provides a cost guarantee.
-For example, by separating tables based on the `reference_name` you are
-guaranteed that each chromosome's query will only process variants of that
-chromosome. Also, you can append new rows to your existing tables and still
-enjoy the same guarantee.
-
-In our experimental studies,  we found out the most effective way to reduce the
-cost of queries, specially *the point lookup queries*, is a hybrid approach:
-specify the hotspots in the config file so that their variants end up in
-separate tables, but also add clustering to each table and sort based on
-`start_position` and `end_position` to further optimize your queries. This is
-a very effective strategy specially when having only 1 output table makes the
-clustering step very long and practically impossible.
-table for range queries.
+This feature can be used more broadly for filtering out unwanted variants from
+the output tables. Filtering reduces the cost of running Variant Transforms
+as well as the cost of running queries on the output tables.
