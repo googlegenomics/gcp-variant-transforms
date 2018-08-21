@@ -22,6 +22,10 @@ from __future__ import absolute_import
 import logging
 from collections import namedtuple
 
+from nucleus.io.python import vcf_reader as nucleus
+from nucleus.protos import variants_pb2 as nucleus_proto
+import os
+import tempfile
 import vcf
 
 from apache_beam.coders import coders
@@ -464,3 +468,72 @@ class PyVcfParser(VcfParser):
         call.info[field] = data
       calls.append(call)
     return calls
+
+
+class NucleusParser(VcfParser):
+  """An Iterator for processing a single VCF file using Nucleus."""
+
+  def __init__(self,
+	       file_name,  # type: str
+	       range_tracker,  # type: range_trackers.OffsetRangeTracker
+	       file_pattern,  # type: str
+	       compression_type,  # type: str
+	       allow_malformed_records,  # type: bool
+	       representative_header_lines=None,  # type:  List[str]
+	       **kwargs  # type: **str
+	      ):
+    # type: (...) -> None
+    super(NucleusParser, self).__init__(file_name,
+                                      range_tracker,
+                                      file_pattern,
+                                      compression_type,
+                                      allow_malformed_records,
+                                      representative_header_lines,
+                                      **kwargs)
+    # This member will be properly initiated in _init_with_header().
+    self._vcf_reader = None
+
+  def _store_to_temp_local_file(self, header_lines):
+    (temp_file, temp_file_name) = tempfile.mkstemp(text=True)
+    for line in header_lines:
+      os.write(temp_file, line)
+    os.close(temp_file)
+    return temp_file_name
+
+  def _init_with_header(self, header_lines):
+    # This optional header line is needed by Nucleus.
+    header_lines = ['##fileformat=VCFv4.2'] + header_lines
+    try:
+      self._vcf_reader = nucleus.VcfReader.from_file(
+          self._store_to_temp_local_file(header_lines),
+          nucleus_proto.VcfReaderOptions())
+    except SyntaxError as e:
+      raise ValueError(
+          'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
+
+  def _get_variant(self, data_line):
+    try:
+      record = self._vcf_reader.from_string(data_line)
+      return self._convert_to_variant(record)
+    except (LookupError, ValueError) as e:
+      logging.warning('VCF record read failed in %s for line %s: %s',
+                      self._file_name, data_line, str(e))
+      return MalformedVcfRecord(self._file_name, data_line, str(e))
+
+  def _convert_to_variant_record(
+      self,
+      record,  # type: nucleus_proto
+      ):
+    # type: (...) -> Variant
+    return Variant(
+        reference_name=record.reference_name,
+        start=record.start,
+        end=record.end,
+        reference_bases=(
+            record.reference_bases if record.reference_bases != MISSING_FIELD_VALUE else None),
+        alternate_bases=map(str, record.alternate_bases) if record.alternate_bases else [],
+        names=map(str, record.names) if record.names else [],
+        quality=record.quality,
+        filters=[PASS_FILTER] if record.filter == [] else map(str, record.filter),
+        info=record.info)#,
+        #calls=self._get_variant_calls(record))

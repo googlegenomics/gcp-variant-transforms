@@ -186,7 +186,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
                compression_type=CompressionTypes.AUTO,  # type: str
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
-               allow_malformed_records=False  # type: bool
+               allow_malformed_records=False,  # type: bool
+               use_nucleus=True  # type: bool
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -196,21 +197,33 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
+    self._use_nucleus = use_nucleus
 
   def read_records(self,
                    file_name,  # type: str
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    record_iterator = vcf_parser.PyVcfParser(
-        file_name,
-        range_tracker,
-        self._pattern,
-        self._compression_type,
-        self._allow_malformed_records,
-        self._representative_header_lines,
-        buffer_size=self._buffer_size,
-        skip_header_lines=0)
+    if self._use_nucleus:
+      record_iterator = vcf_parser.NucleusParser(
+          file_name,
+          range_tracker,
+          self._pattern,
+          self._compression_type,
+          self._allow_malformed_records,
+          self._representative_header_lines,
+          buffer_size=self._buffer_size,
+          skip_header_lines=0)
+    else:
+      record_iterator = vcf_parser.PyVcfParser(
+          file_name,
+          range_tracker,
+          self._pattern,
+          self._compression_type,
+          self._allow_malformed_records,
+          self._representative_header_lines,
+          buffer_size=self._buffer_size,
+          skip_header_lines=0)
 
     # Convert iterator to generator to abstract behavior
     for record in record_iterator:
