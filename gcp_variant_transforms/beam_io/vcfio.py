@@ -120,13 +120,16 @@ class _ToVcfRecordCoder(coders.Coder):
     return format_keys
 
   def _encode_variant_calls(self, variant, format_keys):
-    """Encodes the calls of a :class:`Variant` in a VCF line."""
+    # type: (Variant, List[str]) -> str
+    """Encodes the calls of `Variant` in a VCF line.
+
+    The calls are encoded following the calls' natural order.
+    """
     # Ensure that genotype is always the first key in format_keys
     assert not format_keys or format_keys[0] == GENOTYPE_FORMAT_KEY
     encoded_calls = []
-    for call in variant.calls:
-      encoded_call_info = [self._encode_genotype(
-          call.genotype, call.phaseset)]
+    for call in sorted(variant.calls):
+      encoded_call_info = [self._encode_genotype(call.genotype, call.phaseset)]
       for key in format_keys[1:]:
         if key == PHASESET_FORMAT_KEY:
           encoded_call_info.append(
@@ -392,3 +395,23 @@ class WriteVcfDataLines(PTransform):
   """
   def expand(self, pcoll):
     return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())
+
+
+def write_vcf_data_header(sample_names, vcf_fixed_columns, file_path):
+  # type: (List[str], List[str], str) -> None
+  """Writes VCF data header.
+
+  It writes the header line with ` vcf_fixed_columns`, followed by sample
+  names in `sample_names` in sorted order. Example:
+  #CHROM  POS  ID  REF  ALT  QUAL  FILTER  INFO  SAMPLE1  SAMPLE2
+
+  Args:
+    sample_names: The sample names appended to `vcf_fixed_columns`. The names
+      will be sorted in increasing order.
+    vcf_fixed_columns: The VCF fixed columns.
+    file_path: The location where the data header line is saved.
+  """
+  with filesystems.FileSystems.create(file_path) as file_to_write:
+    file_to_write.write(
+        str('\t'.join(vcf_fixed_columns + sorted(sample_names))))
+    file_to_write.write('\n')

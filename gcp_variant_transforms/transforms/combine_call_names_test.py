@@ -1,4 +1,4 @@
-# Copyright 2017 Google Inc.  All Rights Reserved.
+# Copyright 2018 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,49 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for densify_variants module."""
-
-from __future__ import absolute_import
+"""Tests for `combine_call_names` module."""
 
 import unittest
 
+import apache_beam as beam
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
+from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.testing import asserts
-from gcp_variant_transforms.transforms import densify_variants
+from gcp_variant_transforms.transforms import combine_call_names
 
 
-class DensifyVariantsTest(unittest.TestCase):
-  """Test cases for the ``DensifyVariants`` transform."""
+class GetCallNamesTest(unittest.TestCase):
+  """Test cases for the `CallNamesCombiner` transform."""
 
-  def test_add_missing_calls(self):
-    transform = densify_variants.DensifyVariants(None)
-    variant = vcfio.Variant(calls=[vcfio.VariantCall(name='sample2')])
-    new_variant = transform._densify_variants(
-        variant, ['sample1', 'sample2', 'sample3'])
-    call_names = [call.name for call in new_variant.calls]
-    self.assertItemsEqual(call_names, ['sample1', 'sample2', 'sample3'])
-
-  def test_densify_variants_pipeline(self):
+  def test_call_names_combiner_pipeline(self):
     call_names = ['sample1', 'sample2', 'sample3']
     variant_calls = [
         vcfio.VariantCall(name=call_names[0]),
         vcfio.VariantCall(name=call_names[1]),
-        vcfio.VariantCall(name=call_names[2]),
+        vcfio.VariantCall(name=call_names[2])
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
-        vcfio.Variant(calls=[variant_calls[1], variant_calls[2]]),
+        vcfio.Variant(calls=[variant_calls[1], variant_calls[2]])
     ]
 
     pipeline = TestPipeline()
-    densified_variants = (
+    combined_call_names = (
         pipeline
         | Create(variants)
-        | 'DensifyVariants' >> densify_variants.DensifyVariants(call_names))
-    assert_that(densified_variants, asserts.has_calls(call_names))
-
+        | 'CombineCallNames' >> combine_call_names.CallNamesCombiner()
+        | 'SortCallNames' >> beam.ParDo(sorted))
+    assert_that(combined_call_names, equal_to(call_names))
     pipeline.run()

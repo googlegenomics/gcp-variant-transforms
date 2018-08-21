@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_parser  # pylint: disable=unused-import
 
 __all__ = ['DensifyVariants']
 
@@ -26,21 +27,28 @@ __all__ = ['DensifyVariants']
 class DensifyVariants(beam.PTransform):
   """Extends each Variant's calls to contain data for all samples."""
 
-  def _get_call_names(self, variant):
-    """Returns the names of all calls for the variant."""
-    return [call.name for call in variant.calls]
+  def __init__(self, all_call_names):
+    # type: (List[str]) -> None
+    """Initializes a `DensifyVariants` object.
+
+    Args:
+      all_call_names: A list of sample names that used to extend each
+        variant'calls.
+    """
+    self._all_call_names = all_call_names
 
   def _densify_variants(self, variant, all_call_names):
+    # type: (vcf_parser.Variant, List[str]) -> vcf_parser.Variant
     """Adds all missing calls to the variant.
 
     Args:
       variant: The variant that will be modified to contain calls for
-        all samples.
-      all_call_names: A list of all sample names across all records in the
-        collection.
+        `all_call_names`.
+      all_call_names: A list of sample names that used to extend each
+        variant'calls.
 
     Returns:
-      `variant` modified to contain calls for all samples.
+      `variant` modified to contain calls for `all_call_names`.
     """
     variant_call_names = [call.name for call in variant.calls]
     missing_call_names = set(all_call_names) - set(variant_call_names)
@@ -53,14 +61,7 @@ class DensifyVariants(beam.PTransform):
     return variant
 
   def expand(self, pcoll):
-    # Get a list of all call names across variants.
-    call_names = (pcoll
-                  | 'GetCallNames' >> beam.FlatMap(self._get_call_names)
-                  | 'RemoveDuplicates' >> beam.RemoveDuplicates()
-                  | 'Combine' >> beam.combiners.ToList())
-
     # Extend each variant's list of calls to contain all samples.
     return (pcoll
             | 'DensifyVariants' >> beam.Map(
-                self._densify_variants,
-                all_call_names=beam.pvalue.AsSingleton(call_names)))
+                self._densify_variants, all_call_names=self._all_call_names))
