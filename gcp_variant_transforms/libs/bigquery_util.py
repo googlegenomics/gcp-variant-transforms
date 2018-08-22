@@ -17,6 +17,10 @@
 import re
 from typing import Tuple  # pylint: disable=unused-import
 
+from gcp_variant_transforms.beam_io import vcf_header_io
+
+_VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
 
 class ColumnKeyConstants(object):
   """Constants for column names in the BigQuery schema."""
@@ -53,6 +57,14 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
     'character': TableFieldConstants.TYPE_STRING,
     'float': TableFieldConstants.TYPE_FLOAT,
     'flag': TableFieldConstants.TYPE_BOOLEAN,
+}
+
+# A map to convert from BigQuery types to their equivalent VCF types.
+BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = {
+    TableFieldConstants.TYPE_INTEGER: _VcfHeaderTypeConstants.INTEGER,
+    TableFieldConstants.TYPE_STRING: _VcfHeaderTypeConstants.STRING,
+    TableFieldConstants.TYPE_FLOAT: _VcfHeaderTypeConstants.FLOAT,
+    TableFieldConstants.TYPE_BOOLEAN: _VcfHeaderTypeConstants.FLAG
 }
 
 # A map to convert from BigQuery types to Python types.
