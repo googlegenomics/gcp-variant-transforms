@@ -14,7 +14,7 @@
 
 """A PTransform to combine call names from all variants."""
 
-from typing import List  # pylint: disable=unused-import
+from typing import List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
 
@@ -25,12 +25,35 @@ class CallNamesCombiner(beam.PTransform):
   """A PTransform to combine call names from all variants."""
 
   def _get_call_names(self, variant):
-    # type: (vcf_parser.Variant) -> List[str]
+    # type: (vcf_parser.Variant) -> Tuple[str]
     """Returns the names of all calls for the variant."""
-    return [call.name for call in variant.calls]
+    call_names = [call.name for call in variant.calls]
+    if len(call_names) != len(set(call_names)):
+      raise ValueError('There are duplicate call names in the variant {}'.
+                       format(variant))
+    return tuple(call_names)
+
+  def _combine_unique_call_names(self, call_names):
+    # type: (List[Tuple[str]]) -> List[str]
+    """Combines unique call names from all variants.
+
+    If there is only one unique call name tuple in `call_names`, it means that
+    the call names from all variants are the same. For this case, return this
+    call name tuple directly. Otherwise, return the call names in sorted order.
+    """
+    if len(call_names) == 1:
+      return list(call_names[0])
+    return (call_names
+            | 'FlattenCallNames' >> beam.Flatten()
+            | 'RemoveDuplicates' >> beam.RemoveDuplicates()
+            | 'Combine' >> beam.combiners.ToList()
+            | 'SortCallNames' >> beam.ParDo(sorted))
 
   def expand(self, pcoll):
     return (pcoll
-            | 'GetCallNames' >> beam.FlatMap(self._get_call_names)
+            | 'GetCallNames' >> beam.Map(self._get_call_names)
             | 'RemoveDuplicates' >> beam.RemoveDuplicates()
-            | 'Combine' >> beam.combiners.ToList())
+            | 'Combine' >> beam.combiners.ToList()
+            | 'CombineUniqueCallNames'
+            >> beam.ParDo(self._combine_unique_call_names)
+            | beam.combiners.ToList())

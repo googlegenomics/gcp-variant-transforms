@@ -41,6 +41,7 @@ class DensifyVariants(beam.PTransform):
     # type: (vcf_parser.Variant, List[str]) -> vcf_parser.Variant
     """Adds all missing calls to the variant.
 
+    The calls are in the same order as the `all_call_names`.
     Args:
       variant: The variant that will be modified to contain calls for
         `all_call_names`.
@@ -50,13 +51,17 @@ class DensifyVariants(beam.PTransform):
     Returns:
       `variant` modified to contain calls for `all_call_names`.
     """
-    variant_call_names = [call.name for call in variant.calls]
-    missing_call_names = set(all_call_names) - set(variant_call_names)
+    existing_call_name = {call.name: call for call in variant.calls}
 
-    for call_name in missing_call_names:
-      variant.calls.append(
-          vcfio.VariantCall(name=call_name,
-                            genotype=vcfio.MISSING_GENOTYPE_VALUE))
+    new_calls = []
+    for call_name in all_call_names:
+      if call_name in existing_call_name.keys():
+        new_calls.append(existing_call_name.get(call_name))
+      else:
+        new_calls.append(
+            vcfio.VariantCall(name=call_name,
+                              genotype=vcfio.MISSING_GENOTYPE_VALUE))
+    variant.calls = new_calls
 
     return variant
 

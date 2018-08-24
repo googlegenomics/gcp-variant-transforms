@@ -47,8 +47,9 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
-from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import combine_call_names
+from gcp_variant_transforms.transforms import densify_variants
+
 
 _BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`;'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
@@ -68,13 +69,13 @@ def run(argv=None):
   if not google_cloud_options.temp_location or not google_cloud_options.project:
     raise ValueError('temp_location and project must be set.')
 
-  time_stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+  timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
   vcf_data_temp_folder = filesystems.FileSystems.join(
       google_cloud_options.temp_location,
-      'bq_to_vcf_data_temp_files_{}'.format(time_stamp))
+      'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
   vcf_data_header_file_path = filesystems.FileSystems.join(
       google_cloud_options.temp_location,
-      'bq_to_vcf_data_header_{}'.format(time_stamp))
+      'bq_to_vcf_data_header_{}'.format(timestamp_str))
 
   _bigquery_to_vcf_shards(known_args,
                           options,
@@ -119,12 +120,12 @@ def _bigquery_to_vcf_shards(
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
                 | bigquery_to_variant.BigQueryToVariant())
     call_names = (variants
-                  | 'CombineAndSortAllCallNames' >>
+                  | 'CombineCallNames' >>
                   combine_call_names.CallNamesCombiner())
 
     _ = (call_names
-         | 'GenerateVCFDataHeader' >>
-         beam.ParDo(vcfio.write_vcf_data_header,
+         | 'GenerateVcfDataHeader' >>
+         beam.ParDo(_write_vcf_data_header,
                     _VCF_FIXED_COLUMNS,
                     vcf_data_header_file_path))
 
@@ -135,6 +136,27 @@ def _bigquery_to_vcf_shards(
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
          | vcfio.WriteVcfDataLines())
+
+
+def _write_vcf_data_header(sample_names, vcf_fixed_columns, file_path):
+  # type: (List[str], List[str], str) -> None
+  """Writes VCF data header.
+
+  It writes the header line with ` vcf_fixed_columns`, followed by sample
+  names in `sample_names`. Example:
+  #CHROM  POS  ID  REF  ALT  QUAL  FILTER  INFO  SAMPLE1  SAMPLE2
+
+  Args:
+    sample_names: The sample names appended to `vcf_fixed_columns`.
+    vcf_fixed_columns: The VCF fixed columns.
+    file_path: The location where the data header line is saved.
+  """
+  # pylint: disable=redefined-outer-name,reimported
+  from apache_beam.io import filesystems
+  with filesystems.FileSystems.create(file_path) as file_to_write:
+    file_to_write.write(
+        str('\t'.join(vcf_fixed_columns + sample_names)))
+    file_to_write.write('\n')
 
 
 def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):

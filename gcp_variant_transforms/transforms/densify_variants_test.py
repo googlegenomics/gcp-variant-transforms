@@ -30,13 +30,25 @@ from gcp_variant_transforms.transforms import densify_variants
 class DensifyVariantsTest(unittest.TestCase):
   """Test cases for the ``DensifyVariants`` transform."""
 
-  def test_add_missing_calls(self):
-    transform = densify_variants.DensifyVariants(None)
-    variant = vcfio.Variant(calls=[vcfio.VariantCall(name='sample2')])
-    new_variant = transform._densify_variants(
-        variant, ['sample1', 'sample2', 'sample3'])
-    call_names = [call.name for call in new_variant.calls]
-    self.assertItemsEqual(call_names, ['sample1', 'sample2', 'sample3'])
+  def test_densify_variants_pipeline_no_calls(self):
+    call_names = ['sample1', 'sample2', 'sample3']
+    variant_calls = [
+        vcfio.VariantCall(name=call_names[0]),
+        vcfio.VariantCall(name=call_names[1]),
+        vcfio.VariantCall(name=call_names[2]),
+    ]
+    variants = [
+        vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
+        vcfio.Variant(calls=[variant_calls[1], variant_calls[2]]),
+    ]
+    pipeline = TestPipeline()
+    densified_variants = (
+        pipeline
+        | Create(variants)
+        | 'DensifyVariants' >> densify_variants.DensifyVariants([]))
+    assert_that(densified_variants, asserts.has_calls([]))
+
+    pipeline.run()
 
   def test_densify_variants_pipeline(self):
     call_names = ['sample1', 'sample2', 'sample3']

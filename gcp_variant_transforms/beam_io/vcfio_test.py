@@ -26,7 +26,6 @@ from itertools import chain
 from itertools import permutations
 
 import apache_beam as beam
-from apache_beam.io import filesystems
 from apache_beam.io.filesystem import CompressionTypes
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
@@ -39,7 +38,6 @@ from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
-from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 from gcp_variant_transforms.testing.temp_dir import TempDir
 
@@ -838,14 +836,6 @@ class VcfSinkTest(unittest.TestCase):
     expected = '.	.	.	.	.	.	.	.	GT	.\n'
     self._assert_variant_lines_equal(coder.encode(variant), expected)
 
-  def test_encode_variant_calls_not_sorted(self):
-    coder = self._get_coder()
-    variant = Variant()
-    variant.calls.append(VariantCall(name='Sample2', genotype=[1, 0, 1]))
-    variant.calls.append(VariantCall(name='Sample1', genotype=-1))
-    expected = '.	1/0/1'
-    self.assertEqual(coder._encode_variant_calls(variant, []), expected)
-
   def test_missing_genotype(self):
     coder = self._get_coder()
     variant = Variant()
@@ -912,18 +902,6 @@ class VcfSinkTest(unittest.TestCase):
     self.assertEqual(read_result[0], 'foo')
     for actual, expected in zip(read_result[1:], self.variant_lines):
       self._assert_variant_lines_equal(actual, expected)
-
-  def test_write_vcf_data_header(self):
-    with temp_dir.TempDir() as tempdir:
-      file_path = filesystems.FileSystems.join(tempdir.get_path(),
-                                               'data_header')
-      vcfio.write_vcf_data_header(['Sample 1', 'Sample 2'],
-                                  ['#CHROM', 'POS', 'ID', 'REF', 'ALT'],
-                                  file_path)
-      expected_content = '#CHROM\tPOS\tID\tREF\tALT\tSample 1\tSample 2\n'
-      with filesystems.FileSystems.open(file_path) as f:
-        content = f.readlines()
-        self.assertEqual(content, [expected_content])
 
 
 if __name__ == '__main__':
