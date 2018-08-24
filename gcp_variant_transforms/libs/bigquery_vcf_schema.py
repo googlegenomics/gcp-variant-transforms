@@ -135,13 +135,15 @@ def generate_schema_from_header_fields(
 
   # Add info fields.
   info_keys = set()
-  info_type_keys_set = set(key for name, key in
-                           proc_variant_factory.gen_annotation_info_type_keys())
+  annotation_info_type_keys_set = set(proc_variant_factory.
+                                      gen_annotation_info_type_keys())
   for key, field in header_fields.infos.iteritems():
-    # END info is already included by modifying the end_position.
+    # END info is already included by modifying the end_position. Info type
+    # fields exist only to indicate the type of corresponding annotation fields,
+    # and should not be added to the schema.
     if (key == vcfio.END_INFO_KEY or
         proc_variant_factory.info_is_in_alt_bases(key) or
-        key in info_type_keys_set):
+        key in annotation_info_type_keys_set):
       continue
     schema.fields.append(bigquery.TableFieldSchema(
         name=bigquery_sanitizer.SchemaSanitizer.get_sanitized_field_name(key),
