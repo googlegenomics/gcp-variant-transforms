@@ -31,11 +31,10 @@ class DensifyVariantsTest(unittest.TestCase):
   """Test cases for the ``DensifyVariants`` transform."""
 
   def test_densify_variants_pipeline_no_calls(self):
-    call_names = ['sample1', 'sample2', 'sample3']
     variant_calls = [
-        vcfio.VariantCall(name=call_names[0]),
-        vcfio.VariantCall(name=call_names[1]),
-        vcfio.VariantCall(name=call_names[2]),
+        vcfio.VariantCall(name='sample1'),
+        vcfio.VariantCall(name='sample2'),
+        vcfio.VariantCall(name='sample3'),
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),

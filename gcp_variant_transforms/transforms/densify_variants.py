@@ -25,28 +25,28 @@ __all__ = ['DensifyVariants']
 
 
 class DensifyVariants(beam.PTransform):
-  """Extends each Variant's calls to contain data for all samples."""
+  """Densifys each Variant's calls to contain data for `all_call_names`."""
 
   def __init__(self, all_call_names):
     # type: (List[str]) -> None
     """Initializes a `DensifyVariants` object.
 
     Args:
-      all_call_names: A list of sample names that used to extend each
+      all_call_names: A list of sample names that used to select/extend each
         variant'calls.
     """
     self._all_call_names = all_call_names
 
   def _densify_variants(self, variant, all_call_names):
     # type: (vcf_parser.Variant, List[str]) -> vcf_parser.Variant
-    """Adds all missing calls to the variant.
+    """Cherry-picks calls for the variant.
 
     The calls are in the same order as the `all_call_names`.
     Args:
       variant: The variant that will be modified to contain calls for
         `all_call_names`.
-      all_call_names: A list of sample names that used to extend each
-        variant'calls.
+      all_call_names: A list of sample names that used to cherry-pick each
+        variant'calls. If one call is missing, an empty `VariantCall` is added.
 
     Returns:
       `variant` modified to contain calls for `all_call_names`.
@@ -66,7 +66,7 @@ class DensifyVariants(beam.PTransform):
     return variant
 
   def expand(self, pcoll):
-    # Extend each variant's list of calls to contain all samples.
+    # Extend each variant's list of calls to contain `all_call_names`.
     return (pcoll
             | 'DensifyVariants' >> beam.Map(
                 self._densify_variants, all_call_names=self._all_call_names))
