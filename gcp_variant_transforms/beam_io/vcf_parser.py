@@ -25,7 +25,6 @@ from collections import namedtuple
 import os
 import tempfile
 
-#from nucleus.io import vcf as nucleus
 import nucleus
 import vcf
 
