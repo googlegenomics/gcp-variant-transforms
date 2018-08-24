@@ -22,13 +22,14 @@ from __future__ import absolute_import
 import logging
 from collections import namedtuple
 
-from nucleus.io.python import vcf_reader as nucleus
-from nucleus.protos import variants_pb2 as nucleus_proto
 import os
 import tempfile
+
+from nucleus.io import vcf as nucleus
 import vcf
 
 from apache_beam.coders import coders
+from apache_beam.io.filesystems import FileSystems
 from apache_beam.io import textio
 
 
@@ -476,24 +477,41 @@ class NucleusParser(VcfParser):
   """An Iterator for processing a single VCF file using Nucleus."""
 
   def __init__(self,
-	       file_name,  # type: str
-	       range_tracker,  # type: range_trackers.OffsetRangeTracker
-	       file_pattern,  # type: str
-	       compression_type,  # type: str
-	       allow_malformed_records,  # type: bool
-	       representative_header_lines=None,  # type:  List[str]
-	       **kwargs  # type: **str
-	      ):
+               file_name,  # type: str
+               range_tracker,  # type: range_trackers.OffsetRangeTracker
+               file_pattern,  # type: str
+               compression_type,  # type: str
+               allow_malformed_records,  # type: bool
+               representative_header_lines=None,  # type:  List[str]
+               **kwargs  # type: **str
+              ):
     # type: (...) -> None
     super(NucleusParser, self).__init__(file_name,
-                                      range_tracker,
-                                      file_pattern,
-                                      compression_type,
-                                      allow_malformed_records,
-                                      representative_header_lines,
-                                      **kwargs)
+                                        range_tracker,
+                                        file_pattern,
+                                        compression_type,
+                                        allow_malformed_records,
+                                        representative_header_lines,
+                                        **kwargs)
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
+    # These members will be properly initiated in _extract_header_fields().
+    self._is_info_repeated = {}
+    self._is_format_repeated = {}
+    # This is a temporary solution until from_string will be fixed.
+    self._temp_local_file = self._write_to_local_file(file_name)
+
+  def _write_to_local_file(self, remote_file_name):
+    (temp_file, temp_file_name) = tempfile.mkstemp(text=True)
+    with FileSystems.open(remote_file_name) as f:
+      while True:
+        line = f.readline()
+        if line:
+          os.write(temp_file, line)
+        else:
+          os.close(temp_file)
+          break
+    return temp_file_name
 
   def _store_to_temp_local_file(self, header_lines):
     (temp_file, temp_file_name) = tempfile.mkstemp(text=True)
@@ -503,39 +521,129 @@ class NucleusParser(VcfParser):
     return temp_file_name
 
   def _init_with_header(self, header_lines):
-    # This optional header line is needed by Nucleus.
+    # This header line is needed by Nucleus.
     header_lines = ['##fileformat=VCFv4.2'] + header_lines
     try:
-      self._vcf_reader = nucleus.VcfReader.from_file(
-          self._store_to_temp_local_file(header_lines),
-          nucleus_proto.VcfReaderOptions())
+      # This is a temporary solution until from_string will be fixed.
+      self._vcf_reader = nucleus.VcfReader(self._temp_local_file,
+                                           use_index=False)
+
     except SyntaxError as e:
       raise ValueError(
           'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
+    self._extract_header_fields()
+
+  def _extract_header_fields(self):
+    header = self._vcf_reader.header
+    for info in header.infos:
+      if info.number in ('0', '1'):
+        self._is_info_repeated[info.id] = False
+      else:
+        self._is_info_repeated[info.id] = True
+
+    for format_info in header.formats:
+      if format_info.number in ('0', '1'):
+        self._is_format_repeated[format_info.id] = False
+      else:
+        self._is_format_repeated[format_info.id] = True
 
   def _get_variant(self, data_line):
     try:
-      record = self._vcf_reader.from_string(data_line)
+      # This is a temporary solution until from_string will be fixed.
+      record = next(self._vcf_reader)
       return self._convert_to_variant(record)
     except (LookupError, ValueError) as e:
       logging.warning('VCF record read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
-  def _convert_to_variant_record(
-      self,
-      record,  # type: nucleus_proto
-      ):
-    # type: (...) -> Variant
+  def _convert_to_variant(self, record):
+    # type: (nucleus_proto.Variant) -> Variant
     return Variant(
         reference_name=record.reference_name,
         start=record.start,
         end=record.end,
-        reference_bases=(
-            record.reference_bases if record.reference_bases != MISSING_FIELD_VALUE else None),
-        alternate_bases=map(str, record.alternate_bases) if record.alternate_bases else [],
+        reference_bases=(record.reference_bases
+                         if record.reference_bases != MISSING_FIELD_VALUE
+                         else None),
+        alternate_bases=(
+            map(str, record.alternate_bases) if record.alternate_bases else []),
         names=map(str, record.names) if record.names else [],
         quality=record.quality,
-        filters=[PASS_FILTER] if record.filter == [] else map(str, record.filter),
-        info=record.info)#,
-        #calls=self._get_variant_calls(record))
+        filters=(
+            [PASS_FILTER] if record.filter == [] else map(str, record.filter)),
+        info=self._get_variant_info(record),
+        calls=self._get_variant_calls(record))
+
+  def _get_variant_info(self, record):
+    info = {}
+    for k in record.info:
+      data = self._convert_list_value(record.info[k],
+                                      self._is_info_repeated.get(k, False))
+      # Prevents including missing flags as 'false' flag.
+      if isinstance(data, bool) and not data:
+        continue
+      info[k] = data
+    return info
+
+  def _convert_list_value(self, list_values, is_repeated):
+    """Converts an object of ListValue to python native types.
+
+    if is_repeated is set the output will be a list otherwise a single value.
+    """
+    output_list = []
+    for value in list_values.values:
+      if value.HasField('null_value'):
+        output_list.append(value.null_value)
+      elif value.HasField('number_value'):
+        output_list.append(value.number_value)
+      elif value.HasField('int_value'):
+        output_list.append(value.int_value)
+      elif value.HasField('string_value'):
+        output_list.append(value.string_value)
+      elif value.HasField('bool_value'):
+        output_list.append(value.bool_value)
+      elif value.HasField('struct_value'):
+        output_list.append(value.struct_value)
+      elif value.HasField('list_value'):
+        output_list.append(self._convert_list_value(value.list_value, True))
+      else:
+        raise ValueError('ListValue object has an unexpected value: %s' % value)
+
+    if is_repeated:
+      return output_list
+    if not output_list:
+      return None
+    if len(output_list) == 1:
+      return output_list[0]
+    raise ValueError('a not repeated field has more than 1 value')
+
+  def _get_variant_calls(self, record):
+    calls = []
+    for sample in record.calls:
+      call = VariantCall()
+      call.name = sample.call_set_name
+      if not sample.genotype:
+        call.genotype.append(MISSING_GENOTYPE_VALUE)
+      else:
+        for v in sample.genotype:
+          call.genotype.append(v)
+
+      phaseset_from_format = (
+          sample.info[PHASESET_FORMAT_KEY].values[0].string_value
+          if sample.info.get(PHASESET_FORMAT_KEY, None)
+          else None)
+      # Note: Call is considered phased if it contains the 'PS' key regardless
+      # of whether it uses '|'.
+      if phaseset_from_format or sample.is_phased:
+        call.phaseset = (phaseset_from_format if phaseset_from_format
+                         else DEFAULT_PHASESET_VALUE)
+      for k in sample.info:
+        # Genotype and phaseset (if present) are already included.
+        if k in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
+          continue
+        is_repeated = self._is_format_repeated.get(k, False)
+        data = self._convert_list_value(sample.info[k], is_repeated)
+        call.info[k] = data
+      calls.append(call)
+    return calls
