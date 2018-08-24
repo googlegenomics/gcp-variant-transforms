@@ -25,7 +25,7 @@ from collections import namedtuple
 import os
 import tempfile
 
-from nucleus.io import vcf as nucleus
+import nucleus
 import vcf
 
 from apache_beam.coders import coders
@@ -525,8 +525,8 @@ class NucleusParser(VcfParser):
     header_lines = ['##fileformat=VCFv4.2'] + header_lines
     try:
       # This is a temporary solution until from_string will be fixed.
-      self._vcf_reader = nucleus.VcfReader(self._temp_local_file,
-                                           use_index=False)
+      self._vcf_reader = nucleus.io.vcf.VcfReader(
+          self._temp_local_file, use_index=False)
 
     except SyntaxError as e:
       raise ValueError(
