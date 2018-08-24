@@ -27,12 +27,9 @@ data science with BigQuery.
 
 ### Prerequisites
 
-1.  Setup a [Google Cloud account](https://cloud.google.com/) and
-    [create a project](https://cloud.google.com/resource-manager/docs/creating-managing-projects).
-1.  [Sign up and install the Google Cloud SDK](https://cloud.google.com/genomics/install-genomics-tools)
+1.  Follow the [getting started](https://cloud.google.com/genomics/docs/how-tos/getting-started)
+    instructions on the Google Cloud page.
 1.  Enable the [Genomics, Compute Engine, Cloud Storage, and Dataflow APIs](https://console.cloud.google.com/flows/enableapi?apiid=genomics,storage_component,storage_api,compute_component,dataflow)
-1.  Open the [billing](https://console.cloud.google.com/project/_/settings) page
-    for the project you have selected or created, and click _Enable billing_.
 1.  Create a new BigQuery dataset by visiting the
     [BigQuery web UI](https://bigquery.cloud.google.com/), clicking on the
     down arrow icon next to your project name in the navigation, and clicking on
