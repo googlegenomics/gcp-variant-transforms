@@ -187,7 +187,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
                allow_malformed_records=False,  # type: bool
-               use_nucleus=True  # type: bool
+               use_nucleus=False  # type: bool
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
