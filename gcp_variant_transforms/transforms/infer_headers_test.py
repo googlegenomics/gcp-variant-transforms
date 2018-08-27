@@ -37,7 +37,13 @@ from gcp_variant_transforms.transforms import infer_headers
 class InferHeaderFieldsTest(unittest.TestCase):
   """Test case for `InferHeaderFields` DoFn."""
 
-  def _get_sample_header_fields(self):
+  def _get_sample_header_fields(self, with_annotation=False):
+    """Provides a simple `VcfHeader` with info and format fields
+
+    Args:
+      with_annotation: Can be bool or list of tuples. Tuples should be
+        additional annotation fields in the format (key, `Info`).
+    """
     infos = OrderedDict([
         ('IS', Info('I1', 1, 'String', 'desc', 'src', 'v')),
         ('ISI', Info('ISI', 1, 'Int', 'desc', 'src', 'v')),
@@ -45,6 +51,17 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('IF', Info('IF', 1, 'Float', 'desc', 'src', 'v')),
         ('IB', Info('I1', 1, 'Flag', 'desc', 'src', 'v')),
         ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+    if with_annotation:
+      infos['CSQ'] = Info(
+          'CSQ',
+          -1,
+          'String',
+          'Annotations from VEP. Format: Allele|Gene|Position|Score',
+          'src',
+          'v')
+      if isinstance(with_annotation, list):
+        for key, value in with_annotation:
+          infos[key] = value
     formats = OrderedDict([
         ('FS', Format('FS', 1, 'String', 'desc')),
         ('FI', Format('FI', 2, 'Integer', 'desc')),
@@ -52,17 +69,6 @@ class InferHeaderFieldsTest(unittest.TestCase):
         ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
         ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
     return vcf_header_io.VcfHeader(infos=infos, formats=formats)
-
-  def _get_sample_header_fields_with_annotation(self):
-    header = self._get_sample_header_fields()
-    header.infos['CSQ'] = OrderedDict([
-        ('id', 'CSQ'),
-        ('num', -1),
-        ('type', 'String'),
-        ('desc', 'Annotations from VEP. Format: Allele|Gene|Position|Score'),
-        ('source', 'src'),
-        ('version', 'v')])
-    return header
 
   def _get_sample_variant_1(self):
     variant = vcfio.Variant(
@@ -420,109 +426,88 @@ class InferHeaderFieldsTest(unittest.TestCase):
 
   def test_infer_annotation_types_no_conflicts(self):
     anno_fields = ['CSQ']
-    header = self._get_sample_header_fields_with_annotation()
+    header = self._get_sample_header_fields(with_annotation=True)
     variant = self._get_sample_variant_1()
     variant.info['CSQ'] = ['A|GENE1|100|1.2', 'TT|GENE1|101|1.3']
-    infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
-    new_header = next(infer_header_fields.process(variant, header))
-    desc = 'Inferred type field for annotation {}.'
-    expected = vcf_header_io.VcfHeader(infos={
-        'CSQ_Gene_TYPE':
-        Info('CSQ_Gene_TYPE', 1, 'String', desc.format('Gene'), '', ''),
-        'CSQ_Position_TYPE':
-        Info('CSQ_Position_TYPE', 1, 'Integer',
-             desc.format('Position'), '', ''),
-        'CSQ_Score_TYPE':
-        Info('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'), '', '')})
-    self.assertEqual(expected, new_header)
-    return new_header, expected
+    infer_header_fields = infer_headers._InferHeaderFields(
+        infer_headers=False, annotation_fields_to_infer=anno_fields)
+    inferred_headers = next(infer_header_fields.process(variant, header))
+    expected_types = {'CSQ_Gene_TYPE': 'String',
+                      'CSQ_Position_TYPE': 'Integer',
+                      'CSQ_Score_TYPE': 'Float'}
+    for key, item in inferred_headers.infos.iteritems():
+      self.assertEqual(item['type'], expected_types[key])
+    self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
-  def test_infer_annotation_types_with_conflicts(self):
+  def test_infer_annotation_types_with_type_conflicts(self):
     anno_fields = ['CSQ']
-    header = self._get_sample_header_fields_with_annotation()
+    header = self._get_sample_header_fields(with_annotation=True)
     variant = self._get_sample_variant_1()
     variant.info['CSQ'] = ['A|1|100|1.2',
                            'A|2|101|1.3',
                            'A|1.2|start|0',
                            'TT|1.3|end|7']
     infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
-    new_header = next(infer_header_fields.process(variant, header))
-    desc = 'Inferred type field for annotation {}.'
-    expected = vcf_header_io.VcfHeader(infos={
-        'CSQ_Gene_TYPE':
-        Info('CSQ_Gene_TYPE', 1, 'Float', desc.format('Gene'), '', ''),
-        'CSQ_Position_TYPE':
-        Info('CSQ_Position_TYPE', 1, 'String',
-             desc.format('Position'), '', ''),
-        'CSQ_Score_TYPE':
-        Info('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'), '', '')})
-    self.assertEqual(expected, new_header)
+    inferred_headers = next(infer_header_fields.process(variant, header))
+    expected_types = {'CSQ_Gene_TYPE': 'Float',
+                      'CSQ_Position_TYPE': 'String',
+                      'CSQ_Score_TYPE': 'Float'}
+    for key, item in inferred_headers.infos.iteritems():
+      self.assertEqual(item['type'], expected_types[key])
+    self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
   def test_infer_annotation_types_with_missing(self):
     anno_fields = ['CSQ']
-    header = self._get_sample_header_fields_with_annotation()
+    header = self._get_sample_header_fields(with_annotation=True)
     variant = self._get_sample_variant_1()
     variant.info['CSQ'] = ['A||100|',
                            'A||101|1.3',
                            'A|||1.4',
                            'TT|||']
     infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
-    new_header = next(infer_header_fields.process(variant, header))
-    desc = 'Inferred type field for annotation {}.'
-    expected = vcf_header_io.VcfHeader(infos={
-        'CSQ_Gene_TYPE':
-        Info('CSQ_Gene_TYPE', 1, 'Integer', desc.format('Gene'), '', ''),
-        'CSQ_Position_TYPE':
-        Info('CSQ_Position_TYPE', 1, 'Integer',
-             desc.format('Position'), '', ''),
-        'CSQ_Score_TYPE':
-        Info('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'), '', '')})
-    self.assertEqual(expected, new_header)
+    inferred_headers = next(infer_header_fields.process(variant, header))
+    expected_types = {'CSQ_Gene_TYPE': 'Integer',
+                      'CSQ_Position_TYPE': 'Integer',
+                      'CSQ_Score_TYPE': 'Float'}
+    for key, item in inferred_headers.infos.iteritems():
+      self.assertEqual(item['type'], expected_types[key])
+    self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
     variant.info['CSQ'] = []
-    new_header = next(infer_header_fields.process(variant, header))
+    inferred_headers = next(infer_header_fields.process(variant, header))
     expected = vcf_header_io.VcfHeader()
-    self.assertEqual(expected, new_header)
+    self.assertEqual(expected, inferred_headers)
 
   def test_infer_annotation_types_with_multiple_annotation_fields(self):
     anno_fields = ['CSQ', 'CSQ_VT']
-    header = self._get_sample_header_fields_with_annotation()
-    header.infos['CSQ_VT'] = OrderedDict([
-        ('id', 'CSQ_VT'),
-        ('num', -1),
-        ('type', 'String'),
-        ('desc', 'Annotations from VEP. Format: Allele|Gene|Position|Score'),
-        ('source', 'src'),
-        ('version', 'v')])
+    csq_vt = [('CSQ_VT', Info(
+        'CSQ_VT',
+        -1,
+        'String',
+        'Annotations from VEP. Format: Allele|Gene|Position|Score',
+        'source',
+        'v'))]
+    header = self._get_sample_header_fields(with_annotation=csq_vt)
     variant = self._get_sample_variant_1()
     variant.info['CSQ_VT'] = ['A|1|100|1.2',
                               'A|2|101|1.3']
     variant.info['CSQ'] = ['A|1|100|1.2',
                            'A|2|101|1.3']
     infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
-    new_header = next(infer_header_fields.process(variant, header))
-    desc = 'Inferred type field for annotation {}.'
-    expected = vcf_header_io.VcfHeader(infos={
-        'CSQ_Gene_TYPE':
-        Info('CSQ_Gene_TYPE', 1, 'Integer', desc.format('Gene'), '', ''),
-        'CSQ_Position_TYPE':
-        Info('CSQ_Position_TYPE', 1, 'Integer',
-             desc.format('Position'), '', ''),
-        'CSQ_Score_TYPE':
-        Info('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'), '', ''),
-        'CSQ_VT_Gene_TYPE':
-        Info('CSQ_VT_Gene_TYPE', 1, 'Integer', desc.format('Gene'), '', ''),
-        'CSQ_VT_Position_TYPE':
-        Info('CSQ_VT_Position_TYPE', 1, 'Integer',
-             desc.format('Position'), '', ''),
-        'CSQ_VT_Score_TYPE':
-        Info('CSQ_VT_Score_TYPE', 1, 'Float', desc.format('Score'), '', '')
-    })
-    self.assertEqual(dict(expected.infos), dict(new_header.infos))
+    inferred_headers = next(infer_header_fields.process(variant, header))
+    expected_types = {'CSQ_Gene_TYPE': 'Integer',
+                      'CSQ_Position_TYPE': 'Integer',
+                      'CSQ_Score_TYPE': 'Float',
+                      'CSQ_VT_Gene_TYPE': 'Integer',
+                      'CSQ_VT_Position_TYPE': 'Integer',
+                      'CSQ_VT_Score_TYPE': 'Float'}
+    for key, item in inferred_headers.infos.iteritems():
+      self.assertEqual(item['type'], expected_types[key])
+    self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
   def test_infer_annotation_pipeline(self):
     anno_fields = ['CSQ']
-    header = self._get_sample_header_fields_with_annotation()
+    header = self._get_sample_header_fields(with_annotation=True)
     variant1 = self._get_sample_variant_1()
     variant1.info['CSQ'] = ['A|1|100|1.2',
                             'A|2|101|1.3',

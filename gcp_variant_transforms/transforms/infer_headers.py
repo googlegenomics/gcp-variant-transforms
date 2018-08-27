@@ -33,7 +33,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
-#Filled with annotation field and name data, then used as a header ID
+# Filled with annotation field and name data, then used as a header ID.
 _BASE_ANNOTATION_TYPE_KEY = '{}_{}_TYPE'
 
 # Alias for the header key/type constants to make referencing easier.
@@ -42,6 +42,16 @@ _HeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
 
 def get_inferred_annotation_type_header_key(annot_field, name):
+  # type: (str, str) -> str
+  """Creates ID values for annotation type info headers.
+
+  Args:
+    annot_field: field name representing annotation field (e.g. 'CSQ').
+    name: annotation data field names (e.g. 'IMPACT').
+
+  Returns:
+    Info ID value (e.g. CSQ_IMPACT_TYPE).
+  """
   return _BASE_ANNOTATION_TYPE_KEY.format(annot_field, name)
 
 
@@ -218,7 +228,7 @@ class _InferHeaderFields(beam.DoFn):
     - The info fields' definitions provided by the header does not match the
       field value.
     Args:
-      variant: variant obj.
+      variant: variant object
       infos: dict of (info_key, `Info`) for any info field in
         `variant` that is not defined in the header or the definition mismatches
         the field values.
@@ -263,7 +273,7 @@ class _InferHeaderFields(beam.DoFn):
     header, a small 'merge' of value types is performed before VcfHeader
     creation for each variant.
     Args:
-      variant: variant obj.
+      variant: variant object
       infos: dict of (info_key, `Info`) for any info field in
         `variant` that is not defined in the header or the definition mismatches
         the field values.
@@ -324,7 +334,7 @@ class _InferHeaderFields(beam.DoFn):
       fields.
 
     Args:
-      variant: variant obj.
+      variant: variant object
       defined_headers: header fields defined in header section of VCF files.
     Returns:
       infos: dict of (info_key, `Info`) for any info field in
@@ -347,7 +357,7 @@ class _InferHeaderFields(beam.DoFn):
     - The format definition provided by the headers does not match the field
       values.
     Args:
-      variant: variant obj.
+      variant: variant object
       defined_headers: header fields defined in header section of VCF files.
     Returns:
       A dict of (format_key, `Format`) for any format key in

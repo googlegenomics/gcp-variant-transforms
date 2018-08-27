@@ -46,7 +46,7 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
-#Map for casting values with VcfHeaderFieldTypeConstants to Python types
+# Map for casting values with VcfHeaderFieldTypeConstants to Python types.
 VCF_TYPE_TO_PY = {vcf_header_io.VcfHeaderFieldTypeConstants.STRING: str,
                   vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT: float,
                   vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER: int}
@@ -345,9 +345,9 @@ class ProcessedVariantFactory(object):
 
     Yields:
       type_key: IDs for info fields added during inferring annotation types. For
-      example, if annotations fields are ('CSQ', 'CSQ_VT'), and names are
-      ['Gene', 'Impact'], this will yield ('CSQ_Gene_TYPE', 'CSQ_Impact_TYPE',
-      'CSQ_VT_Gene_TYPE', 'CSQ_VT_Impact_TYPE').
+        example, if annotations fields are ('CSQ', 'CSQ_VT'), and names are
+        ['Gene', 'Impact'], this will yield ('CSQ_Gene_TYPE', 'CSQ_Impact_TYPE',
+        'CSQ_VT_Gene_TYPE', 'CSQ_VT_Impact_TYPE').
     """
     for annot_field in self._annotation_field_set:
       for _, type_key in self._gen_annotation_name_key_pairs(annot_field):
@@ -456,8 +456,8 @@ class _AnnotationProcessor(object):
                 annotation_field_name, name)
             vcf_type = self._vcf_type_from_annotation_header(
                 annotation_field_name, type_key)
-            value = VCF_TYPE_TO_PY[vcf_type](value) if value else None
-            annotation_map[name] = value
+            typed_value = VCF_TYPE_TO_PY[vcf_type](value) if value else None
+            annotation_map[name] = typed_value
         self._alt_match_counter.inc()
         alt_datas = proc_var._alternate_datas[ind]
         if annotation_field_name not in alt_datas._info:

@@ -135,8 +135,8 @@ def generate_schema_from_header_fields(
 
   # Add info fields.
   info_keys = set()
-  annotation_info_type_keys_set = set(proc_variant_factory.
-                                      gen_annotation_info_type_keys())
+  annotation_info_type_keys_set = set(
+      proc_variant_factory.gen_annotation_info_type_keys())
   for key, field in header_fields.infos.iteritems():
     # END info is already included by modifying the end_position. Info type
     # fields exist only to indicate the type of corresponding annotation fields,

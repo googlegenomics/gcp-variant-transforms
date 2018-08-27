@@ -299,7 +299,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'default, annotation fields are STRING. Note: setting this flag '
               'or `infer_headers` incurs a performance penalty of an extra '
               'pass over all variants. Additionally, this flag will resolve '
-              'conflicts for all headers as if `allow_incompatible_types was '
+              'conflicts for all headers as if `allow_incompatible_types` was '
               'true.'))
 
   def validate(self, parsed_args):
