@@ -26,7 +26,6 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
-    'nucleus',
     'mmh3<2.6',
     # Need to explicitly install v<=1.2.0. apache-beam requires
     # google-cloud-pubsub 0.26.0, which relies on google-cloud-core<0.26dev,
