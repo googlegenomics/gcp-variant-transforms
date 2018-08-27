@@ -473,3 +473,7 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'within a contiguous region of the genome. This parameter will '
               'have an impact on memory requirements since the data in a '
               'single shard must be sorted.'))
+    parser.add_argument(
+        '--representative_header_file',
+        help='If provided, header values from the provided file will be added '
+             'into the output_file. ')

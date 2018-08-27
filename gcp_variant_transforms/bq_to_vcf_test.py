@@ -29,10 +29,9 @@ class BqToVcfTest(unittest.TestCase):
     with temp_dir.TempDir() as tempdir:
       file_path = filesystems.FileSystems.join(tempdir.get_path(),
                                                'data_header')
-      bq_to_vcf._write_vcf_data_header(['Sample 1', 'Sample 2'],
-                                       ['#CHROM', 'POS', 'ID', 'REF', 'ALT'],
-                                       file_path)
-      expected_content = '#CHROM\tPOS\tID\tREF\tALT\tSample 1\tSample 2\n'
+      bq_to_vcf._write_call_names(['Sample 1', 'Sample 2'],
+                                  file_path)
+      expected_content = '\tSample 1\tSample 2\n'
       with filesystems.FileSystems.open(file_path) as f:
         content = f.readlines()
         self.assertEqual(content, [expected_content])

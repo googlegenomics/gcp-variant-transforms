@@ -29,7 +29,7 @@ from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeaderSource
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadAllVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
-from gcp_variant_transforms.beam_io.vcf_header_io import _WriteVcfHeaderFn
+from gcp_variant_transforms.beam_io.vcf_header_io import WriteVcfHeaderFn
 from gcp_variant_transforms.beam_io.vcf_header_io import WriteVcfHeaders
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
@@ -211,7 +211,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     self.lines = testdata_util.get_sample_vcf_header_lines()
 
   def test_to_vcf_header_line(self):
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     header = collections.OrderedDict([
         ('id', 'NS'),
         ('num', 1),
@@ -225,14 +225,14 @@ class WriteVcfHeadersTest(unittest.TestCase):
                      expected)
 
   def test_raises_error_for_invalid_key(self):
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     header = collections.OrderedDict([('number', 0)])
 
     with self.assertRaises(ValueError):
       header_fn._format_header_key_value('number', header['number'])
 
   def test_raises_error_for_invalid_num(self):
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     header = collections.OrderedDict([('num', -4)])
 
     with self.assertRaises(ValueError):
@@ -245,7 +245,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
         self.lines[-1]
     ]
     header = _get_vcf_header_from_lines(self.lines)
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     actual = header_fn._to_vcf_header_line('INFO', header.infos.values()[0])
     expected = self.lines[0]
     self.assertEqual(actual, expected)
@@ -256,7 +256,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
         self.lines[-1],
     ]
     header = _get_vcf_header_from_lines(self.lines)
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     actual = header_fn._to_vcf_header_line('contig', header.contigs.values()[0])
     expected = '##contig=<ID=M,length=16>\n'
     self.assertEqual(actual, expected)
@@ -270,7 +270,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
         self.lines[-1],
     ]
     header = _get_vcf_header_from_lines(self.lines)
-    header_fn = _WriteVcfHeaderFn('')
+    header_fn = WriteVcfHeaderFn('')
     actual = []
     for info in header.infos.values():
       actual.append(header_fn._to_vcf_header_line('INFO', info))
@@ -281,7 +281,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     header = _get_vcf_header_from_lines(self.lines)
     with temp_dir.TempDir() as tempdir:
       tempfile = tempdir.create_temp_file(suffix='.vcf')
-      header_fn = _WriteVcfHeaderFn(tempfile)
+      header_fn = WriteVcfHeaderFn(tempfile)
       header_fn.process(header)
       self._assert_file_contents_equal(tempfile, self.lines)
 
