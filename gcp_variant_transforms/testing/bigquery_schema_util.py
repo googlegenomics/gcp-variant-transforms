@@ -78,12 +78,12 @@ def get_sample_table_schema(with_annotation_fields=False):
         mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
         description='desc')
     annotation_record.fields.append(bigquery.TableFieldSchema(
-        name='allele',
+        name='Consequence',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='desc.'))
     annotation_record.fields.append(bigquery.TableFieldSchema(
-        name='Consequence',
+        name='IMPACT',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='desc.'))
@@ -142,22 +142,20 @@ def get_sample_table_schema(with_annotation_fields=False):
       description='desc'))
   schema.fields.append(calls_record)
 
-  # Call record.
-  call_record = bigquery.TableFieldSchema(
-      name=bigquery_util.ColumnKeyConstants.CALLS,
-      type=bigquery_util.TableFieldConstants.TYPE_RECORD,
-      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
-      description='One record for each call.')
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FB',
-      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='GQ',
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='II',
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
-  schema.fields.append(call_record)
-  
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IFR',
+      type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description='desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IS',
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+
   return schema

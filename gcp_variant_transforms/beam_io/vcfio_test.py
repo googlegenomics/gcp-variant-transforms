@@ -843,8 +843,8 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_coder(self, annotation_fields=None):
-    return vcfio._ToVcfRecordCoder(annotation_fields)
+  def _get_coder(self):
+    return vcfio._ToVcfRecordCoder()
 
   def test_to_vcf_line(self):
     coder = self._get_coder()
@@ -883,46 +883,12 @@ class VcfSinkTest(unittest.TestCase):
     variant.info['NS'] = 3
     variant.info['AF'] = [0.333, 0.667]
     variant.info['DB'] = True
-    expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
+    variant.info['CSQ'] = ['G|upstream_gene_variant||MODIFIER',
+                           'T|||MODIFIER']
+    expected = ('.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB;'
+                'CSQ=G|upstream_gene_variant||MODIFIER,T|||MODIFIER	.\n')
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
-
-  def test_encode_annotation_value(self):
-    coder = self._get_coder(['allele', 'Consequence', 'AF'])
-    variant = Variant()
-    variant.info['CSQ'] = [
-        [
-            {u'allele': u'G',
-             u'Consequence': u'upstream_gene_variant',
-             u'AF': u''},
-            {u'allele': u'G',
-             u'Consequence': u'upstream_gene_variant',
-             u'AF': u''}
-        ],
-        [
-            {u'allele': u'T',
-             u'Consequence': u'upstream_gene_variant',
-             u'AF': u''},
-            {u'Consequence': u'upstream_gene_variant',
-             u'AF': u'0.1',
-             u'allele': u'T'}
-        ]
-    ]
-    expected = ['.	.	.	.	.	.	.	CSQ=G|upstream_gene_variant|,'
-                'G|upstream_gene_variant|,T|upstream_gene_variant|,'
-                'T|upstream_gene_variant|0.1	.\n']
-    self._assert_variant_lines_equal(coder.encode(variant), ''.join(expected))
-
-  def test_encode_annotation_value_missing_annotation_fields(self):
-    coder = self._get_coder()
-    variant = Variant()
-    variant.info['CSQ'] = [
-        [
-            {u'allele': u'G'}
-        ]
-    ]
-    with self.assertRaises(ValueError):
-      coder.encode(variant)
 
   def test_empty_sample_calls(self):
     coder = self._get_coder()

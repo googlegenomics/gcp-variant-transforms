@@ -45,7 +45,7 @@ import logging
 import sys
 import tempfile
 from datetime import datetime
-from typing import Iterable, List, Tuple  # pylint: disable=unused-import
+from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam.io import filesystems
@@ -160,11 +160,11 @@ def _bigquery_to_vcf_shards(
                                       validate=True,
                                       use_standard_sql=True)
   schema = _get_schema(known_args.input_table)
-  annotation_fields = _extract_annotation_fields(schema)
+  annotation_names = _extract_annotation_names(schema)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
-                | bigquery_to_variant.BigQueryToVariant())
+                | bigquery_to_variant.BigQueryToVariant(annotation_names))
     call_names = (variants
                   | 'CombineCallNames' >>
                   combine_call_names.CallNamesCombiner())
@@ -182,18 +182,7 @@ def _bigquery_to_vcf_shards(
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
-         | vcfio.WriteVcfDataLines(annotation_fields))
-
-
-def _extract_annotation_fields(schema):
-  # type: (bigquery_v2.TableSchema) -> List[str]
-  for table_field in schema.fields:
-    if table_field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
-      for sub_field in table_field.fields:
-        if (sub_field.type.lower() ==
-            bigquery_util.TableFieldConstants.TYPE_RECORD):
-          return [field.name for field in sub_field.fields]
-  return []
+         | vcfio.WriteVcfDataLines())
 
 
 def _get_schema(input_table):
@@ -228,6 +217,27 @@ def _get_bigquery_query(known_args):
   if not conditions:
     return base_query
   return ' '.join([base_query, 'WHERE', ' OR '.join(conditions)])
+
+
+def _extract_annotation_names(schema):
+  # type: (bigquery_v2.TableSchema) -> Dict[str, List[str]]
+  """Returns a mapping of annotation id to the corresponding annotation names.
+
+  The annotation names are useful for reconstructing the annotation str (e.g.,
+  'A|upstream_gene_variant|MODIFIER|PSMF1|||||'). Sample returned map:
+  {'CSQ': ['Consequence', 'IMPACT', 'SYMBOL'],
+   'CSQ_2': ['Codons', 'STRAND']}
+  """
+  annotation_names = {}
+  for table_field in schema.fields:
+    if table_field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
+      for sub_field in table_field.fields:
+        if (sub_field.type.lower() ==
+            bigquery_util.TableFieldConstants.TYPE_RECORD):
+          annotation_names.update({
+              sub_field.name: [field.name for field in sub_field.fields]
+          })
+  return annotation_names
 
 
 def _write_vcf_header_with_call_names(sample_names,
