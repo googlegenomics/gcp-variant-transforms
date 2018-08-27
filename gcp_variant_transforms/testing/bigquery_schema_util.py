@@ -21,7 +21,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from gcp_variant_transforms.libs import bigquery_util
 
 
-def get_sample_table_schema():
+def get_sample_table_schema(with_annotation_fields=False):
   # type: () -> bigquery.TableSchema
   """Creates a sample BigQuery table schema.
 
@@ -70,6 +70,24 @@ def get_sample_table_schema():
       type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
+
+  if with_annotation_fields:
+    annotation_record = bigquery.TableFieldSchema(
+        name='CSQ',
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='desc')
+    annotation_record.fields.append(bigquery.TableFieldSchema(
+        name='allele',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    annotation_record.fields.append(bigquery.TableFieldSchema(
+        name='Consequence',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    alternate_bases_record.fields.append(annotation_record)
 
   schema.fields.append(alternate_bases_record)
   schema.fields.append(bigquery.TableFieldSchema(
@@ -124,20 +142,22 @@ def get_sample_table_schema():
       description='desc'))
   schema.fields.append(calls_record)
 
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='II',
+  # Call record.
+  call_record = bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.CALLS,
+      type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description='One record for each call.')
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='FB',
+      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='GQ',
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IFR',
-      type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
-      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
-      description='desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IS',
-      type=bigquery_util.TableFieldConstants.TYPE_STRING,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='desc'))
-
+  schema.fields.append(call_record)
+  
   return schema

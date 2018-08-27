@@ -20,6 +20,7 @@ import unittest
 from apache_beam.io import filesystems
 
 from gcp_variant_transforms import bq_to_vcf
+from gcp_variant_transforms.testing import bigquery_schema_util
 from gcp_variant_transforms.testing import temp_dir
 
 
@@ -76,3 +77,17 @@ class BqToVcfTest(unittest.TestCase):
         'end_position<=9223372036854775807)'
     )
     self.assertEqual(bq_to_vcf._get_bigquery_query(args_1), expected_query)
+
+  def test_get_annotation_fields(self):
+    schema_with_annotations = bigquery_schema_util.get_sample_table_schema(
+        with_annotation_fields=True)
+
+    self.assertEqual(
+        bq_to_vcf._extract_annotation_fields(schema_with_annotations),
+        ['allele', 'Consequence']
+    )
+    schema_with_no_annotation = bigquery_schema_util.get_sample_table_schema()
+    self.assertEqual(
+        bq_to_vcf._extract_annotation_fields(schema_with_no_annotation),
+        []
+    )

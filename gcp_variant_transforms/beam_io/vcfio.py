@@ -19,7 +19,7 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
-from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
+from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
 import enum
 
@@ -40,6 +40,7 @@ from gcp_variant_transforms.beam_io import vcf_parser
 MalformedVcfRecord = vcf_parser.MalformedVcfRecord
 FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
+MISSING_ANNOTATION_FIELD_VALUE = ''
 PASS_FILTER = vcf_parser.PASS_FILTER
 END_INFO_KEY = vcf_parser.END_INFO_KEY
 GENOTYPE_FORMAT_KEY = vcf_parser.GENOTYPE_FORMAT_KEY
@@ -58,6 +59,16 @@ class VcfParserType(enum.Enum):
 
 class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
+
+  def __init__(self, annotation_fields=None):
+    # type: (List[str]) -> None
+    """Initializes an object of `_ToVcfRecordCoder`.
+
+    Args:
+      annotation_fields: A list of annotation fields. The annotation field
+        values are encoded in the same order as `annotation_fields`.
+    """
+    self._annotation_fields = annotation_fields
 
   def encode(self, variant):
     # type: (Variant) -> str
@@ -84,12 +95,25 @@ class _ToVcfRecordCoder(coders.Coder):
     return '\t'.join(columns) + '\n'
 
   def _encode_value(self, value):
-    """Encodes a single :class:`Variant` column value for a VCF file line."""
+    # type: (Any) -> str
+    """Encodes a single `Variant` column value for a VCF file line."""
     if not value and value != 0:
       return MISSING_FIELD_VALUE
     elif isinstance(value, list):
       return ','.join([self._encode_value(x) for x in value])
-    return str(value)
+    elif isinstance(value, dict):
+      if not self._annotation_fields:
+        raise ValueError('No annotation fields defined.')
+      return '|'.join(self._encode_annotation_value(value.get(x)) for
+                      x in self._annotation_fields)
+    return value.encode('utf-8') if isinstance(value, unicode) else str(value)
+
+  def _encode_annotation_value(self, value):
+    # type: (unicode) -> str
+    if not value and value != 0:
+      return MISSING_ANNOTATION_FIELD_VALUE
+    else:
+      return value.encode('utf-8') if isinstance(value, unicode) else str(value)
 
   def _encode_variant_info(self, variant):
     """Encodes the info of a :class:`Variant` for a VCF file line."""
@@ -106,7 +130,7 @@ class _ToVcfRecordCoder(coders.Coder):
       if v is True:
         encoded_infos.append(k)
       else:
-        encoded_infos.append('%s=%s' % (k, self._encode_value(v)))
+        encoded_infos.append('%s=%s' % (str(k), self._encode_value(v)))
     return ';'.join(encoded_infos)
 
   def _get_variant_format_keys(self, variant):
@@ -391,8 +415,9 @@ class WriteToVcf(PTransform):
 class _WriteVcfDataLinesFn(beam.DoFn):
   """A function that writes variants to one VCF file."""
 
-  def __init__(self):
-    self._coder = _ToVcfRecordCoder()
+  def __init__(self, annotation_fields):
+    # type: (List[str]) -> None
+    self._coder = _ToVcfRecordCoder(annotation_fields)
 
   def process(self, (file_path, variants), *args, **kwargs):
     # type: (Tuple[str, List[Variant]]) -> None
@@ -408,5 +433,16 @@ class WriteVcfDataLines(PTransform):
   writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
   PCollection<`Variant`> as input, and writes all variants to the same file.
   """
+
+  def __init__(self, annotation_fields=None):
+    """Initializes a PTransform for writing VCF data lines.
+
+    Args:
+      annotation_fields: A list of annotation fields. The annotation field
+        values are encoded in the same order as `annotation_fields`.
+    """
+    self._annotation_fields = annotation_fields
+
   def expand(self, pcoll):
-    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())
+    return pcoll | 'WriteToVCF' >> beam.ParDo(
+        _WriteVcfDataLinesFn(self._annotation_fields))

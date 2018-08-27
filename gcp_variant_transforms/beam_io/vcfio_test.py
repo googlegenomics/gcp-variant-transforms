@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 # Copyright 2017 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,14 +86,15 @@ def _get_sample_variant_1(is_for_nucleus=False):
     multiple alternates
     not phased
     multiple names
+    utf-8 encoded
   """
   if not is_for_nucleus:
     vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-                'PASS	AF=0.5,0.1;NS=1	GT:GQ	0/0:48	1/0:20\n')
+                'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
     variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
         alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1})
+        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
     variant.calls.append(
         vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
     variant.calls.append(
@@ -100,15 +102,16 @@ def _get_sample_variant_1(is_for_nucleus=False):
   else:
     # 0.1 -> 0.25 float precision loss due to binary floating point conversion.
     vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-                'PASS	AF=0.5,0.25;NS=1	GT:GQ	0/0:48	1/0:20\n')
+                'PASS	AF=0.5,0.25;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
     variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
         alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1})
+        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1, 'SVTYPE': ['BÑD']})
     variant.calls.append(
         vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
     variant.calls.append(
         vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+
   return variant, vcf_line
 
 
@@ -840,8 +843,8 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_coder(self):
-    return vcfio._ToVcfRecordCoder()
+  def _get_coder(self, annotation_fields=None):
+    return vcfio._ToVcfRecordCoder(annotation_fields)
 
   def test_to_vcf_line(self):
     coder = self._get_coder()
@@ -883,6 +886,43 @@ class VcfSinkTest(unittest.TestCase):
     expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
+
+  def test_encode_annotation_value(self):
+    coder = self._get_coder(['allele', 'Consequence', 'AF'])
+    variant = Variant()
+    variant.info['CSQ'] = [
+        [
+            {u'allele': u'G',
+             u'Consequence': u'upstream_gene_variant',
+             u'AF': u''},
+            {u'allele': u'G',
+             u'Consequence': u'upstream_gene_variant',
+             u'AF': u''}
+        ],
+        [
+            {u'allele': u'T',
+             u'Consequence': u'upstream_gene_variant',
+             u'AF': u''},
+            {u'Consequence': u'upstream_gene_variant',
+             u'AF': u'0.1',
+             u'allele': u'T'}
+        ]
+    ]
+    expected = ['.	.	.	.	.	.	.	CSQ=G|upstream_gene_variant|,'
+                'G|upstream_gene_variant|,T|upstream_gene_variant|,'
+                'T|upstream_gene_variant|0.1	.\n']
+    self._assert_variant_lines_equal(coder.encode(variant), ''.join(expected))
+
+  def test_encode_annotation_value_missing_annotation_fields(self):
+    coder = self._get_coder()
+    variant = Variant()
+    variant.info['CSQ'] = [
+        [
+            {u'allele': u'G'}
+        ]
+    ]
+    with self.assertRaises(ValueError):
+      coder.encode(variant)
 
   def test_empty_sample_calls(self):
     coder = self._get_coder()
