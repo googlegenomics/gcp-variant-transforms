@@ -23,7 +23,7 @@ set -euo pipefail
 #
 # To run this test successfully:
 # - The user's gcloud credentials should be set; follow the steps at:
-#   https://cloud.google.com/genomics/install-genomics-tools
+#   https://cloud.google.com/genomics/docs/how-tos/getting-started#set_up_sdk_name_and_gcloud
 #
 # - The user should have access to the 'gcp-variant-transforms-test' project.
 

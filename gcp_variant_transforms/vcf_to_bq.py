@@ -256,7 +256,7 @@ def run(argv=None):
       variants[i] |= ('MergeVariants' + str(i) >>
                       merge_variants.MergeVariants(variant_merger))
     variants[i] |= (
-        'ProcessVaraints' + str(i) >>
+        'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
             with_output_types(processed_variant.ProcessedVariant))
   if partitioner and partitioner.should_flatten():

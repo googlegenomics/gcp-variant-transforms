@@ -120,13 +120,13 @@ class _ToVcfRecordCoder(coders.Coder):
     return format_keys
 
   def _encode_variant_calls(self, variant, format_keys):
-    """Encodes the calls of a :class:`Variant` in a VCF line."""
+    # type: (Variant, List[str]) -> str
+    """Encodes the calls of `Variant` in a VCF line."""
     # Ensure that genotype is always the first key in format_keys
     assert not format_keys or format_keys[0] == GENOTYPE_FORMAT_KEY
     encoded_calls = []
     for call in variant.calls:
-      encoded_call_info = [self._encode_genotype(
-          call.genotype, call.phaseset)]
+      encoded_call_info = [self._encode_genotype(call.genotype, call.phaseset)]
       for key in format_keys[1:]:
         if key == PHASESET_FORMAT_KEY:
           encoded_call_info.append(
