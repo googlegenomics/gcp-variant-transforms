@@ -34,7 +34,7 @@ from apache_beam.io import textio
 MalformedVcfRecord = namedtuple('MalformedVcfRecord',
                                 ['file_name', 'line', 'error'])
 FIELD_COUNT_ALTERNATE_ALLELE = 'A'  # Indicates one value for each alternate
-                                    # allele
+                                    # allele.
 MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
 PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
 END_INFO_KEY = 'END'  # The info key that explicitly specifies end of a record.

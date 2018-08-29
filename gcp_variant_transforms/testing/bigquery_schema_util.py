@@ -14,6 +14,7 @@
 
 """Utility functions for creating BigQuery schema used by unit tests."""
 
+from __future__ import absolute_import
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
@@ -22,7 +23,14 @@ from gcp_variant_transforms.libs import bigquery_util
 
 def get_sample_table_schema():
   # type: () -> bigquery.TableSchema
-  """Creates a sample BigQuery table schema."""
+  """Creates a sample BigQuery table schema.
+
+  The schema contains the fixed schema fields for VCF. Besides that, it also
+  has:
+    - One sub field (`AF`) for `alternate_bases`.
+    - Two sub fields (`FB` and `GQ`) for `call`.
+    - Three INFO fields (`II`, `IFR`, `IS`).
+  """
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
@@ -80,6 +88,42 @@ def get_sample_table_schema():
       mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
       description=('List of failed filters (if any) or "PASS" indicating the '
                    'variant has passed all filters.')))
+    # Call record.
+  calls_record = bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.CALLS,
+      type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description='One record for each call.')
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.CALLS_NAME,
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='Name of the call.'))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
+      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description=('Genotype of the call. "-1" is used in cases where the '
+                   'genotype is not called.')))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.CALLS_PHASESET,
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description=('Phaseset of the call (if any). "*" is used in cases where '
+                   'the genotype is phased, but no phase set ("PS" in FORMAT) '
+                   'was specified.')))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name='FB',
+      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name='GQ',
+      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+  schema.fields.append(calls_record)
+
   schema.fields.append(bigquery.TableFieldSchema(
       name='II',
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
@@ -95,21 +139,5 @@ def get_sample_table_schema():
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
-  # Call record.
-  call_record = bigquery.TableFieldSchema(
-      name=bigquery_util.ColumnKeyConstants.CALLS,
-      type=bigquery_util.TableFieldConstants.TYPE_RECORD,
-      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
-      description='One record for each call.')
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FB',
-      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='GQ',
-      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='desc'))
-  schema.fields.append(call_record)
+
   return schema

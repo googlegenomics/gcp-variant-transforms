@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handles generation and processing of BigQuery schema for variants."""
+"""Handles the conversion between BigQuery schema and VCF header."""
 
 from __future__ import absolute_import
 
-from typing import Dict, Any  # pylint: disable=unused-import
+from collections import OrderedDict
+from typing import Any, Dict  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
+
+from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -30,8 +33,31 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: d
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
 
+_BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = bigquery_util.BIG_QUERY_TYPE_TO_VCF_TYPE_MAP
+_Format = parser._Format
+_Info = parser._Info
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+
+
+# The Constant fields included below are not part of the INFO or FORMAT in the
+# VCF header.
+_NON_INFO_OR_FORMAT_CONSTANT_FIELDS = [
+    bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+    bigquery_util.ColumnKeyConstants.START_POSITION,
+    bigquery_util.ColumnKeyConstants.END_POSITION,
+    bigquery_util.ColumnKeyConstants.REFERENCE_BASES,
+    bigquery_util.ColumnKeyConstants.NAMES,
+    bigquery_util.ColumnKeyConstants.QUALITY,
+    bigquery_util.ColumnKeyConstants.FILTER
+]
+
+_CONSTANT_CALL_FIELDS = [bigquery_util.ColumnKeyConstants.CALLS_NAME,
+                         bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
+                         bigquery_util.ColumnKeyConstants.CALLS_PHASESET]
+
+_CONSTANT_ALTERNATE_BASES_FIELDS = [
+    bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT]
 
 
 def generate_schema_from_header_fields(
@@ -157,3 +183,63 @@ def generate_schema_from_header_fields(
   if variant_merger:
     variant_merger.modify_bigquery_schema(schema, info_keys)
   return schema
+
+
+def generate_header_fields_from_schema(schema):
+  # type: (bigquery.TableSchema) -> vcf_header_io.VcfHeader
+  """Returns header fields converted from BigQuery schema.
+
+  This is a best effort reconstruction of header fields. Only INFO and FORMAT
+  are considered. For each header field, the type is mapped from BigQuery schema
+  field type to VCF type. Since the Number information is not included in
+  BigQuery schema, the Number remains to be an unknown value (Number=`.`).
+  One exception is the sub fields in alternate_bases, which have `Number=A`.
+  """
+  infos = OrderedDict()  # type: OrderedDict[str, _Info]
+  formats = OrderedDict()  # type: OrderedDict[str, _Format]
+  for field in schema.fields:
+    if field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS:
+      continue
+
+    if field.name == bigquery_util.ColumnKeyConstants.CALLS:
+      _add_format_fields(field, formats)
+    elif field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
+      _add_info_fields_from_alternate_bases(field, infos)
+    else:
+      infos.update({
+          field.name: _Info(field.name,
+                            parser.field_counts[vcfio.MISSING_FIELD_VALUE],
+                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
+                            field.description,
+                            None,
+                            None)})
+
+  return vcf_header_io.VcfHeader(infos=infos, formats=formats)
+
+
+def _add_format_fields(schema, formats):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Format]) -> None
+  for field in schema.fields:
+    if field.name in _CONSTANT_CALL_FIELDS:
+      continue
+    formats.update({
+        field.name: _Format(field.name,
+                            parser.field_counts[vcfio.MISSING_FIELD_VALUE],
+                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
+                            field.description)})
+
+
+def _add_info_fields_from_alternate_bases(schema, infos):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+  for field in schema.fields:
+    if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
+      continue
+
+    infos.update({
+        field.name: _Info(field.name,
+                          parser.field_counts[
+                              vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
+                          _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
+                          field.description,
+                          None,
+                          None)})
