@@ -38,7 +38,7 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
-
+from gcp_variant_transforms.transforms import infer_headers
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
@@ -46,6 +46,10 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
+# Map for casting values with VcfHeaderFieldTypeConstants to Python types.
+VCF_TYPE_TO_PY = {vcf_header_io.VcfHeaderFieldTypeConstants.STRING: str,
+                  vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT: float,
+                  vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER: int}
 
 # Counter names
 class _CounterEnum(enum.Enum):
@@ -195,6 +199,7 @@ class ProcessedVariantFactory(object):
       annotation_fields=None,  # type: List[str]
       use_allele_num=False,  # type: bool
       minimal_match=False,  # type: bool
+      infer_annotation_types=False,  # type: bool
       counter_factory=None  # type: metrics_util.CounterFactoryInterface
   ):
     # type: (...) -> None
@@ -212,6 +217,8 @@ class ProcessedVariantFactory(object):
         the index of the ALT that corresponds to an annotation set.
       minimal_match: If set, then the --minimal mode of VEP is simulated for
         annotation ALT matching.
+      infer_annotation_types: If set, then warnings will be provided if header
+        fields fail to contain Info type lines for annotation fields
     """
     self._header_fields = header_fields
     self._split_alternate_allele_info_fields = (
@@ -222,8 +229,9 @@ class ProcessedVariantFactory(object):
         _CounterEnum.VARIANT.value)
     self._annotation_processor = _AnnotationProcessor(
         annotation_fields, self._header_fields, cfactory, use_allele_num,
-        minimal_match)
+        minimal_match, infer_annotation_types)
     self._minimal_match = minimal_match
+    self._infer_annotation_types = infer_annotation_types
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -290,8 +298,6 @@ class ProcessedVariantFactory(object):
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
-      annotation_names = annotation_parser.extract_annotation_names(
-          self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
       annotation_descs = descriptions.VEP_DESCRIPTIONS
       annotation_record = bigquery.TableFieldSchema(
           name=_BigQuerySchemaSanitizer.get_sanitized_field_name(annot_field),
@@ -304,15 +310,48 @@ class ProcessedVariantFactory(object):
           type=bigquery_util.TableFieldConstants.TYPE_STRING,
           mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
           description='The ALT part of the annotation field.'))
-      for annotation_name in annotation_names:
+      annotation_names_keys = self._gen_annotation_name_key_pairs(annot_field)
+      for annotation_name, type_key in annotation_names_keys:
+        if type_key in self._header_fields.infos:
+          vcf_type = self._header_fields.infos[type_key][
+              vcf_header_io.VcfParserHeaderKeyConstants.TYPE]
+        else:
+          vcf_type = vcf_header_io.VcfHeaderFieldTypeConstants.STRING
+          if self._infer_annotation_types:
+            logging.warning(('Annotation field %s has no corresponding header '
+                             'field with id %s to specify type. Using type %s '
+                             'instead.'), annotation_name, type_key, vcf_type)
         annotation_record.fields.append(bigquery.TableFieldSchema(
             name=_BigQuerySchemaSanitizer.get_sanitized_field_name(
                 annotation_name),
-            type=bigquery_util.TableFieldConstants.TYPE_STRING,
+            type=bigquery_util.get_bigquery_type_from_vcf_type(vcf_type),
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
             description=annotation_descs.get(annotation_name, '')))
       alternate_bases_record.fields.append(annotation_record)
     return alternate_bases_record
+
+  def _gen_annotation_name_key_pairs(self, annot_field):
+    #  type: (str) -> (str, str)
+    annotation_names = annotation_parser.extract_annotation_names(
+        self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
+    for name in annotation_names:
+      type_key = infer_headers.get_inferred_annotation_type_header_key(
+          annot_field, name)
+      yield name, type_key
+
+  def gen_annotation_info_type_keys(self):
+    #  type: () -> str
+    """Generates all possible key IDs for annotation type info fields.
+
+    Yields:
+      type_key: IDs for info fields added during inferring annotation types. For
+        example, if annotations fields are ('CSQ', 'CSQ_VT'), and names are
+        ['Gene', 'Impact'], this will yield ('CSQ_Gene_TYPE', 'CSQ_Impact_TYPE',
+        'CSQ_VT_Gene_TYPE', 'CSQ_VT_Impact_TYPE').
+    """
+    for annot_field in self._annotation_field_set:
+      for _, type_key in self._gen_annotation_name_key_pairs(annot_field):
+        yield type_key
 
   def info_is_in_alt_bases(self, info_field_name):
     # type: (str) -> bool
@@ -336,6 +375,7 @@ class _AnnotationProcessor(object):
                counter_factory,  # type: metrics_util.CounterFactoryInterface
                use_allele_num,  # type: bool
                minimal_match,  # type: bool
+               infer_annotation_types,  # type: bool
               ):
     # type: (...) -> None
     """Creates an instance for adding annotations to `ProcessedVariant` objects.
@@ -349,7 +389,10 @@ class _AnnotationProcessor(object):
         annotations. The format of how annotations are stored and their names
         are extracted from header_fields.
       header_fields: The VCF header information.
+      infer_annotation_types: If set, then warnings will be provided if header
+        fields fail to contain Info type lines for annotation fields
     """
+    self._header_fields = header_fields
     self._annotation_names_map = {}  # type: Dict[str, List[str]]
     for field in annotation_fields or []:
       if field not in header_fields.infos:
@@ -369,6 +412,7 @@ class _AnnotationProcessor(object):
         _CounterEnum.ALLELE_NUM_INCORRECT.value)
     self._use_allele_num = use_allele_num
     self._minimal_match = minimal_match
+    self._infer_annotation_types = infer_annotation_types
 
   def add_annotation_data(self, proc_var, annotation_field_name, data):
     # type: (ProcessedVariant, str, List[str]) -> None
@@ -392,7 +436,7 @@ class _AnnotationProcessor(object):
         where the '|' character is the separator. The first element is a way
         to identify the allele (one of the ALTs) that this annotation data
         refers to. The rest of the elements are annotations corresponding to the
-        `annotation_field_name` format description in the hearder, e.g.,
+        `annotation_field_name` format description in the header, e.g.,
 
         Allele|Consequence|IMPACT|SYMBOL|Gene|...
     """
@@ -404,6 +448,15 @@ class _AnnotationProcessor(object):
     for annotation_str in data:
       try:
         ind, annotation_map = parser.parse_and_match_alt(annotation_str)
+        for name, value in annotation_map.iteritems():
+          if name == annotation_parser.ANNOTATION_ALT:
+            continue
+          type_key = infer_headers.get_inferred_annotation_type_header_key(
+              annotation_field_name, name)
+          vcf_type = self._vcf_type_from_annotation_header(
+              annotation_field_name, type_key)
+          typed_value = VCF_TYPE_TO_PY[vcf_type](value) if value else None
+          annotation_map[name] = typed_value
         self._alt_match_counter.inc()
         alt_datas = proc_var._alternate_datas[ind]
         if annotation_field_name not in alt_datas._info:
@@ -424,3 +477,15 @@ class _AnnotationProcessor(object):
           self._allele_num_incorrect_counter.inc()
         elif isinstance(e, annotation_parser.AmbiguousAnnotationAllele):
           self._alt_minimal_ambiguous_counter.inc()
+
+  def _vcf_type_from_annotation_header(self, annotation_name, type_key):
+    # type: (str, str) -> str
+    if type_key in self._header_fields.infos:
+      vcf_type = self._header_fields.infos[type_key][_HeaderKeyConstants.TYPE]
+    else:
+      vcf_type = vcf_header_io.VcfHeaderFieldTypeConstants.STRING
+      if self._infer_annotation_types:
+        logging.warning(('Annotation field %s has no corresponding header '
+                         'field with id %s to specify type. Using type %s '
+                         'instead.'), annotation_name, type_key, vcf_type)
+    return vcf_type

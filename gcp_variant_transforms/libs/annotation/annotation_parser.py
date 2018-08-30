@@ -144,7 +144,7 @@ class Parser(object):
       ValueError: In a few other error cases, the exception message should be
         descriptive enough.
     """
-    annotations = _extract_annotation_list_with_alt(annotation_str)
+    annotations = extract_annotation_list_with_alt(annotation_str)
     annotation_map = self._create_map(annotations)
     alt_ind = self._find_alt_index(annotation_map)
     return alt_ind, annotation_map
@@ -301,7 +301,7 @@ class Parser(object):
       raise InvalidAlleleNumValue(e)
 
 
-def _extract_annotation_list_with_alt(annotation_str):
+def extract_annotation_list_with_alt(annotation_str):
   # type: (str) -> List[str]
   """Extracts annotations from an annotation INFO field.
 
@@ -323,10 +323,10 @@ def extract_annotation_names(description):
   # type: (str) -> List[str]
   """Extracts annotation list from the description of an annotation INFO field.
 
-  This is similar to extract_extract_annotation_list_with_alt with the
-  difference that it ignores everything before the first '|'. For example, for
+  This is similar to extract_annotation_list_with_alt with the difference
+  that it ignores everything before the first '|'. For example, for
   'some desc ... Format: Allele|Consequence|IMPACT|SYMBOL|Gene', it returns
-  ['Consequence', 'IMPACT', 'SYMBOL', 'Gene']
+  ['Consequence', 'IMPACT', 'SYMBOL', 'Gene'].
 
   Args:
     description: The "Description" part of the annotation INFO field
@@ -335,7 +335,7 @@ def extract_annotation_names(description):
   Returns:
     The list of annotation names.
   """
-  annotation_names = _extract_annotation_list_with_alt(description)
+  annotation_names = extract_annotation_list_with_alt(description)
   if len(annotation_names) < 2:
     raise ValueError(
         'Expected at least one | in annotation description {}'.format(

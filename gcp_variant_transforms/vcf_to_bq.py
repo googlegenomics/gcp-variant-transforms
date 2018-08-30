@@ -126,13 +126,17 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> pvalue.PCollection
+  annotation_fields_to_infer = (known_args.annotation_fields if
+                                known_args.infer_annotation_types else [])
   inferred_headers = (
       _read_variants(pipeline, known_args)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
           pvalue.AsSingleton(merged_header),
-          known_args.allow_incompatible_records))
+          known_args.allow_incompatible_records,
+          known_args.infer_headers,
+          annotation_fields_to_infer))
   merged_header = (
       (inferred_headers, merged_header)
       | beam.Flatten()
@@ -178,7 +182,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
         headers,
         known_args.split_alternate_allele_info_fields,
         known_args.allow_incompatible_records)
-    if known_args.infer_headers:
+    if known_args.infer_headers or known_args.infer_annotation_types:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
     vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path
@@ -218,6 +222,7 @@ def run(argv=None):
       known_args.annotation_fields,
       known_args.use_allele_num,
       known_args.minimal_vep_alt_matching,
+      known_args.infer_annotation_types,
       counter_factory)
 
   partitioner = None
