@@ -56,11 +56,11 @@ class VcfHeader(object):
   """Container for header data."""
 
   def __init__(self,
-               infos=None,  # type: Dict[str, OrderedDict[vcf.parser._Info]]
-               filters=None,  # type: Dict[str, OrderedDict[vcf.parser._Filter]]
-               alts=None,  # type: Dict[str, OrderedDict[vcf.parser._Alt]]
-               formats=None,  # type: Dict[str, OrderedDict[vcf.parser._Format]]
-               contigs=None,  # type: Dict[str, OrderedDict[vcf.parser._Contig]]
+               infos=None,  # type: OrderedDict[str, vcf.parser._Info]
+               filters=None,  # type: OrderedDict[str, vcf.parser._Filter]
+               alts=None,  # type: OrderedDict[str, vcf.parser._Alt]
+               formats=None,  # type: OrderedDict[str, vcf.parser._Format]
+               contigs=None,  # type: OrderedDict[str, vcf.parser._Contig]
                file_name=None  # type: str
               ):
     # type: (...) -> None
@@ -78,6 +78,7 @@ class VcfHeader(object):
       contigs: A dictionary mapping contig keys to vcf contig metadata values.
       file_name: The file name of the vcf file.
     """
+    # type: OrderedDict[str, OrderedDict]
     self.infos = self._values_asdict(infos or {})
     self.filters = self._values_asdict(filters or {})
     self.alts = self._values_asdict(alts or {})
