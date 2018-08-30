@@ -246,10 +246,7 @@ class ProcessedVariantFactory(object):
       if key in self._annotation_field_set:
         self._annotation_processor.add_annotation_data(
             proc_var, key, variant_info_data)
-      elif (self._split_alternate_allele_info_fields and
-            key in self._header_fields.infos and
-            self._header_fields.infos[key][_HeaderKeyConstants.NUM] == (
-                vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
+      elif self._is_per_alt_info_field(key):
         self._add_per_alt_info(proc_var, key, variant_info_data)
       else:
         proc_var._non_alt_info[key] = variant_info_data
@@ -358,12 +355,18 @@ class ProcessedVariantFactory(object):
     # type: (str) -> bool
     if info_field_name not in self._header_fields.infos:
       raise ValueError('INFO field {} not found'.format(info_field_name))
-    is_per_alt_info = (
-        self._split_alternate_allele_info_fields and
-        self._header_fields.infos[info_field_name][_HeaderKeyConstants.NUM] ==
-        vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])
+    is_per_alt_info = self._is_per_alt_info_field(info_field_name)
     is_annotation = info_field_name in self._annotation_field_set
     return is_per_alt_info or is_annotation
+
+  def _is_per_alt_info_field(self, info_field_name):
+    # type: (str) -> bool
+    """Returns true iff `info_field_name` is defined as having Number=A."""
+    return (
+        self._split_alternate_allele_info_fields and
+        info_field_name in self._header_fields.infos and
+        self._header_fields.infos[info_field_name][_HeaderKeyConstants.NUM] == (
+            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]))
 
 
 class _AnnotationProcessor(object):
