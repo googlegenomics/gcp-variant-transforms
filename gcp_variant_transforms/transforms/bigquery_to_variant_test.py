@@ -16,80 +16,48 @@
 
 import unittest
 
+from apache_beam import transforms
+from apache_beam.testing import test_pipeline
+from apache_beam.testing.util import assert_that
+from apache_beam.testing.util import equal_to
+
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.beam_io import vcfio
 
 
 class BigQueryToVariantTest(unittest.TestCase):
+  """Test cases for `BigQueryToVariant` transform."""
 
-  def _get_big_query_row(self):
-    return {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
-            unicode(ColumnKeyConstants.START_POSITION): 11,
-            unicode(ColumnKeyConstants.END_POSITION): 12,
-            unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
-            unicode(ColumnKeyConstants.NAMES): ['rs1', 'rs2'],
-            unicode(ColumnKeyConstants.QUALITY): 2,
-            unicode(ColumnKeyConstants.FILTER): ['PASS'],
-            unicode(ColumnKeyConstants.CALLS): [
-                {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
-                 unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
-                 unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
-                 unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-                {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
-                 unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
-                 unicode(ColumnKeyConstants.CALLS_PHASESET): None,
-                 unicode('GQ'): 10, unicode('FB'): True}
-            ],
-            unicode(ColumnKeyConstants.ALTERNATE_BASES): [
-                {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
-                 unicode('IFR'): None,
-                 unicode('IFR2'): 0.2},
-                {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
-                 unicode('IFR'): 0.2,
-                 unicode('IFR2'): 0.3}
-            ],
-            unicode('IS'): unicode('some data'),
-            unicode('ISR'): [unicode('data1'), unicode('data2')]}
-
-  def test_alternate_bases(self):
-    alternate_base_records = self._get_big_query_row()[
-        ColumnKeyConstants.ALTERNATE_BASES]
-
-    expected_alternate_bases = ['A', 'TT']
-    bq_to_variant = bigquery_to_variant.BigQueryToVariant()
-    self.assertEqual(expected_alternate_bases,
-                     bq_to_variant._get_alternate_bases(alternate_base_records))
-
-  def test_get_variant_info(self):
-    row = self._get_big_query_row()
-    expected_variant_info = {'IFR': [0.2],
-                             'IFR2': [0.2, 0.3],
-                             'IS': 'some data',
-                             'ISR': ['data1', 'data2']}
-    bq_to_variant = bigquery_to_variant.BigQueryToVariant()
-    self.assertEqual(expected_variant_info,
-                     bq_to_variant._get_variant_info(row))
-
-  def test_get_variant_calls(self):
-    variant_call_records = self._get_big_query_row()[ColumnKeyConstants.CALLS]
-
-    expected_calls = [
-        vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
-            info={'GQ': 20, 'FIR': [10, 20]}),
-        vcfio.VariantCall(
-            name='Sample2', genotype=[1, 0],
-            info={'GQ': 10, 'FB': True}),
-    ]
-
-    bq_to_variant = bigquery_to_variant.BigQueryToVariant()
-    self.assertEqual(expected_calls,
-                     bq_to_variant._get_variant_calls(variant_call_records))
-
-  def test_convert_bq_row_to_variant(self):
-    row = self._get_big_query_row()
-    expected_variant = vcfio.Variant(
+  def _get_bigquery_row_and_variant(self):
+    row = {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
+           unicode(ColumnKeyConstants.START_POSITION): 11,
+           unicode(ColumnKeyConstants.END_POSITION): 12,
+           unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
+           unicode(ColumnKeyConstants.NAMES): ['rs1', 'rs2'],
+           unicode(ColumnKeyConstants.QUALITY): 2,
+           unicode(ColumnKeyConstants.FILTER): ['PASS'],
+           unicode(ColumnKeyConstants.CALLS): [
+               {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
+                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
+                unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
+                unicode('GQ'): 20, unicode('FIR'): [10, 20]},
+               {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
+                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+                unicode(ColumnKeyConstants.CALLS_PHASESET): None,
+                unicode('GQ'): 10, unicode('FB'): True}
+           ],
+           unicode(ColumnKeyConstants.ALTERNATE_BASES): [
+               {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
+                unicode('IFR'): None,
+                unicode('IFR2'): 0.2},
+               {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
+                unicode('IFR'): 0.2,
+                unicode('IFR2'): 0.3}
+           ],
+           unicode('IS'): unicode('some data'),
+           unicode('ISR'): [unicode('data1'), unicode('data2')]}
+    variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
         filters=['PASS'],
@@ -104,6 +72,16 @@ class BigQueryToVariantTest(unittest.TestCase):
                 info={'GQ': 10, 'FB': True})
         ]
     )
-    bq_to_variant = bigquery_to_variant.BigQueryToVariant()
-    self.assertEqual(expected_variant,
-                     bq_to_variant._convert_bq_row_to_variant(row))
+    return row, variant
+
+  def test_pipeline(self):
+    row, expected_variant = self._get_bigquery_row_and_variant()
+    pipeline = test_pipeline.TestPipeline()
+    variants = (
+        pipeline
+        | transforms.Create([row])
+        | bigquery_to_variant.BigQueryToVariant()
+    )
+
+    assert_that(variants, equal_to([expected_variant]))
+    pipeline.run()

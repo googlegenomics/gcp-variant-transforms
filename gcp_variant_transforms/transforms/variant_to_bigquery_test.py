@@ -27,7 +27,7 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
-from gcp_variant_transforms.libs import bigquery_row_generator
+from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -46,7 +46,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     self._conflict_resolver = (
         vcf_field_conflict_resolver.FieldConflictResolver())
 
-    self._row_generator = bigquery_row_generator.BigQueryRowGenerator(
+    self._row_generator = bigquery_vcf_data_converter.BigQueryRowGenerator(
         self._schema_descriptor, self._conflict_resolver)
 
   def _get_table_schema(self):
