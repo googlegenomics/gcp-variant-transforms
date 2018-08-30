@@ -56,28 +56,28 @@
           "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
-        "expected_result": {"num_features": 1576}
+        "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_features": 1576}
+        "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
-        "expected_result": {"num_symbol": 207}
+        "expected_result": {"num_symbol": 206}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_symbol": 207}
+        "expected_result": {"num_symbol": 206}
       }
     ]
   }
