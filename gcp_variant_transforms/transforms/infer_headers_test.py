@@ -54,7 +54,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
     if with_annotation:
       infos['CSQ'] = Info(
           'CSQ',
-          -1,
+          field_counts['.'],
           'String',
           'Annotations from VEP. Format: Allele|Gene|Position|Score',
           'src',

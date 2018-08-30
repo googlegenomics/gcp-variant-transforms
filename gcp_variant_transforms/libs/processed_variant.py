@@ -448,16 +448,15 @@ class _AnnotationProcessor(object):
     for annotation_str in data:
       try:
         ind, annotation_map = parser.parse_and_match_alt(annotation_str)
-        if self._infer_annotation_types:
-          for name, value in annotation_map.iteritems():
-            if name == annotation_parser.ANNOTATION_ALT:
-              continue
-            type_key = infer_headers.get_inferred_annotation_type_header_key(
-                annotation_field_name, name)
-            vcf_type = self._vcf_type_from_annotation_header(
-                annotation_field_name, type_key)
-            typed_value = VCF_TYPE_TO_PY[vcf_type](value) if value else None
-            annotation_map[name] = typed_value
+        for name, value in annotation_map.iteritems():
+          if name == annotation_parser.ANNOTATION_ALT:
+            continue
+          type_key = infer_headers.get_inferred_annotation_type_header_key(
+              annotation_field_name, name)
+          vcf_type = self._vcf_type_from_annotation_header(
+              annotation_field_name, type_key)
+          typed_value = VCF_TYPE_TO_PY[vcf_type](value) if value else None
+          annotation_map[name] = typed_value
         self._alt_match_counter.inc()
         alt_datas = proc_var._alternate_datas[ind]
         if annotation_field_name not in alt_datas._info:

@@ -122,9 +122,9 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
     infos = OrderedDict([
         ('A1', Info('A1', 1, None, '', None, None)),
-        ('A2', Info('A2', -1, None, '', None, None)),
+        ('A2', Info('A2', parser.field_counts['A'], None, '', None, None)),
         ('CSQ', Info('CSQ',
-                     None,
+                     parser.field_counts['.'],
                      None,
                      'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
                      None,

@@ -223,7 +223,7 @@ class _InferHeaderFields(beam.DoFn):
     # type: (vcfio.Variant, Dict[str, Info], vcf_header_io.VcfHeader) -> None
     """Updates `infos` with inferred info fields.
 
-    Three types of info fields are inferred:
+    Two types of info fields are inferred:
     - The info fields are undefined in the headers.
     - The info fields' definitions provided by the header does not match the
       field value.
