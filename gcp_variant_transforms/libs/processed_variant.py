@@ -247,8 +247,9 @@ class ProcessedVariantFactory(object):
         self._annotation_processor.add_annotation_data(
             proc_var, key, variant_info_data)
       elif (self._split_alternate_allele_info_fields and
-            self._header_fields.infos[key][_HeaderKeyConstants.NUM] ==
-            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
+            key in self._header_fields.infos and
+            self._header_fields.infos[key][_HeaderKeyConstants.NUM] == (
+                vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE])):
         self._add_per_alt_info(proc_var, key, variant_info_data)
       else:
         proc_var._non_alt_info[key] = variant_info_data
