@@ -30,7 +30,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unus
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import bigquery_vcf_schema
+from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -112,8 +112,9 @@ class VariantToBigQuery(beam.PTransform):
     self._variant_merger = variant_merger
     self._proc_var_factory = proc_var_factory
     self._append = append
-    self._schema = bigquery_vcf_schema.generate_schema_from_header_fields(
-        self._header_fields, self._proc_var_factory, self._variant_merger)
+    self._schema = (
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
+            self._header_fields, self._proc_var_factory, self._variant_merger))
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
     self._bigquery_row_generator = bigquery_row_generator.BigQueryRowGenerator(

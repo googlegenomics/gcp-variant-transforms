@@ -37,6 +37,7 @@ from gcp_variant_transforms.beam_io import vcf_parser
 # All other modules depend on vcfio for the following const values.
 # In order to keep the current setting we re-declared them here.
 MalformedVcfRecord = vcf_parser.MalformedVcfRecord
+FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
 PASS_FILTER = vcf_parser.PASS_FILTER
 END_INFO_KEY = vcf_parser.END_INFO_KEY
