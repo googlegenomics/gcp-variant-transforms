@@ -25,7 +25,7 @@ from vcf import parser
 from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import schema_and_vcf_header_converter
+from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
@@ -83,7 +83,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     header_fields = vcf_header_io.VcfHeader()
     self._assert_fields_equal(
         self._generate_expected_fields(),
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields)))
 
@@ -104,13 +104,13 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         self._generate_expected_fields(
             alt_fields=['IA', 'IA2'],
             info_fields=['I1', 'I2', 'IU', 'IG', 'I0']),
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields)))
 
     # Test with split_alternate_allele_info_fields=False.
     actual_schema = (
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(
                 header_fields, split_alternate_allele_info_fields=False)))
@@ -158,7 +158,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             alt_fields=['IA'],
             call_fields=['F1', 'F2', 'FU'],
             info_fields=['I1']),
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields)))
 
@@ -180,7 +180,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             call_fields=['a_b', 'OK_format_09'],
             info_fields=['field__', 'field__A', 'field_0a', 'A_B_C',
                          'OK_info_09']),
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields)))
 
@@ -195,7 +195,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             alt_fields=['IA'],
             call_fields=['F1'],
             info_fields=['I1', 'ADDED_BY_MERGER']),
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields),
             variant_merger=_DummyVariantMergeStrategy()))
@@ -206,7 +206,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
 
   def test_generate_header_fields_from_schema(self):
     sample_schema = bigquery_schema_util.get_sample_table_schema()
-    header = schema_and_vcf_header_converter.generate_header_fields_from_schema(
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
         sample_schema)
 
     infos = OrderedDict([
@@ -235,21 +235,21 @@ class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):
         ('FU', Format('FU', field_counts['.'], 'Float', 'desc'))])
     original_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
-    schema = schema_and_vcf_header_converter.generate_schema_from_header_fields(
+    schema = bigquery_vcf_schema_converter.generate_schema_from_header_fields(
         original_header,
         processed_variant.ProcessedVariantFactory(original_header))
     reconstructed_header = (
-        schema_and_vcf_header_converter.generate_header_fields_from_schema(
+        bigquery_vcf_schema_converter.generate_header_fields_from_schema(
             schema))
 
     self.assertEqual(original_header, reconstructed_header)
 
   def test_schema_to_vcf_header_to_schema(self):
     original_schema = bigquery_schema_util.get_sample_table_schema()
-    header = schema_and_vcf_header_converter.generate_header_fields_from_schema(
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
         original_schema)
     reconstructed_schema = (
-        schema_and_vcf_header_converter.generate_schema_from_header_fields(
+        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
             header, processed_variant.ProcessedVariantFactory(header)))
 
     self.assertEqual(_get_fields_from_schema(reconstructed_schema),
