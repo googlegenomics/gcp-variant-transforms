@@ -25,8 +25,8 @@ from collections import namedtuple
 import os
 import tempfile
 
-from nucleus.io.python import vcf_reader as nucleus
-from nucleus.protos import variants_pb2 as nucleus_proto
+from nucleus.io.python import vcf_reader as nucleus_vcf_reader
+from nucleus.protos import variants_pb2
 import vcf
 
 from apache_beam.coders import coders
@@ -48,7 +48,7 @@ PHASESET_FORMAT_KEY = 'PS'  # The phaseset format key.
 DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
                               # no 'PS' is present.
 MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
-FIRST_HEADER_LINE = '##fileformat=VCFv4.2\n'
+FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 class Variant(object):
   """A class to store info about a genomic variant.
@@ -502,18 +502,22 @@ class NucleusParser(VcfParser):
   def _store_to_temp_local_file(self, header_lines):
     temp_file, temp_file_name = tempfile.mkstemp(text=True)
     for line in header_lines:
+      if not line.endswith('\n'):
+        line += '\n'
       os.write(temp_file, line)
     os.close(temp_file)
     return temp_file_name
 
   def _init_with_header(self, header_lines):
-    # The first header line must be similar to '##fileformat=VCFv4.2'.
-    if header_lines and not header_lines[0].startswith('##fileformat'):
-      header_lines.insert(0, FIRST_HEADER_LINE)
+    # The first header line must be similar to '##fileformat=VCFv.*'.
+    if header_lines and not header_lines[0].startswith(
+        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+      header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+
     try:
-      self._vcf_reader = nucleus.VcfReader.from_file(
+      self._vcf_reader = nucleus_vcf_reader.VcfReader.from_file(
           self._store_to_temp_local_file(header_lines),
-          nucleus_proto.VcfReaderOptions())
+          variants_pb2.VcfReaderOptions())
     except ValueError as e:
       raise ValueError(
           'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
@@ -551,13 +555,13 @@ class NucleusParser(VcfParser):
     try:
       variant_proto = self._vcf_reader.from_string(data_line)
       return self._convert_to_variant(variant_proto)
-    except (LookupError, ValueError) as e:
+    except (ValueError) as e:
       logging.warning('VCF variant_proto read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
   def _convert_to_variant(self, variant_proto):
-    # type: (nucleus.protos.variants_pb2.Variant) -> Variant
+    # type: (variants_pb2.Variant) -> Variant
     return Variant(
         reference_name=variant_proto.reference_name,
         start=variant_proto.start,
@@ -567,6 +571,7 @@ class NucleusParser(VcfParser):
                          else None),
         alternate_bases=list(variant_proto.alternate_bases),
         names=variant_proto.names[0].split(';') if variant_proto.names else [],
+        # TODO(samanvp): ensure the default value (when missing) is set to -1.
         quality=variant_proto.quality,
         filters=map(str, variant_proto.filter),
         info=self._get_variant_info(variant_proto),
@@ -610,12 +615,13 @@ class NucleusParser(VcfParser):
     if is_repeated:
       return output_list
     else:
-      if len(output_list) > 1:
+      if len(output_list) > 1 and not self._allow_malformed_records:
         raise ValueError('a not repeated field has more than 1 value')
-      if len(output_list) == 1:
-        return output_list[0]
-      else:
+      if not output_list:
         return None
+      else:
+        # TODO(samanvp): Verify whether we reach here with len(output_list) > 1.
+        return output_list[0]
 
   def _get_variant_calls(self, variant_proto):
     calls = []
@@ -627,12 +633,14 @@ class NucleusParser(VcfParser):
       else:
         call.genotype = list(call_proto.genotype)
 
-      if call_proto.is_phased:
-        call.phaseset = (
-            self._convert_list_value(
-                call_proto.info[PHASESET_FORMAT_KEY], False)
-            if PHASESET_FORMAT_KEY in call_proto.info
-            else DEFAULT_PHASESET_VALUE)
+      phaseset_from_format = (
+          self._convert_list_value(call_proto.info[PHASESET_FORMAT_KEY], False)
+          if PHASESET_FORMAT_KEY in call_proto.info else None)
+      # Note: Call is considered phased if it contains the 'PS' key regardless
+      # of whether it uses '|'.
+      if phaseset_from_format or call_proto.is_phased:
+        call.phaseset = (str(phaseset_from_format) if phaseset_from_format
+                         else DEFAULT_PHASESET_VALUE)
       for k in call_proto.info:
         # Genotype and phaseset (if present) are already included.
         if k in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
