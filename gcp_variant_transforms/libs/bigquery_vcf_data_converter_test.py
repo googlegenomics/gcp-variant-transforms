@@ -36,6 +36,147 @@ from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 from gcp_variant_transforms.testing import vcf_header_util
 
 
+def _get_processed_variant(variant, header_num_dict=None):
+  # TODO(bashir2): To make this more of a "unit" test, we should create
+  # ProcessedVariant instances directly (instead of Variant) and avoid calling
+  # create_processed_variant here. Then we should also add cases that
+  # have annotation fields.
+  header_fields = vcf_header_util.make_header(header_num_dict or {})
+  return processed_variant.ProcessedVariantFactory(
+      header_fields).create_processed_variant(variant)
+
+
+# TODO(allieychen): Use the sample schema in script `bigquery_schema_util`.
+def _get_table_schema():
+  # type (None) -> bigquery.TableSchema
+  schema = bigquery.TableSchema()
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IB',
+      type=TableFieldConstants.TYPE_BOOLEAN,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IBR',
+      type=TableFieldConstants.TYPE_BOOLEAN,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='II',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='II2',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IIR',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IF',
+      type=TableFieldConstants.TYPE_FLOAT,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IF2',
+      type=TableFieldConstants.TYPE_FLOAT,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IFR',
+      type=TableFieldConstants.TYPE_FLOAT,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IFR2',
+      type=TableFieldConstants.TYPE_FLOAT,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='field__IS',
+      type=TableFieldConstants.TYPE_STRING,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IS',
+      type=TableFieldConstants.TYPE_STRING,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='INFO foo desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='ISR',
+      type=TableFieldConstants.TYPE_STRING,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='INFO foo desc'))
+  # Call record.
+  call_record = bigquery.TableFieldSchema(
+      name=ColumnKeyConstants.CALLS,
+      type=TableFieldConstants.TYPE_RECORD,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='One record for each call.')
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='FB',
+      type=TableFieldConstants.TYPE_BOOLEAN,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='FORMAT foo desc'))
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='FI',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='FORMAT foo desc'))
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='GQ',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_NULLABLE,
+      description='FORMAT foo desc'))
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='FIR',
+      type=TableFieldConstants.TYPE_INTEGER,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='FORMAT foo desc'))
+  call_record.fields.append(bigquery.TableFieldSchema(
+      name='FSR',
+      type=TableFieldConstants.TYPE_STRING,
+      mode=TableFieldConstants.MODE_REPEATED,
+      description='FORMAT foo desc'))
+  schema.fields.append(call_record)
+  return schema
+
+
+def _get_big_query_row():
+  # type: (None) -> Dict[unicode, Any]
+  """Returns one sample BigQuery row for testing."""
+  return {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
+          unicode(ColumnKeyConstants.START_POSITION): 11,
+          unicode(ColumnKeyConstants.END_POSITION): 12,
+          unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
+          unicode(ColumnKeyConstants.NAMES): [unicode('rs1'), unicode('rs2')],
+          unicode(ColumnKeyConstants.QUALITY): 2,
+          unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
+          unicode(ColumnKeyConstants.CALLS): [
+              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
+               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
+               unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
+               unicode('GQ'): 20, unicode('FIR'): [10, 20]},
+              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
+               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+               unicode(ColumnKeyConstants.CALLS_PHASESET): None,
+               unicode('GQ'): 10, unicode('FB'): True}
+          ],
+          unicode(ColumnKeyConstants.ALTERNATE_BASES): [
+              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
+               unicode('IFR'): 1,
+               unicode('IFR2'): 0.2},
+              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
+               unicode('IFR'): 0.2,
+               unicode('IFR2'): 0.3}
+          ],
+          unicode('IS'): unicode('some data'),
+          unicode('ISR'): [unicode('data1'), unicode('data2')]}
+
+
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
   """A dummy strategy. It just adds a new field to the schema."""
 
@@ -469,7 +610,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.END_POSITION: 12,
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
-        ColumnKeyConstants.CALLS: [],
         ColumnKeyConstants.CALLS: [
             {ColumnKeyConstants.CALLS_NAME: 'Sample1',
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
@@ -518,7 +658,6 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.END_POSITION: 12,
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
-        ColumnKeyConstants.CALLS: [],
         ColumnKeyConstants.CALLS: [
             {ColumnKeyConstants.CALLS_NAME: 'Sample1',
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
@@ -600,8 +739,8 @@ class VariantGeneratorTest(unittest.TestCase):
                      self._variant_generator.convert_bq_row_to_variant(row))
 
 
-class ConverterConcatenationTest(unittest.TestCase):
-  """Test cases for concatenating the BigQuery VCF data converters."""
+class ConverterCombinationTest(unittest.TestCase):
+  """Test cases for combining the BigQuery VCF data converters."""
 
   def setUp(self):
     self._variant_generator = bigquery_vcf_data_converter.VariantGenerator()
@@ -645,144 +784,3 @@ class ConverterConcatenationTest(unittest.TestCase):
     converted_variant = self._variant_generator.convert_bq_row_to_variant(
         row[0])
     self.assertEqual(variant, converted_variant)
-
-
-def _get_processed_variant(variant, header_num_dict=None):
-  # TODO(bashir2): To make this more of a "unit" test, we should create
-  # ProcessedVariant instances directly (instead of Variant) and avoid calling
-  # create_processed_variant here. Then we should also add cases that
-  # have annotation fields.
-  header_fields = vcf_header_util.make_header(header_num_dict or {})
-  return processed_variant.ProcessedVariantFactory(
-      header_fields).create_processed_variant(variant)
-
-
-# TODO(allieychen): Use the sample schema in script `bigquery_schema_util`.
-def _get_table_schema():
-  # type (None) -> bigquery.TableSchema
-  schema = bigquery.TableSchema()
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IB',
-      type=TableFieldConstants.TYPE_BOOLEAN,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IBR',
-      type=TableFieldConstants.TYPE_BOOLEAN,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='II',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='II2',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IIR',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IF',
-      type=TableFieldConstants.TYPE_FLOAT,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IF2',
-      type=TableFieldConstants.TYPE_FLOAT,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IFR',
-      type=TableFieldConstants.TYPE_FLOAT,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IFR2',
-      type=TableFieldConstants.TYPE_FLOAT,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='field__IS',
-      type=TableFieldConstants.TYPE_STRING,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='IS',
-      type=TableFieldConstants.TYPE_STRING,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='INFO foo desc'))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name='ISR',
-      type=TableFieldConstants.TYPE_STRING,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='INFO foo desc'))
-  # Call record.
-  call_record = bigquery.TableFieldSchema(
-      name=ColumnKeyConstants.CALLS,
-      type=TableFieldConstants.TYPE_RECORD,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='One record for each call.')
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FB',
-      type=TableFieldConstants.TYPE_BOOLEAN,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='FORMAT foo desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FI',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='FORMAT foo desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='GQ',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_NULLABLE,
-      description='FORMAT foo desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FIR',
-      type=TableFieldConstants.TYPE_INTEGER,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='FORMAT foo desc'))
-  call_record.fields.append(bigquery.TableFieldSchema(
-      name='FSR',
-      type=TableFieldConstants.TYPE_STRING,
-      mode=TableFieldConstants.MODE_REPEATED,
-      description='FORMAT foo desc'))
-  schema.fields.append(call_record)
-  return schema
-
-
-def _get_big_query_row():
-  # type: (None) -> Dict[unicode, Any]
-  """Returns one sample BigQuery row for testing."""
-  return {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
-          unicode(ColumnKeyConstants.START_POSITION): 11,
-          unicode(ColumnKeyConstants.END_POSITION): 12,
-          unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
-          unicode(ColumnKeyConstants.NAMES): [unicode('rs1'), unicode('rs2')],
-          unicode(ColumnKeyConstants.QUALITY): 2,
-          unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
-          unicode(ColumnKeyConstants.CALLS): [
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
-               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
-               unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
-               unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
-               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
-               unicode(ColumnKeyConstants.CALLS_PHASESET): None,
-               unicode('GQ'): 10, unicode('FB'): True}
-          ],
-          unicode(ColumnKeyConstants.ALTERNATE_BASES): [
-              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
-               unicode('IFR'): 1,
-               unicode('IFR2'): 0.2},
-              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
-               unicode('IFR'): 0.2,
-               unicode('IFR2'): 0.3}
-          ],
-          unicode('IS'): unicode('some data'),
-          unicode('ISR'): [unicode('data1'), unicode('data2')]}

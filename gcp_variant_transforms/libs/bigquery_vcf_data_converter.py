@@ -242,7 +242,7 @@ class BigQueryRowGenerator(object):
 
 
 class VariantGenerator(object):
-  """Class to generate BigQuery row from a variant."""
+  """Class to generate variant from one BigQuery row."""
 
   def convert_bq_row_to_variant(self, row):
     """Converts one BigQuery row to `Variant`."""
