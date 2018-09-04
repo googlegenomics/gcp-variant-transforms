@@ -53,7 +53,7 @@ from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
 
 
-_BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`;'
+_BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
@@ -122,12 +122,9 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the call names to
   `vcf_header_file_path`.
   """
-  bq_source = bigquery.BigQuerySource(
-      query=_BASE_QUERY_TEMPLATE.format(
-          INPUT_TABLE='.'.join(bigquery_util.parse_table_reference(
-              known_args.input_table))),
-      validate=True,
-      use_standard_sql=True)
+  bq_source = bigquery.BigQuerySource(query=_form_customized_query(known_args),
+                                      validate=True,
+                                      use_standard_sql=True)
 
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p

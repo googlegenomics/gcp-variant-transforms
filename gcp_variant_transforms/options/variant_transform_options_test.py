@@ -149,3 +149,37 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
     self.assertRaises(ValueError, self._options.validate, args)
+
+
+class BigQueryToVcfOptionsTest(unittest.TestCase):
+  """Test cases for `BigQueryToVcfOptions` class."""
+
+  def setUp(self):
+    self._options = variant_transform_options.BigQueryToVcfOptions()
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    return make_args(self._options, args)
+
+  def test_validate_okay_no_start_position(self):
+    args = self._make_args(['--output_file', 'gs://output_file',
+                            '--input_table', 'BigQuery_table',
+                            '--reference_names', '1', '2',
+                            '--end_position', '1000'])
+    self._options.validate(args)
+
+  def test_validate_okay_valid_start_end_position(self):
+    args = self._make_args(['--output_file', 'gs://output_file',
+                            '--input_table', 'BigQuery_table',
+                            '--reference_names', '1', '2',
+                            '--start_position', '1',
+                            '--end_position', '1000'])
+    self._options.validate(args)
+
+  def test_failure_for_invalid_start_end_position(self):
+    args = self._make_args(['--output_file', 'gs://output_file',
+                            '--input_table', 'BigQuery_table',
+                            '--reference_names', '1', '2',
+                            '--start_position', '1000',
+                            '--end_position', '1000'])
+    self.assertRaises(ValueError, self._options.validate, args)

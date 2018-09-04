@@ -14,6 +14,7 @@
 
 """Tests for `bq_to_vcf` module."""
 
+import collections
 import unittest
 
 from apache_beam.io import filesystems
@@ -24,6 +25,9 @@ from gcp_variant_transforms.testing import temp_dir
 
 class BqToVcfTest(unittest.TestCase):
   """Test cases for the `bq_to_vcf` module."""
+
+  def _create_mock_args(self, **args):
+    return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def test_write_vcf_data_header(self):
     lines = [
@@ -53,3 +57,4 @@ class BqToVcfTest(unittest.TestCase):
       with filesystems.FileSystems.open(file_path) as f:
         content = f.readlines()
         self.assertEqual(content, expected_content)
+
