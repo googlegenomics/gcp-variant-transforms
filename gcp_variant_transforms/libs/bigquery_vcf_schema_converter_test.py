@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for bigquery_vcf_schema module."""
+"""Tests for `bigquery_vcf_schema_converter` module."""
 
 from __future__ import absolute_import
 
