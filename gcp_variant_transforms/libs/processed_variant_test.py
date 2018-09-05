@@ -14,10 +14,12 @@
 
 from __future__ import absolute_import
 from typing import Dict  # pylint: disable=unused-import
+from collections import OrderedDict
 
 import unittest
 
 from vcf import parser
+from vcf.parser import _Info as Info
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -108,14 +110,29 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
 
-  def _get_sample_variant_and_header_with_csq(self):
+  def _get_sample_variant_and_header_with_csq(self, additional_infos=None):
+    """Provides a simple `Variant` and `VcfHeader` with info fields
+
+    Args:
+      additional_infos: A list of tuples of the format (key, `Info`) to be added
+        to the `VcfHeader`.
+    """
+    # type:  (
     variant = self._get_sample_variant()
     variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
-    header_fields = vcf_header_util.make_header({'CSQ': '.',
-                                                 'A1': '1', 'A2': 'A'})
-    header_fields.infos['CSQ'][
-        vcf_header_io.VcfParserHeaderKeyConstants.DESC] = (
-            'some desc Allele|Consequence|IMPACT|SYMBOL|Gene')
+    infos = OrderedDict([
+        ('A1', Info('A1', 1, None, '', None, None)),
+        ('A2', Info('A2', parser.field_counts['A'], None, '', None, None)),
+        ('CSQ', Info('CSQ',
+                     parser.field_counts['.'],
+                     None,
+                     'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
+                     None,
+                     None))])
+    if additional_infos is not None:
+      for key, value in additional_infos:
+        infos[key] = value
+    header_fields = vcf_header_io.VcfHeader(infos=infos)
     return variant, header_fields
 
   def test_create_processed_variant_move_alt_info_and_annotation(self):
@@ -488,3 +505,28 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(alt_field.description, 'Alternate base.')
     a2_fields = [field for field in schema.fields if field.name == 'A2']
     self.assertEqual(len(a2_fields), 1)
+
+  def test_create_alt_bases_field_schema_types(self):
+    ids = ['CSQ_Allele_TYPE', 'CSQ_Consequence_TYPE',
+           'CSQ_IMPACT_TYPE', 'CSQ_SYMBOL_TYPE']
+    types = ['String', 'Integer', 'Integer', 'Float']
+    infos = [(i, Info(i, 1, t, '', None, None)) for i, t in zip(ids, types)]
+    _, header_fields = self._get_sample_variant_and_header_with_csq(
+        additional_infos=infos)
+    for hfi in header_fields.infos.values():
+      if hfi['type'] is None:
+        hfi['type'] = 'String'
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        annotation_fields=['CSQ'])
+    schema = factory.create_alt_bases_field_schema()
+    csq_field = [field for field in schema.fields if field.name == 'CSQ'][0]
+    expected_name_type_map = {'CSQ': 'record',
+                              'allele': 'string',
+                              'Consequence': 'integer',
+                              'IMPACT': 'integer',
+                              'SYMBOL': 'float',
+                              'Gene': 'string'}
+    for field in csq_field.fields:
+      self.assertEqual(field.type, expected_name_type_map[field.name])

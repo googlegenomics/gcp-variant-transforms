@@ -1,4 +1,4 @@
-# Copyright 2017 Google Inc.  All Rights Reserved.
+# Copyright 2018 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,44 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handles generation and processing of BigQuery schema for variants."""
+"""Utility functions for creating BigQuery schema used by unit tests."""
 
 from __future__ import absolute_import
 
-from typing import Dict, Any  # pylint: disable=unused-import
-
 from apache_beam.io.gcp.internal.clients import bigquery
 
-from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import bigquery_sanitizer
-from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
-from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
 
-# An alias for the header key constants to make referencing easier.
-_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+def get_sample_table_schema():
+  # type: () -> bigquery.TableSchema
+  """Creates a sample BigQuery table schema.
 
-
-def generate_schema_from_header_fields(
-    header_fields,  # type: vcf_header_io.VcfHeader
-    proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
-    variant_merger=None  # type: variant_merge_strategy.VariantMergeStrategy
-    ):
-  # type: (...) -> bigquery.TableSchema
-  """Returns a ``TableSchema`` for the BigQuery table storing variants.
-
-  Args:
-    header_fields: Representative header fields for all variants.
-    proc_variant_factory: The factory class that knows how to convert Variant
-      instances to ProcessedVariant. As a side effect it also knows how to
-      modify BigQuery schema based on the ProcessedVariants that it generates.
-      The latter functionality is what is needed here.
-    variant_merger: The strategy used for merging variants (if any). Some
-      strategies may change the schema, which is why this may be needed here.
+  The schema contains the fixed schema fields for VCF. Besides that, it also
+  has:
+    - One sub field (`AF`) for `alternate_bases`.
+    - Two sub fields (`FB` and `GQ`) for `call`.
+    - Three INFO fields (`II`, `IFR`, `IS`).
   """
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
@@ -75,8 +55,23 @@ def generate_schema_from_header_fields(
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Reference bases.'))
 
-  schema.fields.append(proc_variant_factory.create_alt_bases_field_schema())
+  alternate_bases_record = bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+      type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description='One record for each alternate base (if any).')
+  alternate_bases_record.fields.append(bigquery.TableFieldSchema(
+      name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT,
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='Alternate base.'))
+  alternate_bases_record.fields.append(bigquery.TableFieldSchema(
+      name='AF',
+      type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
 
+  schema.fields.append(alternate_bases_record)
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.NAMES,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
@@ -86,16 +81,14 @@ def generate_schema_from_header_fields(
       name=bigquery_util.ColumnKeyConstants.QUALITY,
       type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('Phred-scaled quality score (-10log10 prob(call is wrong)). '
-                   'Higher values imply better quality.')))
+      description=('Higher values imply better quality.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.FILTER,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
       description=('List of failed filters (if any) or "PASS" indicating the '
                    'variant has passed all filters.')))
-
-  # Add calls.
+    # Call record.
   calls_record = bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS,
       type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -119,36 +112,32 @@ def generate_schema_from_header_fields(
       description=('Phaseset of the call (if any). "*" is used in cases where '
                    'the genotype is phased, but no phase set ("PS" in FORMAT) '
                    'was specified.')))
-  for key, field in header_fields.formats.iteritems():
-    # GT and PS are already included in 'genotype' and 'phaseset' fields.
-    if key in (vcfio.GENOTYPE_FORMAT_KEY, vcfio.PHASESET_FORMAT_KEY):
-      continue
-    calls_record.fields.append(bigquery.TableFieldSchema(
-        name=bigquery_sanitizer.SchemaSanitizer.get_sanitized_field_name(key),
-        type=bigquery_util.get_bigquery_type_from_vcf_type(
-            field[_HeaderKeyConstants.TYPE]),
-        mode=bigquery_util.get_bigquery_mode_from_vcf_num(
-            field[_HeaderKeyConstants.NUM]),
-        description=bigquery_sanitizer.SchemaSanitizer.get_sanitized_string(
-            field[_HeaderKeyConstants.DESC])))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name='FB',
+      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+  calls_record.fields.append(bigquery.TableFieldSchema(
+      name='GQ',
+      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
   schema.fields.append(calls_record)
 
-  # Add info fields.
-  info_keys = set()
-  for key, field in header_fields.infos.iteritems():
-    # END info is already included by modifying the end_position.
-    if (key == vcfio.END_INFO_KEY or
-        proc_variant_factory.info_is_in_alt_bases(key)):
-      continue
-    schema.fields.append(bigquery.TableFieldSchema(
-        name=bigquery_sanitizer.SchemaSanitizer.get_sanitized_field_name(key),
-        type=bigquery_util.get_bigquery_type_from_vcf_type(
-            field[_HeaderKeyConstants.TYPE]),
-        mode=bigquery_util.get_bigquery_mode_from_vcf_num(
-            field[_HeaderKeyConstants.NUM]),
-        description=bigquery_sanitizer.SchemaSanitizer.get_sanitized_string(
-            field[_HeaderKeyConstants.DESC])))
-    info_keys.add(key)
-  if variant_merger:
-    variant_merger.modify_bigquery_schema(schema, info_keys)
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='II',
+      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IFR',
+      type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+      mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+      description='desc'))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name='IS',
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description='desc'))
+
   return schema

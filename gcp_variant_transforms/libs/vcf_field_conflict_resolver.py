@@ -116,10 +116,10 @@ class FieldConflictResolver(object):
 
   def _resolve_type(self, first, second):
     type_constants = vcf_header_io.VcfHeaderFieldTypeConstants
+    numeric_types = (type_constants.INTEGER, type_constants.FLOAT)
     if first == second:
       return first
-    elif (first in (type_constants.INTEGER, type_constants.FLOAT) and
-          second in (type_constants.INTEGER, type_constants.FLOAT)):
+    elif first in numeric_types and second in numeric_types:
       return type_constants.FLOAT
     elif self._resolve_always:
       return type_constants.STRING
