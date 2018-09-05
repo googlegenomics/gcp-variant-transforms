@@ -27,10 +27,10 @@ from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
+from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -47,11 +47,13 @@ _WRITE_SHARDS_LIMIT = 1000
 class _ConvertToBigQueryTableRow(beam.DoFn):
   """Converts a ``Variant`` record to a BigQuery row."""
 
-  def __init__(self,
-               row_generator,
-               allow_incompatible_records=False,
-               omit_empty_sample_calls=False):
-    # type: (bigquery_row_generator.BigQueryRowGenerator, bool, bool) -> None
+  def __init__(
+      self,
+      row_generator,  # type: bigquery_vcf_data_converter.BigQueryRowGenerator
+      allow_incompatible_records=False,  # type: bool
+      omit_empty_sample_calls=False  # type: bool
+  ):
+    # type: (...) -> None
     super(_ConvertToBigQueryTableRow, self).__init__()
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
@@ -117,11 +119,12 @@ class VariantToBigQuery(beam.PTransform):
             self._header_fields, self._proc_var_factory, self._variant_merger))
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
-    self._bigquery_row_generator = bigquery_row_generator.BigQueryRowGenerator(
-        bigquery_schema_descriptor.SchemaDescriptor(self._schema),
-        vcf_field_conflict_resolver.FieldConflictResolver(
-            resolve_always=allow_incompatible_records),
-        null_numeric_value_replacement)
+    self._bigquery_row_generator = (
+        bigquery_vcf_data_converter.BigQueryRowGenerator(
+            bigquery_schema_descriptor.SchemaDescriptor(self._schema),
+            vcf_field_conflict_resolver.FieldConflictResolver(
+                resolve_always=allow_incompatible_records),
+            null_numeric_value_replacement))
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
