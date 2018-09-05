@@ -23,7 +23,6 @@ import os
 import tempfile
 import unittest
 from itertools import chain
-from itertools import permutations
 
 import apache_beam as beam
 from apache_beam.io.filesystem import CompressionTypes
@@ -38,6 +37,7 @@ from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
+from gcp_variant_transforms.beam_io.vcfio import VcfParserType
 from gcp_variant_transforms.testing import testdata_util
 from gcp_variant_transforms.testing.temp_dir import TempDir
 
@@ -48,6 +48,19 @@ _SAMPLE_HEADER_LINES = [
     '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
     '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
     '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
+    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
+]
+
+# Note: Nucleus cannot tolarate missing fields in the header and needs contig.
+_NUCLEUS_HEADER_LINES = [
+    '##fileformat=VCFv4.2\n',
+    '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+    '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+    '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
+    '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
+    '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phaseset">\n',
+    '##contig=<ID=19,length=1>\n',
+    '##contig=<ID=20,length=1>\n',
     '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
 ]
 
@@ -63,7 +76,9 @@ _SAMPLE_TEXT_LINES = [
 ]
 
 
-def _get_sample_variant_1():
+# Note: all 3 following sample variants have two versions, one for PyVcf and one
+# simplified for Nucleus. We need to do this so Nucleus can process them.
+def _get_sample_variant_1(is_for_nucleus=False):
   """Get first sample variant.
 
   Features:
@@ -71,20 +86,33 @@ def _get_sample_variant_1():
     not phased
     multiple names
   """
-  vcf_line = ('20	1234	rs123;rs2	C	A,T	50	PASS	AF=0.5,0.1;NS=1	'
-              'GT:GQ	0/0:48	1/0:20\n')
-  variant = vcfio.Variant(
-      reference_name='20', start=1233, end=1234, reference_bases='C',
-      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-      filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1})
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+  if not is_for_nucleus:
+    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
+                'PASS	AF=0.5,0.1;NS=1	GT:GQ	0/0:48	1/0:20\n')
+    variant = vcfio.Variant(
+        reference_name='20', start=1233, end=1234, reference_bases='C',
+        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+  else:
+    # 0.1 -> 0.25 float precision loss due to binary floating point conversion.
+    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
+                'PASS	AF=0.5,0.25;NS=1	GT:GQ	0/0:48	1/0:20\n')
+    variant = vcfio.Variant(
+        reference_name='20', start=1233, end=1234, reference_bases='C',
+        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
   return variant, vcf_line
 
 
-def _get_sample_variant_2():
+def _get_sample_variant_2(is_for_nucleus=False):
   """Get second sample variant.
 
   Features:
@@ -94,21 +122,39 @@ def _get_sample_variant_2():
     multiple filters
     missing format field
   """
-  vcf_line = (
-      '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	1|0:48	0/1:.\n')
-  variant = vcfio.Variant(
-      reference_name='19', start=122, end=125, reference_bases='GTC',
-      alternate_bases=[], names=['rs1234'], quality=40,
-      filters=['q10', 's50'], info={'NS': 2})
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[1, 0],
-                        phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48}))
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
+  if not is_for_nucleus:
+    vcf_line = (
+        '19	123	rs1234	GTC	.	40	q10;s50	NS=2	'
+        'GT:GQ	1|0:48	0/1:.\n')
+    variant = vcfio.Variant(
+        reference_name='19', start=122, end=125, reference_bases='GTC',
+        alternate_bases=[], names=['rs1234'], quality=40,
+        filters=['q10', 's50'], info={'NS': 2})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[1, 0],
+                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                          info={'GQ': 48}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
+  else:
+    # 'q10;s50' -> 'PASS' due to missing header fields.
+    vcf_line = (
+        '19	123	rs1234	GTC	.	40	PASS	NS=2	'
+        'GT:GQ	1|0:48	0/1:.\n')
+    variant = vcfio.Variant(
+        reference_name='19', start=122, end=125, reference_bases='GTC',
+        alternate_bases=[], names=['rs1234'], quality=40,
+        filters=['PASS'], info={'NS': 2})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[1, 0],
+                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                          info={'GQ': 48}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={}))
   return variant, vcf_line
 
 
-def _get_sample_variant_3():
+def _get_sample_variant_3(is_for_nucleus=False):
   """Get third sample variant.
 
   Features:
@@ -116,20 +162,38 @@ def _get_sample_variant_3():
     no calls for sample 2
     alternate phaseset
   """
-  vcf_line = (
-      '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:PS:GQ	0|1:1:45	'
-      '.:.:.\n')
-  variant = vcfio.Variant(
-      reference_name='19', start=11, end=12, reference_bases='C',
-      alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-      info={'AF': [0.5]})
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[0, 1],
-                        phaseset='1', info={'GQ': 45}))
-  variant.calls.append(
-      vcfio.VariantCall(name='Sample2',
-                        genotype=[vcfio.MISSING_GENOTYPE_VALUE],
-                        info={'GQ': None}))
+  if not is_for_nucleus:
+    vcf_line = (
+        '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	'
+        'GT:PS:GQ	0|1:1:45	.:.:.\n')
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
+        info={'AF': [0.5]})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+                          phaseset='1', info={'GQ': 45}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2',
+                          genotype=[vcfio.MISSING_GENOTYPE_VALUE],
+                          info={'GQ': None}))
+  else:
+    # '.:.:.' -> './.:.:.' due to Nucleus handeling of VariantCall.genotype.
+    vcf_line = (
+        '19	12	.	C	<SYMBOLIC>	49	PASS	'
+        'AF=0.5	GT:PS:GQ	0|1:1:45	./.:.:.\n')
+    variant = vcfio.Variant(
+        reference_name='19', start=11, end=12, reference_bases='C',
+        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['PASS'],
+        info={'AF': [0.5]})
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+                          phaseset='1', info={'GQ': 45}))
+    variant.calls.append(
+        vcfio.VariantCall(name='Sample2',
+                          genotype=[vcfio.MISSING_GENOTYPE_VALUE,
+                                    vcfio.MISSING_GENOTYPE_VALUE],
+                          info={}))
   return variant, vcf_line
 
 
@@ -165,18 +229,21 @@ class VcfSourceTest(unittest.TestCase):
     return tempdir.create_temp_file(
         suffix=suffix, lines=lines, compression_type=compression_type)
 
-  def _read_records(self, file_or_pattern,
-                    representative_header_lines=None, **kwargs):
+  def _read_records(self, file_or_pattern, representative_header_lines=None,
+                    vcf_parser_type=VcfParserType.PYVCF, **kwargs):
     return source_test_utils.read_from_source(
         VcfSource(file_or_pattern,
                   representative_header_lines=representative_header_lines,
+                  vcf_parser_type=vcf_parser_type,
                   **kwargs))
 
   def _create_temp_file_and_read_records(
-      self, lines, representative_header_lines=None):
+      self, lines, representative_header_lines=None,
+      vcf_parser_type=VcfParserType.PYVCF):
     with TempDir() as tempdir:
       file_name = tempdir.create_temp_file(suffix='.vcf', lines=lines)
-      return self._read_records(file_name, representative_header_lines)
+      return self._read_records(file_name, representative_header_lines,
+                                vcf_parser_type)
 
   def _assert_variants_equal(self, actual, expected):
     self.assertEqual(
@@ -235,42 +302,6 @@ class VcfSourceTest(unittest.TestCase):
 
     return (malformed_vcf_records, malformed_header_lines)
 
-  def test_sort_variants(self):
-    sorted_variants = [
-        Variant(reference_name='a', start=20, end=22),
-        Variant(reference_name='a', start=20, end=22, quality=20),
-        Variant(reference_name='b', start=20, end=22),
-        Variant(reference_name='b', start=21, end=22),
-        Variant(reference_name='b', start=21, end=23)]
-
-    for permutation in permutations(sorted_variants):
-      self.assertEqual(sorted(permutation), sorted_variants)
-
-  def test_variant_equality(self):
-    base_variant = Variant(reference_name='a', start=20, end=22,
-                           reference_bases='a', alternate_bases=['g', 't'],
-                           names=['variant'], quality=9, filters=['q10'],
-                           info={'key': 'value'},
-                           calls=[VariantCall(genotype=[0, 0])])
-    equal_variant = Variant(reference_name='a', start=20, end=22,
-                            reference_bases='a', alternate_bases=['g', 't'],
-                            names=['variant'], quality=9, filters=['q10'],
-                            info={'key': 'value'},
-                            calls=[VariantCall(genotype=[0, 0])])
-    different_calls = Variant(reference_name='a', start=20, end=22,
-                              reference_bases='a', alternate_bases=['g', 't'],
-                              names=['variant'], quality=9, filters=['q10'],
-                              info={'key': 'value'},
-                              calls=[VariantCall(genotype=[1, 0])])
-    missing_field = Variant(reference_name='a', start=20, end=22,
-                            reference_bases='a', alternate_bases=['g', 't'],
-                            names=['variant'], quality=9, filters=['q10'],
-                            info={'key': 'value'})
-
-    self.assertEqual(base_variant, equal_variant)
-    self.assertNotEqual(base_variant, different_calls)
-    self.assertNotEqual(base_variant, missing_field)
-
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_single_file_large(self):
     test_data_conifgs = [
@@ -300,19 +331,6 @@ class VcfSourceTest(unittest.TestCase):
       self.assertEqual([], self._create_temp_file_and_read_records(
           content, _SAMPLE_HEADER_LINES))
 
-  def _default_variant_call(self):
-    return vcfio.VariantCall(
-        name='Sample1', genotype=[1, 0],
-        phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48})
-
-  def test_variant_call_order(self):
-    variant_call_1 = self._default_variant_call()
-    variant_call_2 = self._default_variant_call()
-    self.assertEqual(variant_call_1, variant_call_2)
-    variant_call_1.phaseset = 0
-    variant_call_2.phaseset = 1
-    self.assertGreater(variant_call_2, variant_call_1)
-
   def test_single_file_verify_details(self):
     variant_1, vcf_line_1 = _get_sample_variant_1()
     read_data = self._create_temp_file_and_read_records(
@@ -327,6 +345,22 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
+  def test_single_file_verify_details_nucleus(self):
+    variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
+    read_data = self._create_temp_file_and_read_records(
+        _NUCLEUS_HEADER_LINES + [vcf_line_1],
+        vcf_parser_type=VcfParserType.NUCLEUS)
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant_1, read_data[0])
+
+    variant_2, vcf_line_2 = _get_sample_variant_2(is_for_nucleus=True)
+    variant_3, vcf_line_3 = _get_sample_variant_3(is_for_nucleus=True)
+    read_data = self._create_temp_file_and_read_records(
+        _NUCLEUS_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3],
+        vcf_parser_type=VcfParserType.NUCLEUS)
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
   def test_file_pattern_verify_details(self):
     variant_1, vcf_line_1 = _get_sample_variant_1()
     variant_2, vcf_line_2 = _get_sample_variant_2()
@@ -337,6 +371,20 @@ class VcfSourceTest(unittest.TestCase):
                                   [vcf_line_2, vcf_line_3]),
                                  tempdir)
       read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'))
+      self.assertEqual(3, len(read_data))
+      self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
+  def test_file_pattern_verify_details_nucleus(self):
+    variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
+    variant_2, vcf_line_2 = _get_sample_variant_2(is_for_nucleus=True)
+    variant_3, vcf_line_3 = _get_sample_variant_3(is_for_nucleus=True)
+    with TempDir() as tempdir:
+      self._create_temp_vcf_file(_NUCLEUS_HEADER_LINES + [vcf_line_1], tempdir)
+      self._create_temp_vcf_file((_NUCLEUS_HEADER_LINES +
+                                  [vcf_line_2, vcf_line_3]),
+                                 tempdir)
+      read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'),
+                                     vcf_parser_type=VcfParserType.NUCLEUS)
       self.assertEqual(3, len(read_data))
       self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
