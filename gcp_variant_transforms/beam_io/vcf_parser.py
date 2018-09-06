@@ -25,8 +25,12 @@ from collections import namedtuple
 import os
 import tempfile
 
-from nucleus.io.python import vcf_reader as nucleus_vcf_reader
-from nucleus.protos import variants_pb2
+try:
+  from nucleus.io.python import vcf_reader as nucleus_vcf_reader
+  from nucleus.protos import variants_pb2
+except ImportError:
+  logging.warning('Nucleus is not installed. Cannot use the Nucleus parser.')
+
 import vcf
 
 from apache_beam.coders import coders
@@ -493,6 +497,12 @@ class NucleusParser(VcfParser):
                                         allow_malformed_records,
                                         representative_header_lines,
                                         **kwargs)
+    try:
+      nucleus_vcf_reader
+    except NameError:
+      raise RuntimeError(
+          'Nucleus is not installed. Cannot use the Nucleus parser.')
+
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
     # These members will be properly initiated in _extract_header_fields().
@@ -517,7 +527,7 @@ class NucleusParser(VcfParser):
     try:
       self._vcf_reader = nucleus_vcf_reader.VcfReader.from_file(
           self._store_to_temp_local_file(header_lines),
-          variants_pb2.VcfReaderOptions())
+          variants_pb2.VcfReaderOptions())  # pylint: disable=c-extension-no-member
     except ValueError as e:
       raise ValueError(
           'Invalid VCF header in %s: %s' % (self._file_name, str(e)))

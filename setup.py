@@ -14,7 +14,9 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
+import os
 import setuptools
+from setuptools.command.build_py import build_py
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -43,6 +45,20 @@ REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
 ]
 
+
+class BuildPyCommand(build_py):
+  """Custom build command for installing libraries outside of PyPi."""
+
+  _NUCLEUS_WHEEL_PATH = (
+      'https://storage.googleapis.com/gcp-variant-transforms-setupfiles/'
+      'nucleus/Nucleus-0.1.0-py2-none-any.whl')
+
+  def run(self):
+    # Temporary workaround for installing Nucleus until it's available via PyPi.
+    os.system('pip install {}'.format(BuildPyCommand._NUCLEUS_WHEEL_PATH))
+    build_py.run(self)
+
+
 setuptools.setup(
     name='gcp_variant_transforms',
     version='0.4.2',
@@ -64,10 +80,6 @@ setuptools.setup(
         'Programming Language :: Python :: 2.7',
     ],
 
-    dependency_links=[
-        'https://storage.googleapis.com/gcp-variant-transforms-setupfiles/nucleus/Nucleus-0.1.0-py2-none-any.whl',
-    ],
-
     setup_requires=REQUIRED_SETUP_PACKAGES,
     install_requires=REQUIRED_PACKAGES,
     extras_require={
@@ -77,5 +89,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={
         'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
+    },
+    cmdclass={
+        'build_py': BuildPyCommand,
     },
 )

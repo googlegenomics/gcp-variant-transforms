@@ -213,6 +213,12 @@ def _get_sample_non_variant():
 class VcfSourceTest(unittest.TestCase):
 
   VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
+  try:
+    vcfio.vcf_parser.nucleus_vcf_reader
+  except AttributeError:
+    NUCLEUS_IMPORT_MISSING = True
+  else:
+    NUCLEUS_IMPORT_MISSING = False
 
   def _create_temp_vcf_file(
       self, lines, tempdir, compression_type=CompressionTypes.UNCOMPRESSED):
@@ -345,6 +351,7 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
+  @unittest.skipIf(NUCLEUS_IMPORT_MISSING, 'Nucleus is not imported')
   def test_single_file_verify_details_nucleus(self):
     variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
     read_data = self._create_temp_file_and_read_records(
@@ -374,6 +381,7 @@ class VcfSourceTest(unittest.TestCase):
       self.assertEqual(3, len(read_data))
       self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
+  @unittest.skipIf(NUCLEUS_IMPORT_MISSING, 'Nucleus is not imported')
   def test_file_pattern_verify_details_nucleus(self):
     variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
     variant_2, vcf_line_2 = _get_sample_variant_2(is_for_nucleus=True)
