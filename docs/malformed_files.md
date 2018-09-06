@@ -65,7 +65,9 @@ for:
 If this flag is set, pipeline will infer `TYPE` and `NUMBER` for undefined
 fields based on field values seen in VCF files. It will also output a
 representive header that contains infered definitions as well as definitions
-from headers. Use this flag if there are fields with missing definition.
+from headers. Use this flag if there are fields with missing definition or if
+pipeline should ignore header definitions that are incompatible with field values,
+and instead should infer the correct header definitions for the corresponding fields.
 
 
 ## Specifying `--allow_incompatible_records`
