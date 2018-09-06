@@ -46,6 +46,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import vcf_file_composer
+from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import combine_call_names
@@ -54,6 +55,8 @@ from gcp_variant_transforms.transforms import densify_variants
 
 _BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`;'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
+_VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
+                      'INFO', 'FORMAT']
 
 
 def run(argv=None):
@@ -72,29 +75,28 @@ def run(argv=None):
   vcf_data_temp_folder = filesystems.FileSystems.join(
       google_cloud_options.temp_location,
       'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
-  vcf_call_names_file_path = filesystems.FileSystems.join(
+  vcf_header_file_path = filesystems.FileSystems.join(
       google_cloud_options.temp_location,
-      'bq_to_vcf_call_names_{}'.format(timestamp_str))
+      'bq_to_vcf_header_with_call_names_{}'.format(timestamp_str))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         google_cloud_options.temp_location,
-        'bq_to_vcf_header_{}'.format(timestamp_str))
-    _write_vcf_header(known_args.representative_header_file)
+        'bq_to_vcf_meta_info_{}'.format(timestamp_str))
+    _write_vcf_meta_info(known_args.representative_header_file)
 
   _bigquery_to_vcf_shards(known_args,
                           options,
                           vcf_data_temp_folder,
-                          vcf_call_names_file_path)
+                          vcf_header_file_path)
 
   vcf_file_composer.compose_vcf_shards(google_cloud_options.project,
-                                       known_args.representative_header_file,
-                                       vcf_call_names_file_path,
+                                       vcf_header_file_path,
                                        vcf_data_temp_folder,
                                        known_args.output_file)
 
 
-def _write_vcf_header(representative_header_file):
+def _write_vcf_meta_info(representative_header_file):
   # TODO(allieychen): infer the meta information from the schema and replace the
   # empty `VcfHeader` below.
   header_fields = vcf_header_io.VcfHeader()
@@ -106,7 +108,7 @@ def _bigquery_to_vcf_shards(
     known_args,  # type: argparse.Namespace
     beam_pipeline_options,  # type: pipeline_options.PipelineOptions
     vcf_data_temp_folder,  # type: str
-    call_names_file_path,  # type: str
+    header_file_path,  # type: str
     ):
   # type: (...) -> None
   """Runs BigQuery to VCF shards pipelines.
@@ -117,7 +119,8 @@ def _bigquery_to_vcf_shards(
   writes to one VCF file. All VCF data files are saved in
   `vcf_data_temp_folder`.
 
-  Also, it writes the call names to `call_names_file_path`.
+  Also, it writes the meta info and data header with the call names to
+  `vcf_header_file_path`.
   """
   bq_source = bigquery.BigQuerySource(
       query=_BASE_QUERY_TEMPLATE.format(
@@ -136,7 +139,10 @@ def _bigquery_to_vcf_shards(
 
     _ = (call_names
          | 'GenerateVcfDataHeader' >>
-         beam.ParDo(_write_call_names, call_names_file_path))
+         beam.ParDo(_write_vcf_header_with_call_names,
+                    _VCF_FIXED_COLUMNS,
+                    known_args.representative_header_file,
+                    header_file_path))
 
     _ = (variants
          | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(call_names))
@@ -147,22 +153,35 @@ def _bigquery_to_vcf_shards(
          | vcfio.WriteVcfDataLines())
 
 
-def _write_call_names(call_names, file_path):
-  # type: (List[str], str) -> None
-  """Writes call names.
+def _write_vcf_header_with_call_names(sample_names,
+                                      vcf_fixed_columns,
+                                      representative_header_file,
+                                      file_path):
+  # type: (List[str], List[str], str, str) -> None
+  """Writes VCF header containing meta info and header line with call names.
 
-  It writes the call names in `call_names`. Example:
-    SAMPLE1  SAMPLE2  SAMPLE3
+  It writes all meta-information starting with `##` extracted from
+  `representative_header_file`, followed by one data header line with
+  ` vcf_fixed_columns`, and sample names in `sample_names`. Example:
+  ##INFO=<ID=CGA_SDO,Number=1,Type=Integer,Description="Number">
+  ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+  #CHROM  POS  ID  REF  ALT  QUAL  FILTER  INFO  SAMPLE1  SAMPLE2
 
   Args:
-    call_names: The call names in the header line.
-    file_path: The location where the call names is saved.
+    sample_names: The sample names appended to `vcf_fixed_columns`.
+    vcf_fixed_columns: The VCF fixed columns.
+    representative_header_file: The location of the file that provides the
+      meta-information.
+    file_path: The location where the VCF headers is saved.
   """
   # pylint: disable=redefined-outer-name,reimported
   from apache_beam.io import filesystems
+  metadata_header_lines = vcf_header_parser.get_metadata_header_lines(
+      representative_header_file)
   with filesystems.FileSystems.create(file_path) as file_to_write:
+    file_to_write.write(''.join(metadata_header_lines))
     file_to_write.write(
-        str(''.join(['\t' + call_name for call_name in call_names])))
+        str('\t'.join(vcf_fixed_columns + sample_names)))
     file_to_write.write('\n')
 
 

@@ -26,12 +26,30 @@ class BqToVcfTest(unittest.TestCase):
   """Test cases for the `bq_to_vcf` module."""
 
   def test_write_vcf_data_header(self):
+    lines = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	\n']
     with temp_dir.TempDir() as tempdir:
+      representative_header = tempdir.create_temp_file(lines=lines)
       file_path = filesystems.FileSystems.join(tempdir.get_path(),
                                                'data_header')
-      bq_to_vcf._write_call_names(['Sample 1', 'Sample 2'],
-                                  file_path)
-      expected_content = '\tSample 1\tSample 2\n'
+      bq_to_vcf._write_vcf_header_with_call_names(
+          ['Sample 1', 'Sample 2'],
+          ['#CHROM', 'POS', 'ID', 'REF', 'ALT'],
+          representative_header,
+          file_path)
+      expected_content = [
+          '##fileformat=VCFv4.2\n',
+          '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+          '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+          '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+          '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+          '#CHROM\tPOS\tID\tREF\tALT\tSample 1\tSample 2\n'
+      ]
       with filesystems.FileSystems.open(file_path) as f:
         content = f.readlines()
-        self.assertEqual(content, [expected_content])
+        self.assertEqual(content, expected_content)

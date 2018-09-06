@@ -475,5 +475,5 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'single shard must be sorted.'))
     parser.add_argument(
         '--representative_header_file',
-        help='If provided, header values from the provided file will be added '
-             'into the output_file. ')
+        help=('If provided, meta-information from the provided file will be '
+              'added into the output_file. '))

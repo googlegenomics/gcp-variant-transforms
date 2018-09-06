@@ -27,8 +27,7 @@ _MAX_NUM_OF_BLOBS_PER_COMPOSE = 32
 
 
 def compose_vcf_shards(project,  # type: str
-                       vcf_header_file,  # type: str
-                       call_names_file_path,  # type: str
+                       vcf_header_file_path,  # type: str
                        vcf_data_files_folder,  # type: str
                        output_file,  # type: str
                        delete=True,  # type: bool
@@ -36,30 +35,25 @@ def compose_vcf_shards(project,  # type: str
   # type: (...) -> None
   """Composes VCF shards to one VCF file.
 
-  It composes VCF header, call names, and VCF data files to one VCF file, and
-  deletes the original VCF shards if `delete` is True.
-
+  It composes VCF header and VCF data files to one VCF file, and deletes the
+  original VCF shards if `delete` is True.
 
   Args:
     project: The project name.
-    vcf_header_file: The path of the VCF header file.
-    call_names_file_path: The file path that contains the call names.
+    vcf_header_file_path: The path of the VCF header file, it contains the meta
+      information, as well as the data header line with the call names.
     vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
     delete: If true, delete the original VCF shards.
   """
-  header_bucket_name, header_blob = gcsio.parse_gcs_path(vcf_header_file)
+  header_bucket_name, header_blob = gcsio.parse_gcs_path(vcf_header_file_path)
   vcf_data_bucket_name, vcf_data_blob_prefix = gcsio.parse_gcs_path(
       vcf_data_files_folder)
-  call_names_bucket_name, call_names_blob_name = gcsio.parse_gcs_path(
-      call_names_file_path)
-  if (vcf_data_bucket_name != call_names_bucket_name or
-      vcf_data_bucket_name != header_bucket_name):
-    raise ValueError(
-        'The VCF header file {}, VCF data files {}, call names file {} '
-        'must be in the same bucket. '.format(vcf_header_file,
-                                              vcf_data_files_folder,
-                                              call_names_file_path))
+
+  if vcf_data_bucket_name != header_bucket_name:
+    raise ValueError('The VCF data files {} and header file {} are in '
+                     'different buckets. '.format(vcf_data_files_folder,
+                                                  vcf_header_file_path))
 
   composed_vcf_data_blob = _compose_vcf_data_files(project,
                                                    vcf_data_files_folder)
@@ -67,11 +61,10 @@ def compose_vcf_shards(project,  # type: str
   bucket = client.get_bucket(vcf_data_bucket_name)
   output_file_blob = _create_blob(client, output_file)
   output_file_blob.compose([bucket.get_blob(header_blob),
-                            bucket.get_blob(call_names_blob_name),
                             composed_vcf_data_blob])
   if delete:
     bucket.delete_blobs(bucket.list_blobs(prefix=vcf_data_blob_prefix))
-    bucket.delete_blobs(bucket.list_blobs(prefix=call_names_blob_name))
+    bucket.delete_blobs(bucket.list_blobs(prefix=header_blob))
 
 
 def _compose_vcf_data_files(project, vcf_data_files_folder):
