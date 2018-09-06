@@ -1,5 +1,6 @@
 # Dealing with malformed files
 
+
 ## Field compatibility
 
 When loading multiple files, the `INFO` and `FORMAT` fields
@@ -15,9 +16,10 @@ The compatibility rules are as follows:
 * Fields with different `Type` values are compatible in the following cases:
 
   * `Integer` and `Float` fields are compatible and are converted to `Float`.
-  * We are adding more compatibility options (e.g. resolving `String` and
-  `Integer` to `String`). See
-  [below](#specifying---allow-incompatible-records) for more details.
+  * You must run the pipeline with --allow-incompatible-records to
+    automatically resolve conflicts between incompatible fields (e.g. String
+    and Integer). This is to ensure incompatible types are not silently ignored.
+    See [below](#specifying---allow-incompatible-records) for more details.
 
 * Fields with different `Number` values are compatible in the following cases:
 
@@ -29,10 +31,15 @@ The compatibility rules are as follows:
     * `Number=A` (one value for each alternate) only if running with
       `--split_alternate_allele_info_fields False`.
 
-  * We are adding more compatibility options (e.g. resolving `Number=1` and
-    `Number=.` with `Number=.`). See
-    [below](#specifying---allow-incompatible-records) for more details.
-
+  * You must run the pipeline with --allow-incompatible-records to
+    automatically resolve conflicts between incompatible fields (e.g.
+    `Number=1` and `Number=.`). This is to ensure incompatible types
+    are not silently ignored.
+    See [below](#specifying---allow-incompatible-records) for more details.
+    
+You can run preprossing tool to get a summary of malformed/incompatible
+records. Please refer to 
+[VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
 
 ## Specifying `--representative_header_file`
 
@@ -50,7 +57,8 @@ for:
   files have identical VCF headers.
 * Providing definitions for missing header fields. See the
   [troubleshooting page](./troubleshooting.md) for more details.
-* Coming soon: resolving incompatible fields across files.
+* Resolving incompatible field definition across files. See
+  [below](#specifying---allow-incompatible-records) for an alternative.
 
 ## Specifying `--infer-undefined-header-fields`
 
@@ -67,6 +75,5 @@ and actual values or if a field has two inconsistent definitions in two
 different VCF files.
 By specifying `--allow-incompatible-records`, pipeline will resolve conflicts
 in header definitons. It will also cast field values to match BigQuery schema if
-there is a mismatch between field definition and field value. Please see [this
-doc](https://docs.google.com/document/d/1JusaPllbpXynNziNzdyOdSRTM8i7UXbNvtkbrWNMq3Q)
-for more details.
+there is a mismatch between field definition and field value (e.g. Integer field
+value is casted to String to match a field schema of type String).
