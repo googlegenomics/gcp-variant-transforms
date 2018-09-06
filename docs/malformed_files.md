@@ -16,7 +16,7 @@ The compatibility rules are as follows:
 * Fields with different `Type` values are compatible in the following cases:
 
   * `Integer` and `Float` fields are compatible and are converted to `Float`.
-  * You must run the pipeline with --allow-incompatible-records to
+  * You must run the pipeline with `--allow-incompatible-records` to
     automatically resolve conflicts between incompatible fields (e.g. String
     and Integer). This is to ensure incompatible types are not silently ignored.
     See [below](#specifying---allow-incompatible-records) for more details.
@@ -31,7 +31,7 @@ The compatibility rules are as follows:
     * `Number=A` (one value for each alternate) only if running with
       `--split_alternate_allele_info_fields False`.
 
-  * You must run the pipeline with --allow-incompatible-records to
+  * You must run the pipeline with --allow_incompatible-records to
     automatically resolve conflicts between incompatible fields (e.g.
     `Number=1` and `Number=.`). This is to ensure incompatible types
     are not silently ignored.
@@ -39,7 +39,7 @@ The compatibility rules are as follows:
     
 You can run preprossing tool to get a summary of malformed/incompatible
 records. Please refer to 
-[VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
+[VCF files preprocessor](./vcf_files_preprocessor.md) for more details.
 
 ## Specifying `--representative_header_file`
 
@@ -60,7 +60,7 @@ for:
 * Resolving incompatible field definition across files. See
   [below](#specifying---allow-incompatible-records) for an alternative.
 
-## Specifying `--infer-undefined-header-fields`
+## Specifying `--infer_headers`
 
 If this flag is set, pipeline will infer `TYPE` and `NUMBER` for undefined
 fields based on field values seen in VCF files. It will also output a
@@ -68,12 +68,12 @@ representive header that contains infered definitions as well as definitions
 from headers. Use this flag if there are fields with missing definition.
 
 
-## Specifying `--allow-incompatible-records`
+## Specifying `--allow_incompatible_records`
 
 Pipeline will fail by defualt if there is a mismatch between field definition
 and actual values or if a field has two inconsistent definitions in two
 different VCF files.
-By specifying `--allow-incompatible-records`, pipeline will resolve conflicts
+By specifying `--allow_incompatible_records`, pipeline will resolve conflicts
 in header definitons. It will also cast field values to match BigQuery schema if
 there is a mismatch between field definition and field value (e.g. Integer field
 value is casted to String to match a field schema of type String).
