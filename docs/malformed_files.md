@@ -75,5 +75,5 @@ and actual values or if a field has two inconsistent definitions in two
 different VCF files.
 By specifying `--allow_incompatible_records`, pipeline will resolve conflicts
 in header definitons. It will also cast field values to match BigQuery schema if
-there is a mismatch between field definition and field value (e.g. Integer field
-value is casted to String to match a field schema of type String).
+there is a mismatch between field definition and field value (e.g. `Integer` field
+value is casted to `String` to match a field schema of type `String`).
