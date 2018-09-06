@@ -16,10 +16,10 @@ The compatibility rules are as follows:
 * Fields with different `Type` values are compatible in the following cases:
 
   * `Integer` and `Float` fields are compatible and are converted to `Float`.
-  * You must run the pipeline with `--allow-incompatible-records` to
+  * You must run the pipeline with `--allow_incompatible_records` to
     automatically resolve conflicts between incompatible fields (e.g. String
     and Integer). This is to ensure incompatible types are not silently ignored.
-    See [below](#specifying---allow-incompatible-records) for more details.
+    See [below](#specifying---allow_incompatible_records) for more details.
 
 * Fields with different `Number` values are compatible in the following cases:
 
@@ -35,7 +35,7 @@ The compatibility rules are as follows:
     automatically resolve conflicts between incompatible fields (e.g.
     `Number=1` and `Number=.`). This is to ensure incompatible types
     are not silently ignored.
-    See [below](#specifying---allow-incompatible-records) for more details.
+    See [below](#specifying---allow_incompatible_records) for more details.
     
 You can run preprossing tool to get a summary of malformed/incompatible
 records. Please refer to 
