@@ -476,4 +476,4 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--representative_header_file',
         help=('If provided, meta-information from the provided file will be '
-              'added into the output_file. '))
+              'added into the output_file.'))
