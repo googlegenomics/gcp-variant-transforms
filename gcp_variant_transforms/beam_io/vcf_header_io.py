@@ -260,7 +260,7 @@ class _HeaderFieldKeyConstants(object):
   LENGTH = 'length'
 
 
-class _WriteVcfHeaderFn(beam.DoFn):
+class WriteVcfHeaderFn(beam.DoFn):
   """A DoFn for writing VCF headers to a file."""
 
   HEADER_TEMPLATE = '##{}=<{}>\n'
@@ -411,4 +411,4 @@ class WriteVcfHeaders(PTransform):
     self._file_path = file_path
 
   def expand(self, pcoll):
-    return pcoll | beam.ParDo(_WriteVcfHeaderFn(self._file_path))
+    return pcoll | beam.ParDo(WriteVcfHeaderFn(self._file_path))
