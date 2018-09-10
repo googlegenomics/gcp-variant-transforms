@@ -703,33 +703,37 @@ class VariantGeneratorTest(unittest.TestCase):
 
   def test_get_variant_info_annotation(self):
     variant_generator = bigquery_vcf_data_converter.VariantGenerator({
-        'CSQ': ['Consequence', 'AF', 'IMPACT']
+        'CSQ': ['allele', 'Consequence', 'AF', 'IMPACT']
     })
     row = {
         unicode(ColumnKeyConstants.ALTERNATE_BASES): [
             {
-                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('G'),
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'G',
                 unicode('CSQ'): [
-                    {u'Consequence': u'upstream_gene_variant',
+                    {u'allele': 'G',
+                     u'Consequence': u'upstream_gene_variant',
                      u'AF': u'',
                      u'IMPACT': u'MODIFIER'},
-                    {u'Consequence': u'upstream_gene_variant',
+                    {u'allele': 'G',
+                     u'Consequence': u'upstream_gene_variant',
                      u'AF': u'0.1',
                      u'IMPACT': u''}]
             },
             {
-                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('T'),
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'T',
                 unicode('CSQ'): [
-                    {u'Consequence': u'',
+                    {u'allele': 'T',
+                     u'Consequence': u'',
                      u'AF': u'',
                      u'IMPACT': u'MODIFIER'},
-                    {u'Consequence': u'upstream_gene_variant',
+                    {u'allele': 'T',
+                     u'Consequence': u'upstream_gene_variant',
                      u'AF': u'0.6',
                      u'IMPACT': u''}]
 
             },
             {
-                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'TT',
                 unicode('CSQ'): []
             }
         ]
@@ -744,14 +748,6 @@ class VariantGeneratorTest(unittest.TestCase):
     }
     self.assertEqual(expected_variant_info,
                      variant_generator._get_variant_info(row))
-
-  def test_get_variant_info_annotation_missing_annotation_names(self):
-    row = {
-        unicode(ColumnKeyConstants.ALTERNATE_BASES): [
-            {unicode('CSQ'): [{u'Consequence': u'upstream_gene_variant'}]}]
-    }
-    with self.assertRaises(ValueError):
-      self._variant_generator._get_variant_info(row)
 
   def test_get_variant_calls(self):
     variant_call_records = _get_big_query_row()[ColumnKeyConstants.CALLS]

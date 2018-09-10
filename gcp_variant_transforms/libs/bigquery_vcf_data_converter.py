@@ -21,6 +21,7 @@ import json
 from typing import Any, Dict, List  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
@@ -38,7 +39,6 @@ _MAX_BIGQUERY_ROW_SIZE_BYTES = 10 * 1024 * 1024 - 10 * 1024
 _JSON_CONCATENATION_OVERHEAD_BYTES = 5
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
-_MISSING_ANNOTATION_FIELD_VALUE = ''
 # Reserved constants for column names in the BigQuery schema.
 RESERVED_BQ_COLUMNS = [bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
                        bigquery_util.ColumnKeyConstants.START_POSITION,
@@ -252,11 +252,12 @@ class VariantGenerator(object):
     Args:
       annotation_id_to_annotation_names: A map where the key is the annotation
         id (e.g., `CSQ`) and the value is a list of annotation names (e.g.,
-        ['Consequence', 'IMPACT', 'SYMBOL']). The annotation str (e.g.,
-        'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is reconstructed in the
-        same order as the annotation names.
+        ['allele', 'Consequence', 'IMPACT', 'SYMBOL']). The annotation str
+        (e.g., 'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is reconstructed
+        in the same order as the annotation names.
     """
-    self._annotation_id_to_annotation_names = annotation_id_to_annotation_names
+    self._annotation_str_builder = annotation_parser.AnnotationStrBuilder(
+        annotation_id_to_annotation_names)
 
   def convert_bq_row_to_variant(self, row):
     """Converts one BigQuery row to `Variant`."""
@@ -293,8 +294,10 @@ class VariantGenerator(object):
             not self._is_null_or_empty(value)):
           if key not in info:
             info[key] = []
-          if isinstance(value, list):
-            info[key].extend(self._reconstruct_annotation_str(alt_base, key))
+          if self._annotation_str_builder.is_valid_annotation_id(key):
+            info[key].extend(
+                self._annotation_str_builder.reconstruct_annotation_str(
+                    key, value))
           else:
             info[key].append(value)
     return info
@@ -315,32 +318,6 @@ class VariantGenerator(object):
           info=info)
       variant_calls.append(variant_call)
     return variant_calls
-
-  def _reconstruct_annotation_str(self, alt_base, annotation_id):
-    # type: (Dict[str, Any], str) -> List[str]
-    """Returns annotation strings.
-
-    The annotation str starts with `alt`, then followed by the annotation values
-    that are reconstructed in the same order as `annotation_names`. (e.g.,
-    'A|upstream_gene_variant|MODIFIER|PSMF1|||||').
-    """
-    if not self._annotation_id_to_annotation_names:
-      raise ValueError('No annotation names defined. The annotation string'
-                       'cannot be reconstructed since the order is not '
-                       'provided.')
-    annotation_str = []
-    for annotation_map in alt_base.get(annotation_id):
-      annotation_values = [
-          alt_base.get(bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT)]
-      for annotation_name in self._annotation_id_to_annotation_names.get(
-          annotation_id):
-        value = annotation_map.get(annotation_name)
-        if not value and value != 0:
-          annotation_values.append(_MISSING_ANNOTATION_FIELD_VALUE)
-        else:
-          annotation_values.append(value)
-      annotation_str.append('|'.join(annotation_values))
-    return annotation_str
 
   def _is_null_or_empty(self, value):
     # type: (Any) -> bool

@@ -223,10 +223,11 @@ def _extract_annotation_names(schema):
   # type: (bigquery_v2.TableSchema) -> Dict[str, List[str]]
   """Returns a mapping of annotation id to the corresponding annotation names.
 
-  The annotation names are useful for reconstructing the annotation str (e.g.,
-  'A|upstream_gene_variant|MODIFIER|PSMF1|||||'). Sample returned map:
-  {'CSQ': ['Consequence', 'IMPACT', 'SYMBOL'],
-   'CSQ_2': ['Codons', 'STRAND']}
+  Any `Record` field within alternate bases is considered as an annotation
+  field. The annotation names are useful for reconstructing the annotation str
+  (e.g., 'A|upstream_gene_variant|MODIFIER|PSMF1|||||'). Sample returned map:
+  {'CSQ': ['allele', 'Consequence', 'IMPACT', 'SYMBOL'],
+   'CSQ_2': ['allele', 'Codons', 'STRAND']}
   """
   annotation_names = {}
   for table_field in schema.fields:

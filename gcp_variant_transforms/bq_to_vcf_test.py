@@ -107,6 +107,11 @@ class BqToVcfTest(unittest.TestCase):
         mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
         description='desc')
     annotation_record_1.fields.append(bigquery.TableFieldSchema(
+        name='allele',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    annotation_record_1.fields.append(bigquery.TableFieldSchema(
         name='Consequence',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
@@ -118,6 +123,11 @@ class BqToVcfTest(unittest.TestCase):
         mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
         description='desc')
     annotation_record_2.fields.append(bigquery.TableFieldSchema(
+        name='allele',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    annotation_record_2.fields.append(bigquery.TableFieldSchema(
         name='IMPACT',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
@@ -126,5 +136,5 @@ class BqToVcfTest(unittest.TestCase):
     schema.fields.append(alternate_bases_record)
     self.assertEqual(
         bq_to_vcf._extract_annotation_names(schema),
-        {'CSQ_1': ['Consequence'], 'CSQ_2': ['IMPACT']}
+        {'CSQ_1': ['allele', 'Consequence'], 'CSQ_2': ['allele', 'IMPACT']}
     )

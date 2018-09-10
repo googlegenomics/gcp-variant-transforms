@@ -42,3 +42,39 @@ class AnnotationParserTest(unittest.TestCase):
     annotation_str = 'some desc-Consequence-IMPACT-SYMBOL-Gene'
     with self.assertRaisesRegexp(ValueError, 'Expected at least one.*'):
       annotation_parser.extract_annotation_names(annotation_str)
+
+
+class AnnotationStrBuilderTest(unittest.TestCase):
+  """Test cases for `AnnotationStrBuilder` class."""
+
+  def test_reconstruct_annotation_str(self):
+    str_builder = annotation_parser.AnnotationStrBuilder({
+        'CSQ': ['allele', 'Consequence', 'AF', 'IMPACT'],
+        'CSQ_2': ['allele', 'Consequence', 'IMPACT']})
+    annotation_maps = [{u'allele': u'G',
+                        u'Consequence': u'upstream_gene_variant',
+                        u'AF': u'',
+                        u'IMPACT': u'MODIFIER'},
+                       {u'allele': u'G',
+                        u'Consequence': u'upstream_gene_variant',
+                        u'AF': u'0.1',
+                        u'IMPACT': u''}]
+
+    expected_annotation_strs = ['G|upstream_gene_variant||MODIFIER',
+                                'G|upstream_gene_variant|0.1|']
+    self.assertEqual(
+        expected_annotation_strs,
+        str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
+    )
+
+  def test_reconstruct_annotation_str_missing_annotation_names(self):
+    str_builder = annotation_parser.AnnotationStrBuilder(None)
+    annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
+    with self.assertRaises(ValueError):
+      str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
+
+    str_builder = annotation_parser.AnnotationStrBuilder(
+        {'CSQ2': ['Consequence', 'AF']})
+    annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
+    with self.assertRaises(ValueError):
+      str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
