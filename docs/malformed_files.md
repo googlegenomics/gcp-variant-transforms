@@ -17,9 +17,10 @@ The compatibility rules are as follows:
 
   * `Integer` and `Float` fields are compatible and are converted to `Float`.
   * You must run the pipeline with `--allow_incompatible_records` to
-    automatically resolve conflicts between incompatible fields (e.g. String
-    and Integer). This is to ensure incompatible types are not silently ignored.
-    See [below](#specifying---allow_incompatible_records) for more details.
+    automatically resolve conflicts between incompatible fields (e.g. `String`
+    and `Integer`). This is to ensure incompatible types are not silently
+    ignored. See 
+    [below](#specifying---allow_incompatible_records) for more details.
 
 * Fields with different `Number` values are compatible in the following cases:
 
@@ -31,7 +32,7 @@ The compatibility rules are as follows:
     * `Number=A` (one value for each alternate) only if running with
       `--split_alternate_allele_info_fields False`.
 
-  * You must run the pipeline with --allow_incompatible-records to
+  * You must run the pipeline with `--allow_incompatible-records` to
     automatically resolve conflicts between incompatible fields (e.g.
     `Number=1` and `Number=.`). This is to ensure incompatible types
     are not silently ignored.
@@ -64,15 +65,18 @@ for:
 
 If this flag is set, pipeline will infer `TYPE` and `NUMBER` for undefined
 fields based on field values seen in VCF files. It will also output a
-representive header that contains infered definitions as well as definitions
+representive header that contains inferred definitions as well as definitions
 from headers. Use this flag if there are fields with missing definition or if
-pipeline should ignore header definitions that are incompatible with field values,
-and instead should infer the correct header definitions for the corresponding fields.
+pipeline should ignore header definitions that are incompatible with field
+values, and instead should infer the correct header definitions for
+the corresponding fields.
 
+Note that this will make pipelines do two passes on the data, which results
+in ~30% more compute.
 
 ## Specifying `--allow_incompatible_records`
 
-Pipeline will fail by defualt if there is a mismatch between field definition
+Pipeline will fail by default if there is a mismatch between field definition
 and actual values or if a field has two inconsistent definitions in two
 different VCF files.
 By specifying `--allow_incompatible_records`, pipeline will resolve conflicts
