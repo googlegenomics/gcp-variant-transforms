@@ -45,6 +45,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.options import variant_transform_options
@@ -148,6 +149,26 @@ def _bigquery_to_vcf_shards(
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
          | vcfio.WriteVcfDataLines())
+
+
+def _form_customized_query(known_args):
+  # type: (argparse.Namespace) -> str
+  """Returns a customized query for the interested regions."""
+  base_query = _BASE_QUERY_TEMPLATE.format(INPUT_TABLE='.'.join(
+      bigquery_util.parse_table_reference(known_args.input_table)))
+  if not known_args.genomic_regions:
+    return base_query
+
+  conditions = []
+  for region in known_args.genomic_regions:
+    ref, start, end = genomic_region_parser.parse_genomic_region(region)
+
+    conditions.append('{}=\'{}\' AND {}>={} AND {}<={}'.format(
+        bigquery_util.ColumnKeyConstants.REFERENCE_NAME, ref,
+        bigquery_util.ColumnKeyConstants.START_POSITION, start,
+        bigquery_util.ColumnKeyConstants.END_POSITION, end))
+
+  return ' '.join([base_query, 'WHERE', ' OR '.join(conditions)])
 
 
 def _write_vcf_header_with_call_names(sample_names,

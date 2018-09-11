@@ -477,5 +477,12 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         '--representative_header_file',
         help=('If provided, meta-information from the provided file will be '
               'added into the output_file.'))
-
-
+    parser.add_argument(
+        '--genomic_regions',
+        default=None, nargs='+',
+        help=('A list of genomic regions (separated by a space) to load from '
+              'BigQuery. The format of each genomic region should be '
+              'CHROMOSOME:START_POSITION-END_POSITION or CHROMOSOME if the full'
+              'chromosome is interested. Only variants matching at least one '
+              'of these regions will be loaded. If this parameter is not '
+              'specified, all variants will be kept.'))
