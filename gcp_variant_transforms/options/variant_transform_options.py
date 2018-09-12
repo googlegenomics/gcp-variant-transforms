@@ -483,6 +483,6 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         help=('A list of genomic regions (separated by a space) to load from '
               'BigQuery. The format of each genomic region should be '
               'CHROMOSOME:START_POSITION-END_POSITION or CHROMOSOME if the full'
-              'chromosome is interested. Only variants matching at least one '
+              'chromosome is requested. Only variants matching at least one '
               'of these regions will be loaded. If this parameter is not '
               'specified, all variants will be kept.'))

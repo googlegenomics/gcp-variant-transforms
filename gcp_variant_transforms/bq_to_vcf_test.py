@@ -58,22 +58,21 @@ class BqToVcfTest(unittest.TestCase):
         content = f.readlines()
         self.assertEqual(content, expected_content)
 
-  def test_form_customized_query_no_region(self):
+  def test_get_bigquery_query_no_region(self):
     args = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
         genomic_regions=None)
-    self.assertEqual(bq_to_vcf._form_customized_query(args),
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args),
                      'SELECT * FROM `my_bucket.my_dataset.my_table`')
 
-  def test_form_customized_query_with_regions(self):
+  def test_get_bigquery_query_with_regions(self):
     args_1 = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
         genomic_regions=['c1:1,000-2,000', 'c2'])
-    self.assertEqual(
-        bq_to_vcf._form_customized_query(args_1),
+    expected_query = (
         'SELECT * FROM `my_bucket.my_dataset.my_table` WHERE '
-        'reference_name=\'c1\' AND start_position>=1000 AND end_position<=2000 '
-        'OR '
-        'reference_name=\'c2\' AND start_position>=0 AND '
-        'end_position<=9223372036854775807'
+        '(reference_name="c1" AND start_position>=1000 AND end_position<=2000) '
+        'OR (reference_name="c2" AND start_position>=0 AND '
+        'end_position<=9223372036854775807)'
     )
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1), expected_query)

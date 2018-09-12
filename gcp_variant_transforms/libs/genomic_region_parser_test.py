@@ -21,7 +21,7 @@ import unittest
 from gcp_variant_transforms.libs import genomic_region_parser
 
 
-class VariantPartitionTest(unittest.TestCase):
+class GenomicRegionParserTest(unittest.TestCase):
 
   def test_parse_genomic_regions(self):
     self.assertEqual(

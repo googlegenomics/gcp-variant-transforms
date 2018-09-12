@@ -55,6 +55,9 @@ from gcp_variant_transforms.transforms import densify_variants
 
 
 _BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`'
+_GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
+                            '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
+                            '{END_POSITION_ID}<={END_POSITION_VALUE})')
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
@@ -123,7 +126,9 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the call names to
   `vcf_header_file_path`.
   """
-  bq_source = bigquery.BigQuerySource(query=_form_customized_query(known_args),
+  query = _get_bigquery_query(known_args)
+  logging.info('Processing BigQuery query %s:', query)
+  bq_source = bigquery.BigQuerySource(query=query,
                                       validate=True,
                                       use_standard_sql=True)
 
@@ -151,23 +156,25 @@ def _bigquery_to_vcf_shards(
          | vcfio.WriteVcfDataLines())
 
 
-def _form_customized_query(known_args):
+def _get_bigquery_query(known_args):
   # type: (argparse.Namespace) -> str
-  """Returns a customized query for the interested regions."""
+  """Returns a BigQuery query for the interested regions."""
   base_query = _BASE_QUERY_TEMPLATE.format(INPUT_TABLE='.'.join(
       bigquery_util.parse_table_reference(known_args.input_table)))
-  if not known_args.genomic_regions:
-    return base_query
-
   conditions = []
-  for region in known_args.genomic_regions:
-    ref, start, end = genomic_region_parser.parse_genomic_region(region)
+  if known_args.genomic_regions:
+    for region in known_args.genomic_regions:
+      ref, start, end = genomic_region_parser.parse_genomic_region(region)
+      conditions.append(_GENOMIC_REGION_TEMPLATE.format(
+          REFERENCE_NAME_ID=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+          REFERENCE_NAME_VALUE=ref,
+          START_POSITION_ID=bigquery_util.ColumnKeyConstants.START_POSITION,
+          START_POSITION_VALUE=start,
+          END_POSITION_ID=bigquery_util.ColumnKeyConstants.END_POSITION,
+          END_POSITION_VALUE=end))
 
-    conditions.append('{}=\'{}\' AND {}>={} AND {}<={}'.format(
-        bigquery_util.ColumnKeyConstants.REFERENCE_NAME, ref,
-        bigquery_util.ColumnKeyConstants.START_POSITION, start,
-        bigquery_util.ColumnKeyConstants.END_POSITION, end))
-
+  if not conditions:
+    return base_query
   return ' '.join([base_query, 'WHERE', ' OR '.join(conditions)])
 
 
