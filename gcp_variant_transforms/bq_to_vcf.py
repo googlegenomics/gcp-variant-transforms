@@ -17,7 +17,15 @@ r"""Pipeline for loading BigQuery table to one VCF file. [EXPERIMENTAL]
 The pipeline reads the variants from BigQuery table, groups a collection of
 variants within a contiguous region of the genome (the size of the collection is
 adjustable through flag `--number_of_bases_per_shard`), sorts them, and then
-writes to one VCF shard. At the end, it consolidates VCF shards into one.
+writes to one VCF shard. At the end, it consolidates VCF header and VCF shards
+into one.
+
+Run locally:
+python -m gcp_variant_transforms.bq_to_vcf \
+  --output_file <local path to VCF file> \
+  --input_table projectname:bigquerydataset.tablename \
+  --project projectname \
+  --setup_file ./setup.py
 
 Run on Dataflow:
 python -m gcp_variant_transforms.bq_to_vcf \
@@ -33,6 +41,7 @@ python -m gcp_variant_transforms.bq_to_vcf \
 
 import logging
 import sys
+import tempfile
 from datetime import datetime
 from typing import Iterable, List, Tuple  # pylint: disable=unused-import
 
@@ -40,6 +49,7 @@ import apache_beam as beam
 from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
 from apache_beam.options import pipeline_options
+from apache_beam.runners.direct import direct_runner
 
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -47,7 +57,6 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
-from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import combine_call_names
@@ -61,6 +70,7 @@ _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
+_LOCAL_TEMP_DATA_FILE_NAME = 'data.vcf'
 
 
 def run(argv=None):
@@ -71,21 +81,20 @@ def run(argv=None):
                                                           _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
-  # TODO(allieychen): Add support for local location.
-  if not google_cloud_options.temp_location or not google_cloud_options.project:
-    raise ValueError('temp_location and project must be set.')
 
+  temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
   timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
   vcf_data_temp_folder = filesystems.FileSystems.join(
-      google_cloud_options.temp_location,
+      temp_folder,
       'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
+  filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
-      google_cloud_options.temp_location,
+      temp_folder,
       'bq_to_vcf_header_with_call_names_{}'.format(timestamp_str))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
-        google_cloud_options.temp_location,
+        temp_folder,
         'bq_to_vcf_meta_info_{}'.format(timestamp_str))
     _write_vcf_meta_info(known_args.representative_header_file)
 
@@ -94,10 +103,15 @@ def run(argv=None):
                           vcf_data_temp_folder,
                           vcf_header_file_path)
 
-  vcf_file_composer.compose_vcf_shards(google_cloud_options.project,
-                                       vcf_header_file_path,
-                                       vcf_data_temp_folder,
-                                       known_args.output_file)
+  if _is_direct_runner(beam.Pipeline(options=options)):
+    _compose_local_vcf_shards(vcf_header_file_path,
+                              vcf_data_temp_folder,
+                              known_args.output_file)
+  else:
+    vcf_file_composer.compose_vcf_shards(google_cloud_options.project,
+                                         vcf_header_file_path,
+                                         vcf_data_temp_folder,
+                                         known_args.output_file)
 
 
 def _write_vcf_meta_info(representative_header_file):
@@ -150,7 +164,8 @@ def _bigquery_to_vcf_shards(
     _ = (variants
          | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(call_names))
          | 'PairVariantWithKey' >>
-         beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
+         beam.Map(_pair_variant_with_key, _is_direct_runner(p),
+                  known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
          | vcfio.WriteVcfDataLines())
@@ -178,6 +193,17 @@ def _get_bigquery_query(known_args):
   return ' '.join([base_query, 'WHERE', ' OR '.join(conditions)])
 
 
+def _compose_local_vcf_shards(vcf_header_file_path,
+                              vcf_data_temp_folder,
+                              output_file):
+  # type: (str, str, str) -> None
+  with filesystems.FileSystems.create(output_file) as file_to_write:
+    _write_source_file_to_target_file(vcf_header_file_path, file_to_write)
+    temp_data_file = filesystems.FileSystems.join(vcf_data_temp_folder,
+                                                  _LOCAL_TEMP_DATA_FILE_NAME)
+    _write_source_file_to_target_file(temp_data_file, file_to_write)
+
+
 def _write_vcf_header_with_call_names(sample_names,
                                       vcf_fixed_columns,
                                       representative_header_file,
@@ -201,6 +227,7 @@ def _write_vcf_header_with_call_names(sample_names,
   """
   # pylint: disable=redefined-outer-name,reimported
   from apache_beam.io import filesystems
+  from gcp_variant_transforms.libs import vcf_header_parser
   metadata_header_lines = vcf_header_parser.get_metadata_header_lines(
       representative_header_file)
   with filesystems.FileSystems.create(file_path) as file_to_write:
@@ -228,7 +255,27 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
   yield (file_path, sorted(variants))
 
 
-def _pair_variant_with_key(variant, number_of_variants_per_shard):
+def _is_direct_runner(pipeline):
+  return isinstance(pipeline.runner, direct_runner.DirectRunner)
+
+
+def _write_source_file_to_target_file(source_file, target_file):
+  with filesystems.FileSystems.open(source_file) as f:
+    for line in f:
+      target_file.write(line)
+
+
+def _pair_variant_with_key(variant,
+                           is_direct_runner,
+                           number_of_variants_per_shard):
+  # type: (vcfio.Variant, bool, int) -> Tuple[str, vcfio.Variant]
+  """Pairs the variant with a key.
+
+  For direct runner, all variants are paired with the same key. Otherwise, the
+  key is determined by the variant's reference name and start position.
+  """
+  if is_direct_runner:
+    return (_LOCAL_TEMP_DATA_FILE_NAME, variant)
   return ('%s_%011d' % (variant.reference_name,
                         variant.start / number_of_variants_per_shard *
                         number_of_variants_per_shard),
