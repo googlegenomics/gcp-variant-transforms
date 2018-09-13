@@ -38,6 +38,7 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
+from gcp_variant_transforms.libs.annotation.vep import vep_runner2
 from gcp_variant_transforms.transforms import infer_headers
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
@@ -136,7 +137,7 @@ class ProcessedVariant(object):
     """Returns the INFO fields that are not alternate base specific.
 
     The type of the values in the map is specified in the VCF header. The values
-    are copied from the `vcfio.VariantIfno.data` fields of the input variants.
+    are copied from the `vcfio.VariantInfo.data` fields of the input variants.
     """
     return self._non_alt_info
 
@@ -199,6 +200,9 @@ class ProcessedVariantFactory(object):
       annotation_fields=None,  # type: List[str]
       use_allele_num=False,  # type: bool
       minimal_match=False,  # type: bool
+      run_annotation_pipeline=False,  # type: bool
+      vep_info_field=None,  # type: str
+      annotation_url=None,  # type: str
       infer_annotation_types=False,  # type: bool
       counter_factory=None  # type: metrics_util.CounterFactoryInterface
   ):
@@ -232,6 +236,13 @@ class ProcessedVariantFactory(object):
         minimal_match, infer_annotation_types)
     self._minimal_match = minimal_match
     self._infer_annotation_types = infer_annotation_types
+    self.run_annotation_pipeline = run_annotation_pipeline
+    self.vep_info_field = vep_info_field
+    self.annotation_headers = None
+    if self.run_annotation_pipeline:
+      if not self.vep_info_field:
+        raise ValueError('`self.vep_info_field` must be provided.')
+      self.annotation_headers = vep_runner2.get_headers(annotation_url)
 
   def create_processed_variant(self, variant):
     # type: (vcfio.Variant) -> ProcessedVariant
@@ -325,6 +336,26 @@ class ProcessedVariantFactory(object):
             type=bigquery_util.get_bigquery_type_from_vcf_type(vcf_type),
             mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
             description=annotation_descs.get(annotation_name, '')))
+      alternate_bases_record.fields.append(annotation_record)
+
+    # TODO(jessime) Data for new annotation field is in a different form than
+    # what we currently have. Instead of trying to integrate them into one
+    # for loop, I'm just going to keep them separate (for now).
+    if self.run_annotation_pipeline:
+      annotation_record = bigquery.TableFieldSchema(
+          name=_BigQuerySchemaSanitizer.get_sanitized_field_name(
+              self.vep_info_field),
+          type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+          mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+          description='List of {} annotations for this alternate.'.format(
+              self.vep_info_field))
+      for header in self.annotation_headers:
+        annotation_record.fields.append(bigquery.TableFieldSchema(
+            name=_BigQuerySchemaSanitizer.get_sanitized_field_name(
+                header['name']),
+            type=header['type'],
+            mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+            description=header['desc']))
       alternate_bases_record.fields.append(annotation_record)
     return alternate_bases_record
 
