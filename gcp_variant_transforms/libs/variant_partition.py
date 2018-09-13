@@ -35,6 +35,8 @@ import yaml
 
 from apache_beam.io.filesystems import FileSystems
 
+from gcp_variant_transforms.libs import genomic_region_parser
+
 # A reg exp that will match to standard reference_names such as "chr01" or "13".
 _CHROMOSOME_NAME_REGEXP = re.compile(r'^(chr)?([0-9][0-9]?)$')
 # Partition 0 to 21 is reserved for common reference_names such as "chr1".
@@ -48,8 +50,6 @@ _DEFAULT_NUM_PARTITIONS = _RESERVED_AUTO_PARTITIONS + 5
 _MAX_NUM_PARTITIONS = 1000
 # Each partition can contain at most 64 regions.
 _MAX_NUM_REGIONS = 64
-# Matches to regions formatted as 'chr12:10,000-20,000' used in par_config.yaml
-_REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
 # A special literal for identifying residual partition's region name.
 _RESIDUAL_REGION_LITERAL = 'residual'
 _UNDEFINED_PARTITION_INDEX = -1
@@ -166,10 +166,6 @@ class VariantPartition(object):
     Raises:
       A ValueError if any of the expected config formats are violated.
     """
-    def _parse_position(pos_str):
-      # type: (str) -> int
-      return int(pos_str.replace(',', ''))
-
     def _is_residual_partition(regions):
       # type: (List[str]) -> bool
       return (len(regions) == 1 and
@@ -192,17 +188,7 @@ class VariantPartition(object):
         continue
 
       for r in regions:
-        matched = _REGION_LITERAL_REGEXP.match(r)
-        if matched:
-          ref_name, start, end = matched.groups()
-          ref_name = ref_name.strip().lower()
-          start = _parse_position(start)
-          end = _parse_position(end)
-        else:
-          # This region includes a full chromosome
-          ref_name = r.strip().lower()
-          start = 0
-          end = sys.maxint
+        ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
         self._ref_name_to_partitions_map[ref_name].add_region(
             start, end, partition_index)
 

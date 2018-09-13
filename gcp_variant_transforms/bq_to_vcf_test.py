@@ -14,6 +14,7 @@
 
 """Tests for `bq_to_vcf` module."""
 
+import collections
 import unittest
 
 from apache_beam.io import filesystems
@@ -24,6 +25,9 @@ from gcp_variant_transforms.testing import temp_dir
 
 class BqToVcfTest(unittest.TestCase):
   """Test cases for the `bq_to_vcf` module."""
+
+  def _create_mock_args(self, **args):
+    return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def test_write_vcf_data_header(self):
     lines = [
@@ -53,3 +57,22 @@ class BqToVcfTest(unittest.TestCase):
       with filesystems.FileSystems.open(file_path) as f:
         content = f.readlines()
         self.assertEqual(content, expected_content)
+
+  def test_get_bigquery_query_no_region(self):
+    args = self._create_mock_args(
+        input_table='my_bucket:my_dataset.my_table',
+        genomic_regions=None)
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args),
+                     'SELECT * FROM `my_bucket.my_dataset.my_table`')
+
+  def test_get_bigquery_query_with_regions(self):
+    args_1 = self._create_mock_args(
+        input_table='my_bucket:my_dataset.my_table',
+        genomic_regions=['c1:1,000-2,000', 'c2'])
+    expected_query = (
+        'SELECT * FROM `my_bucket.my_dataset.my_table` WHERE '
+        '(reference_name="c1" AND start_position>=1000 AND end_position<=2000) '
+        'OR (reference_name="c2" AND start_position>=0 AND '
+        'end_position<=9223372036854775807)'
+    )
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1), expected_query)
