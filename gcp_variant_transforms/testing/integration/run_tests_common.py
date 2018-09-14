@@ -26,6 +26,8 @@ import time
 from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
+from apache_beam.io import filesystems
+
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
@@ -36,6 +38,9 @@ _DEFAULT_ZONES = ['us-east1-b']
 # test script (.json).
 TestCaseState = namedtuple('TestCaseState',
                            ['running_test', 'remaining_tests'])
+_BASE_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin'
+BQ_TO_VCF_SCRIPT = 'bq_to_vcf'
+VCF_TO_BQ_SCRIPT = 'vcf_to_bq'
 
 
 class TestCaseInterface(object):
@@ -195,6 +200,13 @@ def get_configs(test_file_path, required_keys):
     raise TestCaseFailure('Found no .json files in directory {}'.format(
         test_file_path))
   return test_configs
+
+
+def get_script_path(script):
+  if script == BQ_TO_VCF_SCRIPT or VCF_TO_BQ_SCRIPT:
+    return filesystems.FileSystems.join(_BASE_SCRIPT_PATH, script)
+  else:
+    raise TestCaseFailure('The script type {} is not supported'.format(script))
 
 
 def _load_test_configs(filename, required_keys):
