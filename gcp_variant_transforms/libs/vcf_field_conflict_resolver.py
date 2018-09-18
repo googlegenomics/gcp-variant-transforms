@@ -30,9 +30,8 @@ class FieldConflictResolver(object):
 
   def __init__(self,
                split_alternate_allele_info_fields=True,
-               resolve_always=False,
-               allow_none_type=False):
-    # type: (bool, bool, bool) -> None
+               resolve_always=False):
+    # type: (bool, bool) -> None
     """Initialize the class.
 
     Args:
@@ -41,13 +40,10 @@ class FieldConflictResolver(object):
       resolve_always: Always find a solution for the conflicts. When the
         conflicts are incompatible, convert all type conflicts to `String` and
         number conflicts to `.`.
-      allow_none_type: If true, resolve type conflicts when one value is `None`
-        by returning the type of the second value, otherwise, raise ValueError.
     """
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
     self._resolve_always = resolve_always
-    self._allow_none_type = allow_none_type
 
   def resolve_schema_conflict(self,
                               schema_field_descriptor,
@@ -123,7 +119,7 @@ class FieldConflictResolver(object):
     numeric_types = (type_constants.INTEGER, type_constants.FLOAT)
     if first == second:
       return first
-    elif (first is None or second is None) and self._allow_none_type:
+    elif first is None or second is None:
       return first if second is None else second
     elif first in numeric_types and second in numeric_types:
       return type_constants.FLOAT

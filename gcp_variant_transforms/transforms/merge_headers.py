@@ -139,9 +139,8 @@ class MergeHeaders(beam.PTransform):
 
   def __init__(self,
                split_alternate_allele_info_fields=True,
-               allow_incompatible_records=False,
-               allow_none_type=False):
-    # type: (bool, bool, bool) -> None
+               allow_incompatible_records=False):
+    # type: (bool, bool) -> None
     """Initializes :class:`MergeHeaders` object.
 
     Args:
@@ -150,8 +149,6 @@ class MergeHeaders(beam.PTransform):
         as it changes the header compatibility rules as it changes the schema.
       allow_incompatible_records: If true, header definition with type mismatch
         (e.g., string vs float) are always resolved.
-      allow_none_type: If true, resolve type conflicts when one value is `None`
-        by returning the type of the second value, otherwise, raise ValueError.
     """
     super(MergeHeaders, self).__init__()
     # Resolver makes extra efforts to resolve conflict in header definitions
@@ -160,8 +157,7 @@ class MergeHeaders(beam.PTransform):
     self._header_merger = _HeaderMerger(
         vcf_field_conflict_resolver.FieldConflictResolver(
             split_alternate_allele_info_fields,
-            resolve_always=allow_incompatible_records,
-            allow_none_type=allow_none_type))
+            resolve_always=allow_incompatible_records))
 
   def expand(self, pcoll):
     return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
