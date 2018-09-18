@@ -94,6 +94,13 @@ class VcfReadOptions(VariantTransformsOptions):
               'of the the header fields do not match the field values. Note: '
               'setting this flag or `--infer_annotation_types` incurs a '
               'performance penalty of an extra pass over all variants.'))
+    parser.add_argument(
+        '--vcf_parser_type',
+        default='PyVcf',
+        help=('Choose the underlying parser for reading VCF files. Currently '
+              'we only support `PyVcf` (default) and `Nucleus`. Note: Nucleus '
+              'parser is still in experimental stage and we do not recommend '
+              'using it for production jobs.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -101,6 +108,10 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
+    # Accepted values correspond to enum defined in beam_io/vcfio.VcfParserType.
+    if parsed_args.vcf_parser_type not in ('PyVcf', 'Nucleus'):
+      raise ValueError('Only valid values for the --vcf_parser_types are '
+                       '`PyVcf` and `Nucleus`.')
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):
