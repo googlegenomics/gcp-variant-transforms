@@ -21,6 +21,7 @@ from __future__ import absolute_import
 
 from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
 from functools import partial
+import enum
 
 import apache_beam as beam
 from apache_beam.coders import coders
@@ -47,6 +48,12 @@ DEFAULT_PHASESET_VALUE = vcf_parser.DEFAULT_PHASESET_VALUE
 MISSING_GENOTYPE_VALUE = vcf_parser.MISSING_GENOTYPE_VALUE
 Variant = vcf_parser.Variant
 VariantCall = vcf_parser.VariantCall
+
+
+class VcfParserType(enum.Enum):
+  """An Enum specifying the parser used for reading VCF files."""
+  PYVCF = 0
+  NUCLEUS = 1
 
 
 class _ToVcfRecordCoder(coders.Coder):
@@ -187,7 +194,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
                compression_type=CompressionTypes.AUTO,  # type: str
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
-               allow_malformed_records=False  # type: bool
+               allow_malformed_records=False,  # type: bool
+               vcf_parser_type=VcfParserType.PYVCF  # type: int
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -197,13 +205,22 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
+    self._vcf_parser_type = vcf_parser_type
 
   def read_records(self,
                    file_name,  # type: str
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    record_iterator = vcf_parser.PyVcfParser(
+    vcf_parser_class = None
+    if self._vcf_parser_type == VcfParserType.PYVCF:
+      vcf_parser_class = vcf_parser.PyVcfParser
+    elif self._vcf_parser_type == VcfParserType.NUCLEUS:
+      vcf_parser_class = vcf_parser.NucleusParser
+    else:
+      raise ValueError(
+          'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
+    record_iterator = vcf_parser_class(
         file_name,
         range_tracker,
         self._pattern,
