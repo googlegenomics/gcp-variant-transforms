@@ -289,7 +289,7 @@ class _InferHeaderFields(beam.DoFn):
         raise ValueError(error)
 
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
-        resolve_always=True)
+        resolve_always=True, allow_none_type=True)
     for field in self._annotation_fields_to_infer:
       if field not in variant.info:
         continue
@@ -301,7 +301,7 @@ class _InferHeaderFields(beam.DoFn):
       _check_annotation_lists_lengths(annotation_names, annotation_values)
       annotation_values = zip(*annotation_values)
       for name, values in zip(annotation_names, annotation_values):
-        variant_merged_type = _HeaderTypeConstants.INTEGER
+        variant_merged_type = None
         for v in values:
           if not v:
             continue
@@ -457,4 +457,5 @@ class InferHeaderFields(beam.PTransform):
                 split_alternate_allele_info_fields=True,
                 allow_incompatible_records=(
                     self._allow_incompatible_records or
-                    bool(self._annotation_fields_to_infer))))
+                    bool(self._annotation_fields_to_infer)),
+                allow_none_type=bool(self._annotation_fields_to_infer)))

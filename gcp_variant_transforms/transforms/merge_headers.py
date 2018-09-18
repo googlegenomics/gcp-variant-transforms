@@ -21,6 +21,10 @@ import apache_beam as beam
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
+# An alias for the header key constants to make referencing easier.
+_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+_VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
 # TODO(nmousavi): Consider moving this into a separate file.
 class _HeaderMerger(object):
   """Class for merging two :class:`VcfHeader`s."""
@@ -124,6 +128,9 @@ class _MergeHeadersFn(beam.CombineFn):
 
   def extract_output(self, merged_headers):
     # type: (vcf_header_io.VcfHeader) -> vcf_header_io.VcfHeader
+    for info in merged_headers.infos.values():
+      if info[_HeaderKeyConstants.TYPE] is None:
+        info[_HeaderKeyConstants.TYPE] = _VcfHeaderTypeConstants.STRING
     return merged_headers
 
 
@@ -132,8 +139,9 @@ class MergeHeaders(beam.PTransform):
 
   def __init__(self,
                split_alternate_allele_info_fields=True,
-               allow_incompatible_records=False):
-    # type: (bool, bool) -> None
+               allow_incompatible_records=False,
+               allow_none_type=False):
+    # type: (bool, bool, bool) -> None
     """Initializes :class:`MergeHeaders` object.
 
     Args:
@@ -142,6 +150,8 @@ class MergeHeaders(beam.PTransform):
         as it changes the header compatibility rules as it changes the schema.
       allow_incompatible_records: If true, header definition with type mismatch
         (e.g., string vs float) are always resolved.
+      allow_none_type: If true, resolve type conflicts when one value is `None`
+        by returning the type of the second value, otherwise, raise ValueError.
     """
     super(MergeHeaders, self).__init__()
     # Resolver makes extra efforts to resolve conflict in header definitions
@@ -150,7 +160,8 @@ class MergeHeaders(beam.PTransform):
     self._header_merger = _HeaderMerger(
         vcf_field_conflict_resolver.FieldConflictResolver(
             split_alternate_allele_info_fields,
-            resolve_always=allow_incompatible_records))
+            resolve_always=allow_incompatible_records,
+            allow_none_type=allow_none_type))
 
   def expand(self, pcoll):
     return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(

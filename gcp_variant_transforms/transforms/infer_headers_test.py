@@ -466,7 +466,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
                            'TT|||']
     infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
     inferred_headers = next(infer_header_fields.process(variant, header))
-    expected_types = {'CSQ_Gene_TYPE': 'Integer',
+    expected_types = {'CSQ_Gene_TYPE': None,
                       'CSQ_Position_TYPE': 'Integer',
                       'CSQ_Score_TYPE': 'Float'}
     for key, item in inferred_headers.infos.iteritems():

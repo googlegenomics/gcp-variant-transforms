@@ -4,6 +4,7 @@
     "table_name": "valid_4_2_VEP",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2_VEP.vcf",
     "annotation_fields": "CSQ",
+    "infer_annotation_types": "True",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
@@ -26,6 +27,13 @@
           "WHERE start_position = 1110695 AND alts.alt = 'G'"
         ],
         "expected_result": {"num_features": 3}
+      },
+      {
+        "query": [
+          "select 'valid' as length_total from(SELECT SUM(LENGTH(CSQ.HGVSc))",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ)"
+          ],
+        "expected_result": {"length_total": "valid"}
       }
     ]
   }
