@@ -565,7 +565,7 @@ class NucleusParser(VcfParser):
     try:
       variant_proto = self._vcf_reader.from_string(data_line)
       return self._convert_to_variant(variant_proto)
-    except (ValueError) as e:
+    except ValueError as e:
       logging.warning('VCF variant_proto read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))

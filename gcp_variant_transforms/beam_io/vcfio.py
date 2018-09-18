@@ -212,30 +212,23 @@ class _VcfSource(filebasedsource.FileBasedSource):
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
+    vcf_parser_class = None
     if self._vcf_parser_type == VcfParserType.PYVCF:
-      record_iterator = vcf_parser.PyVcfParser(
-          file_name,
-          range_tracker,
-          self._pattern,
-          self._compression_type,
-          self._allow_malformed_records,
-          self._representative_header_lines,
-          buffer_size=self._buffer_size,
-          skip_header_lines=0)
+      vcf_parser_class = vcf_parser.PyVcfParser
     elif self._vcf_parser_type == VcfParserType.NUCLEUS:
-      record_iterator = vcf_parser.NucleusParser(
-          file_name,
-          range_tracker,
-          self._pattern,
-          self._compression_type,
-          self._allow_malformed_records,
-          self._representative_header_lines,
-          buffer_size=self._buffer_size,
-          skip_header_lines=0)
+      vcf_parser_class = vcf_parser.NucleusParser
     else:
       raise ValueError(
           'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
-
+    record_iterator = vcf_parser_class(
+        file_name,
+        range_tracker,
+        self._pattern,
+        self._compression_type,
+        self._allow_malformed_records,
+        self._representative_header_lines,
+        buffer_size=self._buffer_size,
+        skip_header_lines=0)
 
     # Convert iterator to generator to abstract behavior
     for record in record_iterator:
