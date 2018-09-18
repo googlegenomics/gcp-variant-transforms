@@ -22,7 +22,7 @@ from __future__ import absolute_import
 
 import re
 
-from typing import Dict, List, Tuple  # pylint: disable=unused-import
+from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 # The key in annotation maps that keeps the original alternate allele in an
 # annotation string (and the field name in the BigQuery table that holds that
@@ -318,8 +318,8 @@ class AnnotationStrBuilder(object):
     self._annotation_id_to_annotation_names = annotation_id_to_annotation_names
 
   def reconstruct_annotation_str(self, annotation_id, annotation_maps):
-    # type: (str, List[Dict[str, Any]]) -> List[str]
-    """Returns annotation strings reconstructed from `annotation_map`.
+    # type: (str, List[Dict[str, Any]]) -> Iterable[str]
+    """Yields annotation string reconstructed from `annotation_map`.
 
     Notice that the returned value is a list of annotation string since the
     annotation record is a repeated field. The annotation str (e.g.,
@@ -340,17 +340,14 @@ class AnnotationStrBuilder(object):
           'IMPACT': ''}
         ]
 
-    Returns:
-      A list of annotation string reconstructed from `annotation_maps`.
-        Example:
-          ['G|upstream_gene_variant||MODIFIER',
-           'G|upstream_gene_variant|0.1|']
+    Yields:
+      Annotation string reconstructed from `annotation_maps`.
+        Example: 'G|upstream_gene_variant||MODIFIER'
     """
     if not self.is_valid_annotation_id(annotation_id):
       raise ValueError('No annotation names for {} are defined. The '
                        'annotation string cannot be reconstructed since the '
                        'order is not provided.'.format(annotation_id))
-    annotation_strs = []
     for annotation_map in annotation_maps:
       annotation_values = []
       for annotation_name in self._annotation_id_to_annotation_names.get(
@@ -360,8 +357,7 @@ class AnnotationStrBuilder(object):
           annotation_values.append(_MISSING_ANNOTATION_FIELD_VALUE)
         else:
           annotation_values.append(str(value))
-      annotation_strs.append('|'.join(annotation_values))
-    return annotation_strs
+      yield '|'.join(annotation_values)
 
   def is_valid_annotation_id(self, key):
     # type: (str) -> bool

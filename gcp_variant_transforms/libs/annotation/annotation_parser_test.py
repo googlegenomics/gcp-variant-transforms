@@ -64,17 +64,17 @@ class AnnotationStrBuilderTest(unittest.TestCase):
                                 'G|upstream_gene_variant|0.1|']
     self.assertEqual(
         expected_annotation_strs,
-        str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
+        list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
     )
 
   def test_reconstruct_annotation_str_missing_annotation_names(self):
     str_builder = annotation_parser.AnnotationStrBuilder(None)
     annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
     with self.assertRaises(ValueError):
-      str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
+      list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
 
     str_builder = annotation_parser.AnnotationStrBuilder(
         {'CSQ2': ['Consequence', 'AF']})
     annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
     with self.assertRaises(ValueError):
-      str_builder.reconstruct_annotation_str('CSQ', annotation_maps)
+      list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
