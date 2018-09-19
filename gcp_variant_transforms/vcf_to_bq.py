@@ -96,7 +96,7 @@ def _read_variants(pipeline, known_args):
         known_args.input_pattern,
         representative_header_lines=representative_header_lines,
         allow_malformed_records=known_args.allow_malformed_records,
-        vcf_parser_type=known_args.vcf_parser_type)
+        vcf_parser_type=vcfio.VcfParserType[known_args.vcf_parser])
   return variants
 
 

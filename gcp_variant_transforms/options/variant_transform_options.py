@@ -21,6 +21,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
 
 
@@ -95,12 +96,14 @@ class VcfReadOptions(VariantTransformsOptions):
               'setting this flag or `--infer_annotation_types` incurs a '
               'performance penalty of an extra pass over all variants.'))
     parser.add_argument(
-        '--vcf_parser_type',
-        default='PyVcf',
+        '--vcf_parser',
+        default=vcfio.VcfParserType.PYVCF.name,
+        choices=[parser.name for parser in vcfio.VcfParserType],
         help=('Choose the underlying parser for reading VCF files. Currently '
-              'we only support `PyVcf` (default) and `Nucleus`. Note: Nucleus '
-              'parser is still in experimental stage and we do not recommend '
-              'using it for production jobs.'))
+              'we only support `{}` (default) and `{}`. Note: Nucleus parser '
+              'is still in experimental stage so using it for production jobs '
+              'is not recommended.'.format(vcfio.VcfParserType.PYVCF.name,
+                                           vcfio.VcfParserType.NUCLEUS.name)))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -108,10 +111,6 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
-    # Accepted values correspond to enum defined in beam_io/vcfio.VcfParserType.
-    if parsed_args.vcf_parser_type not in ('PyVcf', 'Nucleus'):
-      raise ValueError('Only valid values for the --vcf_parser_types are '
-                       '`PyVcf` and `Nucleus`.')
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):

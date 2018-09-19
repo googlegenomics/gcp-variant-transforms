@@ -252,7 +252,7 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type='PyVcf', # type: str
+      vcf_parser_type=VcfParserType.PYVCF,  # type: int
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -271,21 +271,13 @@ class ReadFromVcf(PTransform):
         time.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
-    # Convert the vcf_parser_type (str) to VcfParserType (int).
-    if vcf_parser_type == 'PyVcf':
-      self._vcf_parser_type = VcfParserType.PYVCF
-    elif vcf_parser_type == 'Nucleus':
-      self._vcf_parser_type = VcfParserType.NUCLEUS
-    else:
-      raise ValueError('Unrecognized vcf_parser_type: %s.' % vcf_parser_type)
-
     self._source = _VcfSource(
         file_pattern,
         representative_header_lines,
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=self._vcf_parser_type)
+        vcf_parser_type=vcf_parser_type)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
