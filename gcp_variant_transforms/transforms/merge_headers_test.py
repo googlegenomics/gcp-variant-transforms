@@ -143,6 +143,31 @@ class MergeHeadersTest(unittest.TestCase):
                                        ('source', None),
                                        ('version', None)]))
 
+  def test_none_type_defaults_to_string(self):
+    # This header's type is `None`, so we convert it to `String` while merging.
+    lines = [
+        '##fileformat=VCFv4.2\n',
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
+
+    vcf_reader = vcf.Reader(fsock=iter(lines))
+    headers = self._get_header_from_reader(vcf_reader)
+    headers.infos['NS']['type'] = None
+
+    combiner_fn = self._get_combiner_fn()
+    merged_headers = combiner_fn.create_accumulator()
+    merged_headers = combiner_fn.add_input(merged_headers, headers)
+    merged_headers = combiner_fn.extract_output(merged_headers)
+
+    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
+    self.assertItemsEqual(merged_headers.infos['NS'],
+                          OrderedDict([('id', 'NS'),
+                                       ('num', 1),
+                                       ('type', 'String'),
+                                       ('desc', 'Number samples'),
+                                       ('source', None),
+                                       ('version', None)]))
+
   def test_combine_two_num_conflicting_but_resolvable_headers_1(self):
     # These two headers have conflict in Number field (2 vs dot), however
     # pipeline doesn't raise error because the conflict is resolvable.

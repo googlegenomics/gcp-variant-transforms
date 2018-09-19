@@ -119,6 +119,8 @@ class FieldConflictResolver(object):
     numeric_types = (type_constants.INTEGER, type_constants.FLOAT)
     if first == second:
       return first
+    elif first is None or second is None:
+      return first if second is None else second
     elif first in numeric_types and second in numeric_types:
       return type_constants.FLOAT
     elif self._resolve_always:

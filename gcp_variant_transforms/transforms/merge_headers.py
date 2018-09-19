@@ -21,6 +21,10 @@ import apache_beam as beam
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
+# An alias for the header key constants to make referencing easier.
+_HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
+_VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
 # TODO(nmousavi): Consider moving this into a separate file.
 class _HeaderMerger(object):
   """Class for merging two :class:`VcfHeader`s."""
@@ -124,6 +128,9 @@ class _MergeHeadersFn(beam.CombineFn):
 
   def extract_output(self, merged_headers):
     # type: (vcf_header_io.VcfHeader) -> vcf_header_io.VcfHeader
+    for info in merged_headers.infos.values():
+      if info[_HeaderKeyConstants.TYPE] is None:
+        info[_HeaderKeyConstants.TYPE] = _VcfHeaderTypeConstants.STRING
     return merged_headers
 
 

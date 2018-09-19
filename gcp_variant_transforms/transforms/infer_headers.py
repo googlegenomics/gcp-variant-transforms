@@ -301,7 +301,7 @@ class _InferHeaderFields(beam.DoFn):
       _check_annotation_lists_lengths(annotation_names, annotation_values)
       annotation_values = zip(*annotation_values)
       for name, values in zip(annotation_names, annotation_values):
-        variant_merged_type = _HeaderTypeConstants.INTEGER
+        variant_merged_type = None
         for v in values:
           if not v:
             continue
