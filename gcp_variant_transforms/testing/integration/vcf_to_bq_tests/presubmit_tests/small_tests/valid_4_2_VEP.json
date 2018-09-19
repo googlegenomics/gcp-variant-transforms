@@ -30,7 +30,7 @@
       },
       {
         "query": [
-          "select 'valid' as length_total from(SELECT SUM(LENGTH(CSQ.HGVSc))",
+          "SELECT 'valid' AS length_total FROM(SELECT SUM(LENGTH(CSQ.HGVSc))",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ AS CSQ)"
           ],
         "expected_result": {"length_total": "valid"}
