@@ -86,13 +86,11 @@ class BqToVcfTest(unittest.TestCase):
 
     self.assertEqual(
         bq_to_vcf._extract_annotation_names(schema_with_annotations),
-        {'CSQ': ['Consequence', 'IMPACT']}
-    )
+        {'CSQ': ['Consequence', 'IMPACT']})
     schema_with_no_annotation = bigquery_schema_util.get_sample_table_schema()
     self.assertEqual(
         bq_to_vcf._extract_annotation_names(schema_with_no_annotation),
-        {}
-    )
+        {})
 
   def test_get_annotation_names_multiple_annotations(self):
     schema = bigquery.TableSchema()
@@ -136,5 +134,4 @@ class BqToVcfTest(unittest.TestCase):
     schema.fields.append(alternate_bases_record)
     self.assertEqual(
         bq_to_vcf._extract_annotation_names(schema),
-        {'CSQ_1': ['allele', 'Consequence'], 'CSQ_2': ['allele', 'IMPACT']}
-    )
+        {'CSQ_1': ['allele', 'Consequence'], 'CSQ_2': ['allele', 'IMPACT']})
