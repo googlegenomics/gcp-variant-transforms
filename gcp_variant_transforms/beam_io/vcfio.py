@@ -19,7 +19,7 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
-from typing import Dict, Iterable, List, Optional, Tuple  # pylint: disable=unused-import
+from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
 import enum
 
@@ -84,12 +84,13 @@ class _ToVcfRecordCoder(coders.Coder):
     return '\t'.join(columns) + '\n'
 
   def _encode_value(self, value):
-    """Encodes a single :class:`Variant` column value for a VCF file line."""
+    # type: (Any) -> str
+    """Encodes a single `Variant` column value for a VCF file line."""
     if not value and value != 0:
       return MISSING_FIELD_VALUE
     elif isinstance(value, list):
       return ','.join([self._encode_value(x) for x in value])
-    return str(value)
+    return value.encode('utf-8') if isinstance(value, unicode) else str(value)
 
   def _encode_variant_info(self, variant):
     """Encodes the info of a :class:`Variant` for a VCF file line."""
@@ -106,7 +107,7 @@ class _ToVcfRecordCoder(coders.Coder):
       if v is True:
         encoded_infos.append(k)
       else:
-        encoded_infos.append('%s=%s' % (k, self._encode_value(v)))
+        encoded_infos.append('%s=%s' % (str(k), self._encode_value(v)))
     return ';'.join(encoded_infos)
 
   def _get_variant_format_keys(self, variant):

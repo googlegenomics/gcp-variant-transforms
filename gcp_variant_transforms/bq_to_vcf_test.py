@@ -18,8 +18,11 @@ import collections
 import unittest
 
 from apache_beam.io import filesystems
+from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms import bq_to_vcf
+from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.testing import bigquery_schema_util
 from gcp_variant_transforms.testing import temp_dir
 
 
@@ -76,3 +79,59 @@ class BqToVcfTest(unittest.TestCase):
         'end_position<=9223372036854775807)'
     )
     self.assertEqual(bq_to_vcf._get_bigquery_query(args_1), expected_query)
+
+  def test_get_annotation_names(self):
+    schema_with_annotations = bigquery_schema_util.get_sample_table_schema(
+        with_annotation_fields=True)
+
+    self.assertEqual(
+        bq_to_vcf._extract_annotation_names(schema_with_annotations),
+        {'CSQ': ['Consequence', 'IMPACT']})
+    schema_with_no_annotation = bigquery_schema_util.get_sample_table_schema()
+    self.assertEqual(
+        bq_to_vcf._extract_annotation_names(schema_with_no_annotation),
+        {})
+
+  def test_get_annotation_names_multiple_annotations(self):
+    schema = bigquery.TableSchema()
+    alternate_bases_record = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    annotation_record_1 = bigquery.TableFieldSchema(
+        name='CSQ_1',
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='desc')
+    annotation_record_1.fields.append(bigquery.TableFieldSchema(
+        name='allele',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    annotation_record_1.fields.append(bigquery.TableFieldSchema(
+        name='Consequence',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    alternate_bases_record.fields.append(annotation_record_1)
+    annotation_record_2 = bigquery.TableFieldSchema(
+        name='CSQ_2',
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='desc')
+    annotation_record_2.fields.append(bigquery.TableFieldSchema(
+        name='allele',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    annotation_record_2.fields.append(bigquery.TableFieldSchema(
+        name='IMPACT',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc.'))
+    alternate_bases_record.fields.append(annotation_record_2)
+    schema.fields.append(alternate_bases_record)
+    self.assertEqual(
+        bq_to_vcf._extract_annotation_names(schema),
+        {'CSQ_1': ['allele', 'Consequence'], 'CSQ_2': ['allele', 'IMPACT']})

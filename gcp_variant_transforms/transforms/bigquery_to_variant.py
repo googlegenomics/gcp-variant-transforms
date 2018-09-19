@@ -14,6 +14,8 @@
 
 """A PTransform to convert BigQuery table rows to a PCollection of `Variant`."""
 
+from typing import Dict, List  # pylint: disable=unused-import
+
 import apache_beam as beam
 
 from gcp_variant_transforms.libs import bigquery_vcf_data_converter
@@ -22,8 +24,19 @@ from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 class BigQueryToVariant(beam.PTransform):
   """Transforms BigQuery table rows to PCollection of `Variant`."""
 
-  def __init__(self):
-    self._variant_generator = bigquery_vcf_data_converter.VariantGenerator()
+  def __init__(self, annotation_id_to_annotation_names=None):
+    # type: (Dict[str, List[str]]) -> None
+    """Initializes a `BigQueryToVariant` object.
+
+    Args:
+      annotation_id_to_annotation_names: A map where the key is the annotation
+        id (e.g., `CSQ`) and the value is a list of annotation names (e.g.,
+        ['Consequence', 'IMPACT', 'SYMBOL']). The annotation str (e.g.,
+        'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is reconstructed in the
+        same order as the annotation names.
+    """
+    self._variant_generator = bigquery_vcf_data_converter.VariantGenerator(
+        annotation_id_to_annotation_names)
 
   def expand(self, pcoll):
     return (pcoll | 'BigQueryToVariant' >> beam.Map(

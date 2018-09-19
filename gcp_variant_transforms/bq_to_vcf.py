@@ -45,13 +45,16 @@ import logging
 import sys
 import tempfile
 from datetime import datetime
-from typing import Iterable, List, Tuple  # pylint: disable=unused-import
+from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
+from apache_beam.io.gcp.internal.clients import bigquery as bigquery_v2
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
+
+from oauth2client import client
 
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -150,16 +153,18 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the call names to
   `vcf_header_file_path`.
   """
+
   query = _get_bigquery_query(known_args)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
                                       validate=True,
                                       use_standard_sql=True)
-
+  schema = _get_schema(known_args.input_table)
+  annotation_names = _extract_annotation_names(schema)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
-                | bigquery_to_variant.BigQueryToVariant())
+                | bigquery_to_variant.BigQueryToVariant(annotation_names))
     call_names = (variants
                   | 'CombineCallNames' >>
                   combine_call_names.CallNamesCombiner())
@@ -178,6 +183,18 @@ def _bigquery_to_vcf_shards(
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
          | vcfio.WriteVcfDataLines())
+
+
+def _get_schema(input_table):
+  # type: (str) -> bigqueryv2.TableSchema
+  project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+      input_table)
+  credentials = (client.GoogleCredentials.get_application_default().
+                 create_scoped(['https://www.googleapis.com/auth/bigquery']))
+  bigquery_client = bigquery_v2.BigqueryV2(credentials=credentials)
+  table = bigquery_client.tables.Get(bigquery_v2.BigqueryTablesGetRequest(
+      projectId=project_id, datasetId=dataset_id, tableId=table_id))
+  return table.schema
 
 
 def _get_bigquery_query(known_args):
@@ -200,6 +217,28 @@ def _get_bigquery_query(known_args):
   if not conditions:
     return base_query
   return ' '.join([base_query, 'WHERE', ' OR '.join(conditions)])
+
+
+def _extract_annotation_names(schema):
+  # type: (bigquery_v2.TableSchema) -> Dict[str, List[str]]
+  """Returns a mapping of annotation id to the corresponding annotation names.
+
+  Any `Record` field within alternate bases is considered as an annotation
+  field. The annotation names are useful for reconstructing the annotation str
+  (e.g., 'A|upstream_gene_variant|MODIFIER|PSMF1|||||'). Sample returned map:
+  {'CSQ': ['allele', 'Consequence', 'IMPACT', 'SYMBOL'],
+   'CSQ_2': ['allele', 'Codons', 'STRAND']}
+  """
+  annotation_names = {}
+  for table_field in schema.fields:
+    if table_field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
+      for sub_field in table_field.fields:
+        if (sub_field.type.lower() ==
+            bigquery_util.TableFieldConstants.TYPE_RECORD):
+          annotation_names.update({
+              sub_field.name: [field.name for field in sub_field.fields]
+          })
+  return annotation_names
 
 
 def _write_vcf_header_with_call_names(sample_names,

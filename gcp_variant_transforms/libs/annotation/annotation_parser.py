@@ -22,7 +22,7 @@ from __future__ import absolute_import
 
 import re
 
-from typing import Dict, List, Tuple  # pylint: disable=unused-import
+from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 # The key in annotation maps that keeps the original alternate allele in an
 # annotation string (and the field name in the BigQuery table that holds that
@@ -35,7 +35,7 @@ _ALLELE_NUM_ANNOTATION = 'ALLELE_NUM'
 
 # The representation of a deletion variant in VEP.
 _COMPLETELY_DELETED_ALT = '-'
-
+_MISSING_ANNOTATION_FIELD_VALUE = ''
 # Regular expressions to identify symbolic and breakend ALTs used in
 # annotation alt matching.
 # Check the VCF spec for symbolic and breakend ALT formats.
@@ -299,6 +299,75 @@ class Parser(object):
       return alt_index
     except ValueError as e:
       raise InvalidAlleleNumValue(e)
+
+
+class AnnotationStrBuilder(object):
+  """The class for reconstructing annotation str."""
+
+  def __init__(self, annotation_id_to_annotation_names):
+    # type: (Dict[str, List[str]]) -> None
+    """Initializes an object of `AnnotationStrBuilder`.
+
+    Args:
+      annotation_id_to_annotation_names: A map where the key is the annotation
+        id (e.g., `CSQ`) and the value is a list of annotation names (e.g.,
+        ['allele', 'Consequence', 'IMPACT', 'SYMBOL']). The annotation str
+        (e.g., 'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is reconstructed
+        in the same order as the annotation names.
+    """
+    self._annotation_id_to_annotation_names = annotation_id_to_annotation_names
+
+  def reconstruct_annotation_str(self, annotation_id, annotation_maps):
+    # type: (str, List[Dict[str, Any]]) -> Iterable[str]
+    """Yields annotation string reconstructed from `annotation_map`.
+
+    Notice that the returned value is a list of annotation string since the
+    annotation record is a repeated field. The annotation str (e.g.,
+    'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is
+    reconstructed in the same order as `annotation_names`.
+
+    Args:
+      annotation_id: The annotation id of the `annotation_maps`. Example: 'CSQ'.
+      annotation_maps: A list of annotation map to be reconstructed to
+        annotation str. Example:
+        [{'allele': 'G',
+          'Consequence': 'upstream_gene_variant',
+          'AF': ''
+          'IMPACT': 'MODIFIER'},
+         {'allele': 'G',
+          'Consequence': 'upstream_gene_variant',
+          'AF': '0.1',
+          'IMPACT': ''}
+        ]
+
+    Yields:
+      Annotation string reconstructed from `annotation_maps`.
+        Example: 'G|upstream_gene_variant||MODIFIER'
+    """
+    if not self.is_valid_annotation_id(annotation_id):
+      raise ValueError('No annotation names for {} are defined. The '
+                       'annotation string cannot be reconstructed since the '
+                       'order is not provided.'.format(annotation_id))
+    for annotation_map in annotation_maps:
+      annotation_values = []
+      for annotation_name in self._annotation_id_to_annotation_names.get(
+          annotation_id):
+        value = annotation_map.get(annotation_name)
+        if value is None:
+          annotation_values.append(_MISSING_ANNOTATION_FIELD_VALUE)
+        else:
+          annotation_values.append(str(value))
+      yield '|'.join(annotation_values)
+
+  def is_valid_annotation_id(self, key):
+    # type: (str) -> bool
+    """Returns true if the key is a valid annotation id.
+
+    The key is a valid annotation id only when the corresponding annotation
+    names are given such that the annotation string can be reconstructed.
+    """
+    return (self._annotation_id_to_annotation_names and
+            key in self._annotation_id_to_annotation_names.keys())
 
 
 def extract_annotation_list_with_alt(annotation_str):

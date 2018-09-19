@@ -701,6 +701,54 @@ class VariantGeneratorTest(unittest.TestCase):
     self.assertEqual(expected_variant_info,
                      self._variant_generator._get_variant_info(row))
 
+  def test_get_variant_info_annotation(self):
+    variant_generator = bigquery_vcf_data_converter.VariantGenerator({
+        'CSQ': ['allele', 'Consequence', 'AF', 'IMPACT']
+    })
+    row = {
+        unicode(ColumnKeyConstants.ALTERNATE_BASES): [
+            {
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'G',
+                unicode('CSQ'): [
+                    {u'allele': 'G',
+                     u'Consequence': u'upstream_gene_variant',
+                     u'AF': u'',
+                     u'IMPACT': u'MODIFIER'},
+                    {u'allele': 'G',
+                     u'Consequence': u'upstream_gene_variant',
+                     u'AF': u'0.1',
+                     u'IMPACT': u''}]
+            },
+            {
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'T',
+                unicode('CSQ'): [
+                    {u'allele': 'T',
+                     u'Consequence': u'',
+                     u'AF': u'',
+                     u'IMPACT': u'MODIFIER'},
+                    {u'allele': 'T',
+                     u'Consequence': u'upstream_gene_variant',
+                     u'AF': u'0.6',
+                     u'IMPACT': u''}]
+
+            },
+            {
+                unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): u'TT',
+                unicode('CSQ'): []
+            }
+        ]
+    }
+
+    expected_variant_info = {
+        'CSQ': [
+            'G|upstream_gene_variant||MODIFIER',
+            'G|upstream_gene_variant|0.1|',
+            'T|||MODIFIER',
+            'T|upstream_gene_variant|0.6|']
+    }
+    self.assertEqual(expected_variant_info,
+                     variant_generator._get_variant_info(row))
+
   def test_get_variant_calls(self):
     variant_call_records = _get_big_query_row()[ColumnKeyConstants.CALLS]
 

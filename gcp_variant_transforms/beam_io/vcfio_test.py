@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 # Copyright 2017 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,14 +86,15 @@ def _get_sample_variant_1(is_for_nucleus=False):
     multiple alternates
     not phased
     multiple names
+    utf-8 encoded
   """
   if not is_for_nucleus:
     vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-                'PASS	AF=0.5,0.1;NS=1	GT:GQ	0/0:48	1/0:20\n')
+                'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
     variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
         alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1})
+        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
     variant.calls.append(
         vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
     variant.calls.append(
@@ -100,15 +102,16 @@ def _get_sample_variant_1(is_for_nucleus=False):
   else:
     # 0.1 -> 0.25 float precision loss due to binary floating point conversion.
     vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-                'PASS	AF=0.5,0.25;NS=1	GT:GQ	0/0:48	1/0:20\n')
+                'PASS	AF=0.5,0.25;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
     variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
         alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1})
+        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1, 'SVTYPE': ['BÑD']})
     variant.calls.append(
         vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
     variant.calls.append(
         vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+
   return variant, vcf_line
 
 
@@ -880,7 +883,10 @@ class VcfSinkTest(unittest.TestCase):
     variant.info['NS'] = 3
     variant.info['AF'] = [0.333, 0.667]
     variant.info['DB'] = True
-    expected = '.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB	.\n'
+    variant.info['CSQ'] = ['G|upstream_gene_variant||MODIFIER',
+                           'T|||MODIFIER']
+    expected = ('.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB;'
+                'CSQ=G|upstream_gene_variant||MODIFIER,T|||MODIFIER	.\n')
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
 

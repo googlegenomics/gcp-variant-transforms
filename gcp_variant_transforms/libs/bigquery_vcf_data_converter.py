@@ -21,6 +21,7 @@ import json
 from typing import Any, Dict, List  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
@@ -244,6 +245,20 @@ class BigQueryRowGenerator(object):
 class VariantGenerator(object):
   """Class to generate variant from one BigQuery row."""
 
+  def __init__(self, annotation_id_to_annotation_names=None):
+    # type: (Dict[str, List[str]]) -> None
+    """Initializes an object of `VariantGenerator`.
+
+    Args:
+      annotation_id_to_annotation_names: A map where the key is the annotation
+        id (e.g., `CSQ`) and the value is a list of annotation names (e.g.,
+        ['allele', 'Consequence', 'IMPACT', 'SYMBOL']). The annotation str
+        (e.g., 'A|upstream_gene_variant|MODIFIER|PSMF1|||||') is reconstructed
+        in the same order as the annotation names.
+    """
+    self._annotation_str_builder = annotation_parser.AnnotationStrBuilder(
+        annotation_id_to_annotation_names)
+
   def convert_bq_row_to_variant(self, row):
     """Converts one BigQuery row to `Variant`."""
     # type: (Dict[str, Any]) -> vcfio.Variant
@@ -279,7 +294,12 @@ class VariantGenerator(object):
             not self._is_null_or_empty(value)):
           if key not in info:
             info[key] = []
-          info[key].append(value)
+          if self._annotation_str_builder.is_valid_annotation_id(key):
+            info[key].extend(
+                self._annotation_str_builder.reconstruct_annotation_str(
+                    key, value))
+          else:
+            info[key].append(value)
     return info
 
   def _get_variant_calls(self, variant_call_records):
