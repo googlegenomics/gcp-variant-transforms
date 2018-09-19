@@ -90,7 +90,7 @@ def compose_local_vcf_shards(vcf_header_file_path,
                        for mr in filesystems.FileSystems.match([data_pattern])
                        for file_metadata in mr.metadata_list]
 
-    for data_file_path in data_file_paths:
+    for data_file_path in sorted(data_file_paths):
       file_to_write.write(filesystems.FileSystems.open(data_file_path).read())
 
 

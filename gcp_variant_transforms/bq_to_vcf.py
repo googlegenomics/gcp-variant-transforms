@@ -89,7 +89,7 @@ def run(argv=None):
     raise ValueError('Please set the output file {} to GCS when running with '
                      'DataflowRunner.'.format(known_args.output_file))
   if is_direct_runner:
-    known_args.number_of_bases_per_shard = -1
+    known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
   timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -262,11 +262,11 @@ def _pair_variant_with_key(variant, number_of_variants_per_shard):
   # type: (vcfio.Variant, int) -> Tuple[str, vcfio.Variant]
   """Pairs the variant with a key.
 
-  If `number_of_variants_per_shard` is -1, the variants are paired with the
-  `reference_name`. Otherwise, the key is determined by the variant's reference
-  name and start position.
+  If `number_of_variants_per_shard` is sys.maxsize, the variants are paired
+  with the `reference_name`. Otherwise, the key is determined by the variant's
+  reference name and start position.
   """
-  if number_of_variants_per_shard == -1:
+  if number_of_variants_per_shard == sys.maxsize:
     return (variant.reference_name, variant)
   return ('%s_%011d' % (variant.reference_name,
                         variant.start // number_of_variants_per_shard *
