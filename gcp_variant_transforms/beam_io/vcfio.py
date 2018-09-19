@@ -252,6 +252,7 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
+      vcf_parser_type=VcfParserType.PYVCF,  # type: int
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -275,7 +276,8 @@ class ReadFromVcf(PTransform):
         representative_header_lines,
         compression_type,
         validate=validate,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        vcf_parser_type=vcf_parser_type)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
