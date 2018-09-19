@@ -17,7 +17,7 @@
 from __future__ import absolute_import
 
 from collections import OrderedDict
-from typing import Any, Dict  # pylint: disable=unused-import
+from typing import Any, Dict, Union  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
@@ -30,6 +30,7 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_reserved_fields
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
 
@@ -203,16 +204,8 @@ def generate_header_fields_from_schema(schema):
 
     if field.name == bigquery_util.ColumnKeyConstants.CALLS:
       _add_format_fields(field, formats)
-    elif field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
-      _add_info_fields_from_alternate_bases(field, infos)
     else:
-      infos.update({
-          field.name: _Info(field.name,
-                            parser.field_counts[vcfio.MISSING_FIELD_VALUE],
-                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                            field.description,
-                            None,
-                            None)})
+      _add_info_fields(field, infos)
 
   return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
@@ -222,11 +215,35 @@ def _add_format_fields(schema, formats):
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
-    formats.update({
-        field.name: _Format(field.name,
+    if field.name in vcf_reserved_fields.FORMAT_FIELDS.keys():
+      _add_reserved_field(field,
+                          vcf_reserved_fields.FORMAT_FIELDS.get(field.name),
+                          formats)
+    else:
+      formats.update({
+          field.name: _Format(field.name,
+                              parser.field_counts[vcfio.MISSING_FIELD_VALUE],
+                              _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
+                              field.description)})
+
+
+def _add_info_fields(field, infos):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+  if field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
+    _add_info_fields_from_alternate_bases(field, infos)
+  else:
+    if field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+      _add_reserved_field(field,
+                          vcf_reserved_fields.INFO_FIELDS.get(field.name),
+                          infos)
+    else:
+      infos.update({
+          field.name: _Info(field.name,
                             parser.field_counts[vcfio.MISSING_FIELD_VALUE],
                             _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                            field.description)})
+                            field.description,
+                            None,
+                            None)})
 
 
 def _add_info_fields_from_alternate_bases(schema, infos):
@@ -234,12 +251,37 @@ def _add_info_fields_from_alternate_bases(schema, infos):
   for field in schema.fields:
     if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
       continue
+    if field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+      _add_reserved_field(field,
+                          vcf_reserved_fields.INFO_FIELDS.get(field.name),
+                          infos)
+    else:
+      infos.update({
+          field.name: _Info(field.name,
+                            parser.field_counts[
+                                vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
+                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
+                            field.description,
+                            None,
+                            None)})
 
-    infos.update({
-        field.name: _Info(field.name,
-                          parser.field_counts[
-                              vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
-                          _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                          field.description,
-                          None,
-                          None)})
+
+def _add_reserved_field(
+    field_schema,  # type: bigquery.TableFieldSchema
+    reserved_definition,  # type: Union[_Format, _Info]
+    header_fields_map  # type: Dict[str, Union[_Format, _Info]]
+):
+  # type: (...) -> None
+  """Adds the reserved field to `header_fields_map`.
+
+  Raises:
+    ValueError: If the field schema type is not the same as the reserved type.
+  """
+  schema_type = _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field_schema.type)
+  reserved_type = reserved_definition.type
+  if schema_type != reserved_type:
+    raise ValueError(
+        'The type of field {} is different from the VCF spec: {} vs {}.'
+        .format(field_schema.name, schema_type, reserved_type))
+  else:
+    header_fields_map.update({field_schema.name: reserved_definition})

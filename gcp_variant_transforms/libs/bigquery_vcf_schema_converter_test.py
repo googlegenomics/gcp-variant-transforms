@@ -25,6 +25,7 @@ from vcf import parser
 from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -210,16 +211,62 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         sample_schema)
 
     infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'desc', None, None)),
-        ('II', Info('II', field_counts['.'], 'Integer', 'desc', None, None)),
+        ('AF', Info('AF', field_counts['A'], 'Float', 'Allele frequency for '
+                    'each ALT allele in the same order as listed (estimated '
+                    'from primary data, not called genotypes', None, None)),
+        ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None)),
         ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
         ('IS', Info('IS', field_counts['.'], 'String', 'desc', None, None))])
     formats = OrderedDict([
         ('FB', parser._Format('FB', field_counts['.'], 'Flag', 'desc')),
-        ('GQ', parser._Format('GQ', field_counts['.'], 'Integer', 'desc'))])
+        ('GQ', parser._Format('GQ', 1, 'Integer',
+                              'Conditional genotype quality'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
     self.assertEqual(header, expected_header)
+
+  def test_generate_header_fields_from_schema_conflicts(self):
+    schema_conflict_info_in_alternate = bigquery.TableSchema()
+    alternate_bases_record = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    alternate_bases_record.fields.append(bigquery.TableFieldSchema(
+        name='AF',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc'))
+    schema_conflict_info_in_alternate.fields.append(alternate_bases_record)
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          schema_conflict_info_in_alternate)
+
+    schema_conflict_info = bigquery.TableSchema()
+    schema_conflict_info.fields.append(bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc'))
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          schema_conflict_info)
+
+    schema_conflict_format = bigquery.TableSchema()
+    calls_record = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    calls_record.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc'))
+    schema_conflict_format.fields.append(calls_record)
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          schema_conflict_format)
 
 
 class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):
