@@ -26,14 +26,14 @@ from google.cloud import storage
 _MAX_NUM_OF_BLOBS_PER_COMPOSE = 32
 
 
-def compose_vcf_shards(project,  # type: str
-                       vcf_header_file_path,  # type: str
-                       vcf_data_files_folder,  # type: str
-                       output_file,  # type: str
-                       delete=True,  # type: bool
-                      ):
+def compose_gcs_vcf_shards(project,  # type: str
+                           vcf_header_file_path,  # type: str
+                           vcf_data_files_folder,  # type: str
+                           output_file,  # type: str
+                           delete=True,  # type: bool
+                          ):
   # type: (...) -> None
-  """Composes VCF shards to one VCF file.
+  """Composes VCF shards in GCS to one VCF file.
 
   It composes VCF header and VCF data files to one VCF file, and deletes the
   original VCF shards if `delete` is True.
@@ -65,6 +65,33 @@ def compose_vcf_shards(project,  # type: str
   if delete:
     bucket.delete_blobs(bucket.list_blobs(prefix=vcf_data_blob_prefix))
     bucket.delete_blobs(bucket.list_blobs(prefix=header_blob))
+
+
+def compose_local_vcf_shards(vcf_header_file_path,
+                             vcf_data_files_folder,
+                             output_file):
+  # type: (str, str, str) -> None
+  """Composes local VCF shards to one VCF file.
+
+  It composes VCF header and VCF data files to one VCF file. It can also be used
+  to compose a small number of VCF shards in GCS.
+
+  Args:
+    vcf_header_file_path: The path of the VCF header file, it contains the meta
+      information, as well as the data header line with the call names.
+    vcf_data_files_folder: The folder that contains all VCF data files.
+    output_file: The final VCF file path.
+  """
+  with filesystems.FileSystems.create(output_file) as file_to_write:
+    file_to_write.write(
+        filesystems.FileSystems.open(vcf_header_file_path).read())
+    data_pattern = filesystems.FileSystems.join(vcf_data_files_folder, '*')
+    data_file_paths = [file_metadata.path
+                       for mr in filesystems.FileSystems.match([data_pattern])
+                       for file_metadata in mr.metadata_list]
+
+    for data_file_path in sorted(data_file_paths):
+      file_to_write.write(filesystems.FileSystems.open(data_file_path).read())
 
 
 def _compose_vcf_data_files(project, vcf_data_files_folder):

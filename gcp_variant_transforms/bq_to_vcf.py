@@ -17,7 +17,15 @@ r"""Pipeline for loading BigQuery table to one VCF file. [EXPERIMENTAL]
 The pipeline reads the variants from BigQuery table, groups a collection of
 variants within a contiguous region of the genome (the size of the collection is
 adjustable through flag `--number_of_bases_per_shard`), sorts them, and then
-writes to one VCF shard. At the end, it consolidates VCF shards into one.
+writes to one VCF shard. At the end, it consolidates VCF header and VCF shards
+into one.
+
+Run locally:
+python -m gcp_variant_transforms.bq_to_vcf \
+  --output_file <local path to VCF file> \
+  --input_table projectname:bigquerydataset.tablename \
+  --project projectname \
+  --setup_file ./setup.py
 
 Run on Dataflow:
 python -m gcp_variant_transforms.bq_to_vcf \
@@ -31,8 +39,11 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --runner DataflowRunner
 """
 
+from __future__ import division
+
 import logging
 import sys
+import tempfile
 from datetime import datetime
 from typing import Iterable, List, Tuple  # pylint: disable=unused-import
 
@@ -40,6 +51,7 @@ import apache_beam as beam
 from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
 from apache_beam.options import pipeline_options
+from apache_beam.runners.direct import direct_runner
 
 from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -47,7 +59,6 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
-from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import combine_call_names
@@ -70,22 +81,31 @@ def run(argv=None):
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
+  is_direct_runner = _is_direct_runner(beam.Pipeline(options=options))
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
-  # TODO(allieychen): Add support for local location.
-  if not google_cloud_options.temp_location or not google_cloud_options.project:
-    raise ValueError('temp_location and project must be set.')
+  if not google_cloud_options.project:
+    raise ValueError('project must be set.')
+  if not is_direct_runner and not known_args.output_file.startswith('gs://'):
+    raise ValueError('Please set the output file {} to GCS when running with '
+                     'DataflowRunner.'.format(known_args.output_file))
+  if is_direct_runner:
+    known_args.number_of_bases_per_shard = sys.maxsize
 
+  temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
   timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
   vcf_data_temp_folder = filesystems.FileSystems.join(
-      google_cloud_options.temp_location,
+      temp_folder,
       'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
+  # Create the directory manually. FileSystems cannot create a file if the
+  # directory does not exist when using Direct Runner.
+  filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
-      google_cloud_options.temp_location,
+      temp_folder,
       'bq_to_vcf_header_with_call_names_{}'.format(timestamp_str))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
-        google_cloud_options.temp_location,
+        temp_folder,
         'bq_to_vcf_meta_info_{}'.format(timestamp_str))
     _write_vcf_meta_info(known_args.representative_header_file)
 
@@ -93,11 +113,15 @@ def run(argv=None):
                           options,
                           vcf_data_temp_folder,
                           vcf_header_file_path)
-
-  vcf_file_composer.compose_vcf_shards(google_cloud_options.project,
-                                       vcf_header_file_path,
-                                       vcf_data_temp_folder,
-                                       known_args.output_file)
+  if is_direct_runner:
+    vcf_file_composer.compose_local_vcf_shards(vcf_header_file_path,
+                                               vcf_data_temp_folder,
+                                               known_args.output_file)
+  else:
+    vcf_file_composer.compose_gcs_vcf_shards(google_cloud_options.project,
+                                             vcf_header_file_path,
+                                             vcf_data_temp_folder,
+                                             known_args.output_file)
 
 
 def _write_vcf_meta_info(representative_header_file):
@@ -201,6 +225,7 @@ def _write_vcf_header_with_call_names(sample_names,
   """
   # pylint: disable=redefined-outer-name,reimported
   from apache_beam.io import filesystems
+  from gcp_variant_transforms.libs import vcf_header_parser
   metadata_header_lines = vcf_header_parser.get_metadata_header_lines(
       representative_header_file)
   with filesystems.FileSystems.create(file_path) as file_to_write:
@@ -228,9 +253,23 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
   yield (file_path, sorted(variants))
 
 
+# TODO(allieychen): Move this function to a general lib.
+def _is_direct_runner(pipeline):
+  return isinstance(pipeline.runner, direct_runner.DirectRunner)
+
+
 def _pair_variant_with_key(variant, number_of_variants_per_shard):
+  # type: (vcfio.Variant, int) -> Tuple[str, vcfio.Variant]
+  """Pairs the variant with a key.
+
+  If `number_of_variants_per_shard` is sys.maxsize, the variants are paired
+  with the `reference_name`. Otherwise, the key is determined by the variant's
+  reference name and start position.
+  """
+  if number_of_variants_per_shard == sys.maxsize:
+    return (variant.reference_name, variant)
   return ('%s_%011d' % (variant.reference_name,
-                        variant.start / number_of_variants_per_shard *
+                        variant.start // number_of_variants_per_shard *
                         number_of_variants_per_shard),
           variant)
 
