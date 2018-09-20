@@ -234,20 +234,19 @@ def _get_merged_field_schemas(
       merged_field_schemas.append(field_schema)
     else:
       existing_field_schema = existing_fields.get(field_schema.name)
-      if field_schema.mode.lower() != existing_field_schema.mode.lower():
+      if field_schema.mode != existing_field_schema.mode:
         raise ValueError(
             'The mode of field {} is not compatible. The original mode is {}, '
             'and the new mode is {}.'.format(field_schema.name,
                                              existing_field_schema.mode,
                                              field_schema.mode))
-      if field_schema.type.lower() != existing_field_schema.type.lower():
+      if field_schema.type != existing_field_schema.type:
         raise ValueError(
             'The type of field {} is not compatible. The original type is {}, '
             'and the new type is {}.'.format(field_schema.name,
                                              existing_field_schema.type,
                                              field_schema.type))
-      if (field_schema.type.lower() ==
-          bigquery_util.TableFieldConstants.TYPE_RECORD):
+      if field_schema.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
         existing_field_schema.fields = _get_merged_field_schemas(
             existing_field_schema.fields, field_schema.fields)
   return merged_field_schemas
