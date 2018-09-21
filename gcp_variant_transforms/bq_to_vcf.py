@@ -60,6 +60,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
 from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
@@ -110,7 +111,8 @@ def run(argv=None):
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
         'bq_to_vcf_meta_info_{}'.format(timestamp_str))
-    _write_vcf_meta_info(known_args.representative_header_file)
+    _write_vcf_meta_info(known_args.input_table,
+                         known_args.representative_header_file)
 
   _bigquery_to_vcf_shards(known_args,
                           options,
@@ -127,10 +129,12 @@ def run(argv=None):
                                              known_args.output_file)
 
 
-def _write_vcf_meta_info(representative_header_file):
-  # TODO(allieychen): infer the meta information from the schema and replace the
-  # empty `VcfHeader` below.
-  header_fields = vcf_header_io.VcfHeader()
+def _write_vcf_meta_info(input_table, representative_header_file):
+  # type: (str, str) -> None
+  """Writes the meta information generated from BigQuery schema."""
+  header_fields = (
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          _get_schema(input_table)))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields)
 
@@ -233,8 +237,7 @@ def _extract_annotation_names(schema):
   for table_field in schema.fields:
     if table_field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
       for sub_field in table_field.fields:
-        if (sub_field.type.lower() ==
-            bigquery_util.TableFieldConstants.TYPE_RECORD):
+        if sub_field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
           annotation_names.update({
               sub_field.name: [field.name for field in sub_field.fields]
           })

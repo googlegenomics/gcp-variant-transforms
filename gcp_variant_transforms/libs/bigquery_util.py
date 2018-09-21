@@ -41,13 +41,13 @@ class ColumnKeyConstants(object):
 
 class TableFieldConstants(object):
   """Constants for field modes/types in the BigQuery schema."""
-  TYPE_STRING = 'string'
-  TYPE_INTEGER = 'integer'
-  TYPE_RECORD = 'record'
-  TYPE_FLOAT = 'float'
-  TYPE_BOOLEAN = 'boolean'
-  MODE_NULLABLE = 'nullable'
-  MODE_REPEATED = 'repeated'
+  TYPE_STRING = 'STRING'
+  TYPE_INTEGER = 'INTEGER'
+  TYPE_RECORD = 'RECORD'
+  TYPE_FLOAT = 'FLOAT'
+  TYPE_BOOLEAN = 'BOOLEAN'
+  MODE_NULLABLE = 'NULLABLE'
+  MODE_REPEATED = 'REPEATED'
 
 
 # A map to convert from VCF types to their equivalent BigQuery types.

@@ -522,11 +522,11 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         annotation_fields=['CSQ'])
     schema = factory.create_alt_bases_field_schema()
     csq_field = [field for field in schema.fields if field.name == 'CSQ'][0]
-    expected_name_type_map = {'CSQ': 'record',
-                              'allele': 'string',
-                              'Consequence': 'integer',
-                              'IMPACT': 'integer',
-                              'SYMBOL': 'float',
-                              'Gene': 'string'}
+    expected_name_type_map = {'CSQ': 'RECORD',
+                              'allele': 'STRING',
+                              'Consequence': 'INTEGER',
+                              'IMPACT': 'INTEGER',
+                              'SYMBOL': 'FLOAT',
+                              'Gene': 'STRING'}
     for field in csq_field.fields:
       self.assertEqual(field.type, expected_name_type_map[field.name])
