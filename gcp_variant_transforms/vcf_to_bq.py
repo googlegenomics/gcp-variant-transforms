@@ -51,7 +51,6 @@ from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_partition
-from gcp_variant_transforms.libs.annotation.vep import vep_runner
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -62,6 +61,7 @@ from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import partition_variants
 from gcp_variant_transforms.transforms import variant_to_bigquery
+from gcp_variant_transforms.libs.annotation.vep import vep_runner2
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
@@ -195,14 +195,6 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
-  # Note VepRunner creates new input files, so it should be run before any
-  # other access to known_args.input_pattern.
-  if known_args.run_annotation_pipeline:
-    runner = vep_runner.create_runner_and_update_args(known_args, pipeline_args)
-    runner.run_on_all_files()
-    runner.wait_until_done()
-    logging.info('Using VEP processed files: %s', known_args.input_pattern)
-
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = vcf_to_bq_common.get_pipeline_mode(
       known_args.input_pattern, known_args.optimize_for_large_inputs)
@@ -217,12 +209,23 @@ def run(argv=None):
   header_fields = vcf_header_parser.get_vcf_headers(
       known_args.representative_header_file)
   counter_factory = metrics_util.CounterFactory()
+
+  # # TODO(jessime) get rid of this. Maybe just have one flag?
+  # if known_args.run_annotation_pipeline:
+  #   if known_args.annotation_fields:
+  #     known_args.annotation_fields.append(known_args.vep_info_field)
+  #   else:
+  #     known_args.annotation_fields = [known_args.vep_info_field]
+
   processed_variant_factory = processed_variant.ProcessedVariantFactory(
       header_fields,
       known_args.split_alternate_allele_info_fields,
       known_args.annotation_fields,
       known_args.use_allele_num,
       known_args.minimal_vep_alt_matching,
+      known_args.run_annotation_pipeline,
+      known_args.vep_info_field,
+      known_args.annotation_url,
       known_args.infer_annotation_types,
       counter_factory)
 
@@ -260,6 +263,13 @@ def run(argv=None):
         'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
             with_output_types(processed_variant.ProcessedVariant))
+    if known_args.run_annotation_pipeline:
+      variants_and_lines = variants[i] | 'VariantsToVcfLines' >> beam.ParDo(
+          vep_runner2.PairVariantsLines())
+      variants[i] = variants_and_lines | 'RunVep' + str(i) >> vep_runner2.VepRunner(
+          known_args.annotation_url,
+          processed_variant_factory.annotation_headers,
+          known_args.vep_info_field)
   if partitioner and partitioner.should_flatten():
     variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
     num_partitions = 1

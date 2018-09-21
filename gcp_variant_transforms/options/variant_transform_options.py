@@ -311,6 +311,10 @@ class AnnotationOptions(VariantTransformsOptions):
               'pass over all variants. Additionally, this flag will resolve '
               'conflicts for all headers as if `allow_incompatible_types` was '
               'true.'))
+    parser.add_argument('--annotation_url',
+        default='https://gcp-variant-transforms-test.appspot.com/',
+        help=('Location of annotation server. For testing, this can also be '
+              'set to localhost.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
