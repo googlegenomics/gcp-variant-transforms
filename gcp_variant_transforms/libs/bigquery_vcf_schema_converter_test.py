@@ -216,9 +216,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
                     'from primary data, not called genotypes', None, None)),
         ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None)),
         ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
-        ('IS', Info('IS', field_counts['.'], 'String', 'desc', None, None))])
+        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
     formats = OrderedDict([
-        ('FB', parser._Format('FB', field_counts['.'], 'Flag', 'desc')),
+        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
         ('GQ', parser._Format('GQ', 1, 'Integer',
                               'Conditional genotype quality'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
@@ -242,15 +242,25 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
           schema_conflict_info_in_alternate)
 
-    schema_conflict_info = bigquery.TableSchema()
-    schema_conflict_info.fields.append(bigquery.TableFieldSchema(
+    schema_conflict_info_type = bigquery.TableSchema()
+    schema_conflict_info_type.fields.append(bigquery.TableFieldSchema(
         name='AA',
         type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='desc'))
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-          schema_conflict_info)
+          schema_conflict_info_type)
+
+    schema_conflict_info_mode = bigquery.TableSchema()
+    schema_conflict_info_mode.fields.append(bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='desc'))
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          schema_conflict_info_mode)
 
     schema_conflict_format = bigquery.TableSchema()
     calls_record = bigquery.TableFieldSchema(

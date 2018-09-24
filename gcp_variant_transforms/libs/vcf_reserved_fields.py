@@ -12,20 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Provides reserved INFO and FORMAT fields based on VCF 4.3 spec ."""
+"""Provides reserved INFO and FORMAT fields based on VCF 4.3 spec.
+
+See http://samtools.github.io/hts-specs/VCFv4.3.pdf for more details.
+"""
 
 from __future__ import absolute_import
 
-from vcf import parser
+from typing import Optional  # pylint: disable=unused-import
 
-_Format = parser._Format
+from vcf import parser
 
 
 def _get_field_count(value):
+  # type: (str) -> Optional[int]
   return parser.field_counts[value]
 
 
+def _create_format(field, number, field_type, description):
+   # type: (str, int, str, str) -> parser._Format
+  return parser._Format(field, number, field_type, description)
+
+
 def _create_info(field, number, field_type, description):
+  # type: (str, int, str, str) -> parser._Info
   return parser._Info(field, number, field_type, description, None, None)
 
 
@@ -68,28 +78,28 @@ INFO_FIELDS = {
 }
 
 FORMAT_FIELDS = {
-    'AD': _Format('AD', _get_field_count('R'), 'Integer',
-                  'Read depth for each allele'),
-    'ADF': _Format('ADF', _get_field_count('R'), 'Integer',
-                   'Read depth for each allele on the forward strand'),
-    'ADR': _Format('ADR', _get_field_count('R'), 'Integer',
-                   'Read depth for each allele on the reverse strand'),
-    'DP': _Format('DP', 1, 'Integer', 'Read depth'),
-    'EC': _Format('EC', _get_field_count('A'), 'Integer',
-                  'Expected alternate allele counts'),
-    'FT': _Format('FT', 1, 'String',
-                  'Filter indicating if this genotype was ''called'''),
-    'GL': _Format('GL', _get_field_count('G'), 'Float',
-                  'Genotype likelihoods'),
-    'GP': _Format('GP', _get_field_count('G'), 'Float',
-                  'Genotype posterior probabilities'),
-    'GQ': _Format('GQ', 1, 'Integer', 'Conditional genotype quality'),
-    'GT': _Format('GT', 1, 'String', 'Genotype'),
-    'HQ': _Format('HQ', 2, 'Integer', 'Haplotype quality'),
-    'MQ': _Format('MQ', 1, 'Integer', 'RMS mapping quality'),
-    'PL': _Format('PL', _get_field_count('G'), 'Integer',
-                  'Phred-scaled genotype likelihoods rounded to the closest '
-                  'integer'),
-    'PQ': _Format('PQ', 1, 'Integer', 'Phasing quality'),
-    'PS': _Format('PS', 1, 'Integer', 'Phase set')
+    'AD': _create_format('AD', _get_field_count('R'), 'Integer',
+                         'Read depth for each allele'),
+    'ADF': _create_format('ADF', _get_field_count('R'), 'Integer',
+                          'Read depth for each allele on the forward strand'),
+    'ADR': _create_format('ADR', _get_field_count('R'), 'Integer',
+                          'Read depth for each allele on the reverse strand'),
+    'DP': _create_format('DP', 1, 'Integer', 'Read depth'),
+    'EC': _create_format('EC', _get_field_count('A'), 'Integer',
+                         'Expected alternate allele counts'),
+    'FT': _create_format('FT', 1, 'String',
+                         'Filter indicating if this genotype was ''called'''),
+    'GL': _create_format('GL', _get_field_count('G'), 'Float',
+                         'Genotype likelihoods'),
+    'GP': _create_format('GP', _get_field_count('G'), 'Float',
+                         'Genotype posterior probabilities'),
+    'GQ': _create_format('GQ', 1, 'Integer', 'Conditional genotype quality'),
+    'GT': _create_format('GT', 1, 'String', 'Genotype'),
+    'HQ': _create_format('HQ', 2, 'Integer', 'Haplotype quality'),
+    'MQ': _create_format('MQ', 1, 'Integer', 'RMS mapping quality'),
+    'PL': _create_format('PL', _get_field_count('G'), 'Integer',
+                         'Phred-scaled genotype likelihoods rounded to the '
+                         'closest integer'),
+    'PQ': _create_format('PQ', 1, 'Integer', 'Phasing quality'),
+    'PS': _create_format('PS', 1, 'Integer', 'Phase set')
 }
