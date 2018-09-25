@@ -218,14 +218,18 @@ def _add_format_fields(schema, formats):
     elif field.name in vcf_reserved_fields.FORMAT_FIELDS.keys():
       reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
       _validate_reserved_field(field, reserved_definition)
-      formats.update({field.name: reserved_definition})
+      formats.update({field.name: _Format(
+          id=field.name,
+          num=reserved_definition.num,
+          type=reserved_definition.type,
+          desc=field.description or reserved_definition.desc)})
     else:
       formats.update({field.name: _Format(
-          field.name,
-          bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
-                                                         field.type),
-          bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          field.description)})
+          id=field.name,
+          num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                             field.type),
+          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          desc=field.description)})
 
 
 def _add_info_fields(field, infos):
@@ -235,15 +239,22 @@ def _add_info_fields(field, infos):
   elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
     reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
     _validate_reserved_field(field, reserved_definition)
-    infos.update({field.name: reserved_definition})
+    infos.update({field.name: _Info(
+        id=field.name,
+        num=reserved_definition.num,
+        type=reserved_definition.type,
+        desc=field.description or reserved_definition.desc,
+        source=None,
+        version=None)})
   else:
     infos.update({field.name: _Info(
-        field.name,
-        bigquery_util.get_vcf_num_from_bigquery_schema(field.mode, field.type),
-        bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-        field.description,
-        None,
-        None)})
+        id=field.name,
+        num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                           field.type),
+        type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+        desc=field.description,
+        source=None,
+        version=None)})
 
 
 def _add_info_fields_from_alternate_bases(schema, infos):
@@ -260,15 +271,21 @@ def _add_info_fields_from_alternate_bases(schema, infos):
     elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
       _validate_reserved_field_type(field, reserved_definition)
-      infos.update({field.name: reserved_definition})
+      infos.update({field.name: _Info(
+          id=field.name,
+          num=reserved_definition.num,
+          type=reserved_definition.type,
+          desc=field.description or reserved_definition.desc,
+          source=None,
+          version=None)})
     else:
       infos.update({field.name: _Info(
-          field.name,
-          parser.field_counts[vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
-          bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          field.description,
-          None,
-          None)})
+          id=field.name,
+          num=parser.field_counts[vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
+          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          desc=field.description,
+          source=None,
+          version=None)})
 
 
 # TODO(allieychen): Add an option to allow incompatible definitions and skip the

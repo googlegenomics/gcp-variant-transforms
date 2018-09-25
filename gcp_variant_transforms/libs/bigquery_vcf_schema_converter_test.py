@@ -205,62 +205,166 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
   """Test cases for the `generate_header_fields_from_schema` function."""
 
-  def test_generate_header_fields_from_schema(self):
-    sample_schema = bigquery_schema_util.get_sample_table_schema()
-    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-        sample_schema)
+  def test_add_info_fields_from_alternate_bases_reserved_field(self):
+    alternate_bases_record_with_desc = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    alternate_bases_record_with_desc.fields.append(bigquery.TableFieldSchema(
+        name='AF',
+        type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='bigquery desc'))
+    infos_with_desc = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(
+        alternate_bases_record_with_desc, infos_with_desc)
+    expected_infos = OrderedDict([
+        ('AF', Info('AF', field_counts['A'], 'Float', 'bigquery desc',
+                    None, None))])
+    self.assertEqual(infos_with_desc, expected_infos)
 
-    infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'Allele frequency for '
-                    'each ALT allele in the same order as listed (estimated '
-                    'from primary data, not called genotypes', None, None)),
-        ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None)),
-        ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
-        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
-    formats = OrderedDict([
-        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
-        ('GQ', parser._Format('GQ', 1, 'Integer',
-                              'Conditional genotype quality'))])
-    expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    alternate_bases_record_no_desc = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    alternate_bases_record_no_desc.fields.append(bigquery.TableFieldSchema(
+        name='AF',
+        type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description=''))
+    infos_no_desc = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(
+        alternate_bases_record_no_desc, infos_no_desc)
+    expected_infos = OrderedDict([
+        ('AF', Info('AF', field_counts['A'], 'Float',
+                    'Allele frequency for each ALT allele in the same order '
+                    'as listed (estimated from primary data, not called '
+                    'genotypes', None, None))])
+    self.assertEqual(infos_no_desc, expected_infos)
 
-    self.assertEqual(header, expected_header)
+    schema_conflict_info = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each alternate base (if any).')
+    schema_conflict_info.fields.append(bigquery.TableFieldSchema(
+        name='AF',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc'))
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter._add_info_fields(schema_conflict_info,
+                                                     OrderedDict())
 
-  def test_generate_header_fields_from_schema_conflicts(self):
-    schema_conflict_info_in_alternate = bigquery.TableSchema()
+  def test_add_info_fields_from_alternate_bases_non_reserved_field(self):
     alternate_bases_record = bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
         type=bigquery_util.TableFieldConstants.TYPE_RECORD,
         mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
         description='One record for each alternate base (if any).')
     alternate_bases_record.fields.append(bigquery.TableFieldSchema(
-        name='AF',
-        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
-        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-        description='desc'))
-    schema_conflict_info_in_alternate.fields.append(alternate_bases_record)
-    with self.assertRaises(ValueError):
-      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-          schema_conflict_info_in_alternate)
-
-    schema_conflict_info_type = bigquery.TableSchema()
-    schema_conflict_info_type.fields.append(bigquery.TableFieldSchema(
-        name='AA',
-        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
-        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-        description='desc'))
-    with self.assertRaises(ValueError):
-      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-          schema_conflict_info_type)
-
-    schema_conflict_info_mode = bigquery.TableSchema()
-    schema_conflict_info_mode.fields.append(bigquery.TableFieldSchema(
-        name='AA',
+        name='non_reserved',
         type=bigquery_util.TableFieldConstants.TYPE_FLOAT,
-        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
-        description='desc'))
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='bigquery desc'))
+    infos = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(
+        alternate_bases_record, infos)
+    expected_infos = OrderedDict([
+        ('non_reserved', Info('non_reserved', field_counts['A'], 'Float',
+                              'bigquery desc', None, None))])
+    self.assertEqual(infos, expected_infos)
+
+  def test_add_info_fields_reserved_field(self):
+    field_with_desc = bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='bigquery desc')
+    infos = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(field_with_desc, infos)
+    expected_infos = OrderedDict([
+        ('AA', Info('AA', 1, 'String', 'bigquery desc', None, None))])
+    self.assertEqual(infos, expected_infos)
+
+    field_without_desc = bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='')
+    infos = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(field_without_desc, infos)
+    expected_infos = OrderedDict([
+        ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None))])
+    self.assertEqual(infos, expected_infos)
+
+    field_conflict_info_type = bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc')
     with self.assertRaises(ValueError):
-      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-          schema_conflict_info_mode)
+      bigquery_vcf_schema_converter._add_info_fields(field_conflict_info_type,
+                                                     OrderedDict())
+
+    field_conflict_info_format = bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='desc')
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter._add_info_fields(field_conflict_info_format,
+                                                     OrderedDict())
+
+  def test_add_info_fields_non_reserved_field(self):
+    non_reserved_field = bigquery.TableFieldSchema(
+        name='non_reserved_info',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='')
+    infos = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(non_reserved_field, infos)
+    expected_infos = OrderedDict([
+        ('non_reserved_info', Info('non_reserved_info', 1, 'String', '',
+                                   None, None))])
+    self.assertEqual(infos, expected_infos)
+
+  def test_add_format_fields_reserved_field(self):
+    calls_record_with_desc = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    calls_record_with_desc.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='bigquery desc'))
+    formats = OrderedDict()
+    bigquery_vcf_schema_converter._add_format_fields(calls_record_with_desc,
+                                                     formats)
+    expected_formats = OrderedDict([
+        ('GQ', Format('GQ', 1, 'Integer', 'bigquery desc'))])
+    self.assertEqual(formats, expected_formats)
+
+    calls_record_without_desc = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    calls_record_without_desc.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description=''))
+    formats = OrderedDict()
+    bigquery_vcf_schema_converter._add_format_fields(calls_record_without_desc,
+                                                     formats)
+    expected_formats = OrderedDict([
+        ('GQ', Format('GQ', 1, 'Integer', 'Conditional genotype quality'))])
+    self.assertEqual(formats, expected_formats)
 
     schema_conflict_format = bigquery.TableSchema()
     calls_record = bigquery.TableFieldSchema(
@@ -277,6 +381,51 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
           schema_conflict_format)
+
+  def test_add_format_fields_non_reserved_field(self):
+    calls_record = bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS,
+        type=bigquery_util.TableFieldConstants.TYPE_RECORD,
+        mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    calls_record.fields.append(bigquery.TableFieldSchema(
+        name='non_reserved_format',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='bigquery desc'))
+    formats = OrderedDict()
+    bigquery_vcf_schema_converter._add_format_fields(calls_record, formats)
+    expected_formats = OrderedDict([
+        ('non_reserved_format', Format('non_reserved_format', 1, 'Integer',
+                                       'bigquery desc'))])
+    self.assertEqual(formats, expected_formats)
+
+  def test_generate_header_fields_from_schema(self):
+    sample_schema = bigquery_schema_util.get_sample_table_schema()
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        sample_schema)
+
+    infos = OrderedDict([
+        ('AF', Info('AF', field_counts['A'], 'Float', 'desc', None, None)),
+        ('AA', Info('AA', 1, 'String', 'desc', None, None)),
+        ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
+        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
+    formats = OrderedDict([
+        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
+        ('GQ', parser._Format('GQ', 1, 'Integer',
+                              'desc'))])
+    expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    self.assertEqual(header, expected_header)
+
+    schema_conflict = bigquery.TableSchema()
+    schema_conflict.fields.append(bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='desc'))
+    with self.assertRaises(ValueError):
+      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+          schema_conflict)
 
 
 class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):
