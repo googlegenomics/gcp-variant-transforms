@@ -49,6 +49,7 @@ from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
+from apache_beam import transforms
 from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
 from apache_beam.io.gcp.internal.clients import bigquery as bigquery_v2
@@ -170,9 +171,14 @@ def _bigquery_to_vcf_shards(
     variants = (p
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
-    call_names = (variants
-                  | 'CombineCallNames' >>
-                  combine_call_names.CallNamesCombiner())
+    if known_args.sample_names:
+      call_names = (p
+                    | transforms.Create(known_args.sample_names)
+                    | beam.combiners.ToList())
+    else:
+      call_names = (variants
+                    | 'CombineCallNames' >>
+                    combine_call_names.CallNamesCombiner())
 
     _ = (call_names
          | 'GenerateVcfDataHeader' >>

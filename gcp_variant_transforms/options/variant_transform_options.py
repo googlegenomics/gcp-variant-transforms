@@ -496,3 +496,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'chromosome is requested. Only variants matching at least one '
               'of these regions will be loaded. If this parameter is not '
               'specified, all variants will be kept.'))
+    parser.add_argument(
+        '--sample_names',
+        default=None, nargs='+',
+        help=('A list of sample names (separated by a space). Only variant '
+              'calls for these samples will be loaded from BigQuery. If this '
+              'parameter is not specified, all samples will be kept.'))
