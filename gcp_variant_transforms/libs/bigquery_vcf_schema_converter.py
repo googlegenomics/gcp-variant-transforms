@@ -264,9 +264,13 @@ def _add_info_fields_from_alternate_bases(schema, infos):
   Notice that the validation of field mode is skipped for reserved fields since
   the mode (NULLABLE) of field in alternate bases is expected to be different
   from the mode (REPEATED) in reserved field definition.
+
+  Any `Record` field within alternate bases is considered as an annotation
+  field, and the annotation fields are skipped.
   """
   for field in schema.fields:
-    if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
+    if (field.name in _CONSTANT_ALTERNATE_BASES_FIELDS or
+        field.type == bigquery_util.TableFieldConstants.TYPE_RECORD):
       continue
     elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)

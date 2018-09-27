@@ -400,6 +400,9 @@ class WriteVcfHeaderFn(beam.DoFn):
       raise ValueError('Invalid value for number: {}'.format(number))
 
   def _format_string_value(self, value):
+    # type: (str, unicode) -> str
+    if isinstance(value, unicode):
+      return '"{}"'.format(value.encode('utf-8'))
     return '"{}"'.format(value)
 
 
