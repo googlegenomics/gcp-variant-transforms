@@ -17,7 +17,7 @@
 from __future__ import absolute_import
 
 from collections import OrderedDict
-from typing import Any, Dict  # pylint: disable=unused-import
+from typing import Any, Dict, Union  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
@@ -30,15 +30,13 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_reserved_fields
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
-
-_BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = bigquery_util.BIG_QUERY_TYPE_TO_VCF_TYPE_MAP
 _Format = parser._Format
 _Info = parser._Info
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
-
 
 # The Constant fields included below are not part of the INFO or FORMAT in the
 # VCF header.
@@ -190,29 +188,24 @@ def generate_header_fields_from_schema(schema):
   """Returns header fields converted from BigQuery schema.
 
   This is a best effort reconstruction of header fields. Only INFO and FORMAT
-  are considered. For each header field, the type is mapped from BigQuery schema
-  field type to VCF type. Since the Number information is not included in
-  BigQuery schema, the Number remains to be an unknown value (Number=`.`).
-  One exception is the sub fields in alternate_bases, which have `Number=A`.
+  are considered. For each header field,
+  - If the field is reserved based on VCF spec, use the reserved definition.
+  - Otherwise, the type is mapped from BigQuery schema field type to VCF type,
+    and the number is inferred based on BigQuery schema field type and mode.
+
+  Raises:
+    ValueError: If the field schema type/mode is not consistent with the
+      reserved type/mode.
   """
   infos = OrderedDict()  # type: OrderedDict[str, _Info]
   formats = OrderedDict()  # type: OrderedDict[str, _Format]
   for field in schema.fields:
     if field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS:
       continue
-
-    if field.name == bigquery_util.ColumnKeyConstants.CALLS:
+    elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
       _add_format_fields(field, formats)
-    elif field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
-      _add_info_fields_from_alternate_bases(field, infos)
     else:
-      infos.update({
-          field.name: _Info(field.name,
-                            parser.field_counts[vcfio.MISSING_FIELD_VALUE],
-                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                            field.description,
-                            None,
-                            None)})
+      _add_info_fields(field, infos)
 
   return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
@@ -222,24 +215,107 @@ def _add_format_fields(schema, formats):
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
-    formats.update({
-        field.name: _Format(field.name,
-                            parser.field_counts[vcfio.MISSING_FIELD_VALUE],
-                            _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                            field.description)})
+    elif field.name in vcf_reserved_fields.FORMAT_FIELDS.keys():
+      reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
+      _validate_reserved_field(field, reserved_definition)
+      formats.update({field.name: _Format(
+          id=field.name,
+          num=reserved_definition.num,
+          type=reserved_definition.type,
+          desc=field.description or reserved_definition.desc)})
+    else:
+      formats.update({field.name: _Format(
+          id=field.name,
+          num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                             field.type),
+          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          desc=field.description)})
+
+
+def _add_info_fields(field, infos):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+  if field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
+    _add_info_fields_from_alternate_bases(field, infos)
+  elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+    reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
+    _validate_reserved_field(field, reserved_definition)
+    infos.update({field.name: _Info(
+        id=field.name,
+        num=reserved_definition.num,
+        type=reserved_definition.type,
+        desc=field.description or reserved_definition.desc,
+        source=None,
+        version=None)})
+  else:
+    infos.update({field.name: _Info(
+        id=field.name,
+        num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                           field.type),
+        type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+        desc=field.description,
+        source=None,
+        version=None)})
 
 
 def _add_info_fields_from_alternate_bases(schema, infos):
   # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+  """Adds schema nested fields in alternate bases to `infos`.
+
+  Notice that the validation of field mode is skipped for reserved fields since
+  the mode (NULLABLE) of field in alternate bases is expected to be different
+  from the mode (REPEATED) in reserved field definition.
+  """
   for field in schema.fields:
     if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
       continue
+    elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+      reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
+      _validate_reserved_field_type(field, reserved_definition)
+      infos.update({field.name: _Info(
+          id=field.name,
+          num=reserved_definition.num,
+          type=reserved_definition.type,
+          desc=field.description or reserved_definition.desc,
+          source=None,
+          version=None)})
+    else:
+      infos.update({field.name: _Info(
+          id=field.name,
+          num=parser.field_counts[vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
+          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          desc=field.description,
+          source=None,
+          version=None)})
 
-    infos.update({
-        field.name: _Info(field.name,
-                          parser.field_counts[
-                              vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
-                          _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP.get(field.type),
-                          field.description,
-                          None,
-                          None)})
+
+# TODO(allieychen): Add an option to allow incompatible definitions and skip the
+# following validation.
+def _validate_reserved_field(field_schema, reserved_definition):
+  # type: (bigquery.TableFieldSchema, Union[_Format, _Info]) -> None
+  """Validates the reserved field.
+
+  Raises:
+    ValueError: If the field schema type/mode is not consistent with the
+      reserved type/mode.
+  """
+  _validate_reserved_field_type(field_schema, reserved_definition)
+  _validate_reserved_field_mode(field_schema, reserved_definition)
+
+
+def _validate_reserved_field_type(field_schema, reserved_definition):
+  schema_type = bigquery_util.get_vcf_type_from_bigquery_type(field_schema.type)
+  reserved_type = reserved_definition.type
+  if schema_type != reserved_type:
+    raise ValueError(
+        'The type of field {} is different from the VCF spec: {} vs {}.'
+        .format(field_schema.name, schema_type, reserved_type))
+
+
+def _validate_reserved_field_mode(field_schema, reserved_definition):
+  schema_mode = field_schema.mode
+  reserved_mode = bigquery_util.get_bigquery_mode_from_vcf_num(
+      reserved_definition.num)
+  if schema_mode != reserved_mode:
+    raise ValueError(
+        'The mode of field {} is different from the VCF spec: {} vs {}.'
+        .format(field_schema.name, schema_mode, reserved_mode))

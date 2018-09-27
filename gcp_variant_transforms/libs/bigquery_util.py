@@ -17,7 +17,10 @@
 import re
 from typing import Tuple  # pylint: disable=unused-import
 
+from vcf import parser
+
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
@@ -60,7 +63,7 @@ _VCF_TYPE_TO_BIG_QUERY_TYPE_MAP = {
 }
 
 # A map to convert from BigQuery types to their equivalent VCF types.
-BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = {
+_BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = {
     TableFieldConstants.TYPE_INTEGER: _VcfHeaderTypeConstants.INTEGER,
     TableFieldConstants.TYPE_STRING: _VcfHeaderTypeConstants.STRING,
     TableFieldConstants.TYPE_FLOAT: _VcfHeaderTypeConstants.FLOAT,
@@ -118,3 +121,20 @@ def get_python_type_from_bigquery_type(bigquery_type):
   if bigquery_type not in _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP:
     raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
   return _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP[bigquery_type]
+
+
+def get_vcf_type_from_bigquery_type(bigquery_type):
+  # type: (str) -> str
+  """Returns VCF type based on BigQuery type."""
+  if bigquery_type not in _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP:
+    raise ValueError('Invalid BigQuery type: %s' % bigquery_type)
+  return _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP[bigquery_type]
+
+
+def get_vcf_num_from_bigquery_schema(bigquery_mode, bigquery_type):
+  # type: (str, str) -> int
+  """Returns VCF num based on BigQuery mode and type."""
+  if bigquery_mode == TableFieldConstants.MODE_NULLABLE:
+    return 0 if bigquery_type == TableFieldConstants.TYPE_BOOLEAN else 1
+  else:
+    return parser.field_counts[vcfio.MISSING_FIELD_VALUE]

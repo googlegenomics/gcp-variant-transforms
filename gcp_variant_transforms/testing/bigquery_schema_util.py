@@ -29,7 +29,7 @@ def get_sample_table_schema(with_annotation_fields=False):
   has:
     - One sub field (`AF`) for `alternate_bases`.
     - Two sub fields (`FB` and `GQ`) for `call`.
-    - Three INFO fields (`II`, `IFR`, `IS`).
+    - Three INFO fields (`AA`, `IFR`, `IS`).
   """
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
@@ -143,8 +143,8 @@ def get_sample_table_schema(with_annotation_fields=False):
   schema.fields.append(calls_record)
 
   schema.fields.append(bigquery.TableFieldSchema(
-      name='II',
-      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+      name='AA',
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
   schema.fields.append(bigquery.TableFieldSchema(
