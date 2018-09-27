@@ -17,10 +17,7 @@
 To define a new bq to vcf integration test case, create a json file in
 `gcp_variant_transforms/testing/integration/bq_to_vcf_tests` directory and
 specify at least test_name, input_table, output_file_name and
-expected_output_file.
-
-`expected_output_file` saves the expected VCF contents. All the expected output
-files are saved in `_EXPECTED_OUTPUT_FILE_FOLDER`.
+expected_output_file. `expected_output_file` saves the expected VCF contents.
 
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_bq_to_vcf_tests.py \
@@ -47,8 +44,6 @@ from gcp_variant_transforms.testing.integration import run_tests_common
 _PIPELINE_NAME = 'gcp-variant-transforms-bq-to-vcf-integration-test'
 _SCOPES = ['https://www.googleapis.com/auth/bigquery']
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/bq_to_vcf_tests'
-_EXPECTED_OUTPUT_FILE_FOLDER = ('gcp_variant_transforms/testing/data/vcf/'
-                                'bq_to_vcf')
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/bq_to_vcf'
 
 
@@ -66,8 +61,7 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
               ):
     # type: (...) -> None
     self._name = test_name
-    self._expected_output_file = filesystems.FileSystems.join(
-        _EXPECTED_OUTPUT_FILE_FOLDER, expected_output_file)
+    self._expected_output_file = expected_output_file
     timestamp = 'integration_tests_{}'.format(
         datetime.now().strftime('%Y%m%d_%H%M%S'))
     self._output_file = filesystems.FileSystems.join(parsed_args.temp_location,
