@@ -497,8 +497,8 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'of these regions will be loaded. If this parameter is not '
               'specified, all variants will be kept.'))
     parser.add_argument(
-        '--sample_names',
+        '--call_names',
         default=None, nargs='+',
-        help=('A list of sample names (separated by a space). Only variant '
+        help=('A list of call names (separated by a space). Only variant '
               'calls for these samples will be loaded from BigQuery. If this '
               'parameter is not specified, all samples will be kept.'))
