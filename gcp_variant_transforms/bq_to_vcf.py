@@ -159,7 +159,7 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the call names to
   `vcf_header_file_path`.
   """
-  # TODO (allieychen): Modify the SQL query with the specified call_names.
+  # TODO(allieychen): Modify the SQL query with the specified call_names.
   query = _get_bigquery_query(known_args)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
