@@ -71,7 +71,6 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
                **kwargs  # type: **str
               ):
     # type: (...) -> None
-
     dataset_id = context.dataset_id
     self._table_name = '{}.{}'.format(dataset_id, table_name)
     self._name = test_name
