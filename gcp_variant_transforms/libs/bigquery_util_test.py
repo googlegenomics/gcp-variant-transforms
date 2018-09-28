@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import unittest
 
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_util
 
 
@@ -49,3 +50,35 @@ class BigqueryUtilTest(unittest.TestCase):
     self.assertRaises(
         ValueError,
         bigquery_util.get_python_type_from_bigquery_type, 'DUMMY')
+
+  def test_get_vcf_type_from_bigquery_type(self):
+    self.assertEqual(vcf_header_io.VcfHeaderFieldTypeConstants.INTEGER,
+                     bigquery_util.get_vcf_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_INTEGER))
+    self.assertEqual(vcf_header_io.VcfHeaderFieldTypeConstants.FLOAT,
+                     bigquery_util.get_vcf_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_FLOAT))
+    self.assertEqual(vcf_header_io.VcfHeaderFieldTypeConstants.FLAG,
+                     bigquery_util.get_vcf_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
+    self.assertEqual(vcf_header_io.VcfHeaderFieldTypeConstants.STRING,
+                     bigquery_util.get_vcf_type_from_bigquery_type(
+                         bigquery_util.TableFieldConstants.TYPE_STRING))
+    self.assertRaises(
+        ValueError,
+        bigquery_util.get_vcf_type_from_bigquery_type, 'DUMMY')
+
+  def test_get_vcf_num_from_bigquery_schema(self):
+    self.assertEqual(None,
+                     bigquery_util.get_vcf_num_from_bigquery_schema(
+                         bigquery_util.TableFieldConstants.MODE_REPEATED,
+                         bigquery_util.TableFieldConstants.TYPE_INTEGER))
+
+    self.assertEqual(1,
+                     bigquery_util.get_vcf_num_from_bigquery_schema(
+                         bigquery_util.TableFieldConstants.MODE_NULLABLE,
+                         bigquery_util.TableFieldConstants.TYPE_INTEGER))
+    self.assertEqual(0,
+                     bigquery_util.get_vcf_num_from_bigquery_schema(
+                         bigquery_util.TableFieldConstants.MODE_NULLABLE,
+                         bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
