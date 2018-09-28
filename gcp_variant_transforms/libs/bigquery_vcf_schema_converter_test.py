@@ -206,6 +206,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
   """Test cases for the `generate_header_fields_from_schema` function."""
 
   def test_add_info_fields_from_alternate_bases_reserved_field(self):
+    allow_incompatible_schema = False
     alternate_bases_record_with_desc = bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
         type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -218,7 +219,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='bigquery desc'))
     infos_with_desc = OrderedDict()
     bigquery_vcf_schema_converter._add_info_fields(
-        alternate_bases_record_with_desc, infos_with_desc)
+        alternate_bases_record_with_desc,
+        allow_incompatible_schema,
+        infos_with_desc)
     expected_infos = OrderedDict([
         ('AF', Info('AF', field_counts['A'], 'Float', 'bigquery desc',
                     None, None))])
@@ -236,7 +239,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description=''))
     infos_no_desc = OrderedDict()
     bigquery_vcf_schema_converter._add_info_fields(
-        alternate_bases_record_no_desc, infos_no_desc)
+        alternate_bases_record_no_desc,
+        allow_incompatible_schema,
+        infos_no_desc)
     expected_infos = OrderedDict([
         ('AF', Info('AF', field_counts['A'], 'Float',
                     'Allele frequency for each ALT allele in the same order '
@@ -256,9 +261,22 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='desc'))
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter._add_info_fields(schema_conflict_info,
+                                                     allow_incompatible_schema,
                                                      OrderedDict())
 
+    allow_incompatible_schema = True
+    infos_allow_incompatible_schema = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(
+        schema_conflict_info,
+        allow_incompatible_schema,
+        infos_allow_incompatible_schema)
+    expected_infos = OrderedDict([
+        ('AF', Info('AF', field_counts['A'], 'Integer',
+                    'desc', None, None))])
+    self.assertEqual(infos_allow_incompatible_schema, expected_infos)
+
   def test_add_info_fields_from_alternate_bases_non_reserved_field(self):
+    allow_incompatible_schema = False
     alternate_bases_record = bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.ALTERNATE_BASES,
         type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -271,20 +289,23 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='bigquery desc'))
     infos = OrderedDict()
     bigquery_vcf_schema_converter._add_info_fields(
-        alternate_bases_record, infos)
+        alternate_bases_record, allow_incompatible_schema, infos)
     expected_infos = OrderedDict([
         ('non_reserved', Info('non_reserved', field_counts['A'], 'Float',
                               'bigquery desc', None, None))])
     self.assertEqual(infos, expected_infos)
 
   def test_add_info_fields_reserved_field(self):
+    allow_incompatible_schema = False
     field_with_desc = bigquery.TableFieldSchema(
         name='AA',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='bigquery desc')
     infos = OrderedDict()
-    bigquery_vcf_schema_converter._add_info_fields(field_with_desc, infos)
+    bigquery_vcf_schema_converter._add_info_fields(field_with_desc,
+                                                   allow_incompatible_schema,
+                                                   infos)
     expected_infos = OrderedDict([
         ('AA', Info('AA', 1, 'String', 'bigquery desc', None, None))])
     self.assertEqual(infos, expected_infos)
@@ -295,7 +316,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='')
     infos = OrderedDict()
-    bigquery_vcf_schema_converter._add_info_fields(field_without_desc, infos)
+    bigquery_vcf_schema_converter._add_info_fields(field_without_desc,
+                                                   allow_incompatible_schema,
+                                                   infos)
     expected_infos = OrderedDict([
         ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None))])
     self.assertEqual(infos, expected_infos)
@@ -307,6 +330,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='desc')
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter._add_info_fields(field_conflict_info_type,
+                                                     allow_incompatible_schema,
                                                      OrderedDict())
 
     field_conflict_info_format = bigquery.TableFieldSchema(
@@ -316,22 +340,37 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='desc')
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter._add_info_fields(field_conflict_info_format,
+                                                     allow_incompatible_schema,
                                                      OrderedDict())
 
+    allow_incompatible_schema = True
+    info_allow_incompatible_schema = OrderedDict()
+    bigquery_vcf_schema_converter._add_info_fields(
+        field_conflict_info_format,
+        allow_incompatible_schema,
+        info_allow_incompatible_schema)
+    expected_infos = OrderedDict([
+        ('AA', Info('AA', field_counts['.'], 'String', 'desc', None, None))])
+    self.assertEqual(info_allow_incompatible_schema, expected_infos)
+
   def test_add_info_fields_non_reserved_field(self):
+    allow_incompatible_schema = False
     non_reserved_field = bigquery.TableFieldSchema(
         name='non_reserved_info',
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='')
     infos = OrderedDict()
-    bigquery_vcf_schema_converter._add_info_fields(non_reserved_field, infos)
+    bigquery_vcf_schema_converter._add_info_fields(non_reserved_field,
+                                                   allow_incompatible_schema,
+                                                   infos)
     expected_infos = OrderedDict([
         ('non_reserved_info', Info('non_reserved_info', 1, 'String', '',
                                    None, None))])
     self.assertEqual(infos, expected_infos)
 
   def test_add_format_fields_reserved_field(self):
+    allow_incompatible_schema = False
     calls_record_with_desc = bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.CALLS,
         type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -344,6 +383,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description='bigquery desc'))
     formats = OrderedDict()
     bigquery_vcf_schema_converter._add_format_fields(calls_record_with_desc,
+                                                     allow_incompatible_schema,
                                                      formats)
     expected_formats = OrderedDict([
         ('GQ', Format('GQ', 1, 'Integer', 'bigquery desc'))])
@@ -361,6 +401,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         description=''))
     formats = OrderedDict()
     bigquery_vcf_schema_converter._add_format_fields(calls_record_without_desc,
+                                                     allow_incompatible_schema,
                                                      formats)
     expected_formats = OrderedDict([
         ('GQ', Format('GQ', 1, 'Integer', 'Conditional genotype quality'))])
@@ -382,7 +423,18 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
           schema_conflict_format)
 
+    allow_incompatible_schema = True
+    formats_allow_incompatible_schema = OrderedDict()
+    bigquery_vcf_schema_converter._add_format_fields(
+        calls_record,
+        allow_incompatible_schema,
+        formats_allow_incompatible_schema)
+    expected_formats = OrderedDict([
+        ('GQ', Format('GQ', 1, 'String', 'desc'))])
+    self.assertEqual(formats_allow_incompatible_schema, expected_formats)
+
   def test_add_format_fields_non_reserved_field(self):
+    allow_incompatible_schema = False
     calls_record = bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.CALLS,
         type=bigquery_util.TableFieldConstants.TYPE_RECORD,
@@ -394,7 +446,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='bigquery desc'))
     formats = OrderedDict()
-    bigquery_vcf_schema_converter._add_format_fields(calls_record, formats)
+    bigquery_vcf_schema_converter._add_format_fields(calls_record,
+                                                     allow_incompatible_schema,
+                                                     formats)
     expected_formats = OrderedDict([
         ('non_reserved_format', Format('non_reserved_format', 1, 'Integer',
                                        'bigquery desc'))])
@@ -426,6 +480,15 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     with self.assertRaises(ValueError):
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
           schema_conflict)
+
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        schema_conflict,
+        allow_incompatible_schema=True)
+    infos = OrderedDict([
+        ('AA', Info('AA', 1, 'Integer', 'desc', None, None))])
+    expected_header = vcf_header_io.VcfHeader(infos=infos,
+                                              formats=OrderedDict())
+    self.assertEqual(header, expected_header)
 
 
 class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):

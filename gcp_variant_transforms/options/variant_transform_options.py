@@ -502,3 +502,11 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         help=('A list of call names (separated by a space). Only variants for '
               'these calls will be loaded from BigQuery. If this parameter is '
               'not specified, all calls will be kept.'))
+    parser.add_argument(
+        '--allow_incompatible_schema',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, the incompatibilities between BigQuery schema and the '
+              'reserved fields based on VCF 4.3 spec (see '
+              'http://samtools.github.io/hts-specs/VCFv4.3.pdf for more '
+              'details.) will not raise errors. Instead, the VCF meta '
+              'information are inferred by the schema without validation.'))

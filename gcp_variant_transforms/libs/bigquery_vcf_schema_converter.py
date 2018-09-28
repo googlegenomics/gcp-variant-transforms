@@ -183,16 +183,19 @@ def generate_schema_from_header_fields(
   return schema
 
 
-def generate_header_fields_from_schema(schema):
-  # type: (bigquery.TableSchema) -> vcf_header_io.VcfHeader
+def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
+  # type: (bigquery.TableSchema, bool) -> vcf_header_io.VcfHeader
   """Returns header fields converted from BigQuery schema.
 
   This is a best effort reconstruction of header fields. Only INFO and FORMAT
-  are considered. For each header field,
-  - If the field is reserved based on VCF spec, use the reserved definition.
-  - Otherwise, the type is mapped from BigQuery schema field type to VCF type,
-    and the number is inferred based on BigQuery schema field type and mode.
+  are considered. For each header field, the type is mapped from BigQuery
+  schema field type to VCF type, and the number is inferred based on BigQuery
+  schema field type and mode.
 
+  Args:
+    schema: BigQuery schema that is used to convert to header fields.
+    allow_incompatible_schema: If true, the type and mode compatibility
+      validation between `schema` and the reserved fields are skipped.
   Raises:
     ValueError: If the field schema type/mode is not consistent with the
       reserved type/mode.
@@ -203,19 +206,20 @@ def generate_header_fields_from_schema(schema):
     if field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS:
       continue
     elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
-      _add_format_fields(field, formats)
+      _add_format_fields(field, allow_incompatible_schema, formats)
     else:
-      _add_info_fields(field, infos)
+      _add_info_fields(field, allow_incompatible_schema, infos)
 
   return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
 
-def _add_format_fields(schema, formats):
-  # type: (bigquery.TableFieldSchema, Dict[str, _Format]) -> None
+def _add_format_fields(schema, allow_incompatible_schema, formats):
+  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Format]) -> None
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
-    elif field.name in vcf_reserved_fields.FORMAT_FIELDS.keys():
+    elif (field.name in vcf_reserved_fields.FORMAT_FIELDS.keys() and
+          not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
       _validate_reserved_field(field, reserved_definition)
       formats.update({field.name: _Format(
@@ -232,11 +236,14 @@ def _add_format_fields(schema, formats):
           desc=field.description)})
 
 
-def _add_info_fields(field, infos):
-  # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+def _add_info_fields(field, allow_incompatible_schema, infos):
+  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Info]) -> None
   if field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
-    _add_info_fields_from_alternate_bases(field, infos)
-  elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+    _add_info_fields_from_alternate_bases(field,
+                                          allow_incompatible_schema,
+                                          infos)
+  elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
+        not allow_incompatible_schema):
     reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
     _validate_reserved_field(field, reserved_definition)
     infos.update({field.name: _Info(
@@ -257,8 +264,10 @@ def _add_info_fields(field, infos):
         version=None)})
 
 
-def _add_info_fields_from_alternate_bases(schema, infos):
-  # type: (bigquery.TableFieldSchema, Dict[str, _Info]) -> None
+def _add_info_fields_from_alternate_bases(schema,
+                                          allow_incompatible_schema,
+                                          infos):
+  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Info]) -> None
   """Adds schema nested fields in alternate bases to `infos`.
 
   Notice that the validation of field mode is skipped for reserved fields since
@@ -272,7 +281,8 @@ def _add_info_fields_from_alternate_bases(schema, infos):
     if (field.name in _CONSTANT_ALTERNATE_BASES_FIELDS or
         field.type == bigquery_util.TableFieldConstants.TYPE_RECORD):
       continue
-    elif field.name in vcf_reserved_fields.INFO_FIELDS.keys():
+    elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
+          not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
       _validate_reserved_field_type(field, reserved_definition)
       infos.update({field.name: _Info(
@@ -292,8 +302,6 @@ def _add_info_fields_from_alternate_bases(schema, infos):
           version=None)})
 
 
-# TODO(allieychen): Add an option to allow incompatible definitions and skip the
-# following validation.
 def _validate_reserved_field(field_schema, reserved_definition):
   # type: (bigquery.TableFieldSchema, Union[_Format, _Info]) -> None
   """Validates the reserved field.
