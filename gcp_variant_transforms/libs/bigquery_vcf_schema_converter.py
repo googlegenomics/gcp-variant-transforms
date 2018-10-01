@@ -206,15 +206,15 @@ def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
     if field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS:
       continue
     elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
-      _add_format_fields(field, allow_incompatible_schema, formats)
+      _add_format_fields(field, formats, allow_incompatible_schema)
     else:
-      _add_info_fields(field, allow_incompatible_schema, infos)
+      _add_info_fields(field, infos, allow_incompatible_schema)
 
   return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
 
-def _add_format_fields(schema, allow_incompatible_schema, formats):
-  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Format]) -> None
+def _add_format_fields(schema, formats, allow_incompatible_schema=False):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Format], bool) -> None
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
@@ -236,12 +236,12 @@ def _add_format_fields(schema, allow_incompatible_schema, formats):
           desc=field.description)})
 
 
-def _add_info_fields(field, allow_incompatible_schema, infos):
-  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Info]) -> None
+def _add_info_fields(field, infos, allow_incompatible_schema=False):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Info], bool) -> None
   if field.name == bigquery_util.ColumnKeyConstants.ALTERNATE_BASES:
     _add_info_fields_from_alternate_bases(field,
-                                          allow_incompatible_schema,
-                                          infos)
+                                          infos,
+                                          allow_incompatible_schema)
   elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
         not allow_incompatible_schema):
     reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
@@ -265,9 +265,9 @@ def _add_info_fields(field, allow_incompatible_schema, infos):
 
 
 def _add_info_fields_from_alternate_bases(schema,
-                                          allow_incompatible_schema,
-                                          infos):
-  # type: (bigquery.TableFieldSchema, bool, Dict[str, _Info]) -> None
+                                          infos,
+                                          allow_incompatible_schema=False):
+  # type: (bigquery.TableFieldSchema, Dict[str, _Info], bool) -> None
   """Adds schema nested fields in alternate bases to `infos`.
 
   Notice that the validation of field mode is skipped for reserved fields since
