@@ -114,7 +114,8 @@ def run(argv=None):
         temp_folder,
         'bq_to_vcf_meta_info_{}'.format(timestamp_str))
     _write_vcf_meta_info(known_args.input_table,
-                         known_args.representative_header_file)
+                         known_args.representative_header_file,
+                         known_args.allow_incompatible_schema)
 
   _bigquery_to_vcf_shards(known_args,
                           options,
@@ -131,12 +132,14 @@ def run(argv=None):
                                              known_args.output_file)
 
 
-def _write_vcf_meta_info(input_table, representative_header_file):
-  # type: (str, str) -> None
+def _write_vcf_meta_info(input_table,
+                         representative_header_file,
+                         allow_incompatible_schema):
+  # type: (str, str, bool) -> None
   """Writes the meta information generated from BigQuery schema."""
   header_fields = (
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-          _get_schema(input_table)))
+          _get_schema(input_table), allow_incompatible_schema))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields)
 
