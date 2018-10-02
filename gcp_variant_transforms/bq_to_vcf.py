@@ -115,11 +115,11 @@ def run(argv=None):
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
       '{}_header_with_call_names.vcf'.format(unique_temp_id))
-
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
         '{}_meta_info.vcf'.format(unique_temp_id))
+
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)

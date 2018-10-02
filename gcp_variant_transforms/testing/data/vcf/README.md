@@ -49,3 +49,8 @@ modifications:
 2. The penultimate variant has replaced `HQ` with `FT` in the FORMAT, which is
 not defined in the header.
 3. The `POS` value is removed from the last variant.
+
+The folder `bq_to_vcf` is created to test BQ to VCF pipeline. In
+`expected_output` folder, it saves the expected contents for some of the
+integration tests included in
+`gcp_variant_transforms/testing/integration/bq_to_vcf_tests`.
