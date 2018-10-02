@@ -99,20 +99,21 @@ def run(argv=None):
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
   timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+  _, _, table_id = bigquery_util.parse_table_reference(known_args.input_table)
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
+      'bq_to_vcf_data_temp_files_{}_{}'.format(table_id, timestamp_str))
   # Create the directory manually. FileSystems cannot create a file if the
   # directory does not exist when using Direct Runner.
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_header_with_call_names_{}'.format(timestamp_str))
+      'bq_to_vcf_header_with_call_names_{}_{}'.format(table_id, timestamp_str))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
-        'bq_to_vcf_meta_info_{}'.format(timestamp_str))
+        'bq_to_vcf_meta_info_{}_{}'.format(table_id, timestamp_str))
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)
