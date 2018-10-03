@@ -45,7 +45,6 @@ from __future__ import division
 import logging
 import sys
 import tempfile
-import time
 from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
@@ -85,7 +84,6 @@ def run(argv=None):
   # type: (List[str]) -> None
   """Runs BigQuery to VCF pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  start_time = time.time()
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
@@ -123,7 +121,6 @@ def run(argv=None):
                           options,
                           vcf_data_temp_folder,
                           vcf_header_file_path)
-  print ("Pipeline running time --- %s seconds ---" % (time.time() - start_time))
   if is_direct_runner:
     vcf_file_composer.compose_local_vcf_shards(vcf_header_file_path,
                                                vcf_data_temp_folder,
@@ -133,8 +130,6 @@ def run(argv=None):
                                              vcf_header_file_path,
                                              vcf_data_temp_folder,
                                              known_args.output_file)
-
-  print ("Total time --- %s seconds ---" % (time.time() - start_time))
 
 
 def _write_vcf_meta_info(input_table,

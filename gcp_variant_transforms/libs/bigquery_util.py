@@ -14,6 +14,7 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
+import enum
 import re
 from typing import Tuple  # pylint: disable=unused-import
 
@@ -49,9 +50,20 @@ class TableFieldConstants(object):
   TYPE_RECORD = 'RECORD'
   TYPE_FLOAT = 'FLOAT'
   TYPE_BOOLEAN = 'BOOLEAN'
-  TYPE_DATE = 'DATE'
   MODE_NULLABLE = 'NULLABLE'
   MODE_REPEATED = 'REPEATED'
+
+
+class _SupportedTableFieldType(enum.Enum):
+  """The supported BigQuery field types.
+
+  Only schema fields with these types are interchangeable with VCF.
+  """
+  TYPE_STRING = 'STRING'
+  TYPE_INTEGER = 'INTEGER'
+  TYPE_RECORD = 'RECORD'
+  TYPE_FLOAT = 'FLOAT'
+  TYPE_BOOLEAN = 'BOOLEAN'
 
 
 # A map to convert from VCF types to their equivalent BigQuery types.
@@ -139,3 +151,8 @@ def get_vcf_num_from_bigquery_schema(bigquery_mode, bigquery_type):
     return parser.field_counts[vcfio.MISSING_FIELD_VALUE]
   else:
     return 0 if bigquery_type == TableFieldConstants.TYPE_BOOLEAN else 1
+
+
+def get_supported_bigquery_schema_types():
+  """Returns the supported BigQuery field types."""
+  return [item.value for item in _SupportedTableFieldType]

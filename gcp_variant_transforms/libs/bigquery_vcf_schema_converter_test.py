@@ -451,7 +451,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema = bigquery.TableSchema()
     schema.fields.append(bigquery.TableFieldSchema(
         name='partition_date_please_ignore',
-        type=bigquery_util.TableFieldConstants.TYPE_DATE,
+        type='Date',
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='Column required by BigQuery partitioning logic.'))
     header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
