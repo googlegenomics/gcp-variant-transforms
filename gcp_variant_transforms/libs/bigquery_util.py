@@ -49,6 +49,7 @@ class TableFieldConstants(object):
   TYPE_RECORD = 'RECORD'
   TYPE_FLOAT = 'FLOAT'
   TYPE_BOOLEAN = 'BOOLEAN'
+  TYPE_DATE = 'DATE'
   MODE_NULLABLE = 'NULLABLE'
   MODE_REPEATED = 'REPEATED'
 
@@ -134,7 +135,7 @@ def get_vcf_type_from_bigquery_type(bigquery_type):
 def get_vcf_num_from_bigquery_schema(bigquery_mode, bigquery_type):
   # type: (str, str) -> int
   """Returns VCF num based on BigQuery mode and type."""
-  if bigquery_mode == TableFieldConstants.MODE_NULLABLE:
-    return 0 if bigquery_type == TableFieldConstants.TYPE_BOOLEAN else 1
-  else:
+  if bigquery_mode == TableFieldConstants.MODE_REPEATED:
     return parser.field_counts[vcfio.MISSING_FIELD_VALUE]
+  else:
+    return 0 if bigquery_type == TableFieldConstants.TYPE_BOOLEAN else 1
