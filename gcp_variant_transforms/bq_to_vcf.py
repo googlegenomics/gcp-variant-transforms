@@ -78,6 +78,7 @@ _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
+_BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 
 
 def run(argv=None):
@@ -98,22 +99,29 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-  _, _, table_id = bigquery_util.parse_table_reference(known_args.input_table)
+  # TODO(allieychen): In both here and vcf_to_bq, the job name and time are
+  # added to the names of the temp files to ensure uniqueness such that multiple
+  # pipelines can run at the same time. Refactor it to a common lib.
+  job_name = '-'.join([_BQ_TO_VCF_SHARDS_JOB_NAME,
+                       datetime.now().strftime('%Y%m%d-%H%M%S')])
+  if google_cloud_options.job_name:
+    google_cloud_options.job_name += '-' + job_name
+  else:
+    google_cloud_options.job_name = job_name
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_data_temp_files_{}_{}'.format(table_id, timestamp_str))
+      '{}_data_temp_files'.format(job_name))
   # Create the directory manually. FileSystems cannot create a file if the
   # directory does not exist when using Direct Runner.
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_header_with_call_names_{}_{}'.format(table_id, timestamp_str))
+      '{}_header_with_call_names.vcf'.format(job_name))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
-        'bq_to_vcf_meta_info_{}_{}'.format(table_id, timestamp_str))
+        '{}_meta_info.vcf'.format(job_name))
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)
