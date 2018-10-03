@@ -72,13 +72,31 @@ class BqToVcfTest(unittest.TestCase):
     args_1 = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
         genomic_regions=['c1:1,000-2,000', 'c2'])
+    columns = ['reference_name', 'start_position']
     expected_query = (
-        'SELECT * FROM `my_bucket.my_dataset.my_table` WHERE '
+        'SELECT reference_name, start_position FROM '
+        '`my_bucket.my_dataset.my_table` WHERE '
         '(reference_name="c1" AND start_position>=1000 AND end_position<=2000) '
         'OR (reference_name="c2" AND start_position>=0 AND '
         'end_position<=9223372036854775807)'
     )
-    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1), expected_query)
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1, columns),
+                     expected_query)
+
+  def test_get_query_columns(self):
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Reference name.'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='partition_date_please_ignore',
+        type='Date',
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Column required by BigQuery partitioning logic.'))
+    expected_columns = [bigquery_util.ColumnKeyConstants.REFERENCE_NAME]
+    self.assertEqual(bq_to_vcf._get_query_columns(schema), expected_columns)
 
   def test_get_annotation_names(self):
     schema_with_annotations = bigquery_schema_util.get_sample_table_schema(
