@@ -104,24 +104,29 @@ def run(argv=None):
   # pipelines can run at the same time. Refactor it to a common lib.
   job_name = '-'.join([_BQ_TO_VCF_SHARDS_JOB_NAME,
                        datetime.now().strftime('%Y%m%d-%H%M%S')])
+  # Update the google_cloud_options.job name is necessary:
+  # - If the job_name is provided, the time stamp provides unique temp files.
+  # - Otherwise, there are no unique identifiers for the temp files, assigning
+  # the job_name stops multiple pipelines from interacting with the same temp
+  # files.
   if google_cloud_options.job_name:
     google_cloud_options.job_name += '-' + job_name
   else:
     google_cloud_options.job_name = job_name
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
-      '{}_data_temp_files'.format(job_name))
+      '{}_data_temp_files'.format(google_cloud_options.job_name))
   # Create the directory manually. FileSystems cannot create a file if the
   # directory does not exist when using Direct Runner.
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      '{}_header_with_call_names.vcf'.format(job_name))
+      '{}_header_with_call_names.vcf'.format(google_cloud_options.job_name))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
-        '{}_meta_info.vcf'.format(job_name))
+        '{}_meta_info.vcf'.format(google_cloud_options.job_name))
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)
