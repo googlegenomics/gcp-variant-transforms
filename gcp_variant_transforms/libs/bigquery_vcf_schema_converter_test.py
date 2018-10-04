@@ -447,6 +447,47 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
 
+  def test_generate_header_fields_from_schema_date_type(self):
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='partition_date_please_ignore',
+        type='Date',
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Column required by BigQuery partitioning logic.'))
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        schema)
+
+    expected_header = vcf_header_io.VcfHeader(infos=OrderedDict(),
+                                              formats=OrderedDict())
+    self.assertEqual(header, expected_header)
+
+  def test_generate_header_fields_from_schema_none_mode(self):
+    schema_non_reserved_fields = bigquery.TableSchema()
+    schema_non_reserved_fields.fields.append(bigquery.TableFieldSchema(
+        name='field',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        description='desc'))
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        schema_non_reserved_fields)
+    infos = OrderedDict([
+        ('field', Info('field', 1, 'String', 'desc', None, None))])
+    formats = OrderedDict()
+    expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    self.assertEqual(header, expected_header)
+
+    schema_reserved_fields = bigquery.TableSchema()
+    schema_reserved_fields.fields.append(bigquery.TableFieldSchema(
+        name='AA',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        description='desc'))
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        schema_reserved_fields)
+    infos = OrderedDict([
+        ('AA', Info('AA', 1, 'String', 'desc', None, None))])
+    formats = OrderedDict()
+    expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    self.assertEqual(header, expected_header)
+
   def test_generate_header_fields_from_schema_schema_compatibility(self):
     schema_conflict = bigquery.TableSchema()
     schema_conflict.fields.append(bigquery.TableFieldSchema(

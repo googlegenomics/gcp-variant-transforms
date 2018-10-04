@@ -203,7 +203,8 @@ def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
   infos = OrderedDict()  # type: OrderedDict[str, _Info]
   formats = OrderedDict()  # type: OrderedDict[str, _Format]
   for field in schema.fields:
-    if field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS:
+    if (field.type not in bigquery_util.get_supported_bigquery_schema_types()
+        or field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS):
       continue
     elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
       _add_format_fields(field, formats, allow_incompatible_schema)
@@ -324,7 +325,8 @@ def _validate_reserved_field_type(field_schema, reserved_definition):
 
 
 def _validate_reserved_field_mode(field_schema, reserved_definition):
-  schema_mode = field_schema.mode
+  schema_mode = (field_schema.mode or
+                 bigquery_util.TableFieldConstants.MODE_NULLABLE)
   reserved_mode = bigquery_util.get_bigquery_mode_from_vcf_num(
       reserved_definition.num)
   if schema_mode != reserved_mode:

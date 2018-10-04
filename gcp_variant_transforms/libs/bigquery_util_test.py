@@ -82,3 +82,8 @@ class BigqueryUtilTest(unittest.TestCase):
                      bigquery_util.get_vcf_num_from_bigquery_schema(
                          bigquery_util.TableFieldConstants.MODE_NULLABLE,
                          bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
+    self.assertEqual(
+        0,
+        bigquery_util.get_vcf_num_from_bigquery_schema(
+            bigquery_mode=None,
+            bigquery_type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
