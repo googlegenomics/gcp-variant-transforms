@@ -59,11 +59,11 @@ class _SupportedTableFieldType(enum.Enum):
 
   Only schema fields with these types are interchangeable with VCF.
   """
-  TYPE_STRING = 'STRING'
-  TYPE_INTEGER = 'INTEGER'
-  TYPE_RECORD = 'RECORD'
-  TYPE_FLOAT = 'FLOAT'
-  TYPE_BOOLEAN = 'BOOLEAN'
+  TYPE_STRING = TableFieldConstants.TYPE_STRING
+  TYPE_INTEGER = TableFieldConstants.TYPE_INTEGER
+  TYPE_RECORD = TableFieldConstants.TYPE_RECORD
+  TYPE_FLOAT = TableFieldConstants.TYPE_FLOAT
+  TYPE_BOOLEAN = TableFieldConstants.TYPE_BOOLEAN
 
 
 # A map to convert from VCF types to their equivalent BigQuery types.
