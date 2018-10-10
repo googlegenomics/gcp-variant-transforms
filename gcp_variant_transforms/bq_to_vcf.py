@@ -45,6 +45,7 @@ from __future__ import division
 import logging
 import sys
 import tempfile
+import uuid
 from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
@@ -99,34 +100,26 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  # TODO(allieychen): In both here and vcf_to_bq, the job name and time are
-  # added to the names of the temp files to ensure uniqueness such that multiple
-  # pipelines can run at the same time. Refactor it to a common lib.
-  job_name = '-'.join([_BQ_TO_VCF_SHARDS_JOB_NAME,
-                       datetime.now().strftime('%Y%m%d-%H%M%S')])
-  # Update the google_cloud_options.job name is necessary:
-  # - If the job_name is provided, the time stamp provides unique temp files.
-  # - Otherwise, there are no unique identifiers for the temp files, assigning
-  # the job_name stops multiple pipelines from interacting with the same temp
-  # files.
-  if google_cloud_options.job_name:
-    google_cloud_options.job_name += '-' + job_name
-  else:
-    google_cloud_options.job_name = job_name
+  # TODO(allieychen): Refactor the generation of the unique temp id to a common
+  # lib.
+  unique_temp_id = '-'.join(
+      [google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME,
+       datetime.now().strftime('%Y%m%d-%H%M%S'),
+       str(uuid.uuid4())])
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
-      '{}_data_temp_files'.format(google_cloud_options.job_name))
+      '{}_data_temp_files'.format(unique_temp_id))
   # Create the directory manually. FileSystems cannot create a file if the
   # directory does not exist when using Direct Runner.
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      '{}_header_with_call_names.vcf'.format(google_cloud_options.job_name))
+      '{}_header_with_call_names.vcf'.format(unique_temp_id))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
-        '{}_meta_info.vcf'.format(google_cloud_options.job_name))
+        '{}_meta_info.vcf'.format(unique_temp_id))
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)
