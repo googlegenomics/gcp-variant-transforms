@@ -45,6 +45,7 @@ from __future__ import division
 import logging
 import sys
 import tempfile
+import uuid
 from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
@@ -78,6 +79,7 @@ _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
+_BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 
 
 def run(argv=None):
@@ -98,21 +100,26 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+  # TODO(allieychen): Refactor the generation of the unique temp id to a common
+  # lib.
+  unique_temp_id = '-'.join(
+      [google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME,
+       datetime.now().strftime('%Y%m%d-%H%M%S'),
+       str(uuid.uuid4())])
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_data_temp_files_{}'.format(timestamp_str))
+      '{}_data_temp_files'.format(unique_temp_id))
   # Create the directory manually. FileSystems cannot create a file if the
   # directory does not exist when using Direct Runner.
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      'bq_to_vcf_header_with_call_names_{}'.format(timestamp_str))
+      '{}_header_with_call_names.vcf'.format(unique_temp_id))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
         temp_folder,
-        'bq_to_vcf_meta_info_{}'.format(timestamp_str))
+        '{}_meta_info.vcf'.format(unique_temp_id))
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema)
