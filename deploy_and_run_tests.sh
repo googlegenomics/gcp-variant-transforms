@@ -19,7 +19,8 @@ set -euo pipefail
 # pushes the image to a test registry (project 'gcp-variant-transforms-test')
 # and runs integration tests against that image. By default, only integration
 # tests for vcf_to_bq pipeline will run. To run the preprocessor integration
-# tests, use --run_preprocessor_tests options.
+# tests, use --run_preprocessor_tests option. To run the BQ to VCF integration
+# tests, use --run_bq_to_vcf_tests option.
 #
 # To run this test successfully:
 # - The user's gcloud credentials should be set; follow the steps at:
@@ -36,6 +37,7 @@ IMAGE_TAG_OPT="--image_tag"
 PROJECT_OPT="--project"
 RUN_UNIT_TEST_OPT="--run_unit_tests"
 RUN_PREPROCESSOR_TEST_OPT="--run_preprocessor_tests"
+RUN_BQ_TO_VCF_TEST_OPT="--run_bq_to_vcf_tests"
 SKIP_BUILD_OPT="--skip_build"
 image_tag=""
 keep_image=""
@@ -44,6 +46,7 @@ gs_dir="integration_test_runs"  # default GS dir to store logs, etc.
 project="gcp-variant-transforms-test"  # default project to use
 run_unit_tests=""  # By default do not run unit-tests.
 run_preprocessor_tests=""  # By default skip preprocessor integration tests.
+run_bq_to_vcf_tests=""  # By default skip bq to vcf integration tests.
 
 #################################################
 # Prints a given message with a color.
@@ -75,6 +78,7 @@ usage() {
   echo "    Default is gcp-variant-transforms-test."
   echo "  ${RUN_UNIT_TEST_OPT} runs the unit-tests before integration tests."
   echo "  ${RUN_PREPROCESSOR_TEST_OPT} runs the preprocessor integration tests."
+  echo "  ${RUN_BQ_TO_VCF_TEST_OPT} runs the BQ to VCF integration tests."
   echo "  ${SKIP_BUILD_OPT} skips the build step so it has to be used with "
   echo "    a valid tag_name passed through {$IMAGE_TAG_OPT}."
   echo "  This script should be run from the root of source tree."
@@ -149,6 +153,9 @@ parse_args() {
       shift
     elif [[ "$1" = "${RUN_PREPROCESSOR_TEST_OPT}" ]]; then
       run_preprocessor_tests="yes"  # can be any non-empty string
+      shift
+    elif [[ "$1" = "${RUN_BQ_TO_VCF_TEST_OPT}" ]]; then
+      run_bq_to_vcf_tests="yes"  # can be any non-empty string
       shift
     elif [[ "$1" = "${SKIP_BUILD_OPT}" ]]; then
       skip_build="yes"  # can be any non-empty string
@@ -238,7 +245,17 @@ fi
 # `pid_preprocess` could be the same as `pid_vcf_to_bq` if preprocessor tests
 # are not run.
 pid_preprocess="$!"
-if wait "${pid_vcf_to_bq}" && wait "${pid_preprocess}"; then
+if [[ -n "${run_bq_to_vcf_tests}" ]]; then
+  python gcp_variant_transforms/testing/integration/run_bq_to_vcf_tests.py \
+      --project "${project}" \
+      --staging_location "gs://${gs_dir}/staging" \
+      --temp_location "gs://${gs_dir}/temp" \
+      --logging_location "gs://${gs_dir}/temp/logs" \
+      --image "${full_image_name}" &
+fi
+pid_bq_to_vcf="$!"
+if wait "${pid_vcf_to_bq}" && wait "${pid_preprocess}" && wait "${pid_bq_to_vcf}";
+then
   color_print "$0 succeeded!" "${GREEN}"
 else
   exit 1
