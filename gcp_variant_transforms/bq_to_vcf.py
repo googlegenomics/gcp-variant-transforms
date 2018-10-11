@@ -72,7 +72,7 @@ from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
 
 
-_BASE_QUERY_TEMPLATE = 'SELECT * FROM `{INPUT_TABLE}`'
+_BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')
@@ -169,13 +169,13 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the call names to
   `vcf_header_file_path`.
   """
+  schema = _get_schema(known_args.input_table)
   # TODO(allieychen): Modify the SQL query with the specified call_names.
-  query = _get_bigquery_query(known_args)
+  query = _get_bigquery_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
                                       validate=True,
                                       use_standard_sql=True)
-  schema = _get_schema(known_args.input_table)
   annotation_names = _extract_annotation_names(schema)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
@@ -207,7 +207,7 @@ def _bigquery_to_vcf_shards(
 
 
 def _get_schema(input_table):
-  # type: (str) -> bigqueryv2.TableSchema
+  # type: (str) -> bigquery_v2.TableSchema
   project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
       input_table)
   credentials = (client.GoogleCredentials.get_application_default().
@@ -218,11 +218,14 @@ def _get_schema(input_table):
   return table.schema
 
 
-def _get_bigquery_query(known_args):
-  # type: (argparse.Namespace) -> str
+def _get_bigquery_query(known_args, schema):
+  # type: (argparse.Namespace, bigquery_v2.TableSchema) -> str
   """Returns a BigQuery query for the interested regions."""
-  base_query = _BASE_QUERY_TEMPLATE.format(INPUT_TABLE='.'.join(
-      bigquery_util.parse_table_reference(known_args.input_table)))
+  columns = _get_query_columns(schema)
+  base_query = _BASE_QUERY_TEMPLATE.format(
+      COLUMNS=', '.join(columns),
+      INPUT_TABLE='.'.join(
+          bigquery_util.parse_table_reference(known_args.input_table)))
   conditions = []
   if known_args.genomic_regions:
     for region in known_args.genomic_regions:
@@ -259,6 +262,21 @@ def _extract_annotation_names(schema):
               sub_field.name: [field.name for field in sub_field.fields]
           })
   return annotation_names
+
+
+def _get_query_columns(schema):
+  # type: (bigquery_v2.TableSchema) -> List[str]
+  """Returns a list of columns to be selected for the query.
+
+  Only the fields with supported schema types are loaded from BigQuery. e.g.,
+  in the clustered table, the field with type DATE will be ignored. Also,
+  it assumes that all sub fields in the RECORD fields have valid types.
+  """
+  columns = []
+  for table_field in schema.fields:
+    if table_field.type in bigquery_util.get_supported_bigquery_schema_types():
+      columns.append(table_field.name)
+  return columns
 
 
 def _write_vcf_header_with_call_names(sample_names,
