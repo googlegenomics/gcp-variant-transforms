@@ -477,7 +477,7 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'format of (PROJECT:DATASET.TABLE).'))
     parser.add_argument(
         '--number_of_bases_per_shard',
-        type=int, default=10000,
+        type=int, default=1000000,
         help=('The maximum number of base pairs per chromosome to include in a '
               'single VCF file (one shard). A shard is a collection of data '
               'within a contiguous region of the genome. This parameter will '
