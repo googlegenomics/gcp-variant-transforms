@@ -65,14 +65,32 @@ class BqToVcfTest(unittest.TestCase):
     args = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
         genomic_regions=None)
-    self.assertEqual(bq_to_vcf._get_bigquery_query(args),
-                     'SELECT * FROM `my_bucket.my_dataset.my_table`')
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Reference name.'))
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args, schema),
+                     'SELECT reference_name FROM '
+                     '`my_bucket.my_dataset.my_table`')
 
   def test_get_bigquery_query_with_regions(self):
     args_1 = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
         genomic_regions=['c1:1,000-2,000', 'c2'])
-    columns = ['reference_name', 'start_position']
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Reference name.'))
+    schema.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.START_POSITION,
+        type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description=('Start position (0-based). Corresponds to the first base '
+                     'of the string of reference bases.')))
     expected_query = (
         'SELECT reference_name, start_position FROM '
         '`my_bucket.my_dataset.my_table` WHERE '
@@ -80,7 +98,7 @@ class BqToVcfTest(unittest.TestCase):
         'OR (reference_name="c2" AND start_position>=0 AND '
         'end_position<=9223372036854775807)'
     )
-    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1, columns),
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args_1, schema),
                      expected_query)
 
   def test_get_query_columns(self):

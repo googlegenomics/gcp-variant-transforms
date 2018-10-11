@@ -170,9 +170,8 @@ def _bigquery_to_vcf_shards(
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  columns = _get_query_columns(schema)
   # TODO(allieychen): Modify the SQL query with the specified call_names.
-  query = _get_bigquery_query(known_args, columns)
+  query = _get_bigquery_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
                                       validate=True,
@@ -208,7 +207,7 @@ def _bigquery_to_vcf_shards(
 
 
 def _get_schema(input_table):
-  # type: (str) -> bigqueryv2.TableSchema
+  # type: (str) -> bigquery_v2.TableSchema
   project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
       input_table)
   credentials = (client.GoogleCredentials.get_application_default().
@@ -219,11 +218,12 @@ def _get_schema(input_table):
   return table.schema
 
 
-def _get_bigquery_query(known_args, columns=None):
-  # type: (argparse.Namespace, List[str]) -> str
+def _get_bigquery_query(known_args, schema):
+  # type: (argparse.Namespace, bigquery_v2.TableSchema) -> str
   """Returns a BigQuery query for the interested regions."""
+  columns = _get_query_columns(schema)
   base_query = _BASE_QUERY_TEMPLATE.format(
-      COLUMNS=', '.join(columns or ['*']),
+      COLUMNS=', '.join(columns),
       INPUT_TABLE='.'.join(
           bigquery_util.parse_table_reference(known_args.input_table)))
   conditions = []
