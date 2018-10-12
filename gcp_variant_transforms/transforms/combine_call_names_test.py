@@ -41,10 +41,31 @@ class GetCallNamesTest(unittest.TestCase):
     ]
 
     pipeline = TestPipeline()
-    combined_call_names = (
+    _ = (
         pipeline
         | transforms.Create(variants)
         | 'CombineCallNames' >> combine_call_names.CallNamesCombiner())
+    with self.assertRaises(ValueError):
+      pipeline.run()
+
+  def test_call_names_combiner_pipeline_preserve_call_names_order(self):
+    call_names = ['sample1', 'sample2', 'sample3']
+    variant_calls = [
+        vcfio.VariantCall(name=call_names[0]),
+        vcfio.VariantCall(name=call_names[1]),
+        vcfio.VariantCall(name=call_names[2])
+    ]
+    variants = [
+        vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
+        vcfio.Variant(calls=[variant_calls[1], variant_calls[2]])
+    ]
+
+    pipeline = TestPipeline()
+    combined_call_names = (
+        pipeline
+        | transforms.Create(variants)
+        | 'CombineCallNames' >>
+        combine_call_names.CallNamesCombiner(preserve_call_names_order=False))
     assert_that(combined_call_names, equal_to([call_names]))
     pipeline.run()
 

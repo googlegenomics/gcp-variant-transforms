@@ -189,7 +189,8 @@ def _bigquery_to_vcf_shards(
     else:
       call_names = (variants
                     | 'CombineCallNames' >>
-                    combine_call_names.CallNamesCombiner())
+                    combine_call_names.CallNamesCombiner(
+                        known_args.preserve_call_names_order))
 
     _ = (call_names
          | 'GenerateVcfDataHeader' >>
