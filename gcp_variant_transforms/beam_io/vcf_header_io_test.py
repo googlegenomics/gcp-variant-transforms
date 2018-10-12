@@ -285,6 +285,29 @@ class WriteVcfHeadersTest(unittest.TestCase):
       header_fn.process(header)
       self._assert_file_contents_equal(tempfile, self.lines)
 
+  def test_write_headers_with_vcf_version_line(self):
+    header = _get_vcf_header_from_lines(self.lines)
+    vcf_version_line = '##fileformat=VCFv4.3\n'
+    expected_results = [
+        vcf_version_line,
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+        '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
+        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
+        '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
+    ]
+    with temp_dir.TempDir() as tempdir:
+      tempfile = tempdir.create_temp_file(suffix='.vcf')
+      header_fn = WriteVcfHeaderFn(tempfile)
+      header_fn.process(header, vcf_version_line)
+      with open(tempfile, 'rb') as f:
+        actual = f.readlines()
+        self.assertItemsEqual(actual, expected_results)
+
   def _remove_sample_names(self, line):
     # Return line with all columns except sample names.
     return '\t'.join(line.split('\t')[:9])

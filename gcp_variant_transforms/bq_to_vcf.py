@@ -73,13 +73,14 @@ from gcp_variant_transforms.transforms import densify_variants
 
 
 _BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
+_BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
+_COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')
-_COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
-_BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
+_VCF_VERSION_LINE = '##fileformat=VCFv4.3\n'
 
 
 def run(argv=None):
@@ -148,7 +149,7 @@ def _write_vcf_meta_info(input_table,
       bigquery_vcf_schema_converter.generate_header_fields_from_schema(
           _get_schema(input_table), allow_incompatible_schema))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
-  write_header_fn.process(header_fields)
+  write_header_fn.process(header_fields, _VCF_VERSION_LINE)
 
 
 def _bigquery_to_vcf_shards(
