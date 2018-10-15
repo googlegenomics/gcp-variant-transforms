@@ -162,6 +162,12 @@ validator to check the validity of the VCF files, or as a helper tool for
 [VCF files preprocessor](docs/vcf_files_preprocessor.md) for more details.
 
 
+## Running BigQuery to VCF
+
+The BigQuery to VCF pipeline is used to export variants in BigQuery to one VCF file.
+Please refer to [BigQuery to VCF pipeline](docs/bigquery_to_vcf.md) for more
+details.
+
 ## Running jobs in a particular region/zone
 
 You may need to constrain Cloud Dataflow job processing to a specific geographic

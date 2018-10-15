@@ -469,7 +469,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--output_file',
         required=True,
-        help='The full path of the VCF file to store the result.')
+        help='The full path of the VCF file to store the result. If run with '
+             'Dataflow, a path in Google Cloud Storage that your project has '
+             'write access to is required.')
     parser.add_argument(
         '--input_table',
         required=True,
@@ -486,7 +488,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--representative_header_file',
         help=('If provided, meta-information from the provided file will be '
-              'added into the output_file.'))
+              'added into the output_file. Otherwise, the meta-information is '
+              'inferred from the BigQuery schema. To best recover the VCF, it'
+              'is recommended to provide this file.'))
     parser.add_argument(
         '--genomic_regions',
         default=None, nargs='+',
