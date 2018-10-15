@@ -1,0 +1,10 @@
+[
+  {
+    "test_name": "bq-to-vcf-option-number-of-bases-per-shard",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.platinum_NA12877_hg38_10K_lines",
+    "output_file_name": "bq_to_vcf_option_number_of_bases_per_shard.vcf",
+    "number_of_bases_per_shard": 100000,
+    "runner": "DataflowRunner",
+    "expected_output_file": "gs://gcp-variant-transforms-testfiles/bq_to_vcf_expected_output/platinum_NA12877_hg38_10K_lines.vcf"
+  }
+]
