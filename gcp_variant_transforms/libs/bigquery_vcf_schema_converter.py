@@ -227,14 +227,15 @@ def _add_format_fields(schema, formats, allow_incompatible_schema=False):
           id=field.name,
           num=reserved_definition.num,
           type=reserved_definition.type,
-          desc=field.description or reserved_definition.desc)})
+          desc=(_remove_new_line_character(field.description) or
+                reserved_definition.desc))})
     else:
       formats.update({field.name: _Format(
           id=field.name,
           num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
                                                              field.type),
           type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          desc=field.description)})
+          desc=_remove_new_line_character(field.description))})
 
 
 def _add_info_fields(field, infos, allow_incompatible_schema=False):
@@ -251,7 +252,8 @@ def _add_info_fields(field, infos, allow_incompatible_schema=False):
         id=field.name,
         num=reserved_definition.num,
         type=reserved_definition.type,
-        desc=field.description or reserved_definition.desc,
+        desc=(_remove_new_line_character(field.description) or
+              reserved_definition.desc),
         source=None,
         version=None)})
   else:
@@ -260,7 +262,7 @@ def _add_info_fields(field, infos, allow_incompatible_schema=False):
         num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
                                                            field.type),
         type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-        desc=field.description,
+        desc=_remove_new_line_character(field.description),
         source=None,
         version=None)})
 
@@ -290,7 +292,8 @@ def _add_info_fields_from_alternate_bases(schema,
           id=field.name,
           num=reserved_definition.num,
           type=reserved_definition.type,
-          desc=field.description or reserved_definition.desc,
+          desc=(_remove_new_line_character(field.description) or
+                reserved_definition.desc),
           source=None,
           version=None)})
     else:
@@ -298,7 +301,7 @@ def _add_info_fields_from_alternate_bases(schema,
           id=field.name,
           num=parser.field_counts[vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
           type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          desc=field.description,
+          desc=_remove_new_line_character(field.description),
           source=None,
           version=None)})
 
@@ -333,3 +336,7 @@ def _validate_reserved_field_mode(field_schema, reserved_definition):
     raise ValueError(
         'The mode of field {} is different from the VCF spec: {} vs {}.'
         .format(field_schema.name, schema_mode, reserved_mode))
+
+
+def _remove_new_line_character(description):
+  return description.replace('\n', ' ')
