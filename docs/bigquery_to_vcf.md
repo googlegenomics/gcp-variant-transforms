@@ -1,9 +1,8 @@
 # BigQuery to VCF
 
-The BigQuery to VCF pipeline is used for loading BigQuery table to one VCF. This
-pipeline reads the variants from BigQuery table, groups a collection of variants
-within a contiguous region of the genome, sorts them, and then writes to one VCF
-shard. At the end, it consolidates VCF header and VCF shards into one.
+The BigQuery to VCF pipeline is used for loading a BigQuery table to one VCF
+file. You may also customize the pipeline to load a subset of samples and/or
+genomic regions.
 
 ## Running BQ to VCF
 
@@ -20,9 +19,9 @@ Run the script below and replace the following parameters:
   should run.
 * `INPUT_TABLE`: BigQuery table that will be loaded to VCF. It must be in the
   format of GOOGLE_CLOUD_PROJECT:DATASET.TABLE.
-* `OUTPUT_FILE`: The full path of the VCF file to store the result. If run
-  with Dataflow, a path in Google Cloud Storage that your project has write
-  access to is required.
+* `OUTPUT_FILE`: The full path of the output VCF file. This can be a local path
+  if you use `DirectRunner` (for very small VCF files) but must be a path in
+  Google Cloud Storage if using `DataflowRunner`.
 * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
@@ -51,37 +50,44 @@ gcloud alpha genomics pipelines run \
   --command-line "${COMMAND}"
 ```
 
-Besides, the following optional flags are provided:
+In addition, the following optional flags are provided:
 * `--representative_header_file`: If provided, meta-information from the
-  provided file will be added into the `output_file`. Otherwise, the
-  meta-information is inferred from the BigQuery schema. To best recover the
-  VCF, it is recommended to provide this file.
-* `--number_of_bases_per_shard`:  The maximum number of base pairs per
-  chromosome to include in a single VCF file (one shard). A shard is a
-  collection of data within a contiguous region of the genome. By default,
-  number_of_bases_per_shard = 1,000,000. With the default setting, the variants
-  on the same chromosome with start position 1 to 999,999 are written to the
-  same shard, and the variants on the same chromosome with start position
-  1,000,000 to 1,999,999 are written to another shard, etc. This parameter will
-  have an impact on memory requirements since the data in a single shard must be
-  sorted.
+  provided file (e.g., INFO, FORMAT, FILTER, etc) will be added into the
+  `output_file`. Otherwise, the meta-information is inferred from the BigQuery
+  schema on a "best effort" basis (e.g., any repeated INFO field will have
+  `Number=.`). It is recommended to provide this file to specify the most
+  accurate and complete meta-information in the VCF file.
 * `--genomic_regions`: A list of genomic regions (separated by a space) to load
   from BigQuery. The format of each genomic region should be
-  CHROMOSOME:START_POSITION-END_POSITION or CHROMOSOME if the full chromosome is
-  requested. Only variants matching at least one of these regions will be
-  loaded. If this parameter is not specified, all variants will be kept.
+  REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if the full
+  chromosome is requested. Only variants matching at least one of these regions
+  will be loaded. For example, `--genomic_regions chr1 chr2:1000-2000` will load
+  all variants in `chr1` and all variants in `chr2` with `start_position` in
+  `[1000,2000)` from BigQuery. If this flag is not specified, all variants will
+  be loaded.
 * `--call_names`: A list of call names (separated by a space). Only variants for
   these calls will be loaded from BigQuery. If this parameter is not specified,
-  all calls will be kept.
+  all calls will be loaded.
 * `--allow_incompatible_schema`: If `representative_header_file` is not
   provided, the meta-information is inferred from the BigQuery schema. There are
   some reserved fields based on
   [VCF 4.3 spec](http://samtools.github.io/hts-specs/VCFv4.3.pdf). If the
   inferred definition is not the same as the reserved definition, an error will
-  raise and the pipeline fails. By setting this para to be true, the
+  be raised and the pipeline will fail. By setting this flag to true, the
   incompatibilities between BigQuery schema and the reserved fields will not
-  raise errors. Instead, the VCF meta information are inferred by the schema
+  raise errors. Instead, the VCF meta-information are inferred from the schema
   without validation.
+* `--preserve_call_names_order`: By default, call names in the output VCF file
+  are generated in ascending order. If set to true, the order of call names will
+  be the same as the BigQuery table, but it requires all extracted variants to
+  have the same call name ordering (usually true for tables from single VCF file
+  import).
+* `--number_of_bases_per_shard`: The maximum number of base pairs per
+  chromosome to include in a shard. A shard is a collection of data within a
+  contiguous region of the genome that can be efficiently sorted in memory.
+  This flag is set to 1,000,000 by default, which should work for most datasets.
+  You may change this flag if you have a dataset that is very dense and variants
+  in each shard cannot be sorted in memory.
 
 ### Running from github
 
