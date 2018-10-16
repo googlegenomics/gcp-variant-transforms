@@ -469,7 +469,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--output_file',
         required=True,
-        help='The full path of the VCF file to store the result.')
+        help=('The full path of the output VCF file. This can be a local path '
+              'if you use `DirectRunner` (for very small VCF files) but must '
+              'be a path in Google Cloud Storage if using `DataflowRunner`.'))
     parser.add_argument(
         '--input_table',
         required=True,
@@ -479,37 +481,46 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         '--number_of_bases_per_shard',
         type=int, default=1000000,
         help=('The maximum number of base pairs per chromosome to include in a '
-              'single VCF file (one shard). A shard is a collection of data '
-              'within a contiguous region of the genome. This parameter will '
-              'have an impact on memory requirements since the data in a '
-              'single shard must be sorted.'))
+              'shard. A shard is a collection of data within a contiguous '
+              'region of the genome that can be efficiently sorted in memory. '
+              'You may change this flag if you have a dataset that is very '
+              'dense and variants in each shard cannot be sorted in memory.'))
     parser.add_argument(
         '--representative_header_file',
-        help=('If provided, meta-information from the provided file will be '
-              'added into the output_file.'))
+        help=('If provided, meta-information from the provided file (e.g., '
+              'INFO, FORMAT, FILTER, etc) will be added into the '
+              '`output_file`. Otherwise, the meta-information is inferred from '
+              'the BigQuery schema on a "best effort" basis (e.g., any '
+              'repeated INFO field will have `Number=.`). It is recommended to '
+              'provide this file to specify the most accurate and complete '
+              'meta-information in the VCF file.'))
     parser.add_argument(
         '--genomic_regions',
         default=None, nargs='+',
         help=('A list of genomic regions (separated by a space) to load from '
               'BigQuery. The format of each genomic region should be '
-              'CHROMOSOME:START_POSITION-END_POSITION or CHROMOSOME if the full'
-              'chromosome is requested. Only variants matching at least one '
-              'of these regions will be loaded. If this parameter is not '
-              'specified, all variants will be kept.'))
+              'REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if '
+              'the full chromosome is requested. Only variants matching at '
+              'least one of these regions will be loaded. For example, '
+              '`--genomic_regions chr1 chr2:1000-2000` will load all variants '
+              'in `chr1` and all variants in `chr2` with `start_position` in '
+              '`[1000,2000)` from BigQuery. If this flag is not specified, all '
+              'variants will be loaded.'))
     parser.add_argument(
         '--call_names',
         default=None, nargs='+',
         help=('A list of call names (separated by a space). Only variants for '
               'these calls will be loaded from BigQuery. If this parameter is '
-              'not specified, all calls will be kept.'))
+              'not specified, all calls will be loaded.'))
     parser.add_argument(
         '--allow_incompatible_schema',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, the incompatibilities between BigQuery schema and the '
               'reserved fields based on VCF 4.3 spec (see '
               'http://samtools.github.io/hts-specs/VCFv4.3.pdf for more '
-              'details.) will not raise errors. Instead, the VCF meta '
-              'information are inferred by the schema without validation.'))
+              'details) will not raise errors. Instead, the VCF '
+              'meta-information are inferred from the schema without '
+              'validation.'))
     parser.add_argument(
         '--preserve_call_names_order',
         type='bool', default=False, nargs='?', const=True,
