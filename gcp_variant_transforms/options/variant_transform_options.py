@@ -510,3 +510,11 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'http://samtools.github.io/hts-specs/VCFv4.3.pdf for more '
               'details.) will not raise errors. Instead, the VCF meta '
               'information are inferred by the schema without validation.'))
+    parser.add_argument(
+        '--preserve_call_names_order',
+        type='bool', default=False, nargs='?', const=True,
+        help=('By default, call names in the output VCF file are generated in '
+              'ascending order. If set to true, the order of call names will '
+              'be the same as the BigQuery table, but it requires all '
+              'extracted variants to have the same call name ordering (usually '
+              'true for tables from single VCF file import).'))

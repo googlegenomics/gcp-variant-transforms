@@ -24,6 +24,20 @@ from gcp_variant_transforms.beam_io import vcf_parser  # pylint: disable=unused-
 class CallNamesCombiner(beam.PTransform):
   """A PTransform to combine call names from all variants."""
 
+  def __init__(self, preserve_call_names_order=False):
+    # type: (bool) -> None
+    """Initializes a `CallNamesCombiner` object.
+
+    Args:
+      preserve_call_names_order: If true, the order of the call names will be
+        the same as in the BigQuery table. Otherwise, the call names are sorted
+        in increasing order.
+    Raises:
+      ValueError: If the call names are not equal and in the same order when
+        `preserve_call_names_order` is True.
+    """
+    self._preserve_call_names_order = preserve_call_names_order
+
   def _get_call_names(self, variant):
     # type: (vcf_parser.Variant) -> Tuple[str]
     """Returns the names of all calls for the variant."""
@@ -33,27 +47,35 @@ class CallNamesCombiner(beam.PTransform):
                        format(variant))
     return tuple(call_names)
 
-  def _combine_unique_call_names(self, call_names):
+  def _extract_unique_call_names(self, call_names):
     # type: (List[Tuple[str]]) -> List[str]
-    """Combines unique call names from all variants.
+    """Extracts unique call names from all variants.
 
-    If there is only one unique call name tuple in `call_names`, it means that
-    the call names from all variants are the same. For this case, return this
-    call name tuple directly. Otherwise, return the call names in sorted order.
+    Returns:
+      The unique call name tuple in `call_names`.
+    Raises:
+      ValueError: If the call names are not equal and in the same order when
+        `preserve_call_names_order` is True.
     """
     if len(call_names) == 1:
       return list(call_names[0])
-    return (call_names
-            | 'FlattenCallNames' >> beam.Flatten()
-            | 'RemoveDuplicates' >> beam.RemoveDuplicates()
-            | 'Combine' >> beam.combiners.ToList()
-            | 'SortCallNames' >> beam.ParDo(sorted))
+    raise ValueError('The call names are not equal and in the same order '
+                     'across the variants being exported. Please rerun the '
+                     'pipeline with `--preserve_call_names_order false`.')
 
   def expand(self, pcoll):
-    return (pcoll
-            | 'GetCallNames' >> beam.Map(self._get_call_names)
-            | 'RemoveDuplicates' >> beam.RemoveDuplicates()
-            | 'Combine' >> beam.combiners.ToList()
-            | 'CombineUniqueCallNames'
-            >> beam.ParDo(self._combine_unique_call_names)
-            | beam.combiners.ToList())
+    if self._preserve_call_names_order:
+      return (pcoll
+              | 'GetCallNames' >> beam.Map(self._get_call_names)
+              | 'RemoveDuplicates' >> beam.RemoveDuplicates()
+              | 'Combine' >> beam.combiners.ToList()
+              | 'ExtractUniqueCallNames'
+              >> beam.ParDo(self._extract_unique_call_names)
+              | beam.combiners.ToList())
+    else:
+      return (pcoll
+              | 'GetCallNames' >> beam.FlatMap(self._get_call_names)
+              | 'RemoveDuplicates' >> beam.RemoveDuplicates()
+              | 'Combine' >> beam.combiners.ToList()
+              | 'SortCallNames' >> beam.ParDo(sorted)
+              | beam.combiners.ToList())

@@ -32,5 +32,6 @@ with `--annotation_fields` specified as `CSQ`. The test case
 Table `merge_option_move_to_calls` is created by loading files
 "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf" with
 `variant_merge_strategy=MOVE_TO_CALLS`. The test case
-`densify_samples.vcf` is used to test the densify process for BigQuery table
+`option_preserve_call_names_order.json` is used to test the option
+`--preserve_call_names_order` and densify process for BigQuery table
 with missing variants for some of the calls.
