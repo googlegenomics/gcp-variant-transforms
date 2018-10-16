@@ -14,6 +14,7 @@
 
 """Composes multiple files in GCS to one VCF file."""
 
+import logging
 import multiprocessing
 from typing import Iterable, List  # pylint: disable=unused-import
 
@@ -24,6 +25,8 @@ from google.cloud import storage
 
 # Cloud Storage allows to compose up to 32 objects.
 _MAX_NUM_OF_BLOBS_PER_COMPOSE = 32
+_NUMBER_OF_API_CALL_RETRIES = 5
+_TIMEOUT = 30
 
 
 def compose_gcs_vcf_shards(project,  # type: str
@@ -175,20 +178,45 @@ class MultiProcessComposer(object):
       The final blob that all blobs with `blob_prefix` composed to.
     """
     blobs_to_be_composed = list(self._bucket.list_blobs(prefix=blob_prefix))
+    logging.info('Total number of blobs are %d.', len(blobs_to_be_composed))
     if len(blobs_to_be_composed) == 1:
       return blobs_to_be_composed[0]
     new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')
-
-    proc_pool = multiprocessing.Pool()
+    arguments = []
     for blob_names in self._break_list_in_chunks(blobs_to_be_composed,
                                                  _MAX_NUM_OF_BLOBS_PER_COMPOSE):
       _, file_name = filesystems.FileSystems.split(blob_names[0])
       new_blob_name = ''.join([new_blob_prefix, file_name])
-      proc_pool.apply_async(
-          func=_compose_files,
-          args=(self._project, self._bucket_name, blob_names, new_blob_name))
-    proc_pool.close()
-    proc_pool.join()
+      arguments.append(
+          (self._project, self._bucket_name, blob_names, new_blob_name))
+
+    retry = 0
+    while arguments:
+      proc_pool = multiprocessing.Pool(processes=8)
+      results = []
+      failed_composing_arguments = []
+      for argument in arguments:
+        results.append(proc_pool.apply_async(func=_compose_files,
+                                             args=argument))
+      proc_pool.close()
+      for result, argument in zip(results, arguments):
+        try:
+          result.get(_TIMEOUT)
+        except multiprocessing.TimeoutError:
+          logging.warning('Aborting the composing of blobs (%s to %s) due to '
+                          'timeout.', argument[2][0], argument[2][-1])
+          failed_composing_arguments.append(argument)
+
+      arguments = failed_composing_arguments
+      retry += 1
+      if arguments:
+        if retry > _NUMBER_OF_API_CALL_RETRIES:
+          raise RuntimeError('Composing of blobs fails after {} '
+                             'retries.'.format(_NUMBER_OF_API_CALL_RETRIES))
+        else:
+          logging.warning(
+              '%d jobs of composing of blobs failed due to timeout. Retry for '
+              'the %d time.', len(arguments), retry)
     return self._compose_blobs_to_one(new_blob_prefix)
 
   def _break_list_in_chunks(self, blob_list, chunk_size):
