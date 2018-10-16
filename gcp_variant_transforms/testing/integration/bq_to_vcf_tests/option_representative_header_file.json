@@ -3,6 +3,7 @@
     "test_name": "bq-to-vcf-option-representative-header-file",
     "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0",
     "representative_header_file": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "preserve_call_names_order": true,
     "output_file_name": "bq_to_vcf_option_representative_header_file.vcf",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],

@@ -512,8 +512,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'information are inferred by the schema without validation.'))
     parser.add_argument(
         '--preserve_call_names_order',
-        type='bool', default=True, nargs='?', const=True,
-        help=('If true, the call names order in the VCF will be the same as in '
-              'the BigQuery table. Please set this flag to False if the order '
-              'of the call names are not unique, otherwise an error will '
-              'raise.'))
+        type='bool', default=False, nargs='?', const=True,
+        help=('By default, call names in the output VCF file are generated in '
+              'ascending order. If set to true, the order of call names will '
+              'be the same as the BigQuery table, but it requires all '
+              'extracted variants to have the same call name ordering (usually '
+              'true for tables from single VCF file import).'))

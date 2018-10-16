@@ -24,7 +24,7 @@ from gcp_variant_transforms.beam_io import vcf_parser  # pylint: disable=unused-
 class CallNamesCombiner(beam.PTransform):
   """A PTransform to combine call names from all variants."""
 
-  def __init__(self, preserve_call_names_order=True):
+  def __init__(self, preserve_call_names_order=False):
     # type: (bool) -> None
     """Initializes a `CallNamesCombiner` object.
 
@@ -33,7 +33,7 @@ class CallNamesCombiner(beam.PTransform):
         the same as in the BigQuery table. Otherwise, the call names are sorted
         in increasing order.
     Raises:
-      ValueError: If the order of the call names are not unique when
+      ValueError: If the call names are not equal and in the same order when
         `preserve_call_names_order` is True.
     """
     self._preserve_call_names_order = preserve_call_names_order
@@ -54,14 +54,14 @@ class CallNamesCombiner(beam.PTransform):
     Returns:
       The unique call name tuple in `call_names`.
     Raises:
-      ValueError: If the order of the call names are not unique when
+      ValueError: If the call names are not equal and in the same order when
         `preserve_call_names_order` is True.
     """
     if len(call_names) == 1:
       return list(call_names[0])
-    raise ValueError('The order of the call names are not unique. You can '
-                     'resolve this by setting `preserve_call_names_order` to '
-                     'False.')
+    raise ValueError('The call names are not equal and in the same order '
+                     'across the variants being exported. Please rerun the '
+                     'pipeline with `--preserve_call_names_order false`.')
 
   def expand(self, pcoll):
     if self._preserve_call_names_order:
@@ -69,7 +69,7 @@ class CallNamesCombiner(beam.PTransform):
               | 'GetCallNames' >> beam.Map(self._get_call_names)
               | 'RemoveDuplicates' >> beam.RemoveDuplicates()
               | 'Combine' >> beam.combiners.ToList()
-              | 'CombineUniqueCallNames'
+              | 'ExtractUniqueCallNames'
               >> beam.ParDo(self._extract_unique_call_names)
               | beam.combiners.ToList())
     else:
