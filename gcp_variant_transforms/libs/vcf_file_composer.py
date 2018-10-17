@@ -211,13 +211,13 @@ class MultiProcessComposer(object):
         num_retries += 1
         blobs_to_compose_args = failed_blobs_to_compose_args
         logging.warning(
-            '%d jobs of composing of blobs failed due to timeout. Retrying for '
-            '%d of %d time.', len(blobs_to_compose_args), num_retries,
+            '%d jobs of composing of blobs failed due to timeout. Retrying '
+            '%d of %d.', len(blobs_to_compose_args), num_retries,
             _MAX_NUM_OF_COMPOSE_RETRIES)
       else:
         break
     else:
-      raise RuntimeError('Composing of blobs fails after {} '
+      raise RuntimeError('Composing of blobs failed after {} '
                          'retries.'.format(_MAX_NUM_OF_COMPOSE_RETRIES))
     return self._compose_blobs_to_one(new_blob_prefix)
 
