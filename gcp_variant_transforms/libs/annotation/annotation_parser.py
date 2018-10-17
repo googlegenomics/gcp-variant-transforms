@@ -410,3 +410,13 @@ def extract_annotation_names(description):
         'Expected at least one | in annotation description {}'.format(
             description))
   return annotation_names[1:]
+
+
+def reconstruct_annotation_description(annotation_names):
+  # type: (List[str]) -> str
+  """Reconstructs annotation description.
+
+  For example, given ['Allele', 'Consequence', 'IMPACT', 'SYMBOL', 'Gene'], it
+  returns 'Format: Allele|Consequence|IMPACT|SYMBOL|Gene'.
+  """
+  return ' '.join(['Format:', '|'.join(annotation_names)])
