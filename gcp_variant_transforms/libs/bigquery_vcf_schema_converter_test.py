@@ -508,6 +508,24 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
                                               formats=OrderedDict())
     self.assertEqual(header, expected_header)
 
+  def test_generate_header_fields_from_schema_invalid_description(self):
+    schema = bigquery.TableSchema()
+    schema.fields.append(bigquery.TableFieldSchema(
+        name='invalid_description',
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Desc\nThis is added intentionally.'))
+    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+        schema)
+
+    infos = OrderedDict([
+        ('invalid_description', Info('invalid_description', 1, 'String',
+                                     'Desc This is added intentionally.',
+                                     None, None))])
+    expected_header = vcf_header_io.VcfHeader(infos=infos,
+                                              formats=OrderedDict())
+    self.assertEqual(header, expected_header)
+
 
 class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):
   """Test cases for concatenating VCF header and schema converters."""
