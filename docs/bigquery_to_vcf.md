@@ -89,6 +89,11 @@ In addition, the following optional flags are provided:
   You may change this flag if you have a dataset that is very dense and variants
   in each shard cannot be sorted in memory.
 
+For large datasets, using
+[Cloud Dataflow Shuffle](https://cloud.google.com/dataflow/service/dataflow-service-desc#cloud-dataflow-shuffle)
+can speed up the pipeline, by specifying the parameter:
+`--experiments shuffle_mode=service`.
+
 ### Running from github
 
 In addition to using the docker image, you may run the pipeline directly from
