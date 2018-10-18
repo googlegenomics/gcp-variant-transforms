@@ -240,6 +240,11 @@ def _get_args():
             'given dataset. This is useful when --keep_tables '
             'is used in a previous run. Example: '
             '--revalidation_dataset_id integration_tests_20180118_014812'))
+  parser.add_argument(
+      '--test_name_prefix',
+      default='',
+      help=('If provided, all test names will have this prefix. Mainly, to '
+            'distinguish the integration tests run by cloudbuild_CI.'))
   return parser.parse_args()
 
 
@@ -288,6 +293,8 @@ def main():
     for test_case_configs in test_configs:
       test_cases = []
       for config in test_case_configs:
+        if args.test_name_prefix:
+          config['test_name'] = args.test_name_prefix + config['test_name']
         test_cases.append(VcfToBQTestCase(context, **config))
       tests.append(test_cases)
     test_runner = run_tests_common.TestRunner(
