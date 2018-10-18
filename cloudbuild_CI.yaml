@@ -50,6 +50,7 @@ steps:
       - '--run_unit_tests'
       - '--run_presubmit_tests'
       - '--run_preprocessor_tests'
+      - '--run_bq_to_vcf_tests'
     id: 'test-gcp-variant-transforms-docker'
       # By default the script uses a GS bucket of gcp-variant-transforms-test
       # project. For other projects we should either use the following option
