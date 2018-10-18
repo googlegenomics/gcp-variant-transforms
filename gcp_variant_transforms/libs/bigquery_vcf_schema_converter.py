@@ -339,4 +339,4 @@ def _validate_reserved_field_mode(field_schema, reserved_definition):
 
 
 def _remove_special_characters(description):
-  return description.replace('\n', ' ')
+  return description.replace('\n', ' ') if description else ''
