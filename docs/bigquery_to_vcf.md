@@ -9,7 +9,7 @@ genomic regions.
 Similar to running the
 [VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery), the
 BigQuery to VCF pipeline can also be run using docker or directly from the
-source. 
+source.
 
 ### Using docker
 
@@ -50,7 +50,8 @@ gcloud alpha genomics pipelines run \
   --command-line "${COMMAND}"
 ```
 
-In addition, the following optional flags are provided:
+In addition, the following optional flags can be specified in the `COMMAND`
+argument in the above script:
 * `--representative_header_file`: If provided, meta-information from the
   provided file (e.g., INFO, FORMAT, FILTER, etc) will be added into the
   `output_file`. Otherwise, the meta-information is inferred from the BigQuery
@@ -89,10 +90,15 @@ In addition, the following optional flags are provided:
   You may change this flag if you have a dataset that is very dense and variants
   in each shard cannot be sorted in memory.
 
-For large datasets, using
-[Cloud Dataflow Shuffle](https://cloud.google.com/dataflow/service/dataflow-service-desc#cloud-dataflow-shuffle)
-can speed up the pipeline, by specifying the parameter:
-`--experiments shuffle_mode=service`.
+The pipeline can be optimized depending on the size of the output VCF file:
+* For small VCF files (e.g. a few megabytes), you may use
+  `--runner DirectRunner` to speed up the pipeline as it avoids creating a
+  Dataflow pipeline.
+* For large VCF files (e.g. >100GB), using
+  [Cloud Dataflow Shuffle](https://cloud.google.com/dataflow/service/dataflow-service-desc#cloud-dataflow-shuffle)
+  can speed up the pipeline, by adding the parameter
+  `--experiments shuffle_mode=service` to the `COMMAND` argument.
+* For medium sized VCF files, you can use the above script as is.
 
 ### Running from github
 
