@@ -33,7 +33,7 @@ def compose_gcs_vcf_shards(project,  # type: str
                            vcf_header_file_path,  # type: str
                            vcf_data_files_folder,  # type: str
                            output_file,  # type: str
-                           delete=True,  # type: bool
+                           delete=False,  # type: bool
                           ):
   # type: (...) -> None
   """Composes VCF shards in GCS to one VCF file.
@@ -178,7 +178,7 @@ class MultiProcessComposer(object):
       The final blob that all blobs with `blob_prefix` composed to.
     """
     blobs_to_be_composed = list(self._bucket.list_blobs(prefix=blob_prefix))
-    logging.info('Total number of blobs are %d.', len(blobs_to_be_composed))
+    logging.info('Total number of blobs is %d.', len(blobs_to_be_composed))
     if len(blobs_to_be_composed) == 1:
       return blobs_to_be_composed[0]
     new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')
