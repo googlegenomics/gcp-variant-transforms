@@ -78,11 +78,3 @@ class AnnotationStrBuilderTest(unittest.TestCase):
     annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
     with self.assertRaises(ValueError):
       list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
-
-  def test_reconstruct_annotation_description(self):
-    expected_description = 'Format: Allele|Consequence|IMPACT|SYMBOL|Gene'
-    self.assertEqual(
-        expected_description,
-        annotation_parser.reconstruct_annotation_description(
-            ['Allele', 'Consequence', 'IMPACT', 'SYMBOL', 'Gene'])
-    )

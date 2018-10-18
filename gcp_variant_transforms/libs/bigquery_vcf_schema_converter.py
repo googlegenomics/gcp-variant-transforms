@@ -31,7 +31,6 @@ from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unu
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_reserved_fields
-from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
 _Format = parser._Format
@@ -279,19 +278,12 @@ def _add_info_fields_from_alternate_bases(schema,
   from the mode (REPEATED) in reserved field definition.
 
   Any `Record` field within alternate bases is considered as an annotation
-  field.
+  field, and the annotation fields are skipped.
   """
   for field in schema.fields:
-    if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
+    if (field.name in _CONSTANT_ALTERNATE_BASES_FIELDS or
+        field.type == bigquery_util.TableFieldConstants.TYPE_RECORD):
       continue
-    elif field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
-      infos.update({field.name: _Info(
-          id=field.name,
-          num=parser.field_counts[vcfio.MISSING_FIELD_VALUE],
-          type=bigquery_util._VcfHeaderTypeConstants.STRING,
-          desc=_remove_special_characters(_get_annotation_description(field)),
-          source=None,
-          version=None)})
     elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
           not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
@@ -344,12 +336,6 @@ def _validate_reserved_field_mode(field_schema, reserved_definition):
     raise ValueError(
         'The mode of field {} is different from the VCF spec: {} vs {}.'
         .format(field_schema.name, schema_mode, reserved_mode))
-
-
-def _get_annotation_description(field):
-  return ' '.join([field.description,
-                   annotation_parser.reconstruct_annotation_description(
-                       [sub_field.name for sub_field in field.fields])])
 
 
 def _remove_special_characters(description):

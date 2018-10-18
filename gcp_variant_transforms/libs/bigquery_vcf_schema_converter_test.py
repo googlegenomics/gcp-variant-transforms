@@ -447,26 +447,6 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
 
-  def test_generate_header_fields_from_schema_with_annotation(self):
-    sample_schema = bigquery_schema_util.get_sample_table_schema(
-        with_annotation_fields=True)
-    header = bigquery_vcf_schema_converter.generate_header_fields_from_schema(
-        sample_schema)
-
-    infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'desc', None, None)),
-        ('CSQ', Info('CSQ', field_counts['.'], 'String',
-                     'desc Format: Consequence|IMPACT', None, None)),
-        ('AA', Info('AA', 1, 'String', 'desc', None, None)),
-        ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
-        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
-    formats = OrderedDict([
-        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
-        ('GQ', parser._Format('GQ', 1, 'Integer',
-                              'desc'))])
-    expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
-    self.assertEqual(header, expected_header)
-
   def test_generate_header_fields_from_schema_date_type(self):
     schema = bigquery.TableSchema()
     schema.fields.append(bigquery.TableFieldSchema(
