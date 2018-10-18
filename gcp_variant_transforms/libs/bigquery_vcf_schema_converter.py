@@ -353,4 +353,4 @@ def _get_annotation_description(field):
 
 
 def _remove_special_characters(description):
-  return description.replace('\n', ' ')
+  return description.replace('\n', ' ') if description else ''
