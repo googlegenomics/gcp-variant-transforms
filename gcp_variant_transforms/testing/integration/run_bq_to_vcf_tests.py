@@ -42,7 +42,6 @@ from gcp_variant_transforms.testing.integration import run_tests_common
 
 
 _PIPELINE_NAME = 'gcp-variant-transforms-bq-to-vcf-integration-test'
-_SCOPES = ['https://www.googleapis.com/auth/bigquery']
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/bq_to_vcf_tests'
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/bq_to_vcf'
 
@@ -79,9 +78,10 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        parsed_args.project, parsed_args.logging_location, parsed_args.image,
-        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+        parsed_args.project,
+        '/'.join([parsed_args.logging_location, self._output_file]),
+        parsed_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Validates the results.

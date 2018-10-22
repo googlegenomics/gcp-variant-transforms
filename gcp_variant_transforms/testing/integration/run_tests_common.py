@@ -31,6 +31,7 @@ from oauth2client.client import GoogleCredentials
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 _DEFAULT_ZONES = ['us-east1-b']
+_CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
 # `TestCaseState` saves current running test and the remaining tests in the same
 # test script (.json).
@@ -65,7 +66,7 @@ class TestRunner(object):
     self._tests = tests
     self._service = discovery.build(
         'genomics',
-        'v1alpha2',
+        'v2alpha1',
         credentials=GoogleCredentials.get_application_default())
     self._revalidate = revalidate
     self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
@@ -96,7 +97,7 @@ class TestRunner(object):
     # `googleapiclient.discovery.Resource._set_service_methods`.
     # pylint: disable=no-member
     request = self._service.pipelines().run(
-        body=test_cases[0].pipeline_api_request)
+        body=test_cases[0].pipelines_api_request)
     operation_name = request.execute()['name']
     self._operation_names_to_test_states.update(
         {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
@@ -104,7 +105,7 @@ class TestRunner(object):
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
     # pylint: disable=no-member
-    operations = self._service.operations()
+    operations = self._service.projects().operations()
     while self._operation_names_to_test_states:
       time.sleep(10)
       running_operation_names = self._operation_names_to_test_states.keys()
@@ -112,22 +113,25 @@ class TestRunner(object):
         request = operations.get(name=operation_name)
         response = request.execute()
         if response['done']:
-          self._handle_failure(response)
+          self._handle_failure(operation_name, response)
           test_case_state = self._operation_names_to_test_states.get(
               operation_name)
           del self._operation_names_to_test_states[operation_name]
           test_case_state.running_test.validate_result()
           self._run_test(test_case_state.remaining_tests)
 
-  def _handle_failure(self, response):
+  def _handle_failure(self, operation_name, response):
     """Raises errors if test case failed."""
     if 'error' in response:
       if 'message' in response['error']:
-        raise TestCaseFailure(response['error']['message'])
+        raise TestCaseFailure(
+            'Operation {} failed: {}'.format(operation_name,
+                                             response['error']['message']))
       else:
         # This case should never happen.
         raise TestCaseFailure(
-            'No traceback. See logs for more information on error.')
+            'Operation {} failed: No traceback. '
+            'See logs for more information on error.'.format(operation_name))
 
   def print_results(self):
     """Prints results of test cases."""
@@ -137,29 +141,40 @@ class TestRunner(object):
     return 0
 
 
-def form_pipeline_api_request(project,  # type: str
-                              logging_location,  # type: str
-                              image,  # type: str
-                              scopes,  # type: List[str]
-                              pipeline_name,  # type: str
-                              script_path,  # type: str
-                              zones,  # type: Optional[List[str]]
-                              args  # type: List[str]
-                             ):
+def form_pipelines_api_request(project,  # type: str
+                               logging_location,  # type: str
+                               image,  # type: str
+                               pipeline_name,  # type: str
+                               script_path,  # type: str
+                               zones,  # type: Optional[List[str]]
+                               args  # type: List[str]
+                              ):
   # type: (...) -> Dict
   return {
-      'pipelineArgs': {
-          'projectId': project,
-          'logging': {'gcsPath': logging_location},
-          'serviceAccount': {'scopes': scopes}
-      },
-      'ephemeralPipeline': {
-          'projectId': project,
-          'name': pipeline_name,
-          'resources': {'zones': zones or _DEFAULT_ZONES},
-          'docker': {
-              'imageName': image,
-              'cmd': ' '.join([script_path] + args)
+      'pipeline': {
+          'actions': [
+              {
+                  'imageUri': image,
+                  'commands': ['/bin/sh', '-c', ' '.join([script_path] + args)]
+              },
+              {
+                  'imageUri': 'google/cloud-sdk',
+                  'commands': [
+                      'sh', '-c',
+                      'gsutil cp /google/logs/output %s' % logging_location
+                  ],
+                  'flags': ['ALWAYS_RUN'],
+              }
+          ],
+          'resources': {
+              'projectId': project,
+              'zones': zones or _DEFAULT_ZONES,
+              'virtualMachine': {
+                  'machineType': 'n1-standard-1',
+                  'serviceAccount': {'scopes': [_CLOUD_PLATFORM_SCOPE]},
+                  'bootDiskSizeGb': 100,
+                  'labels': {'pipeline_name': pipeline_name}
+              }
           }
       }
   }

@@ -44,7 +44,6 @@ from gcp_variant_transforms.testing.integration import run_tests_common
 
 _BUCKET_NAME = 'integration_test_runs'
 _PIPELINE_NAME = 'gcp-variant-transforms-preprocessor-integration-test'
-_SCOPES = []
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
@@ -89,9 +88,10 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        parser_args.project, parser_args.logging_location, parser_args.image,
-        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+        parser_args.project,
+        '/'.join([parser_args.logging_location, self._report_blob_name]),
+        parser_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Validates the results.
