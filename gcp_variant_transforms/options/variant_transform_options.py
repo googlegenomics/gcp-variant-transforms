@@ -17,6 +17,8 @@ from __future__ import absolute_import
 import argparse  # pylint: disable=unused-import
 import re
 
+from apache_beam.io import filesystem
+from apache_beam.io import filesystems
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
@@ -111,6 +113,16 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
+    try:
+      # Gets at most one pattern match result of type `filesystems.MatchResult`.
+      first_match = filesystems.FileSystems.match(
+          [parsed_args.input_pattern], [1])[0]
+      if not first_match.metadata_list:
+        raise ValueError('Input pattern {} did not match any files.'.format(
+            parsed_args.input_pattern))
+    except filesystem.BeamIOError:
+      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+          parsed_args.input_pattern))
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):

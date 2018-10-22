@@ -48,17 +48,19 @@ class VcfReadOptionsTest(unittest.TestCase):
     return make_args(self._options, args)
 
   def test_failure_for_conflicting_flags(self):
-    args = self._make_args(['--input_pattern', 'gs://some_pattern',
+    args = self._make_args(['--input_pattern', '*',
                             '--infer_headers',
                             '--representative_header_file', 'gs://some_file'])
-
     self.assertRaises(ValueError, self._options.validate, args)
 
   def test_failure_for_conflicting_flags_no_errors(self):
-    args = self._make_args(['--input_pattern', 'gs://some_pattern',
+    args = self._make_args(['--input_pattern', '*',
                             '--representative_header_file', 'gs://some_file'])
-
     self._options.validate(args)
+
+  def test_failure_for_invalid_input_pattern(self):
+    args = self._make_args(['--input_pattern', 'nonexistent_file.vcf'])
+    self.assertRaises(ValueError, self._options.validate, args)
 
 
 class BigQueryWriteOptionsTest(unittest.TestCase):
