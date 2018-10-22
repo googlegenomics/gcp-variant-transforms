@@ -56,6 +56,8 @@ of actual price (as of today BigQuery costs $5 per TB), we are looking at
 reduction from $26.85 to $0.0026. You may try this out in the publicly hosted
 [1000 genomes table](https://bigquery.cloud.google.com/table/bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220) on GCP.
 
+### Create a clustered variants table
+
 For quick reference, you can cluster your table using a query like this:
 
 ```
@@ -72,6 +74,38 @@ Since clustering currently is only supported for partitioned tables, in this
 query first we add a dummy `DATE` column to our table. By Partitioning table
 using this `DATE` column, we are able to cluster it based on the values of
 `reference_name, start_position, end_position` columns.
+
+### Copying field descriptions from original table
+
+Variant Transforms will set column descriptions in the BigQuery table
+created by `vcf_to_bq`. To copy those column descriptions to your new
+clustered table, save the following shell script, set the `ORIGINAL_TABLE`
+and `CLUSTERED_TABLE` values appropriately, and run the script:
+
+```
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+readonly ORIGINAL_TABLE=<project>:<dataset>.<original_table>
+readonly CLUSTERED_TABLE=<project>:<dataset>.<clustered_table>
+
+readonly TMP_SCHEMA_FILE=/tmp/schema.txt
+
+# Get the schema from the original table
+bq show --schema --format=json "${ORIGINAL_TABLE}" > "${TMP_SCHEMA_FILE}"
+
+# Add the dummy date field to the end of the schema file
+sed -i \
+ -e 's#] *$#,{"description":"","type":"DATE","name":"partition_date_please_ignore", "mode":"NULLABLE", "description": "This field is used for BigQuery clustering and contains no useful information"}]#' \
+  "${TMP_SCHEMA_FILE}"
+
+# Update the clustered table
+bq update "${CLUSTERED_TABLE}" "${TMP_SCHEMA_FILE}" 
+```
+
+### Limitations
 
 Clustering can be very effective in reducing the cost of queries, however,
 it has a few limitations:
