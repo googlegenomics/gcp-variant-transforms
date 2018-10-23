@@ -80,7 +80,8 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
 
     self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
         parsed_args.project,
-        '/'.join([parsed_args.logging_location, self._output_file]),
+        filesystems.FileSystems.join(parsed_args.logging_location,
+                                     '_'.join([test_name, timestamp])),
         parsed_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):

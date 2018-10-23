@@ -45,6 +45,8 @@ import sys
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
+from apache_beam.io import filesystems
+
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -88,7 +90,8 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
         value = v.format(TABLE_NAME=self._table_name)
       args.append('--{} {}'.format(k, value))
     self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
-        context.project, '/'.join([context.logging_location, output_table]),
+        context.project,
+        filesystems.FileSystems.join(context.logging_location, output_table),
         context.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):

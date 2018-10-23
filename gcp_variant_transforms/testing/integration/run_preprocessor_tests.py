@@ -38,6 +38,7 @@ import sys
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
+from apache_beam.io import filesystems
 from google.cloud import storage
 
 from gcp_variant_transforms.testing.integration import run_tests_common
@@ -90,7 +91,8 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
 
     self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
         parser_args.project,
-        '/'.join([parser_args.logging_location, self._report_blob_name]),
+        filesystems.FileSystems.join(parser_args.logging_location,
+                                     self._report_blob_name),
         parser_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
