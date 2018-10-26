@@ -45,6 +45,8 @@ import sys
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
+from apache_beam.io import filesystems
+
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
@@ -53,7 +55,6 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
-_SCOPES = ['https://www.googleapis.com/auth/bigquery']
 _SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
@@ -88,9 +89,10 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
       if isinstance(v, basestring):
         value = v.format(TABLE_NAME=self._table_name)
       args.append('--{} {}'.format(k, value))
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        context.project, context.logging_location, context.image, _SCOPES,
-        _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+        context.project,
+        filesystems.FileSystems.join(context.logging_location, output_table),
+        context.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
