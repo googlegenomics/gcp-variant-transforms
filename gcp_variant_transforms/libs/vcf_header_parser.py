@@ -42,7 +42,7 @@ def get_vcf_headers(input_file):
   try:
     vcf_reader = vcf.Reader(fsock=_line_generator(input_file))
   except (SyntaxError, StopIteration) as e:
-      raise ValueError('Invalid VCF header: %s in: %s' % (str(e), input_file))
+      raise ValueError('Invalid VCF header in %s: %s' % (input_file, str(e)))
   return vcf_header_io.VcfHeader(infos=vcf_reader.infos,
                                  filters=vcf_reader.filters,
                                  alts=vcf_reader.alts,
