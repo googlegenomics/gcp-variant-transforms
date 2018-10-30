@@ -5,7 +5,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "info_keys_to_move_to_calls_regex": "^NS$",
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {

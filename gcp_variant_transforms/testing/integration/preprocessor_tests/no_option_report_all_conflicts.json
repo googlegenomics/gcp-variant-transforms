@@ -3,7 +3,7 @@
     "test_name": "no-option-report-all-conflicts",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-undefined-header-fields.vcf",
     "report_blob_name": "temp/report_no_option_report_all_conflicts.tsv",
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "expected_contents": [
       "No Header Conflicts Found.",

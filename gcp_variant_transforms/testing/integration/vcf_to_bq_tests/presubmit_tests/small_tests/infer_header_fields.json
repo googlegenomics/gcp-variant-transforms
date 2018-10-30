@@ -5,7 +5,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-header-fields.vcf",
     "infer_headers": "True",
     "allow_incompatible_records": "True",
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {

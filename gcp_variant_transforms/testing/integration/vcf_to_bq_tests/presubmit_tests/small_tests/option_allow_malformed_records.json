@@ -4,7 +4,7 @@
     "table_name": "option_allow_malformed_records",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.0-POS-empty.vcf",
     "allow_malformed_records": true,
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {

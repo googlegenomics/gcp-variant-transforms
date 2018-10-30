@@ -4,7 +4,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-header-fields.vcf",
     "report_all_conflicts": "True",
     "report_blob_name": "temp/report_inferred_headers.tsv",
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "expected_contents": [
       "No Header Conflicts Found.",

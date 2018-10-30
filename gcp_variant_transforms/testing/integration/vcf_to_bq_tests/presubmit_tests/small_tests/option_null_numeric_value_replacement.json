@@ -5,7 +5,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
     "null_numeric_value_replacement": 100000,
     "split_alternate_allele_info_fields": false,
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {

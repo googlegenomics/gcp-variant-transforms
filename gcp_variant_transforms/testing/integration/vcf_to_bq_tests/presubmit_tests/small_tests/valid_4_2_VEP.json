@@ -5,7 +5,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2_VEP.vcf",
     "annotation_fields": "CSQ",
     "infer_annotation_types": "True",
-    "runner": "DirectRunner",
+    "runner": "BundleBasedDirectRunner",
     "zones": ["us-west1-b"],
     "assertion_configs": [
       {
