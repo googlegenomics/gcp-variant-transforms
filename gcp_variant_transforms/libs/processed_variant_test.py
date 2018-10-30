@@ -110,6 +110,57 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
 
+  def test_create_processed_variant_move_alt_info_extra_values(self):
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
+    variant = self._get_sample_variant()
+    # Add a value to `A2` (it only has two alternate bases, so this is invalid).
+    variant.info['A2'] = ['data1', 'data2', 'data3']
+
+    # Ensure error is raised by default.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True)
+    with self.assertRaises(ValueError):
+      _ = factory.create_processed_variant(variant)
+
+    # Try again with allow_alternate_allele_info_mismatch=True.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        allow_alternate_allele_info_mismatch=True)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('A')
+    alt1._info = {'A2': 'data1'}
+    alt2 = processed_variant.AlternateBaseData('TT')
+    alt2._info = {'A2': 'data2'}
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+
+  def test_create_processed_variant_move_alt_info_insufficient_values(self):
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
+    variant = self._get_sample_variant()
+    # Remove a value from `A2` (it has two alternate bases, so this is invalid).
+    variant.info['A2'] = ['data1']
+
+    # Ensure error is raised by default.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True)
+    with self.assertRaises(ValueError):
+      _ = factory.create_processed_variant(variant)
+
+    # Try again with allow_alternate_allele_info_mismatch=True.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        allow_alternate_allele_info_mismatch=True)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('A')
+    alt1._info = {'A2': 'data1'}
+    alt2 = processed_variant.AlternateBaseData('TT')
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+
   def _get_sample_variant_and_header_with_csq(self, additional_infos=None):
     """Provides a simple `Variant` and `VcfHeader` with info fields
 

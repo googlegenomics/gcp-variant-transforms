@@ -22,6 +22,12 @@ POS value for the first entry. It is used to test when `allow_malformed_records`
 is enabled, failed VCF record reads will not raise errors and the BigQuery table
 can still be generated.
 
+`invalid-4.2-AF-mismatch.vcf` is created on `valid-4.2.vcf` by changing the
+value of `AF` field in `20:17330` to have too many values (two instead of one)
+and the value in `20:1234567` to have too few values (one instead of two).
+By default, the job will fail as the cardinalities do not match, but it
+should be successful when `allow_malformed_records` is enabled.
+
 The folder `merge` is created to test the merge options. Three .vcf files are
 created. `merge1.vcf` contains two samples, while `merge2.vcf` and `merge3.vcf`
 contain one other sample, respectively. When MERGE_TO_CALLS is selected, the

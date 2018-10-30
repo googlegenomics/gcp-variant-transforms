@@ -224,7 +224,8 @@ def run(argv=None):
       known_args.use_allele_num,
       known_args.minimal_vep_alt_matching,
       known_args.infer_annotation_types,
-      counter_factory)
+      counter_factory,
+      allow_alternate_allele_info_mismatch=known_args.allow_malformed_records)
 
   partitioner = None
   if ((known_args.optimize_for_large_inputs and variant_merger) or

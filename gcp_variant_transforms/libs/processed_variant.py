@@ -54,6 +54,7 @@ VCF_TYPE_TO_PY = {vcf_header_io.VcfHeaderFieldTypeConstants.STRING: str,
 # Counter names
 class _CounterEnum(enum.Enum):
   VARIANT = 'variant_counter'
+  ALTERNATE_ALLELE_INFO_MISMATCH = 'alternate_allele_info_mismatch_counter'
   ANNOTATION_ALT_MATCH = 'annotation_alt_match_counter'
   ANNOTATION_ALT_MINIMAL_AMBIGUOUS = 'annotation_alt_minimal_ambiguous_counter'
   ANNOTATION_ALT_MISMATCH = 'annotation_alt_mismatch_counter'
@@ -200,7 +201,8 @@ class ProcessedVariantFactory(object):
       use_allele_num=False,  # type: bool
       minimal_match=False,  # type: bool
       infer_annotation_types=False,  # type: bool
-      counter_factory=None  # type: metrics_util.CounterFactoryInterface
+      counter_factory=None,  # type: metrics_util.CounterFactoryInterface,
+      allow_alternate_allele_info_mismatch=False  # type: bool
   ):
     # type: (...) -> None
     """Sets the internal state of the factory class.
@@ -209,24 +211,36 @@ class ProcessedVariantFactory(object):
       header_fields: Header information used for parsing and splitting INFO
         fields of the variant.
       split_alternate_allele_info_fields: If True, splits fields with
-        field_count='A' (i.e., one value for each alternate) among alternates.
+        `field_count='A'` (i.e., one value for each alternate) among alternates.
       annotation_fields: If provided, this is the list of INFO field names that
         store variant annotations. The format of how annotations are stored and
         their names are extracted from header_fields.
-      use_allele_num: If set, then "ALLELE_NUM" annotation is used to determine
+      use_allele_num: If True, then "ALLELE_NUM" annotation is used to determine
         the index of the ALT that corresponds to an annotation set.
-      minimal_match: If set, then the --minimal mode of VEP is simulated for
+      minimal_match: If True, then the --minimal mode of VEP is simulated for
         annotation ALT matching.
-      infer_annotation_types: If set, then warnings will be provided if header
+      infer_annotation_types: If True, then warnings will be provided if header
         fields fail to contain Info type lines for annotation fields
+      counter_factory: If provided, it will be used to record counters (e.g. the
+        number of variants processed).
+      allow_alternate_allele_info_mismatch: By default (when False), an error
+        will be raised for INFO fields with `field_count='A'` (i.e. one value
+        for each alternate base) that do not have the same cardinality as
+        alternate bases. If True, an error will not be raised and excess values
+        will be dropped or insufficient values will be set to null. Only
+        applicable if `split_alternate_allele_info_fields` is True.
     """
     self._header_fields = header_fields
     self._split_alternate_allele_info_fields = (
         split_alternate_allele_info_fields)
+    self._allow_alternate_allele_info_mismatch = (
+        allow_alternate_allele_info_mismatch)
     self._annotation_field_set = set(annotation_fields or [])
     cfactory = counter_factory or metrics_util.NoOpCounterFactory()
     self._variant_counter = cfactory.create_counter(
         _CounterEnum.VARIANT.value)
+    self._alternate_allele_info_mismatche_counter = cfactory.create_counter(
+        _CounterEnum.ALTERNATE_ALLELE_INFO_MISMATCH)
     self._annotation_processor = _AnnotationProcessor(
         annotation_fields, self._header_fields, cfactory, use_allele_num,
         minimal_match, infer_annotation_types)
@@ -254,14 +268,21 @@ class ProcessedVariantFactory(object):
 
   def _add_per_alt_info(self, proc_var, field_name, variant_info_data):
     # type: (ProcessedVariant, str, vcfio.VariantInfo) -> None
-    if len(variant_info_data) != len(proc_var._alternate_datas):
-      raise ValueError(
+    num_variant_infos = len(variant_info_data)
+    num_alternate_bases = len(proc_var._alternate_datas)
+    if num_variant_infos != num_alternate_bases:
+      error_message = (
           'Per alternate INFO field "{}" does not have same cardinality as '
-          ' number of alternates: {} vs {} in variant: "{}"'.format(
-              field_name, len(variant_info_data),
-              len(proc_var._alternate_datas), proc_var))
-    for alt_index, info in enumerate(variant_info_data):
-      proc_var._alternate_datas[alt_index]._info[field_name] = info
+          'number of alternates: {} vs {} in variant: "{}"'.format(
+              field_name, num_variant_infos, num_alternate_bases, proc_var))
+      self._alternate_allele_info_mismatche_counter.inc()
+      if self._allow_alternate_allele_info_mismatch:
+        logging.warning(error_message)
+      else:
+        raise ValueError(error_message)
+    for alt_index in range(min(num_variant_infos, num_alternate_bases)):
+      proc_var._alternate_datas[alt_index]._info[field_name] = (
+          variant_info_data[alt_index])
 
   def create_alt_bases_field_schema(self):
     # type: () -> bigquery.TableFieldSchema
