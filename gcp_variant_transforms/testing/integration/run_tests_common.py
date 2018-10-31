@@ -70,6 +70,7 @@ class TestRunner(object):
         credentials=GoogleCredentials.get_application_default())
     self._revalidate = revalidate
     self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
+    self._operation_names_to_test_case_names = {}  # type: Dict[str, str]
 
   def run(self):
     """Runs all tests."""
@@ -101,6 +102,8 @@ class TestRunner(object):
     operation_name = request.execute()['name']
     self._operation_names_to_test_states.update(
         {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
+    self._operation_names_to_test_case_names.update(
+        {operation_name: test_cases[0]._name})
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
@@ -113,7 +116,9 @@ class TestRunner(object):
         request = operations.get(name=operation_name)
         response = request.execute()
         if response['done']:
-          self._handle_failure(operation_name, response)
+          self._handle_failure(
+              self._operation_names_to_test_case_names[operation_name],
+              response)
           test_case_state = self._operation_names_to_test_states.get(
               operation_name)
           del self._operation_names_to_test_states[operation_name]

@@ -157,7 +157,7 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
 
   # Always run pipeline locally if data is small.
   if (pipeline_mode == vcf_to_bq_common.PipelineModes.SMALL and
-      not known_args.infer_headers):
+      not known_args.infer_headers and not known_args.infer_annotation_types):
     options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
