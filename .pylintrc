@@ -100,6 +100,8 @@ disable =
   abstract-method,
   # Beam uses lots of python argument magic (e.g. in 'expand' methods).
   arguments-differ,
+  # Shows up when linking C++ built libraries. Info message only.
+  c-extension-no-member,
   # Too noisy.
   design,
   # We use TODO style.

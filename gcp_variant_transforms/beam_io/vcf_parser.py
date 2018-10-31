@@ -527,7 +527,7 @@ class NucleusParser(VcfParser):
     try:
       self._vcf_reader = nucleus_vcf_reader.VcfReader.from_file(
           self._store_to_temp_local_file(header_lines),
-          variants_pb2.VcfReaderOptions())  # pylint: disable=c-extension-no-member
+          variants_pb2.VcfReaderOptions())
     except ValueError as e:
       raise ValueError(
           'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
