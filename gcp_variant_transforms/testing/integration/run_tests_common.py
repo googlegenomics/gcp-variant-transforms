@@ -116,9 +116,7 @@ class TestRunner(object):
         request = operations.get(name=operation_name)
         response = request.execute()
         if response['done']:
-          self._handle_failure(
-              self._operation_names_to_test_case_names[operation_name],
-              response)
+          self._handle_failure(operation_name, response)
           test_case_state = self._operation_names_to_test_states.get(
               operation_name)
           del self._operation_names_to_test_states[operation_name]
@@ -130,13 +128,17 @@ class TestRunner(object):
     if 'error' in response:
       if 'message' in response['error']:
         raise TestCaseFailure(
-            'Operation {} failed: {}'.format(operation_name,
-                                             response['error']['message']))
+            'Test case {} (Operation {}) failed: {}'.format(
+                self._operation_names_to_test_case_names[operation_name],
+                operation_name,
+                response['error']['message']))
       else:
         # This case should never happen.
         raise TestCaseFailure(
-            'Operation {} failed: No traceback. '
-            'See logs for more information on error.'.format(operation_name))
+            'Test case {} (Operation {}) failed: No traceback. '
+            'See logs for more information on error.'.format(
+                self._operation_names_to_test_case_names[operation_name],
+                operation_name))
 
   def print_results(self):
     """Prints results of test cases."""
