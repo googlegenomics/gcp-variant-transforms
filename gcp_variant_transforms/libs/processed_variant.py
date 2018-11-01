@@ -197,12 +197,12 @@ class ProcessedVariantFactory(object):
       self,
       header_fields,  # type: vcf_header_io.VcfHeader
       split_alternate_allele_info_fields=True,  # type: bool
+      allow_alternate_allele_info_mismatch=False,  # type: bool
       annotation_fields=None,  # type: List[str]
       use_allele_num=False,  # type: bool
       minimal_match=False,  # type: bool
       infer_annotation_types=False,  # type: bool
-      counter_factory=None,  # type: metrics_util.CounterFactoryInterface,
-      allow_alternate_allele_info_mismatch=False  # type: bool
+      counter_factory=None  # type: metrics_util.CounterFactoryInterface
   ):
     # type: (...) -> None
     """Sets the internal state of the factory class.
@@ -212,6 +212,12 @@ class ProcessedVariantFactory(object):
         fields of the variant.
       split_alternate_allele_info_fields: If True, splits fields with
         `field_count='A'` (i.e., one value for each alternate) among alternates.
+      allow_alternate_allele_info_mismatch: By default (when False), an error
+        will be raised for INFO fields with `field_count='A'` (i.e. one value
+        for each alternate base) that do not have the same cardinality as
+        alternate bases. If True, an error will not be raised and excess values
+        will be dropped or insufficient values will be set to null. Only
+        applicable if `split_alternate_allele_info_fields` is True.
       annotation_fields: If provided, this is the list of INFO field names that
         store variant annotations. The format of how annotations are stored and
         their names are extracted from header_fields.
@@ -223,12 +229,6 @@ class ProcessedVariantFactory(object):
         fields fail to contain Info type lines for annotation fields
       counter_factory: If provided, it will be used to record counters (e.g. the
         number of variants processed).
-      allow_alternate_allele_info_mismatch: By default (when False), an error
-        will be raised for INFO fields with `field_count='A'` (i.e. one value
-        for each alternate base) that do not have the same cardinality as
-        alternate bases. If True, an error will not be raised and excess values
-        will be dropped or insufficient values will be set to null. Only
-        applicable if `split_alternate_allele_info_fields` is True.
     """
     self._header_fields = header_fields
     self._split_alternate_allele_info_fields = (
@@ -240,7 +240,7 @@ class ProcessedVariantFactory(object):
     self._variant_counter = cfactory.create_counter(
         _CounterEnum.VARIANT.value)
     self._alternate_allele_info_mismatche_counter = cfactory.create_counter(
-        _CounterEnum.ALTERNATE_ALLELE_INFO_MISMATCH)
+        _CounterEnum.ALTERNATE_ALLELE_INFO_MISMATCH.value)
     self._annotation_processor = _AnnotationProcessor(
         annotation_fields, self._header_fields, cfactory, use_allele_num,
         minimal_match, infer_annotation_types)
