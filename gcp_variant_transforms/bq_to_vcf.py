@@ -45,8 +45,6 @@ from __future__ import division
 import logging
 import sys
 import tempfile
-import uuid
-from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
@@ -55,7 +53,6 @@ from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
 from apache_beam.io.gcp.internal.clients import bigquery as bigquery_v2
 from apache_beam.options import pipeline_options
-from apache_beam.runners.direct import direct_runner
 
 from oauth2client import client
 
@@ -90,7 +87,8 @@ def run(argv=None):
   known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
                                                           _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  is_direct_runner = _is_direct_runner(beam.Pipeline(options=options))
+  is_direct_runner = vcf_to_bq_common.is_pipeline_direct_runner(
+      beam.Pipeline(options=options))
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   if not google_cloud_options.project:
     raise ValueError('project must be set.')
@@ -101,12 +99,8 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  # TODO(allieychen): Refactor the generation of the unique temp id to a common
-  # lib.
-  unique_temp_id = '-'.join(
-      [google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME,
-       datetime.now().strftime('%Y%m%d-%H%M%S'),
-       str(uuid.uuid4())])
+  unique_temp_id = vcf_to_bq_common.generate_unique_name(
+      google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME)
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
       '{}_data_temp_files'.format(unique_temp_id))
@@ -330,11 +324,6 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
   from apache_beam.io import filesystems
   file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
-
-
-# TODO(allieychen): Move this function to a general lib.
-def _is_direct_runner(pipeline):
-  return isinstance(pipeline.runner, direct_runner.DirectRunner)
 
 
 def _pair_variant_with_key(variant, number_of_variants_per_shard):

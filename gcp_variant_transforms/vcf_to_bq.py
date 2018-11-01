@@ -34,7 +34,6 @@ python -m gcp_variant_transforms.vcf_to_bq \
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import datetime
 import logging
 import sys
 import tempfile
@@ -102,7 +101,7 @@ def _read_variants(pipeline, known_args):
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
                                ):
-  # type: (...) -> Optional(variant_merge_strategy.VariantMergeStrategy)
+  # type: (...) -> Optional[variant_merge_strategy.VariantMergeStrategy]
   merge_options = variant_transform_options.MergeOptions
   if (not known_args.variant_merge_strategy or
       known_args.variant_merge_strategy == merge_options.NONE):
@@ -161,11 +160,8 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
     options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
-  # Add a time suffix to ensure the job names and the merged headers files are
-  # unique in case multiple pipelines are run at the same time.
-  merge_headers_job_name = '-'.join([
-      _MERGE_HEADERS_JOB_NAME,
-      datetime.datetime.now().strftime('%Y%m%d-%H%M%S')])
+  merge_headers_job_name = vcf_to_bq_common.generate_unique_name(
+      _MERGE_HEADERS_JOB_NAME)
   if google_cloud_options.job_name:
     google_cloud_options.job_name += '-' + merge_headers_job_name
   else:

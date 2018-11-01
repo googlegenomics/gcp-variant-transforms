@@ -21,11 +21,14 @@ PTransforms and writing the output.
 from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
+import uuid
+from datetime import datetime
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
+from apache_beam.runners.direct import direct_runner
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
@@ -135,3 +138,17 @@ def _raise_error_on_invalid_flags(pipeline_args):
       not known_pipeline_args.setup_file):
     raise ValueError('The --setup_file flag is required for DataflowRunner. '
                      'Please provide a path to the setup.py file.')
+
+
+def is_pipeline_direct_runner(pipeline):
+  # type: (beam.Pipeline) -> bool
+  """Returns True if the pipeline's runner is DirectRunner."""
+  return isinstance(pipeline.runner, direct_runner.DirectRunner)
+
+
+def generate_unique_name(job_name):
+  # type: (str) -> str
+  """Returns a unique name with time suffix and random UUID."""
+  return '-'.join([job_name,
+                   datetime.now().strftime('%Y%m%d-%H%M%S'),
+                   str(uuid.uuid4())])
