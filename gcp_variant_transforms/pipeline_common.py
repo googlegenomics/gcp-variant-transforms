@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Common functions that are used by both vcf_to_bq and vcf_to_bq_preprocessor.
+"""Common functions used by vcf_to_bq, bq_to_vcf and vcf_to_bq_preprocessor.
 
 It includes parsing the command line arguments, reading the input, applying the
 PTransforms and writing the output.

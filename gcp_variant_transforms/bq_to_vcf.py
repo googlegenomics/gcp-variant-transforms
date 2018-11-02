@@ -56,7 +56,7 @@ from apache_beam.options import pipeline_options
 
 from oauth2client import client
 
-from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
@@ -84,10 +84,10 @@ def run(argv=None):
   # type: (List[str]) -> None
   """Runs BigQuery to VCF pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
-                                                          _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = pipeline_common.parse_args(argv,
+                                                         _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  is_direct_runner = vcf_to_bq_common.is_pipeline_direct_runner(
+  is_direct_runner = pipeline_common.is_pipeline_direct_runner(
       beam.Pipeline(options=options))
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   if not google_cloud_options.project:
@@ -99,7 +99,7 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  unique_temp_id = vcf_to_bq_common.generate_unique_name(
+  unique_temp_id = pipeline_common.generate_unique_name(
       google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME)
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,

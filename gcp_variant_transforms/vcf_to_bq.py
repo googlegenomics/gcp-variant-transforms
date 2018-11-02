@@ -44,7 +44,7 @@ from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
-from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
@@ -155,12 +155,12 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
   options = pipeline_options.PipelineOptions(pipeline_args)
 
   # Always run pipeline locally if data is small.
-  if (pipeline_mode == vcf_to_bq_common.PipelineModes.SMALL and
+  if (pipeline_mode == pipeline_common.PipelineModes.SMALL and
       not known_args.infer_headers and not known_args.infer_annotation_types):
     options.view_as(pipeline_options.StandardOptions).runner = 'DirectRunner'
 
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
-  merge_headers_job_name = vcf_to_bq_common.generate_unique_name(
+  merge_headers_job_name = pipeline_common.generate_unique_name(
       _MERGE_HEADERS_JOB_NAME)
   if google_cloud_options.job_name:
     google_cloud_options.job_name += '-' + merge_headers_job_name
@@ -174,14 +174,14 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode):
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
-    headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_header = vcf_to_bq_common.get_merged_headers(
+    headers = pipeline_common.read_headers(p, pipeline_mode, known_args)
+    merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
         known_args.allow_incompatible_records)
     if known_args.infer_headers or known_args.infer_annotation_types:
       merged_header = _add_inferred_headers(p, known_args, merged_header)
-    vcf_to_bq_common.write_headers(merged_header, temp_merged_headers_file_path)
+    pipeline_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path
 
 
@@ -189,8 +189,8 @@ def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
-                                                          _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = pipeline_common.parse_args(argv,
+                                                         _COMMAND_LINE_OPTIONS)
   # Note VepRunner creates new input files, so it should be run before any
   # other access to known_args.input_pattern.
   if known_args.run_annotation_pipeline:
@@ -200,7 +200,7 @@ def run(argv=None):
     logging.info('Using VEP processed files: %s', known_args.input_pattern)
 
   variant_merger = _get_variant_merge_strategy(known_args)
-  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(
+  pipeline_mode = pipeline_common.get_pipeline_mode(
       known_args.input_pattern, known_args.optimize_for_large_inputs)
 
   # Starts a pipeline to merge VCF headers in beam if the total files that
