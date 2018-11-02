@@ -243,6 +243,11 @@ def _get_args():
             'is used in a previous run. Example: '
             '--revalidation_dataset_id integration_tests_20180118_014812'))
   parser.add_argument(
+      '--test_file_suffix',
+      default='',
+      help=('If provided, only the test files in `vcf_to_bq_tests` '
+            'that end with the provided string will run.'))
+  parser.add_argument(
       '--test_name_prefix',
       default='',
       help=('If provided, all test names will have this prefix. Mainly, to '
@@ -250,13 +255,16 @@ def _get_args():
   return parser.parse_args()
 
 
-def _get_test_configs(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> List[List[Dict]]
-  """Gets all test configs in integration directory and subdirectories."""
+def _get_test_configs(run_presubmit_tests, run_all_tests, test_file_suffix=''):
+  # type: (bool, bool, str) -> List[List[Dict]]
+  """Gets all test configs."""
   required_keys = ['test_name', 'table_name', 'input_pattern',
                    'assertion_configs']
-  test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests)
-  test_configs = run_tests_common.get_configs(test_file_path, required_keys)
+  test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests,
+                                       test_file_suffix)
+  test_configs = run_tests_common.get_configs(test_file_path,
+                                              required_keys,
+                                              test_file_suffix)
   for test_case_configs in test_configs:
     for test_config in test_case_configs:
       assertion_configs = test_config['assertion_configs']
@@ -265,9 +273,11 @@ def _get_test_configs(run_presubmit_tests, run_all_tests):
   return test_configs
 
 
-def _get_test_file_path(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> str
-  if run_all_tests:
+def _get_test_file_path(run_presubmit_tests,
+                        run_all_tests,
+                        test_file_suffix=''):
+  # type: (bool, bool, str) -> str
+  if run_all_tests or test_file_suffix:
     test_file_path = os.path.join(os.getcwd(), _BASE_TEST_FOLDER)
   elif run_presubmit_tests:
     test_file_path = os.path.join(
@@ -289,7 +299,7 @@ def _validate_assertion_config(assertion_config):
 def main():
   args = _get_args()
   test_configs = _get_test_configs(
-      args.run_presubmit_tests, args.run_all_tests)
+      args.run_presubmit_tests, args.run_all_tests, args.test_file_suffix)
   with TestContextManager(args) as context:
     tests = []
     for test_case_configs in test_configs:
