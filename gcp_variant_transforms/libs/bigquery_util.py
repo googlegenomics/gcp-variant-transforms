@@ -16,7 +16,7 @@
 
 import enum
 import re
-from typing import Tuple  # pylint: disable=unused-import
+from typing import List, Tuple, Union  # pylint: disable=unused-import
 
 from vcf import parser
 
@@ -54,6 +54,17 @@ class TableFieldConstants(object):
   MODE_REPEATED = 'REPEATED'
 
 
+class AvroConstants(object):
+  """Constants that are relevant to Avro schema."""
+  TYPE = 'type'
+  NAME = 'name'
+  FIELDS = 'fields'
+  ARRAY = 'array'
+  ITEMS = 'items'
+  RECORD = 'record'
+  NULL = 'null'
+
+
 class _SupportedTableFieldType(enum.Enum):
   """The supported BigQuery field types.
 
@@ -81,6 +92,16 @@ _BIG_QUERY_TYPE_TO_VCF_TYPE_MAP = {
     TableFieldConstants.TYPE_STRING: _VcfHeaderTypeConstants.STRING,
     TableFieldConstants.TYPE_FLOAT: _VcfHeaderTypeConstants.FLOAT,
     TableFieldConstants.TYPE_BOOLEAN: _VcfHeaderTypeConstants.FLAG
+}
+
+# A map to convert from BigQuery types to their equivalent Avro types.
+_BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP = {
+    # This list is not exhaustive but covers all of the types we currently use.
+    TableFieldConstants.TYPE_INTEGER: 'long',
+    TableFieldConstants.TYPE_STRING: 'string',
+    TableFieldConstants.TYPE_FLOAT: 'double',
+    TableFieldConstants.TYPE_BOOLEAN: 'boolean',
+    TableFieldConstants.TYPE_RECORD: 'record'
 }
 
 # A map to convert from BigQuery types to Python types.
@@ -156,3 +177,15 @@ def get_vcf_num_from_bigquery_schema(bigquery_mode, bigquery_type):
 def get_supported_bigquery_schema_types():
   """Returns the supported BigQuery field types."""
   return [item.value for item in _SupportedTableFieldType]
+
+
+def get_avro_type_from_bigquery_type_mode(bigquery_type, bigquery_mode):
+  # type: (str, str) -> Union[str, List[str, str]]
+  if not bigquery_type in _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP:
+    raise ValueError('Unknown Avro equivalent for type {}'.format(
+        bigquery_type))
+  t = _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP[bigquery_type]
+  if bigquery_mode == TableFieldConstants.MODE_NULLABLE:
+    return [t, AvroConstants.NULL]
+  else:
+    return t

@@ -27,7 +27,7 @@ from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
 from gcp_variant_transforms.libs import bigquery_vcf_data_converter
@@ -44,7 +44,7 @@ _WRITE_SHARDS_LIMIT = 1000
 
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
-class _ConvertToBigQueryTableRow(beam.DoFn):
+class ConvertVariantToRow(beam.DoFn):
   """Converts a ``Variant`` record to a BigQuery row."""
 
   def __init__(
@@ -54,7 +54,7 @@ class _ConvertToBigQueryTableRow(beam.DoFn):
       omit_empty_sample_calls=False  # type: bool
   ):
     # type: (...) -> None
-    super(_ConvertToBigQueryTableRow, self).__init__()
+    super(ConvertVariantToRow, self).__init__()
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._bigquery_row_generator = row_generator
@@ -134,7 +134,7 @@ class VariantToBigQuery(beam.PTransform):
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
-        _ConvertToBigQueryTableRow(
+        ConvertVariantToRow(
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls))

@@ -34,7 +34,7 @@ from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.testing import vcf_header_util
 from gcp_variant_transforms.transforms import variant_to_bigquery
-from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
+from gcp_variant_transforms.transforms.variant_to_bigquery import ConvertVariantToRow
 
 
 class ConvertToBigQueryTableRowTest(unittest.TestCase):
@@ -244,7 +244,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
             self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
@@ -258,7 +258,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
             self._row_generator, omit_empty_sample_calls=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
@@ -273,7 +273,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
             self._row_generator, allow_incompatible_records=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()

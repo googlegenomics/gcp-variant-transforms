@@ -125,13 +125,29 @@ class VcfReadOptions(VariantTransformsOptions):
           parsed_args.input_pattern))
 
 
+class AvroWriteOptions(VariantTransformsOptions):
+  """Options for writing Variant records to Avro files."""
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument('--output_avro_path',
+                        default='',
+                        help='The output path to write Avro files under.')
+
+  def validate(self, parsed_args):
+    # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
+    if not parsed_args.output_table and not parsed_args.output_avro_path:
+      raise ValueError('At least one of --output_table or --output_avro_path '
+                       'options should be provided')
+
+
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
     parser.add_argument('--output_table',
-                        required=True,
+                        default='',
                         help='BigQuery table to store the results.')
     parser.add_argument(
         '--split_alternate_allele_info_fields',
@@ -177,6 +193,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
+    if not parsed_args.output_table and parsed_args.output_avro_path:
+      # Writing into BigQuery is not requested; no more BigQuery checks needed.
+      return
     output_table_re_match = re.match(
         r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
         parsed_args.output_table)
