@@ -204,18 +204,29 @@ def add_args(parser):
       required=False)
 
 
-def get_configs(test_file_path, required_keys):
-  # type: (str, List[str]) -> List[List[Dict]]
-  """Gets all test configs in integration directory and subdirectories."""
+def get_configs(test_file_dir, required_keys, test_file_suffix=''):
+  # type: (str, List[str], str) -> List[List[Dict]]
+  """Gets test configs.
+
+  Args:
+    test_file_dir: The directory where the test cases are saved.
+    required_keys: The keys that are required in each test case.
+    test_file_suffix: If empty, all test cases in `test_file_path` are
+      considered. Otherwise, only the test cases that end with this suffix will
+      run.
+  Raises:
+    TestCaseFailure: If no test cases are found.
+  """
   test_configs = []
-  for root, _, files in os.walk(test_file_path):
+  test_file_suffix = test_file_suffix or '.json'
+  for root, _, files in os.walk(test_file_dir):
     for filename in files:
-      if filename.endswith('.json'):
+      if filename.endswith(test_file_suffix):
         test_configs.append(_load_test_configs(os.path.join(root, filename),
                                                required_keys))
   if not test_configs:
-    raise TestCaseFailure('Found no .json files in directory {}'.format(
-        test_file_path))
+    raise TestCaseFailure('Found no {} file in directory {}'.format(
+        test_file_suffix, test_file_dir))
   return test_configs
 
 
