@@ -12,17 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds docker image for gcp-variant-transforms:
-# Run using:
-# $ gcloud container builds submit --config cloudbuild.yaml --timeout 1h .
-substitutions:
-  _CUSTOM_TAG_NAME: 'latest'
+# This is used by Google Cloud Build GitHub app, which automatically builds the
+# code each time you push code to Github. This is what it does:
+# * Builds an image using the GitHub commit hash as the tag.
+# * Pushes that image to Container Registry.
+# * Runs small integration tests (only one test included for now) from that very
+#   image.
+
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--tag=gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
+      - '--tag=gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - '--file=docker/Dockerfile'
       - '.'
+    id: 'build-gcp-variant-transforms-docker'
+  # We have to push now since we are using this image in the next step.
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+    id: 'push-gcp-variant-transforms-docker'
+  # Run the test script from the image we just built and pushed.
+  #
+  # Note that ./deploy_and_run_tests.sh that is referenced here is coming from
+  # the source downloaded from GitHub and not the file in the docker image.
+  # The only reason that we use the built image in the 'name' argument is
+  # convenience, i.e., to avoid installing python, virtualenv, etc. on the
+  # image.
+  - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+    args:
+      - 'bash'
+      - './deploy_and_run_tests.sh'
+      - '--keep_image'
+      - '--skip_build'
+      - '--project ${PROJECT_ID}'
+      - '--image_tag ${COMMIT_SHA}'
+      - '--run_unit_tests'
+      - '--test_file_suffix platinum_NA12877_hg38_10K_lines.json'
+    id: 'test-gcp-variant-transforms-docker'
 images:
-  - 'gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
+  - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+timeout: 25m
