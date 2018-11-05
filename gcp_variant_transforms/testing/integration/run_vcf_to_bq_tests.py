@@ -246,7 +246,8 @@ def _get_args():
       '--test_file_suffix',
       default='',
       help=('If provided, only the test files in `vcf_to_bq_tests` '
-            'that end with the provided string will run.'))
+            'that end with the provided string (must include the file '
+            'extension) will run.'))
   parser.add_argument(
       '--test_name_prefix',
       default='',
