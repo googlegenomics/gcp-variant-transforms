@@ -55,7 +55,7 @@ import apache_beam as beam
 from apache_beam import pvalue
 from apache_beam.options import pipeline_options
 
-from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
@@ -91,14 +91,14 @@ def run(argv=None):
   # type: (List[str]) -> (str, str)
   """Runs preprocess pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
-                                                          _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = pipeline_common.parse_args(argv,
+                                                         _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args.input_pattern)
+  pipeline_mode = pipeline_common.get_pipeline_mode(known_args.input_pattern)
 
   with beam.Pipeline(options=options) as p:
-    headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_headers = vcf_to_bq_common.get_merged_headers(headers)
+    headers = pipeline_common.read_headers(p, pipeline_mode, known_args)
+    merged_headers = pipeline_common.get_merged_headers(headers)
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
@@ -123,8 +123,8 @@ def run(argv=None):
                       beam.pvalue.AsSingleton(merged_headers)))
 
     if known_args.resolved_headers_path:
-      vcf_to_bq_common.write_headers(merged_headers,
-                                     known_args.resolved_headers_path)
+      pipeline_common.write_headers(merged_headers,
+                                    known_args.resolved_headers_path)
 
 
 if __name__ == '__main__':
