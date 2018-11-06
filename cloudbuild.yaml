@@ -18,7 +18,6 @@
 # * Pushes that image to Container Registry.
 # * Runs small integration tests (only one test included for now) from that very
 #   image.
-
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
