@@ -16,8 +16,7 @@
 # code each time you push code to Github. This is what it does:
 # * Builds an image using the GitHub commit hash as the tag.
 # * Pushes that image to Container Registry.
-# * Runs small integration tests (only one test included for now) from that very
-#   image.
+# * Runs small integration tests (only one test included for now) from that image.
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
