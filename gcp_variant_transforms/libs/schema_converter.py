@@ -185,44 +185,52 @@ def generate_schema_from_header_fields(
   return schema
 
 
-def _convert_repeated_field_to_avro_array(f, fields_list):
+def _convert_repeated_field_to_avro_array(field, fields_list):
+  # type: (messages.MessageField) -> Dict
+  """Converts a repeated field to an Avro Array representation.
+
+  For example the return value can be: {"type": "array", "items": "string"}
+  """
   array_dict = {
       bigquery_util.AvroConstants.TYPE: bigquery_util.AvroConstants.ARRAY
   }
-  if f.fields:
+  if field.fields:
     array_dict[bigquery_util.AvroConstants.ITEMS] = {
         bigquery_util.AvroConstants.TYPE: bigquery_util.AvroConstants.RECORD,
-        bigquery_util.AvroConstants.NAME: f.name,
+        bigquery_util.AvroConstants.NAME: field.name,
         bigquery_util.AvroConstants.FIELDS: fields_list
     }
   else:
     array_dict[bigquery_util.AvroConstants.ITEMS] = {
-        bigquery_util.AvroConstants.NAME: f.name,
+        bigquery_util.AvroConstants.NAME: field.name,
         bigquery_util.AvroConstants.TYPE:
-        bigquery_util.get_avro_type_from_bigquery_type_mode(f.type, f.mode)
+        bigquery_util.get_avro_type_from_bigquery_type_mode(
+            field.type, field.mode)
     }
   # All repeated fields are nullable.
   return [bigquery_util.AvroConstants.NULL, array_dict]
 
 
-def _convert_field_to_avro_dict(f):
+def _convert_field_to_avro_dict(field):
   # type: (messages.MessageField) -> Dict
   field_dict = {}
   fields_list = []
-  if f.fields:
-    fields_list = [_convert_field_to_avro_dict(child_f) for child_f in f.fields]
-  if f.mode == bigquery_util.TableFieldConstants.MODE_REPEATED:
+  if field.fields:
+    fields_list = [
+        _convert_field_to_avro_dict(child_f) for child_f in field.fields]
+  if field.mode == bigquery_util.TableFieldConstants.MODE_REPEATED:
     # TODO(bashir2): In this case both the name of the array and also individual
     # records in the array is f.name. Make sure this is according to Avro
     # spec then remove this TODO.
-    field_dict[bigquery_util.AvroConstants.NAME] = f.name
-    field_dict[bigquery_util.AvroConstants.TYPE] = \
-      _convert_repeated_field_to_avro_array(f, fields_list)
-  else:
-    field_dict[bigquery_util.AvroConstants.NAME] = f.name
+    field_dict[bigquery_util.AvroConstants.NAME] = field.name
     field_dict[bigquery_util.AvroConstants.TYPE] = (
-        bigquery_util.get_avro_type_from_bigquery_type_mode(f.type, f.mode))
-    if f.fields:
+        _convert_repeated_field_to_avro_array(field, fields_list))
+  else:
+    field_dict[bigquery_util.AvroConstants.NAME] = field.name
+    field_dict[bigquery_util.AvroConstants.TYPE] = (
+        bigquery_util.get_avro_type_from_bigquery_type_mode(
+            field.type, field.mode))
+    if field.fields:
       field_dict[bigquery_util.AvroConstants.FIELDS] = fields_list
   return field_dict
 
@@ -232,8 +240,8 @@ def _convert_schema_to_avro_dict(schema):
   fields_dict = {}
   # TODO(bashir2): Check if we need `namespace` and `name` at the top level.
   fields_dict[bigquery_util.AvroConstants.NAME] = 'TBD'
-  fields_dict[bigquery_util.AvroConstants.TYPE] = \
-    bigquery_util.AvroConstants.RECORD
+  fields_dict[
+      bigquery_util.AvroConstants.TYPE] = bigquery_util.AvroConstants.RECORD
   fields_dict[bigquery_util.AvroConstants.FIELDS] = [
       _convert_field_to_avro_dict(f) for f in schema.fields]
   return fields_dict

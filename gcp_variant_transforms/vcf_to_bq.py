@@ -291,8 +291,9 @@ def run(argv=None):
     # TODO(bashir2): Add an integration test that outputs to Avro files and
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
-    _ = variants | 'FlattenPartitions' >> beam.Flatten() \
-        | 'VariantToAvro' >>\
+    _ = (
+        variants | 'FlattenPartitions' >> beam.Flatten()
+        | 'VariantToAvro' >>
         variant_to_avro.VariantToAvroFiles(
             known_args.output_avro_path,
             header_fields,
@@ -302,6 +303,7 @@ def run(argv=None):
             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
             null_numeric_value_replacement=(
                 known_args.null_numeric_value_replacement))
+    )
 
   result = pipeline.run()
   result.wait_until_finish()

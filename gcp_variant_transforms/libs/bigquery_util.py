@@ -184,8 +184,10 @@ def get_avro_type_from_bigquery_type_mode(bigquery_type, bigquery_mode):
   if not bigquery_type in _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP:
     raise ValueError('Unknown Avro equivalent for type {}'.format(
         bigquery_type))
-  t = _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP[bigquery_type]
+  avro_type = _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP[bigquery_type]
   if bigquery_mode == TableFieldConstants.MODE_NULLABLE:
-    return [t, AvroConstants.NULL]
+    # A nullable type in the Avro schema is represented by a Union which is
+    # equivalent to an array in JSON format.
+    return [avro_type, AvroConstants.NULL]
   else:
-    return t
+    return avro_type

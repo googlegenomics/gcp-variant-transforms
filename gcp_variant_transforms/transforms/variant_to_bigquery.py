@@ -29,7 +29,7 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
+from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
@@ -74,6 +74,8 @@ class VariantToBigQuery(beam.PTransform):
       header_fields,  # type: vcf_header_io.VcfHeader
       variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
       proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
+      # TODO(bashir2): proc_var_factory is a required argument and if `None` is
+      # supplied this will fail in schema generation.
       append=False,  # type: bool
       update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
@@ -115,7 +117,7 @@ class VariantToBigQuery(beam.PTransform):
     self._proc_var_factory = proc_var_factory
     self._append = append
     self._schema = (
-        bigquery_vcf_schema_converter.generate_schema_from_header_fields(
+        schema_converter.generate_schema_from_header_fields(
             self._header_fields, self._proc_var_factory, self._variant_merger))
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.

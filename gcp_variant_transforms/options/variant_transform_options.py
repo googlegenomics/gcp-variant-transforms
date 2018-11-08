@@ -135,10 +135,10 @@ class AvroWriteOptions(VariantTransformsOptions):
                         help='The output path to write Avro files under.')
 
   def validate(self, parsed_args):
-    # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
+    # type: (argparse.Namespace) -> None
     if not parsed_args.output_table and not parsed_args.output_avro_path:
       raise ValueError('At least one of --output_table or --output_avro_path '
-                       'options should be provided')
+                       'options should be provided.')
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):

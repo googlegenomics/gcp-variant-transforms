@@ -63,7 +63,7 @@ from gcp_variant_transforms import vcf_to_bq_common
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
+from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
@@ -146,7 +146,7 @@ def _write_vcf_meta_info(input_table,
   # type: (str, str, bool) -> None
   """Writes the meta information generated from BigQuery schema."""
   header_fields = (
-      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+      schema_converter.generate_header_fields_from_schema(
           _get_schema(input_table), allow_incompatible_schema))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields, _VCF_VERSION_LINE)
