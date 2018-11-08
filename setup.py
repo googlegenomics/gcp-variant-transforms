@@ -14,6 +14,7 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
+
 import os
 import setuptools
 from setuptools.command.build_py import build_py
