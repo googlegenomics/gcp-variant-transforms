@@ -60,10 +60,13 @@ from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import partition_variants
+from gcp_variant_transforms.transforms import variant_to_avro
 from gcp_variant_transforms.transforms import variant_to_bigquery
+
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
+    variant_transform_options.AvroWriteOptions,
     variant_transform_options.BigQueryWriteOptions,
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
@@ -261,24 +264,43 @@ def run(argv=None):
     variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
     num_partitions = 1
 
-  for i in range(num_partitions):
-    table_suffix = ''
-    if partitioner and partitioner.get_partition_name(i):
-      table_suffix = '_' + partitioner.get_partition_name(i)
-    table_name = known_args.output_table + table_suffix
-    _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
-         variant_to_bigquery.VariantToBigQuery(
-             table_name,
-             header_fields,
-             variant_merger,
-             processed_variant_factory,
-             append=known_args.append,
-             update_schema_on_append=known_args.update_schema_on_append,
-             allow_incompatible_records=known_args.allow_incompatible_records,
-             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-             num_bigquery_write_shards=known_args.num_bigquery_write_shards,
-             null_numeric_value_replacement=(
-                 known_args.null_numeric_value_replacement)))
+  if known_args.output_table:
+    for i in range(num_partitions):
+      table_suffix = ''
+      if partitioner and partitioner.get_partition_name(i):
+        table_suffix = '_' + partitioner.get_partition_name(i)
+      table_name = known_args.output_table + table_suffix
+      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
+           variant_to_bigquery.VariantToBigQuery(
+               table_name,
+               header_fields,
+               variant_merger,
+               processed_variant_factory,
+               append=known_args.append,
+               update_schema_on_append=known_args.update_schema_on_append,
+               allow_incompatible_records=known_args.allow_incompatible_records,
+               omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+               num_bigquery_write_shards=known_args.num_bigquery_write_shards,
+               null_numeric_value_replacement=(
+                   known_args.null_numeric_value_replacement)))
+
+  if known_args.output_avro_path:
+    # TODO(bashir2): Add an integration test that outputs to Avro files and
+    # also imports to BigQuery. Then import those Avro outputs using the bq
+    # tool and verify that the two tables are identical.
+    _ = (
+        variants | 'FlattenToOnePCollection' >> beam.Flatten()
+        | 'VariantToAvro' >>
+        variant_to_avro.VariantToAvroFiles(
+            known_args.output_avro_path,
+            header_fields,
+            processed_variant_factory,
+            variant_merger=variant_merger,
+            allow_incompatible_records=known_args.allow_incompatible_records,
+            omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+            null_numeric_value_replacement=(
+                known_args.null_numeric_value_replacement))
+    )
 
   result = pipeline.run()
   result.wait_until_finish()

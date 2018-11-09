@@ -12,24 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handles the conversion between BigQuery schema and VCF header."""
+"""Handles the conversion between BigQuery/Avro schema and VCF header."""
 
 from __future__ import absolute_import
 
 from collections import OrderedDict
-from typing import Any, Dict, Union  # pylint: disable=unused-import
+import json
+import logging
+from typing import Dict, Union  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
+from apitools.base.protorpclite import messages  # pylint: disable=unused-import
 
 from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
-from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_reserved_fields
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -182,6 +183,144 @@ def generate_schema_from_header_fields(
   if variant_merger:
     variant_merger.modify_bigquery_schema(schema, info_keys)
   return schema
+
+
+def _convert_repeated_field_to_avro_array(field, fields_list):
+  # type: (messages.MessageField) -> Dict
+  """Converts a repeated field to an Avro Array representation.
+
+  For example the return value can be: {"type": "array", "items": "string"}
+  """
+  array_dict = {
+      bigquery_util.AvroConstants.TYPE: bigquery_util.AvroConstants.ARRAY
+  }
+  if field.fields:
+    array_dict[bigquery_util.AvroConstants.ITEMS] = {
+        bigquery_util.AvroConstants.TYPE: bigquery_util.AvroConstants.RECORD,
+        bigquery_util.AvroConstants.NAME: field.name,
+        bigquery_util.AvroConstants.FIELDS: fields_list
+    }
+  else:
+    array_dict[bigquery_util.AvroConstants.ITEMS] = {
+        bigquery_util.AvroConstants.NAME: field.name,
+        bigquery_util.AvroConstants.TYPE:
+        bigquery_util.get_avro_type_from_bigquery_type_mode(
+            field.type, field.mode)
+    }
+  # All repeated fields are nullable.
+  return [bigquery_util.AvroConstants.NULL, array_dict]
+
+
+def _convert_field_to_avro_dict(field):
+  # type: (messages.MessageField) -> Dict
+  field_dict = {}
+  fields_list = []
+  if field.fields:
+    fields_list = [
+        _convert_field_to_avro_dict(child_f) for child_f in field.fields]
+  if field.mode == bigquery_util.TableFieldConstants.MODE_REPEATED:
+    # TODO(bashir2): In this case both the name of the array and also individual
+    # records in the array is f.name. Make sure this is according to Avro
+    # spec then remove this TODO.
+    field_dict[bigquery_util.AvroConstants.NAME] = field.name
+    field_dict[bigquery_util.AvroConstants.TYPE] = (
+        _convert_repeated_field_to_avro_array(field, fields_list))
+  else:
+    field_dict[bigquery_util.AvroConstants.NAME] = field.name
+    field_dict[bigquery_util.AvroConstants.TYPE] = (
+        bigquery_util.get_avro_type_from_bigquery_type_mode(
+            field.type, field.mode))
+    if field.fields:
+      field_dict[bigquery_util.AvroConstants.FIELDS] = fields_list
+  return field_dict
+
+
+def _convert_schema_to_avro_dict(schema):
+  # type: (bigquery.TableSchema) -> Dict
+  fields_dict = {}
+  # TODO(bashir2): Check if we need `namespace` and `name` at the top level.
+  fields_dict[bigquery_util.AvroConstants.NAME] = 'TBD'
+  fields_dict[
+      bigquery_util.AvroConstants.TYPE] = bigquery_util.AvroConstants.RECORD
+  fields_dict[bigquery_util.AvroConstants.FIELDS] = [
+      _convert_field_to_avro_dict(f) for f in schema.fields]
+  return fields_dict
+
+
+def convert_table_schema_to_json_avro_schema(schema):
+  # type: (bigquery.TableSchema) -> str
+  """Returns the Avro equivalent of the given `schema` in json format.
+
+  For writing to Avro files, the only piece that is different is the schema. In
+  other words the exact same `Dict` that represents a BigQuery row can be
+  written to an Avro file if the schema of that file is equivalent to the
+  BigQuery Table schema. This function generates that equivalent Avro schema.
+
+  For details of Avro schema spec, see:
+  https://avro.apache.org/docs/1.8.2/spec.html
+
+  For concrete examples relevant to our BigQuery schema, consider the following
+  three required fields:
+
+  {
+    "fields": [
+      {
+        "type": [ "string", "null"],
+        "name": "reference_name"
+      },
+      {
+        "type": ["int", "null"],
+        "name": "start_position"
+      },
+      {
+        "type": ["int", "null"],
+        "name": "end_position"
+      },
+      ...
+    ],
+    "type": "record",
+    "name": "TBD"
+  }
+
+  Note that the whole schema is represented as a `record` which has several
+  `fields`. In the above example, only the first three `fields` are shown.
+  A `NULLABLE` type in BigQuery schema is equivalent to a `type` array where
+  `null` is one of the members.
+
+  `REPEATED` fields, specially `REPEATED` `RECORD` fields, are a little more
+  complex in Avro schema format. Here is one example for `alternate_bases`:
+  {
+    "type": [{
+      "items": {
+        "type": "record",
+        "name": "alternate_bases",
+        "fields": [
+          {
+            "type": ["string", "null"],
+            "name": "alt"
+          },
+          {
+            "type": ["float", "null"],
+            "name": "AF"
+          }
+        ]
+      },
+      "type": "array"
+    }, "null" ],
+    "name": "alternate_bases"
+  },
+
+  Args:
+    schema: This is the BigQuery table schema that is generated from input VCFs.
+  """
+  if not isinstance(schema, bigquery.TableSchema):
+    raise ValueError(
+        'Expected an instance of bigquery.TableSchema got {}'.format(
+            type(schema)))
+  schema_dict = _convert_schema_to_avro_dict(schema)
+  json_str = json.dumps(schema_dict)
+  logging.info('The Avro schema is: %s', json_str)
+  return json_str
 
 
 def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):

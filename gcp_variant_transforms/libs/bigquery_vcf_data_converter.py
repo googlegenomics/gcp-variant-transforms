@@ -129,7 +129,7 @@ class BigQueryRowGenerator(object):
 
   def _get_call_record(
       self,
-      call,  # type: VariantCall
+      call,  # type: vcfio.VariantCall
       call_record_schema_descriptor,
       # type: bigquery_schema_descriptor.SchemaDescriptor
       allow_incompatible_records,  # type: bool
