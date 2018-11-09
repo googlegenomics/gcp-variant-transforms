@@ -292,7 +292,7 @@ def run(argv=None):
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
     _ = (
-        variants | 'FlattenPartitions' >> beam.Flatten()
+        variants | 'FlattenToOnePCollection' >> beam.Flatten()
         | 'VariantToAvro' >>
         variant_to_avro.VariantToAvroFiles(
             known_args.output_avro_path,
