@@ -1,0 +1,48 @@
+[
+  {
+    "test_name": "option-allow-malformed-records-alternate-mismatch",
+    "table_name": "option_allow_malformed_records_alternate_mismatch",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.2-AF-mismatch.vcf",
+    "allow_malformed_records": true,
+    "runner": "DirectRunner",
+    "zones": ["us-west1-b"],
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 13}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 23031929}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 23033052}
+      },
+      {
+        "query": [
+          "SELECT alternate_bases.AF AS AF ",
+          "FROM {TABLE_NAME} t, t.alternate_bases as alternate_bases ",
+          "WHERE reference_name = '20' and start_position = 17329"
+        ],
+        "expected_result": {"AF": 0.017}
+      },
+      {
+        "query": [
+          "SELECT SUM(alternate_bases.AF) AS AF_sum ",
+          "FROM {TABLE_NAME} t, t.alternate_bases as alternate_bases ",
+          "WHERE reference_name = '20' and start_position = 1234566"
+        ],
+        "expected_result": {"AF_sum": 0.1}
+      },
+      {
+        "query": [
+          "SELECT COUNT(IFNULL(alternate_bases.AF, 0)) AS AF_count ",
+          "FROM {TABLE_NAME} t, t.alternate_bases as alternate_bases ",
+          "WHERE reference_name = '20' and start_position = 1234566"
+        ],
+        "expected_result": {"AF_count": 2}
+      }
+    ]
+  }
+]

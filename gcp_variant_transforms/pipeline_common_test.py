@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for vcf_to_bq_common script."""
+"""Tests for pipeline_common script."""
 
 import collections
 import unittest
@@ -20,19 +20,19 @@ import unittest
 from apache_beam.io.filesystems import FileSystems
 import mock
 
-from gcp_variant_transforms import vcf_to_bq_common
-from gcp_variant_transforms.vcf_to_bq_common import PipelineModes
+from gcp_variant_transforms import pipeline_common
+from gcp_variant_transforms.pipeline_common import PipelineModes
 
 
 class VcfToBqCommonTest(unittest.TestCase):
-  """Tests cases for the ``vcf_to_bq_common`` script."""
+  """Tests cases for the `pipeline_common` script."""
 
   def _create_mock_args(self, **args):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
-    return vcf_to_bq_common.get_pipeline_mode(args.input_pattern,
-                                              args.optimize_for_large_inputs)
+    return pipeline_common.get_pipeline_mode(args.input_pattern,
+                                             args.optimize_for_large_inputs)
 
   def test_get_mode_raises_error_for_no_match(self):
     args = self._create_mock_args(
@@ -85,7 +85,7 @@ class VcfToBqCommonTest(unittest.TestCase):
 
     match = match_result(range(101))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(vcf_to_bq_common.get_pipeline_mode(args.input_pattern),
+      self.assertEqual(pipeline_common.get_pipeline_mode(args.input_pattern),
                        PipelineModes.MEDIUM)
 
   def test_fail_on_invalid_flags(self):
@@ -94,18 +94,18 @@ class VcfToBqCommonTest(unittest.TestCase):
                      'gcp-variant-transforms-test',
                      '--staging_location',
                      'gs://integration_test_runs/staging']
-    vcf_to_bq_common._raise_error_on_invalid_flags(pipeline_args)
+    pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
     # Add Dataflow runner (requires --setup_file).
     pipeline_args.extend(['--runner', 'DataflowRunner'])
     with self.assertRaisesRegexp(ValueError, 'setup_file'):
-      vcf_to_bq_common._raise_error_on_invalid_flags(pipeline_args)
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
     # Add setup.py (required for Variant Transforms run). This is now valid.
     pipeline_args.extend(['--setup_file', 'setup.py'])
-    vcf_to_bq_common._raise_error_on_invalid_flags(pipeline_args)
+    pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
     # Add an unknown flag.
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
     with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
-      vcf_to_bq_common._raise_error_on_invalid_flags(pipeline_args)
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args)

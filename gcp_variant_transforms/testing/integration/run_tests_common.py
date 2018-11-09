@@ -70,6 +70,7 @@ class TestRunner(object):
         credentials=GoogleCredentials.get_application_default())
     self._revalidate = revalidate
     self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
+    self._operation_names_to_test_case_names = {}  # type: Dict[str, str]
 
   def run(self):
     """Runs all tests."""
@@ -101,6 +102,8 @@ class TestRunner(object):
     operation_name = request.execute()['name']
     self._operation_names_to_test_states.update(
         {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
+    self._operation_names_to_test_case_names.update(
+        {operation_name: test_cases[0]._name})
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
@@ -125,13 +128,17 @@ class TestRunner(object):
     if 'error' in response:
       if 'message' in response['error']:
         raise TestCaseFailure(
-            'Operation {} failed: {}'.format(operation_name,
-                                             response['error']['message']))
+            'Test case {} (Operation {}) failed: {}'.format(
+                self._operation_names_to_test_case_names[operation_name],
+                operation_name,
+                response['error']['message']))
       else:
         # This case should never happen.
         raise TestCaseFailure(
-            'Operation {} failed: No traceback. '
-            'See logs for more information on error.'.format(operation_name))
+            'Test case {} (Operation {}) failed: No traceback. '
+            'See logs for more information on error.'.format(
+                self._operation_names_to_test_case_names[operation_name],
+                operation_name))
 
   def print_results(self):
     """Prints results of test cases."""
@@ -197,18 +204,29 @@ def add_args(parser):
       required=False)
 
 
-def get_configs(test_file_path, required_keys):
-  # type: (str, List[str]) -> List[List[Dict]]
-  """Gets all test configs in integration directory and subdirectories."""
+def get_configs(test_file_dir, required_keys, test_file_suffix=''):
+  # type: (str, List[str], str) -> List[List[Dict]]
+  """Gets test configs.
+
+  Args:
+    test_file_dir: The directory where the test cases are saved.
+    required_keys: The keys that are required in each test case.
+    test_file_suffix: If empty, all test cases in `test_file_path` are
+      considered. Otherwise, only the test cases that end with this suffix will
+      run.
+  Raises:
+    TestCaseFailure: If no test cases are found.
+  """
   test_configs = []
-  for root, _, files in os.walk(test_file_path):
+  test_file_suffix = test_file_suffix or '.json'
+  for root, _, files in os.walk(test_file_dir):
     for filename in files:
-      if filename.endswith('.json'):
+      if filename.endswith(test_file_suffix):
         test_configs.append(_load_test_configs(os.path.join(root, filename),
                                                required_keys))
   if not test_configs:
-    raise TestCaseFailure('Found no .json files in directory {}'.format(
-        test_file_path))
+    raise TestCaseFailure('Found no {} file in directory {}'.format(
+        test_file_suffix, test_file_dir))
   return test_configs
 
 
