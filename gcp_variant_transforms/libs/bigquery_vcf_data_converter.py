@@ -15,6 +15,7 @@
 """Handles the conversion between BigQuery row and variant."""
 
 from __future__ import absolute_import
+from __future__ import division
 
 import copy
 import json
@@ -29,14 +30,6 @@ from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unu
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 
 
-# Maximum size of a BigQuery row is 10MB. See
-# https://cloud.google.com/bigquery/quotas#import for details.
-# We set it to 10MB - 10KB to leave a bit of room for error in case jsonifying
-# the object is not exactly the same in different libraries.
-_MAX_BIGQUERY_ROW_SIZE_BYTES = 10 * 1024 * 1024 - 10 * 1024
-# Number of bytes to add to the object size when concatenating calls (i.e.
-# to account for ", "). We use 5 bytes to be conservative.
-_JSON_CONCATENATION_OVERHEAD_BYTES = 5
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
 # Reserved constants for column names in the BigQuery schema.
@@ -55,6 +48,19 @@ RESERVED_VARIANT_CALL_COLUMNS = [
     bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
     bigquery_util.ColumnKeyConstants.CALLS_PHASESET
 ]
+
+# Constants for calculating row size. This is needed because the maximum size of
+# a BigQuery row is 100MB. See
+# https://cloud.google.com/bigquery/quotas#import for details.
+# We set it to 90MB to leave some room for error as our row estimate is based
+# on sampling rather than exact byte size.
+_MAX_BIGQUERY_ROW_SIZE_BYTES = 90 * 1024 * 1024
+# Maximum number of calls to sample for BigQuery row size estimate.
+_MAX_NUM_CALL_SAMPLES = 5
+# Row size estimation based on sampling calls can be expensive and unnecessary
+# when there are not enough calls, so it's only enabled when there are at least
+# this many calls.
+_MIN_NUM_CALLS_FOR_ROW_SIZE_ESTIMATION = 100
 
 
 class BigQueryRowGenerator(object):
@@ -80,9 +86,9 @@ class BigQueryRowGenerator(object):
     # type: (processed_variant.ProcessedVariant, bool, bool) -> Dict
     """Yields BigQuery rows according to the schema from the given variant.
 
-    There is a 10MB limit for each BigQuery row, which can be exceeded by having
-    a large number of calls. This method may split up a row into multiple rows
-    if it exceeds 10MB.
+    There is a 100MB limit for each BigQuery row, which can be exceeded by
+    having a large number of calls. This method may split up a row into
+    multiple rows if it exceeds the limit.
 
     Args:
       variant: Variant to convert to a row.
@@ -97,34 +103,30 @@ class BigQueryRowGenerator(object):
     Raises:
       ValueError: If variant data is inconsistent or invalid.
     """
-
     base_row = self._get_base_row_from_variant(
         variant, allow_incompatible_records)
-    base_row_size_in_bytes = self._get_json_object_size(base_row)
-    row_size_in_bytes = base_row_size_in_bytes
-    row = copy.deepcopy(base_row)  # Keep base_row intact.
+    call_limit_per_row = self._get_call_limit_per_row(variant)
+    if call_limit_per_row < len(variant.calls):
+      # Keep base_row intact if we need to split rows.
+      row = copy.deepcopy(base_row)
+    else:
+      row = base_row
 
     call_record_schema_descriptor = (
         self._schema_descriptor.get_record_schema_descriptor(
             bigquery_util.ColumnKeyConstants.CALLS))
+    num_calls_in_row = 0
     for call in variant.calls:
       call_record, empty = self._get_call_record(
           call, call_record_schema_descriptor, allow_incompatible_records)
       if omit_empty_sample_calls and empty:
         continue
-
-      # Add a few bytes to account for surrounding characters when
-      # concatenating.
-      call_record_size_in_bytes = (
-          self._get_json_object_size(call_record) +
-          _JSON_CONCATENATION_OVERHEAD_BYTES)
-      if (row_size_in_bytes + call_record_size_in_bytes >=
-          _MAX_BIGQUERY_ROW_SIZE_BYTES):
+      num_calls_in_row += 1
+      if num_calls_in_row > call_limit_per_row:
         yield row
+        num_calls_in_row = 1
         row = copy.deepcopy(base_row)
-        row_size_in_bytes = base_row_size_in_bytes
       row[bigquery_util.ColumnKeyConstants.CALLS].append(call_record)
-      row_size_in_bytes += call_record_size_in_bytes
     yield row
 
   def _get_call_record(
@@ -237,6 +239,39 @@ class BigQueryRowGenerator(object):
   def _is_empty_field(self, value):
     return (value in (vcfio.MISSING_FIELD_VALUE, [vcfio.MISSING_FIELD_VALUE]) or
             (not value and value != 0))
+
+  def _get_call_limit_per_row(self, variant):
+    # type: (processed_variant.ProcessedVariant) -> int
+    """Returns an estimate of maximum number of calls per BigQuery row.
+
+    This method works by sampling `variant.calls` and getting an estimate based
+    on the serialized JSON value.
+    """
+    # Assume that the non-call part of the variant is negligible compared to the
+    # call part.
+    num_calls = len(variant.calls)
+    if num_calls < _MIN_NUM_CALLS_FOR_ROW_SIZE_ESTIMATION:
+      return num_calls
+    average_call_size_bytes = self._get_average_call_size_bytes(variant.calls)
+    if average_call_size_bytes * num_calls <= _MAX_BIGQUERY_ROW_SIZE_BYTES:
+      return num_calls
+    else:
+      return _MAX_BIGQUERY_ROW_SIZE_BYTES // average_call_size_bytes
+
+  def _get_average_call_size_bytes(self, calls):
+    # type: (List[vcfio.VariantCall]) -> int
+    """Returns the average call size based on sampling."""
+    sum_sampled_call_size_bytes = 0
+    num_sampled_calls = 0
+    call_record_schema_descriptor = (
+        self._schema_descriptor.get_record_schema_descriptor(
+            bigquery_util.ColumnKeyConstants.CALLS))
+    for call in calls[::len(calls) // _MAX_NUM_CALL_SAMPLES]:
+      call_record, _ = self._get_call_record(
+          call, call_record_schema_descriptor, allow_incompatible_records=True)
+      sum_sampled_call_size_bytes += self._get_json_object_size(call_record)
+      num_sampled_calls += 1
+    return sum_sampled_call_size_bytes // num_sampled_calls
 
   def _get_json_object_size(self, obj):
     return len(json.dumps(obj))
