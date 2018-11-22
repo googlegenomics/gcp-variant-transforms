@@ -101,11 +101,14 @@ def _get_sample_variant_1(is_for_nucleus=False):
         vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
   else:
     # 0.1 -> 0.25 float precision loss due to binary floating point conversion.
-    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
+    # rs123;rs2 -> rs123 it seems nuclues does not parse IDs correctly.
+    # quality=50 -> 50.0 nucleus converts quality values to float.
+    # TODO(samanvp): convert all quality values to float.
+    vcf_line = ('20	1234	rs123	C	A,T	50	'
                 'PASS	AF=0.5,0.25;NS=1	GT:GQ	0/0:48	1/0:20\n')
     variant = vcfio.Variant(
         reference_name='20', start=1233, end=1234, reference_bases='C',
-        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+        alternate_bases=['A', 'T'], names=['rs123'], quality=50.0,
         filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1})
     variant.calls.append(
         vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
