@@ -14,7 +14,7 @@
 
 # Builds docker image for gcp-variant-transforms:
 # Run using:
-# $ gcloud container builds submit --config cloudbuild.yaml --timeout 1h .
+# $ gcloud builds submit --config cloudbuild.yaml --timeout 1h .
 substitutions:
   _CUSTOM_TAG_NAME: 'latest'
 steps:
