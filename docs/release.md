@@ -66,7 +66,7 @@ The process is as follows:
    virtualenv "${temp_dir}"
    source ${temp_dir}/bin/activate
    pip install --upgrade .[int_test]
-   python gcp_variant_transforms/testing/integration/run_tests.py \
+   python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
        --project gcp-variant-transforms-test \
        --staging_location "gs://integration_test_runs/staging" \
        --temp_location "gs://integration_test_runs/temp" \
