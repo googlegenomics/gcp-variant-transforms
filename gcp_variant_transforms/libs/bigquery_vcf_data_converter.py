@@ -55,8 +55,8 @@ RESERVED_VARIANT_CALL_COLUMNS = [
 # We set it to 90MB to leave some room for error as our row estimate is based
 # on sampling rather than exact byte size.
 _MAX_BIGQUERY_ROW_SIZE_BYTES = 90 * 1024 * 1024
-# Maximum number of calls to sample for BigQuery row size estimate.
-_MAX_NUM_CALL_SAMPLES = 5
+# Number of calls to sample for BigQuery row size estimation.
+_NUM_CALL_SAMPLES = 5
 # Row size estimation based on sampling calls can be expensive and unnecessary
 # when there are not enough calls, so it's only enabled when there are at least
 # this many calls.
@@ -266,7 +266,7 @@ class BigQueryRowGenerator(object):
     call_record_schema_descriptor = (
         self._schema_descriptor.get_record_schema_descriptor(
             bigquery_util.ColumnKeyConstants.CALLS))
-    for call in calls[::len(calls) // _MAX_NUM_CALL_SAMPLES]:
+    for call in calls[::len(calls) // _NUM_CALL_SAMPLES]:
       call_record, _ = self._get_call_record(
           call, call_record_schema_descriptor, allow_incompatible_records=True)
       sum_sampled_call_size_bytes += self._get_json_object_size(call_record)
