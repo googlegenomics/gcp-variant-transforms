@@ -13,15 +13,15 @@
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 26}
+        "expected_result": {"num_rows": 13}
       },
       {
         "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 46063858}
+        "expected_result": {"sum_start": 23031929}
       },
       {
         "query": ["SUM_END_QUERY"],
-        "expected_result": {"sum_end": 46066104}
+        "expected_result": {"sum_end": 23033052}
       },
       {
         "query": [

@@ -416,6 +416,9 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
                      list(self._row_generator.get_rows(proc_variant)))
 
   def test_sharded_rows(self):
+    """Tests splitting BigQuery rows that are larger than BigQuery limit."""
+    num_calls = 10  # Number of calls for a variant in this test.
+    num_first_row_calls = 6  # BigQuery row limit is adjusted accordingly.
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
@@ -425,16 +428,12 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
               'IS': 'some data'},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
-                info={'GQ': 20, 'FIR': [10, 20]}),
-            vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
-                info={'GQ': 10, 'FB': True}),
-            vcfio.VariantCall(
-                name='Sample3', genotype=[1, 0],
-                info={'GQ': 30, 'FB': True})])
+                name='Sample{}'.format(i), genotype=[0, 1], phaseset='*',
+                info={'GQ': 20, 'FIR': [10, 20]})
+            for i in range(num_calls)])
     header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1'}
     proc_variant = _get_processed_variant(variant, header_num_dict)
+
     expected_rows = [
         {
             ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -450,14 +449,11 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             ColumnKeyConstants.QUALITY: 2,
             ColumnKeyConstants.FILTER: ['PASS'],
             ColumnKeyConstants.CALLS: [
-                {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                {ColumnKeyConstants.CALLS_NAME: 'Sample{}'.format(i),
                  ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                  ColumnKeyConstants.CALLS_PHASESET: '*',
-                 'GQ': 20, 'FIR': [10, 20]},
-                {ColumnKeyConstants.CALLS_NAME: 'Sample2',
-                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
-                 ColumnKeyConstants.CALLS_PHASESET: None,
-                 'GQ': 10, 'FB': True}],
+                 'GQ': 20, 'FIR': [10, 20]}
+                for i in range(num_first_row_calls)],
             'IS': 'some data'
         },
         {
@@ -474,18 +470,23 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
             ColumnKeyConstants.QUALITY: 2,
             ColumnKeyConstants.FILTER: ['PASS'],
             ColumnKeyConstants.CALLS: [
-                {ColumnKeyConstants.CALLS_NAME: 'Sample3',
-                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
-                 ColumnKeyConstants.CALLS_PHASESET: None,
-                 'GQ': 30, 'FB': True}],
+                {ColumnKeyConstants.CALLS_NAME: 'Sample{}'.format(i),
+                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+                 ColumnKeyConstants.CALLS_PHASESET: '*',
+                 'GQ': 20, 'FIR': [10, 20]}
+                for i in range(num_first_row_calls, num_calls)],
             'IS': 'some data'
         },
     ]
     with mock.patch.object(bigquery_vcf_data_converter,
                            '_MAX_BIGQUERY_ROW_SIZE_BYTES',
-                           len(json.dumps(expected_rows[0])) + 10):
-      self.assertEqual(expected_rows,
-                       list(self._row_generator.get_rows(proc_variant)))
+                           num_first_row_calls * len(json.dumps(
+                               expected_rows[0][ColumnKeyConstants.CALLS][0]))):
+      with mock.patch.object(bigquery_vcf_data_converter,
+                             '_MIN_NUM_CALLS_FOR_ROW_SIZE_ESTIMATION',
+                             num_calls):
+        self.assertEqual(expected_rows,
+                         list(self._row_generator.get_rows(proc_variant)))
 
   def test_omit_empty_sample_calls(self):
     variant = vcfio.Variant(
