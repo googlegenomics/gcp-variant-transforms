@@ -17,6 +17,8 @@
 import os
 import setuptools
 from setuptools.command.build_py import build_py
+from Cython.Build import cythonize
+
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -93,4 +95,11 @@ setuptools.setup(
     cmdclass={
         'build_py': BuildPyCommand,
     },
+
+    # Cython options. See https://cython.org/.
+    ext_modules=cythonize(['gcp_variant_transforms/**/*.pyx']),
+    data_files=[('gcp_variant_transforms', [
+        'gcp_variant_transforms/libs/bigquery_vcf_data_converter.pyx',
+        'gcp_variant_transforms/libs/bigquery_sanitizer.pyx',
+    ])],
 )

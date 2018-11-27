@@ -19,7 +19,7 @@ import unittest
 
 from gcp_variant_transforms.libs import bigquery_sanitizer
 
-_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
+_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer  # pylint: disable=invalid-name
 
 
 class BigQuerySanitizerTest(unittest.TestCase):

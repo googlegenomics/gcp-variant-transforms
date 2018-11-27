@@ -121,7 +121,9 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
+pip install --upgrade cython>=0.28.1
 pip install --upgrade .
+python setup.py build_ext --inplace  # install cython modules.
 ```
 
 You may use the

@@ -220,6 +220,7 @@ export VIRTUAL_ENV_DISABLE_PROMPT="something"
 virtualenv "${temp_dir}"
 source ${temp_dir}/bin/activate;
 trap clean_up EXIT
+pip install --upgrade cython>=0.28.1
 if [[ -n "${run_unit_tests}" ]]; then
   pip install --upgrade .
   python setup.py test

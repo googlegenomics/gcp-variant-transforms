@@ -44,7 +44,7 @@ _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
-_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
+_BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer  # pylint: disable=invalid-name
 
 # Map for casting values with VcfHeaderFieldTypeConstants to Python types.
 VCF_TYPE_TO_PY = {vcf_header_io.VcfHeaderFieldTypeConstants.STRING: str,

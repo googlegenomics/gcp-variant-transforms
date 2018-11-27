@@ -21,6 +21,15 @@ import apache_beam as beam
 from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 
 
+class _ConvertBqRowToVariant(beam.DoFn):
+
+  def __init__(self, variant_generator):
+    self._variant_generator = variant_generator
+
+  def process(self, row):
+    yield self._variant_generator.convert_bq_row_to_variant(row)
+
+
 class BigQueryToVariant(beam.PTransform):
   """Transforms BigQuery table rows to PCollection of `Variant`."""
 
@@ -39,5 +48,5 @@ class BigQueryToVariant(beam.PTransform):
         annotation_id_to_annotation_names)
 
   def expand(self, pcoll):
-    return (pcoll | 'BigQueryToVariant' >> beam.Map(
-        self._variant_generator.convert_bq_row_to_variant))
+    bq_to_variant_dofn = _ConvertBqRowToVariant(self._variant_generator)
+    return pcoll | 'BigQueryToVariant' >> beam.ParDo(bq_to_variant_dofn)
