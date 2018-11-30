@@ -177,7 +177,8 @@ region in support of your project’s security and compliance needs. See
 
 ## Additional topics
 
-* [Understanding the BigQuery Variants Table Schema](docs/bigquery_schema.md)
+* [Understanding the BigQuery Variants Table
+  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
