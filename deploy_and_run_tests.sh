@@ -207,8 +207,9 @@ if [[ -z "${skip_build}" ]]; then
   # TODO(bashir2): This will pick and include all directories in the image,
   # including local build and library dirs that do not need to be included.
   # Update this to include only the required files/directories.
-  gcloud container builds submit --config "${build_file}" \
+  gcloud builds submit --config "${build_file}" \
       --project "${project}" \
+      --timeout '30m' \
       --substitutions _CUSTOM_TAG_NAME="${image_tag}" .
 fi
 

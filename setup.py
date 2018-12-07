@@ -14,9 +14,7 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
-import os
 import setuptools
-from setuptools.command.build_py import build_py
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -28,6 +26,9 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'pyvcf<0.7.0',
+    'google-nucleus==0.2.0',
+    # Nucleus needs uptodate protocol buffer compiler (protoc).
+    'protobuf>=3.6.1',
     'mmh3<2.6',
     # Need to explicitly install v<=1.2.0. apache-beam requires
     # google-cloud-pubsub 0.26.0, which relies on google-cloud-core<0.26dev,
@@ -44,20 +45,6 @@ INTEGRATION_TEST_REQUIREMENTS = [
 REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
 ]
-
-
-class BuildPyCommand(build_py):
-  """Custom build command for installing libraries outside of PyPi."""
-
-  _NUCLEUS_WHEEL_PATH = (
-      'https://storage.googleapis.com/gcp-variant-transforms-setupfiles/'
-      'nucleus/Nucleus-0.1.0-py2-none-any.whl')
-
-  def run(self):
-    # Temporary workaround for installing Nucleus until it's available via PyPi.
-    os.system('pip install {}'.format(BuildPyCommand._NUCLEUS_WHEEL_PATH))
-    build_py.run(self)
-
 
 setuptools.setup(
     name='gcp_variant_transforms',
@@ -89,8 +76,5 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={
         'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
-    },
-    cmdclass={
-        'build_py': BuildPyCommand,
     },
 )
