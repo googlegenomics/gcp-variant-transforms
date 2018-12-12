@@ -1,4 +1,4 @@
-# Copyright 2017 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,100 +13,24 @@
 # limitations under the License.
 
 """beam combiner function for merging VCF file headers."""
-from collections import OrderedDict
-from typing import Dict, Any  #pylint: disable=unused-import
 
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import header_merger
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
-# TODO(nmousavi): Consider moving this into a separate file.
-class _HeaderMerger(object):
-  """Class for merging two :class:`VcfHeader`s."""
-
-  def __init__(self, resolver):
-    # type: (vcf_field_cnflict_resolver.FieldConflictResolver) -> None
-    """Initialize :class:`VcfHeader` object.
-
-    Args:
-      resolver: Auxiliary class for resolving possible header value mismatches.
-    """
-    self._resolver = resolver
-
-  def merge(self, first, second):
-    # type: (vcf_header_io.VcfHeader, vcf_header_io.VcfHeader) -> None
-    """Updates ``first``'s headers with values from ``second``.
-
-    If a specific key does not already exist in a specific one of ``first``'s
-    headers, that key and the associated value will be added. If the key does
-    already exist in the specific header of ``first``, then the value of that
-    key will be updated with the value from ``second``.
-
-    Args:
-      first: The VcfHeader object.
-      second: The VcfHeader object that's headers will be merged into the
-        headers of first.
-    """
-    if (not isinstance(first, vcf_header_io.VcfHeader) or
-        not isinstance(first, vcf_header_io.VcfHeader)):
-      raise NotImplementedError
-    self._merge_header_fields(first.infos, second.infos)
-    self._merge_header_fields(first.filters, second.filters)
-    self._merge_header_fields(first.alts, second.alts)
-    self._merge_header_fields(first.formats, second.formats)
-    self._merge_header_fields(first.contigs, second.contigs)
-
-  def _merge_header_fields(
-      self,
-      first,  # type: Dict[str, OrderedDict[str, Union[str, int]]]
-      second  # type: Dict[str, OrderedDict[str, Union[str, int]]]
-      ):
-    # type: (...) -> None
-    """Modifies ``first`` to add any keys from ``second`` not in ``first``.
-
-    Args:
-      first: first header fields.
-      second: second header fields.
-    Raises:
-      ValueError: If the header fields are incompatible (e.g. same key with
-        different types or numbers).
-    """
-    for second_key, second_value in second.iteritems():
-      if second_key not in first:
-        first[second_key] = second_value
-        continue
-      first_value = first[second_key]
-      if first_value.keys() != second_value.keys():
-        raise ValueError('Incompatible header fields: {}, {}'.format(
-            first_value, second_value))
-      merged_value = OrderedDict()
-      for first_field_key, first_field_value in first_value.iteritems():
-        second_field_value = second_value[first_field_key]
-        try:
-          resolution_field_value = self._resolver.resolve_attribute_conflict(
-              first_field_key,
-              first_field_value,
-              second_field_value)
-          merged_value.update({first_field_key: resolution_field_value})
-        except ValueError as e:
-          raise ValueError('Incompatible number or types in header fields:'
-                           '{}, {} \n. Error: {}'.format(
-                               first_value, second_value, str(e)))
-
-      first[second_key] = merged_value
-
 class _MergeHeadersFn(beam.CombineFn):
   """Combiner function for merging VCF file headers."""
 
-  def __init__(self, header_merger):
-    # type: (_HeaderMerger) -> None
+  def __init__(self, merger):
+    # type: (HeaderMerger) -> None
     super(_MergeHeadersFn, self).__init__()
-    self._header_merger = header_merger
+    self._header_merger = merger
 
   def create_accumulator(self):
     # type: () -> vcf_header_io.VcfHeader
@@ -133,7 +57,6 @@ class _MergeHeadersFn(beam.CombineFn):
         info[_HeaderKeyConstants.TYPE] = _VcfHeaderTypeConstants.STRING
     return merged_headers
 
-
 class MergeHeaders(beam.PTransform):
   """A PTransform to merge VCF file headers."""
 
@@ -154,11 +77,11 @@ class MergeHeaders(beam.PTransform):
     # Resolver makes extra efforts to resolve conflict in header definitions
     # when flag allow_incompatible_records is set. For example, it resolves
     # type conflict of string and float into string.
-    self._header_merger = _HeaderMerger(
+    self._header_merger = header_merger.HeaderMerger(
         vcf_field_conflict_resolver.FieldConflictResolver(
             split_alternate_allele_info_fields,
             resolve_always=allow_incompatible_records))
 
   def expand(self, pcoll):
-    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(_MergeHeadersFn(
-        self._header_merger)).without_defaults()
+    return pcoll | 'MergeHeaders' >> beam.CombineGlobally(
+        _MergeHeadersFn(self._header_merger)).without_defaults()

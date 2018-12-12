@@ -1,4 +1,4 @@
-# Copyright 2017 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test cases for get_merged_headers module."""
+"""Test cases for merge_headers module."""
 
 from collections import OrderedDict
 import unittest
@@ -25,8 +25,8 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs.header_merger import HeaderMerger
 from gcp_variant_transforms.transforms import merge_headers
-from gcp_variant_transforms.transforms.merge_headers import _HeaderMerger as HeaderMerger
 
 FILE_1_LINES = [
     '##fileformat=VCFv4.2\n',
@@ -324,6 +324,7 @@ class MergeHeadersTest(unittest.TestCase):
       merged_headers = combiner_fn.add_input(merged_headers, headers_1)
       merged_headers = combiner_fn.add_input(merged_headers, headers_2)
       merged_headers = combiner_fn.extract_output(merged_headers)
+
 
   def test_combine_pipeline(self):
     vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))

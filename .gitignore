@@ -7,3 +7,5 @@ build/
 dist/
 .idea/
 venv/
+.vscode/
+.coverage
