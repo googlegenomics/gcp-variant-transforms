@@ -13,14 +13,18 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+from __future__ import division
 
 import logging
+import math
+import re
 
 from typing import Dict, List  # pylint: disable=unused-import
 
 from apache_beam.io import filesystem  # pylint: disable=unused-import
 from apache_beam.io import filesystems
 
+_SHARD_PREFIX = 'count_'
 
 # The siffux that is added to output files (the output is always a VCF).
 _VEP_OUTPUT_SUFFIX = '_vep_output.vcf'
@@ -44,6 +48,8 @@ _GZ_SUFFIX = 'gz'
 # based on some anecdotal samples.
 # TODO(bashir2): Revisit the file size calculation logic.
 _GZ_FACTOR = 10
+# Minimum number of variants that will be send to each VM.
+_MIN_NUM_OF_VARIANT = 100000
 
 
 class SingleWorkerActions(object):
@@ -80,7 +86,7 @@ def disribute_files_on_workers(
     num_workers: Maximum number of workers to use.
   """
   single_vm_actions_list = []  # type: List[SingleWorkerActions]
-  file_chunks = [file_metadata_list[i::num_workers] for i in range(num_workers)]
+  file_chunks = _group_files(file_metadata_list, num_workers)
   for chunk in file_chunks:
     if not chunk:
       continue  # This happens when `num_workers` > number of files.
@@ -102,6 +108,50 @@ def disribute_files_on_workers(
         'Number of VM action sets {} is greater than workers {}'.format(
             len(single_vm_actions_list), num_workers))
   return single_vm_actions_list
+
+
+def _group_files(
+    file_metadata_list,  # type: List[filesystem.FileMetadata]
+    num_workers  # type: int
+):
+  # type: (...) -> List[List[filesystem.FileMetadata]]
+  """Groups the files in chunks bases on number of variants/files.
+
+  Each chunk of files would have roughly the same number of variants or same
+  number of files.
+  """
+  try:
+    variant_num_in_each_file = [_get_variant_num(file_metadata.path)
+                                for file_metadata in file_metadata_list]
+    target = _MIN_NUM_OF_VARIANT
+    if sum(variant_num_in_each_file) > _MIN_NUM_OF_VARIANT * num_workers:
+      target = int(math.ceil(sum(variant_num_in_each_file)/num_workers))
+    logging.info('Each VM will annotate about %d variants', target)
+    file_groups = []  # type: List[List[filesystem.FileMetadata]]
+    current_file_group = []  # type:  List[filesystem.FileMetadata]
+    current_variant_sum = 0
+    for file_metadata, variant_num in zip(file_metadata_list,
+                                          variant_num_in_each_file):
+      current_variant_sum += variant_num
+      current_file_group.append(file_metadata)
+      if current_variant_sum >= target:
+        file_groups.append(current_file_group)
+        current_variant_sum = 0
+        current_file_group = []
+    if current_file_group:
+      file_groups.append(current_file_group)
+    return file_groups
+  except ValueError:
+    logging.info('There are no variant count information in the file name. '
+                 'Group the files based on the number of files instead.')
+    return [file_metadata_list[i::num_workers] for i in range(num_workers)]
+
+
+def _get_variant_num(file_path):
+  _, file_name = filesystems.FileSystems.split(file_path)
+  if not re.match('^' + _SHARD_PREFIX + '[0-9]+$', file_name):
+    raise ValueError('Expected a file name (count_[COUNT]) ')
+  return int(file_name.split('_')[1])
 
 
 def _map_to_output_dir(input_path, output_dir):

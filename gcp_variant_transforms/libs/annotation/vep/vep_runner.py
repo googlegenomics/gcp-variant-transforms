@@ -17,16 +17,16 @@ from __future__ import absolute_import
 import argparse  # pylint: disable=unused-import
 import logging
 import time
-
-from typing import Dict, List, Any  # pylint: disable=unused-import
+from typing import Any, Dict, List, Optional  # pylint: disable=unused-import
 
 from apache_beam.io import filesystem  # pylint: disable=unused-import
 from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
+
 from googleapiclient import discovery
 from oauth2client import client
-from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 
+from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 
 # Minimum size of virtual machine disks to account for cache files.
 # NOTE(bashir2): The proper way of setting this is to measure the input cache
@@ -46,9 +46,16 @@ _GLOBAL_LOG_FILE = 'VEP_run_info.log'
 _API_PIPELINE = 'pipeline'
 _API_ACTIONS = 'actions'
 
+# The following image wraps gsutil with additional retry logic.
+_GCS_UTIL_IMAGE = 'gcr.io/cloud-genomics-pipelines/io'
 # The expected path of the run_vep.sh script in the docker container.
 _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 
+# The expected path of run_vep_in_variant_transforms.sh script in the
+# docker container. The difference between this script and run_vep.sh is that
+# it kills the VEP process in case of failure or cancellation.
+_VEP_RUN_IN_VT_SCRIPT = (
+    '/opt/variant_effect_predictor/run_vep_in_variant_transforms.sh')
 # The local name of the output file and directory for VEP runs.
 _LOCAL_OUTPUT_DIR = '/mnt/vep/output_files'
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + '/output.vcf'
@@ -60,39 +67,28 @@ _POLLING_INTERVAL_SECONDS = 30
 _NUMBER_OF_API_CALL_RETRIES = 5
 
 
-def create_runner_and_update_args(known_args, pipeline_args):
-  # type: (argparse.Namespace, List[str]) -> VepRunner
-  """Creates an instance of VepRunner using the provided args and updates them.
-
-  In particular, the two arguments that are updated are `input_pattern` and
-  `annotation_fields`.
+def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
+  # type: (argparse.Namespace, List[str], str, Optional[str]) -> VepRunner
+  """Creates an instance of VepRunner using the provided args.
 
   Args:
     known_args: The list of arguments defined in `variant_transform_options`.
     pipeline_args: The list of remaining arguments meant to be used to
       determine resources like number of workers, machine type, etc.
+    input_pattern: The file pattern that is to be annotated.
+    watchdog_file: The file that will be updated by the Dataflow worker every
+      `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
+      process running in the VM will be killed.
   """
   credentials = client.GoogleCredentials.get_application_default()
   pipeline_service = discovery.build(
       'genomics', 'v2alpha1', credentials=credentials)
   runner = VepRunner(
       pipeline_service, known_args.vep_species, known_args.vep_assembly,
-      known_args.input_pattern, known_args.annotation_output_dir,
+      input_pattern, known_args.annotation_output_dir,
       known_args.vep_info_field, known_args.vep_image_uri,
-      known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args)
-  known_args.input_pattern = runner.get_output_pattern()
-  if known_args.annotation_fields:
-    known_args.annotation_fields.append(known_args.vep_info_field)
-  else:
-    known_args.annotation_fields = [known_args.vep_info_field]
-  # TODO(bashir2): The VEP runner by default runs VEP with --allele_number hence
-  # we turn on this feature here. However, this might be inconsistent with other
-  # annotation fields that are originally present in input files, if they do not
-  # have ALLELE_NUM annotation. The fix is to make annotation ALT matching
-  # smarter to fall back on other matching methods if ALLELE_NUM is not present.
-  # When this is implemented, we may even consider removing use_allele_num flag
-  # and always start by checking if ALLELE_NUM is present.
-  known_args.use_allele_num = True
+      known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args,
+      watchdog_file)
   return runner
 
 
@@ -113,7 +109,8 @@ class VepRunner(object):
       vep_image_uri,  # type: str
       vep_cache_path,  # type: str
       vep_num_fork,  # type: int
-      pipeline_args  # List[str]
+      pipeline_args,  # type: List[str]
+      watchdog_file=None,  # type: str
       ):
     # type: (...) -> None
     """Constructs an instance for running VEP.
@@ -131,6 +128,9 @@ class VepRunner(object):
       pipeline_args: The list of arguments that are meant to be used when
         running Beam; for simplicity we use the same arguments to decide how
         many and what type of workers to use, where to run, etc.
+      watchdog_file: The file that will be updated by the Dataflow worker every
+        `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
+        process running in the VM will be killed.
     """
     self._pipeline_service = pipeline_service
     self._species = species
@@ -142,7 +142,10 @@ class VepRunner(object):
     self._output_dir = output_dir
     self._vep_info_field = vep_info_field
     self._process_pipeline_args(pipeline_args)
+    self._watchdog_file = watchdog_file
     self._running_operation_ids = []  # type: List[str]
+    self._operation_name_to_actions = {}
+    self._operation_name_to_logs = {}
 
   def _make_vep_cache_path(self, vep_cache_path):
     # type: (str) -> str
@@ -166,9 +169,10 @@ class VepRunner(object):
     return {
         _API_PIPELINE: {
             _API_ACTIONS: [
-                self._make_action('mkdir', '-p', '/mnt/vep/vep_cache'),
-                self._make_action('gsutil', '-q', 'cp', self._vep_cache_path,
-                                  '/mnt/vep/vep_cache/')
+                self._make_action(self._vep_image_uri, 'mkdir', '-p',
+                                  '/mnt/vep/vep_cache'),
+                self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
+                                  self._vep_cache_path, '/mnt/vep/vep_cache/')
             ],
             'environment': {
                 'GENOME_ASSEMBLY': self._assembly,
@@ -209,12 +213,12 @@ class VepRunner(object):
         }
     }
 
-  def _make_action(self, *args, **kwargs):
-    # type: (*str, **List[str]) -> Dict
+  def _make_action(self, image_uri, *args, **kwargs):
+    # type: (str, *str, **List[str]) -> Dict
     command_args = list(args)
     action = {
         'commands': command_args,
-        'imageUri': self._vep_image_uri,
+        'imageUri': image_uri,
         'mounts': [{'disk': 'vep', 'path': '/mnt/vep'}]
     }
     action.update(kwargs)
@@ -268,11 +272,38 @@ class VepRunner(object):
   def wait_until_done(self):
     # type: () -> None
     """Polls currently running operations and waits until all are done."""
-    while self._running_operation_ids:
-      self._running_operation_ids = [op for op in self._running_operation_ids
-                                     if not self._is_done(op)]
-      if self._running_operation_ids:
-        time.sleep(_POLLING_INTERVAL_SECONDS)
+    num_retries = 0
+    while num_retries < _NUMBER_OF_API_CALL_RETRIES:
+      new_running_operation_ids = []
+      for operation in self._running_operation_ids:
+        while not self._is_done(operation):
+          self._update_time_stamp_in_watchdog_file()
+          time.sleep(_POLLING_INTERVAL_SECONDS)
+        error_message = self._get_error_message(operation)
+        if error_message:
+          actions = self._operation_name_to_actions.get(operation)
+          logs = self._operation_name_to_logs.get(operation) + 'retry'
+          new_operation_name = self._call_pipelines_api(actions, logs)
+          self._operation_name_to_actions.update({new_operation_name: actions})
+          self._operation_name_to_logs.update({new_operation_name: logs})
+          new_running_operation_ids.append(new_operation_name)
+          logging.warning('Annotation job failed for the operation %s with '
+                          'error: %s. Retrying %d of %d.', operation,
+                          error_message, num_retries + 1,
+                          _NUMBER_OF_API_CALL_RETRIES)
+      self._running_operation_ids = new_running_operation_ids
+      if not self._running_operation_ids:
+        return
+      num_retries += 1
+
+    raise RuntimeError('Annotations for the input {} failed after {} '
+                       'retries.'.format(self._input_pattern,
+                                         _NUMBER_OF_API_CALL_RETRIES))
+
+  def _update_time_stamp_in_watchdog_file(self):
+    if self._watchdog_file:
+      with filesystems.FileSystems.create(self._watchdog_file) as file_to_write:
+        file_to_write.write(str(int(time.time())))
 
   def _is_done(self, operation):
     # type: (str) -> bool
@@ -287,6 +318,16 @@ class VepRunner(object):
     if is_done:
       logging.info('Operation %s is done.', operation)
     return is_done
+
+  def _get_error_message(self, operation):
+    request = self._pipeline_service.projects().operations().get(
+        name=operation)
+    try:
+      errors = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)['error']
+      return errors['message']
+    except KeyError:
+      logging.info('Operation %s is succeed.', operation)
+      return ''
 
   def run_on_all_files(self):
     # type: () -> None
@@ -305,12 +346,14 @@ class VepRunner(object):
       raise ValueError('No files matched input_pattern: {}'.format(
           self._input_pattern))
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
-    self._check_and_write_to_output_dir(self._output_dir)
     single_vm_actions_list = vep_runner_util.disribute_files_on_workers(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
     for vm_index, actions in enumerate(single_vm_actions_list):
-      operation_name = self._call_pipelines_api(
-          actions, self._get_output_log_path(self._output_dir, vm_index))
+      output_log_path = self._get_output_log_path(self._output_dir, vm_index)
+      operation_name = self._call_pipelines_api(actions, output_log_path)
+      self._operation_name_to_actions.update({operation_name: actions})
+      self._operation_name_to_logs.update({operation_name: output_log_path})
+
       logging.info('Started operation %s on VM %d processing %d input files',
                    operation_name, vm_index, len(actions.io_map))
       self._running_operation_ids.append(operation_name)
@@ -326,7 +369,7 @@ class VepRunner(object):
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(
-        self._make_action('gsutil', '-q', 'cp',
+        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
                           '/google/logs/output',
                           output_log_path,
                           flags=['ALWAYS_RUN']))
@@ -358,15 +401,27 @@ class VepRunner(object):
   def _create_actions(self, input_file, output_file):
     # type: (str, str) -> List
     local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
+    if self._watchdog_file:
+      action = self._make_action(self._vep_image_uri,
+                                 _VEP_RUN_IN_VT_SCRIPT,
+                                 local_input_file,
+                                 _LOCAL_OUTPUT_FILE,
+                                 self._watchdog_file)
+    else:
+      action = self._make_action(self._vep_image_uri,
+                                 _VEP_RUN_SCRIPT,
+                                 local_input_file,
+                                 _LOCAL_OUTPUT_FILE)
     return [
-        self._make_action('gsutil', '-q', 'cp', input_file, local_input_file),
-        self._make_action('rm', '-r', '-f', _LOCAL_OUTPUT_DIR),
-        self._make_action(_VEP_RUN_SCRIPT, local_input_file,
-                          _LOCAL_OUTPUT_FILE),
+        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp', input_file,
+                          local_input_file),
+        self._make_action(self._vep_image_uri, 'rm', '-r', '-f',
+                          _LOCAL_OUTPUT_DIR),
+        action,
         # TODO(bashir2): When the output files are local, the output directory
         # structure should be created as well otherwise gsutil fails.
-        self._make_action('gsutil', '-q', 'cp', _LOCAL_OUTPUT_FILE,
-                          output_file)]
+        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
+                          _LOCAL_OUTPUT_FILE, output_file)]
 
 
 def _get_base_name(file_path):
