@@ -49,15 +49,6 @@ class HeaderMergerTest(unittest.TestCase):
         formats=reader.formats,
         contigs=reader.contigs)
 
-  def _get_header_from_reader(self, reader):
-    """Extracts values from a pyVCF reader into a VcfHeader object."""
-    return vcf_header_io.VcfHeader(
-        infos=reader.infos,
-        filters=reader.filters,
-        alts=reader.alts,
-        formats=reader.formats,
-        contigs=reader.contigs)
-
   def _get_header_merger(self, split_alternate_allele_info_fields=True):
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
         split_alternate_allele_info_fields)
