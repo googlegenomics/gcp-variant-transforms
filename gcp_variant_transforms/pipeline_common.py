@@ -99,6 +99,27 @@ def read_headers(pipeline, pipeline_mode, known_args):
   return headers
 
 
+def add_original_headers(pipeline, known_args, pipeline_mode,
+                         merged_header,
+                         original_input_pattern):
+  if pipeline_mode == PipelineModes.LARGE:
+    original_headers = (pipeline
+                        | 'ReadOriginalInput'
+                        >> beam.Create([original_input_pattern])
+                        | 'ReadHeaders' >> vcf_header_io.ReadAllVcfHeaders())
+  else:
+    original_headers = (
+        pipeline
+        | 'ReadHeaders' >> vcf_header_io.ReadVcfHeaders(original_input_pattern))
+  merged_header = (
+      (merged_header, original_headers)
+      | beam.Flatten()
+      | 'MergeWithOriginalHeaders' >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
+  return merged_header
+
+
 def get_merged_headers(headers,
                        split_alternate_allele_info_fields=True,
                        allow_incompatible_records=True):

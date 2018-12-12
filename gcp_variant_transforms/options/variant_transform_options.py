@@ -287,14 +287,22 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
+        '--shard_input_files',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If true, shard the input files before running annotation tools. '
+              'This can improve the annotation performance for large input '
+              'files.'))
+    parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default='',
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
-              'structure as input files with a suffix added to them.'))
+              'structure as input files with a suffix added to them. Note that '
+              'this is expected not to exist and is created in the process of '
+              'running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/gcp-variant-annotation/vep_91',
+        default='gcr.io/gcp-variant-annotation/vep_91_in_vt',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
@@ -342,6 +350,16 @@ class AnnotationOptions(VariantTransformsOptions):
               'pass over all variants. Additionally, this flag will resolve '
               'conflicts for all headers as if `allow_incompatible_types` was '
               'true.'))
+    parser.add_argument(
+        '--run_with_garbage_collection',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If set, in case of failure or cancellation, the VMs running '
+              'VEP annotation will be cleaned up automatically.'))
+    parser.add_argument(
+        '--number_of_variants_per_shard',
+        type=int, default=20000,
+        help=('The maximum number of variants written to each shard if '
+              '`shard_input_files` is true.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
