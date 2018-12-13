@@ -41,7 +41,7 @@ data science with BigQuery.
 
 The easiest way to run the VCF to BigQuery pipeline is to use the
 [docker](https://www.docker.com/) image and run it with the
-[Google Genomics Pipelines API](https://cloud-dot-devsite.googleplex.com/genomics/pipelines)
+[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run)
 as it has the binaries and all dependencies pre-installed. Please ensure you
 have the latest `gcloud` tool by running `gcloud components update` (more
 details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
