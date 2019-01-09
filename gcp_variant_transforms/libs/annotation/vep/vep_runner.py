@@ -51,11 +51,11 @@ _GCS_UTIL_IMAGE = 'gcr.io/cloud-genomics-pipelines/io'
 # The expected path of the run_vep.sh script in the docker container.
 _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 
-# The expected path of run_vep_in_variant_transforms.sh script in the
-# docker container. The difference between this script and run_vep.sh is that
-# it kills the VEP process in case of failure or cancellation.
+# The expected path of `run_script_with_watchdog.sh` script in the
+# docker container. It runs `run_vep.sh` in background and kills this background
+# process in case of failure or cancellation.
 _VEP_RUN_IN_VT_SCRIPT = (
-    '/opt/variant_effect_predictor/run_vep_in_variant_transforms.sh')
+    '/opt/variant_effect_predictor/run_script_with_watchdog.sh')
 # The local name of the output file and directory for VEP runs.
 _LOCAL_OUTPUT_DIR = '/mnt/vep/output_files'
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + '/output.vcf'
@@ -69,13 +69,13 @@ _NUMBER_OF_API_CALL_RETRIES = 5
 
 def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
   # type: (argparse.Namespace, List[str], str, Optional[str]) -> VepRunner
-  """Creates an instance of VepRunner using the provided args.
+  """Returns an instance of VepRunner using the provided args.
 
   Args:
     known_args: The list of arguments defined in `variant_transform_options`.
     pipeline_args: The list of remaining arguments meant to be used to
       determine resources like number of workers, machine type, etc.
-    input_pattern: The file pattern that is to be annotated.
+    input_pattern: The VCF files to be annotated.
     watchdog_file: The file that will be updated by the Dataflow worker every
       `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
       process running in the VM will be killed.
@@ -144,7 +144,7 @@ class VepRunner(object):
     self._process_pipeline_args(pipeline_args)
     self._watchdog_file = watchdog_file
     self._running_operation_ids = []  # type: List[str]
-    self._operation_name_to_actions = {}
+    self._operation_name_to_io_infos = {}
     self._operation_name_to_logs = {}
 
   def _make_vep_cache_path(self, vep_cache_path):
@@ -271,34 +271,56 @@ class VepRunner(object):
 
   def wait_until_done(self):
     # type: () -> None
-    """Polls currently running operations and waits until all are done."""
+    """Polls currently running operations and waits until all are done.
+
+    In case of failure, retry the operation for at most
+    `_NUMBER_OF_API_CALL_RETRIES` times.
+    """
     num_retries = 0
     while num_retries < _NUMBER_OF_API_CALL_RETRIES:
-      new_running_operation_ids = []
-      for operation in self._running_operation_ids:
-        while not self._is_done(operation):
-          self._update_time_stamp_in_watchdog_file()
-          time.sleep(_POLLING_INTERVAL_SECONDS)
-        error_message = self._get_error_message(operation)
-        if error_message:
-          actions = self._operation_name_to_actions.get(operation)
-          logs = self._operation_name_to_logs.get(operation) + 'retry'
-          new_operation_name = self._call_pipelines_api(actions, logs)
-          self._operation_name_to_actions.update({new_operation_name: actions})
-          self._operation_name_to_logs.update({new_operation_name: logs})
-          new_running_operation_ids.append(new_operation_name)
-          logging.warning('Annotation job failed for the operation %s with '
-                          'error: %s. Retrying %d of %d.', operation,
-                          error_message, num_retries + 1,
-                          _NUMBER_OF_API_CALL_RETRIES)
-      self._running_operation_ids = new_running_operation_ids
       if not self._running_operation_ids:
         return
+      self._running_operation_ids = self._wait_and_retry_operations()
       num_retries += 1
 
     raise RuntimeError('Annotations for the input {} failed after {} '
                        'retries.'.format(self._input_pattern,
                                          _NUMBER_OF_API_CALL_RETRIES))
+
+  def _wait_and_retry_operations(self):
+    # type: () -> Optional(List[str])
+    """Waits currently running operations and retries when the operation failed.
+
+    Args:
+      running_operation_ids: currently running PAPI operation ids.
+
+    Returns:
+      A list of retry operation ids.
+    """
+    retry_operation_ids = []
+    for operation in self._running_operation_ids:
+      while not self._is_done(operation):
+        self._update_time_stamp_in_watchdog_file()
+        time.sleep(_POLLING_INTERVAL_SECONDS)
+      error_message = self._get_error_message(operation)
+      if error_message:
+        new_operation_name = self._retry_operation(operation, error_message)
+        retry_operation_ids.append(new_operation_name)
+    return retry_operation_ids
+
+  def _retry_operation(self, operation, error_message):
+    # type: (str, str) -> str
+    """Returns retry operation id."""
+    io_infos = self._operation_name_to_io_infos.get(operation)
+    logs = self._operation_name_to_logs.get(operation) + 'retry'
+    retry_operation_id = self._call_pipelines_api(io_infos, logs)
+    self._operation_name_to_io_infos.update({retry_operation_id: io_infos})
+    self._operation_name_to_logs.update({retry_operation_id: logs})
+
+    logging.warning('Annotation job failed for the operation %s with error: '
+                    '%s. Retrying with operation id %s.', operation,
+                    error_message, retry_operation_id)
+    return retry_operation_id
 
   def _update_time_stamp_in_watchdog_file(self):
     if self._watchdog_file:
@@ -346,26 +368,26 @@ class VepRunner(object):
       raise ValueError('No files matched input_pattern: {}'.format(
           self._input_pattern))
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
-    single_vm_actions_list = vep_runner_util.disribute_files_on_workers(
+    vm_io_info = vep_runner_util.get_vm_io_infos(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
-    for vm_index, actions in enumerate(single_vm_actions_list):
+    for vm_index, io_info in enumerate(vm_io_info):
       output_log_path = self._get_output_log_path(self._output_dir, vm_index)
-      operation_name = self._call_pipelines_api(actions, output_log_path)
-      self._operation_name_to_actions.update({operation_name: actions})
+      operation_name = self._call_pipelines_api(io_info, output_log_path)
+      self._operation_name_to_io_infos.update({operation_name: io_info})
       self._operation_name_to_logs.update({operation_name: output_log_path})
 
       logging.info('Started operation %s on VM %d processing %d input files',
-                   operation_name, vm_index, len(actions.io_map))
+                   operation_name, vm_index, len(io_info.io_map))
       self._running_operation_ids.append(operation_name)
 
-  def _call_pipelines_api(self, single_vm_actions, output_log_path):
+  def _call_pipelines_api(self, io_infos, output_log_path):
     # type: (vep_runner_util.SingleWorkerActions, str) -> str
     api_request = self._get_api_request_fixed_parts()
-    size_gb = single_vm_actions.disk_size_bytes / (1 << 30)
+    size_gb = io_infos.disk_size_bytes / (1 << 30)
     api_request[_API_PIPELINE]['resources'][
         'virtualMachine']['disks'][0]['sizeGb'] = (
             size_gb + _MINIMUM_DISK_SIZE_GB)
-    for input_file, output_file in single_vm_actions.io_map.iteritems():
+    for input_file, output_file in io_infos.io_map.iteritems():
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(
@@ -404,9 +426,11 @@ class VepRunner(object):
     if self._watchdog_file:
       action = self._make_action(self._vep_image_uri,
                                  _VEP_RUN_IN_VT_SCRIPT,
+                                 _VEP_RUN_SCRIPT,
+                                 str(_POLLING_INTERVAL_SECONDS),
+                                 self._watchdog_file,
                                  local_input_file,
-                                 _LOCAL_OUTPUT_FILE,
-                                 self._watchdog_file)
+                                 _LOCAL_OUTPUT_FILE)
     else:
       action = self._make_action(self._vep_image_uri,
                                  _VEP_RUN_SCRIPT,

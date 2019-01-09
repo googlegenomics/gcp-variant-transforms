@@ -49,11 +49,11 @@ _GZ_SUFFIX = 'gz'
 # TODO(bashir2): Revisit the file size calculation logic.
 _GZ_FACTOR = 10
 # Minimum number of variants that will be send to each VM.
-_MIN_NUM_OF_VARIANT = 100000
+_MIN_NUM_OF_VARIANT = 50 * 1000
 
 
-class SingleWorkerActions(object):
-  """Holds information about actions on a single virtual machine.
+class SingleWorkerIOInfo(object):
+  """Holds information about input/output files info on a virtual machine.
 
   This is a pure data object and attributes can be accessed directly but the
   intended pattern for mutating (creation) instances of this is only through
@@ -70,44 +70,45 @@ class SingleWorkerActions(object):
         self.disk_size_bytes, str(self.io_map))
 
 
-def disribute_files_on_workers(
+def get_vm_io_infos(
     file_metadata_list,  # type: List[filesystem.FileMetadata]
     output_dir,  # type: str
     num_workers  # type: int
     ):
-  # type: (...) -> List[SingleWorkerActions]
-  """Distributes a set of files among VMs to run VEP them.
+  # type: (...) -> List[SingleWorkerIOInfo]
+  """Returns a list of `SingleWorkerIOInfo` for VMs.
 
+  `SingleWorkerIOInfo` contains the input and expected output files for one VM.
   It also calculates some other configuration data for virtual machines running
-  these actions, like disk space.
+  these files, like disk space.
   Args:
     file_metadata_list: Information about input files, e.g., path, size, etc.
     output_dir: The location of output files.
     num_workers: Maximum number of workers to use.
   """
-  single_vm_actions_list = []  # type: List[SingleWorkerActions]
-  file_chunks = _group_files(file_metadata_list, num_workers)
-  for chunk in file_chunks:
-    if not chunk:
+  vm_io_info_list = []  # type: List[SingleWorkerIOInfo]
+  file_groups = _group_files(file_metadata_list, num_workers)
+  for file_group in file_groups:
+    if not file_group:
       continue  # This happens when `num_workers` > number of files.
-    current_worker = SingleWorkerActions()
-    for metadata in chunk:
-      current_worker.io_map[metadata.path] = _map_to_output_dir(metadata.path,
-                                                                output_dir)
-      if metadata.path.endswith(_GZ_SUFFIX):
+    current_worker = SingleWorkerIOInfo()
+    for file_metadata in file_group:
+      current_worker.io_map[file_metadata.path] = _map_to_output_dir(
+          file_metadata.path, output_dir)
+      if file_metadata.path.endswith(_GZ_SUFFIX):
         current_worker.disk_size_bytes += (
-            metadata.size_in_bytes * _GZ_FACTOR)
+            file_metadata.size_in_bytes * _GZ_FACTOR)
       else:
         current_worker.disk_size_bytes += (
-            metadata.size_in_bytes * _SIZE_FACTOR)
+            file_metadata.size_in_bytes * _SIZE_FACTOR)
       logging.info('Found input file %s with size %d',
-                   metadata.path, metadata.size_in_bytes)
-    single_vm_actions_list.append(current_worker)
-  if len(single_vm_actions_list) > num_workers:
+                   file_metadata.path, file_metadata.size_in_bytes)
+    vm_io_info_list.append(current_worker)
+  if len(vm_io_info_list) > num_workers:
     raise AssertionError(
         'Number of VM action sets {} is greater than workers {}'.format(
-            len(single_vm_actions_list), num_workers))
-  return single_vm_actions_list
+            len(vm_io_info_list), num_workers))
+  return vm_io_info_list
 
 
 def _group_files(
@@ -123,10 +124,12 @@ def _group_files(
   try:
     variant_num_in_each_file = [_get_variant_num(file_metadata.path)
                                 for file_metadata in file_metadata_list]
-    target = _MIN_NUM_OF_VARIANT
+    average_variant_num_per_vm = _MIN_NUM_OF_VARIANT
     if sum(variant_num_in_each_file) > _MIN_NUM_OF_VARIANT * num_workers:
-      target = int(math.ceil(sum(variant_num_in_each_file)/num_workers))
-    logging.info('Each VM will annotate about %d variants', target)
+      average_variant_num_per_vm = int(math.ceil(
+          sum(variant_num_in_each_file)/num_workers))
+    logging.info('Each VM will annotate about %d variants',
+                 average_variant_num_per_vm)
     file_groups = []  # type: List[List[filesystem.FileMetadata]]
     current_file_group = []  # type:  List[filesystem.FileMetadata]
     current_variant_sum = 0
@@ -134,7 +137,7 @@ def _group_files(
                                           variant_num_in_each_file):
       current_variant_sum += variant_num
       current_file_group.append(file_metadata)
-      if current_variant_sum >= target:
+      if current_variant_sum >= average_variant_num_per_vm:
         file_groups.append(current_file_group)
         current_variant_sum = 0
         current_file_group = []
@@ -148,6 +151,14 @@ def _group_files(
 
 
 def _get_variant_num(file_path):
+  # type: (str) -> int
+  """Returns the number of variants for a file.
+
+  It assumes the file name suffix has the count.
+
+  Raises:
+    ValueError: if the file name is not formatted as `count_[COUNT]`.
+  """
   _, file_name = filesystems.FileSystems.split(file_path)
   if not re.match('^' + _SHARD_PREFIX + '[0-9]+$', file_name):
     raise ValueError('Expected a file name (count_[COUNT]) ')
