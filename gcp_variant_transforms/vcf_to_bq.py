@@ -292,6 +292,8 @@ def run(argv=None):
   variant_merger = _get_variant_merge_strategy(known_args)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
+  pipeline_mode = pipeline_common.get_pipeline_mode(
+      known_args.input_pattern, known_args.optimize_for_large_inputs)
   _merge_headers(known_args, pipeline_args, pipeline_mode,
                  original_input_pattern)
 

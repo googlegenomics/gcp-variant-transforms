@@ -289,17 +289,18 @@ class AnnotationOptions(VariantTransformsOptions):
     parser.add_argument(
         '--shard_input_files',
         type='bool', default=True, nargs='?', const=True,
-        help=('If true, shard the input files before running annotation tools. '
-              'This can improve the annotation performance for large input '
-              'files.'))
+        help=('By default, the input files are sharded into smaller temporary '
+              'VCF files before running VEP annotation. If the input files are '
+              'small, i.e., each VCF file contains less than 50,000 variants, '
+              'set this flag to false can be more time efficient.'))
     parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default='',
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
               'structure as input files with a suffix added to them. Note that '
-              'this is expected not to exist and is created in the process of '
-              'running VEP pipelines.'))
+              'this is expected not to exist and will be created in the '
+              'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
         default='gcr.io/gcp-variant-annotation/vep_91_in_vt',
@@ -359,7 +360,10 @@ class AnnotationOptions(VariantTransformsOptions):
         '--number_of_variants_per_shard',
         type=int, default=20000,
         help=('The maximum number of variants written to each shard if '
-              '`shard_input_files` is true.'))
+              '`shard_input_files` is true. The default value should work '
+              'for most cases. You may change this flag to a smaller value if '
+              'you have a dataset with a lot of samples. Notice'
+              'that it may take a longer time to run with a smaller value.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
