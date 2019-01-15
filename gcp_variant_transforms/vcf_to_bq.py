@@ -265,35 +265,47 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode,
     known_args.representative_header_file = temp_merged_headers_file_path
 
 
+def _validate_annotation_pipeline_args(known_args, pipeline_args):
+  match_results = filesystems.FileSystems.match(['{}*'.format(
+      vep_runner_util.format_dir_path(known_args.annotation_output_dir))])
+  if match_results and match_results[0].metadata_list:
+    raise ValueError('Output directory {} already exists.'.format(
+        known_args.annotation_output_dir))
+
+  flags_dict = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
+  expected_flags = ['max_num_workers', 'num_workers']
+  for flag in expected_flags:
+    if flag in flags_dict and flags_dict[flag] > 0:
+      return
+  raise ValueError('Could not find any of {} with a valid value among pipeline '
+                   'flags {}'.format(expected_flags, flags_dict))
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
-  pipeline_mode = pipeline_common.get_pipeline_mode(
-      known_args.input_pattern, known_args.optimize_for_large_inputs)
   # Note VepRunner creates new input files, so it should be run before any
   # other access to known_args.input_pattern.
   original_input_pattern = None
   if known_args.run_annotation_pipeline:
-    match_results = filesystems.FileSystems.match(
-        ['{}*'.format(known_args.annotation_output_dir)])
-    if match_results and match_results[0].metadata_list:
-      raise ValueError('Output directory {} already exists.'.format(
-          known_args.annotation_output_dir))
+    _validate_annotation_pipeline_args(known_args, pipeline_args)
     known_args.omit_empty_sample_calls = True
     original_input_pattern = known_args.input_pattern
 
-    if known_args.shard_input_files:
+    if known_args.shard_variants:
+      pipeline_mode = pipeline_common.get_pipeline_mode(
+          known_args.input_pattern, known_args.optimize_for_large_inputs)
       _shard_vcf_files(known_args, pipeline_args, pipeline_mode)
     _annotate_vcf_files(known_args, pipeline_args)
 
   variant_merger = _get_variant_merge_strategy(known_args)
-  # Starts a pipeline to merge VCF headers in beam if the total files that
-  # match the input pattern exceeds _SMALL_DATA_THRESHOLD
   pipeline_mode = pipeline_common.get_pipeline_mode(
       known_args.input_pattern, known_args.optimize_for_large_inputs)
+  # Starts a pipeline to merge VCF headers in beam if the total files that
+  # match the input pattern exceeds _SMALL_DATA_THRESHOLD
   _merge_headers(known_args, pipeline_args, pipeline_mode,
                  original_input_pattern)
 
