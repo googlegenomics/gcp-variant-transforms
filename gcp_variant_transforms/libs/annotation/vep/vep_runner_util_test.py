@@ -41,7 +41,7 @@ class VepRunnerUtilTest(unittest.TestCase):
     output_dir = 'test/out/dir'
     file_metadata_list = [file_metadata_stub.FileMetadataStub(path, size) for
                           (path, size) in _INPUT_FILES_WITH_SIZE]
-    worker_actions_list = vep_runner_util.get_vm_io_infos(
+    worker_actions_list = vep_runner_util.get_all_vm_io_info(
         file_metadata_list, output_dir, 1)
     self.assertEqual(1, len(worker_actions_list))
     single_worker_action_map = worker_actions_list[0].io_map
@@ -55,7 +55,7 @@ class VepRunnerUtilTest(unittest.TestCase):
     output_dir = 'test/out/dir'
     file_metadata_list = [file_metadata_stub.FileMetadataStub(path, size) for
                           (path, size) in _INPUT_FILES_WITH_SIZE]
-    worker_actions_list = vep_runner_util.get_vm_io_infos(
+    worker_actions_list = vep_runner_util.get_all_vm_io_info(
         file_metadata_list, output_dir, 3)
     self.assertEqual(3, len(worker_actions_list))
     total_number_of_files = sum([len(l.io_map) for l in worker_actions_list])

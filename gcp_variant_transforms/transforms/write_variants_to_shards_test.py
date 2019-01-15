@@ -46,7 +46,7 @@ class WriteVariantsToShardsTest(unittest.TestCase):
 
   def test_write_to_shards(self):
     with temp_dir.TempDir() as tempdir:
-      shards_writter = write_variants_to_shards._WriteToShardsFn(
+      shards_writter = write_variants_to_shards._WriteVariantsToVCFShards(
           tempdir.get_path(), 3)
       variants = self._get_variants()
       variant_lines = [shards_writter._coder.encode(v).strip('\n')

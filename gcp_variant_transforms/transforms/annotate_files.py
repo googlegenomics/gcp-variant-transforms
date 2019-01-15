@@ -14,7 +14,6 @@
 
 from __future__ import absolute_import
 
-import time
 import uuid
 from datetime import datetime
 from typing import List  # pylint: disable=unused-import
@@ -44,7 +43,7 @@ class AnnotateFile(beam.DoFn):
       watchdog_file = filesystems.FileSystems.join(
           self._known_args.annotation_output_dir, unique_id)
       with filesystems.FileSystems.create(watchdog_file) as file_to_write:
-        file_to_write.write(str(int(time.time())))
+        file_to_write.write('Watchdog file.')
 
     runner = vep_runner.create_runner(self._known_args,
                                       self._pipeline_args,

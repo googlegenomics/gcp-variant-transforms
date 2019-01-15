@@ -47,14 +47,14 @@ _API_PIPELINE = 'pipeline'
 _API_ACTIONS = 'actions'
 
 # The following image wraps gsutil with additional retry logic.
-_GCS_UTIL_IMAGE = 'gcr.io/cloud-genomics-pipelines/io'
+_GSUTIL_IMAGE = 'gcr.io/cloud-genomics-pipelines/io'
 # The expected path of the run_vep.sh script in the docker container.
 _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 
 # The expected path of `run_script_with_watchdog.sh` script in the
-# docker container. It runs `run_vep.sh` in background and kills this background
-# process in case of failure or cancellation.
-_VEP_RUN_IN_VT_SCRIPT = (
+# docker container. We use this script to run `_VEP_RUN_SCRIPT` in background
+# and kill it in case of failure or cancellation.
+_WATCHDOG_RUNNER_SCRIPT = (
     '/opt/variant_effect_predictor/run_script_with_watchdog.sh')
 # The local name of the output file and directory for VEP runs.
 _LOCAL_OUTPUT_DIR = '/mnt/vep/output_files'
@@ -171,7 +171,7 @@ class VepRunner(object):
             _API_ACTIONS: [
                 self._make_action(self._vep_image_uri, 'mkdir', '-p',
                                   '/mnt/vep/vep_cache'),
-                self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
+                self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
                                   self._vep_cache_path, '/mnt/vep/vep_cache/')
             ],
             'environment': {
@@ -300,7 +300,7 @@ class VepRunner(object):
     retry_operation_ids = []
     for operation in self._running_operation_ids:
       while not self._is_done(operation):
-        self._update_time_stamp_in_watchdog_file()
+        self._update_watchdog_file()
         time.sleep(_POLLING_INTERVAL_SECONDS)
       error_message = self._get_error_message(operation)
       if error_message:
@@ -312,20 +312,22 @@ class VepRunner(object):
     # type: (str, str) -> str
     """Returns retry operation id."""
     io_infos = self._operation_name_to_io_infos.get(operation)
-    logs = self._operation_name_to_logs.get(operation) + 'retry'
-    retry_operation_id = self._call_pipelines_api(io_infos, logs)
+    logs = self._operation_name_to_logs.get(operation)
+    retry_logs = logs + 'retry'
+    retry_operation_id = self._call_pipelines_api(io_infos, retry_logs)
     self._operation_name_to_io_infos.update({retry_operation_id: io_infos})
-    self._operation_name_to_logs.update({retry_operation_id: logs})
+    self._operation_name_to_logs.update({retry_operation_id: retry_logs})
 
     logging.warning('Annotation job failed for the operation %s with error: '
-                    '%s. Retrying with operation id %s.', operation,
-                    error_message, retry_operation_id)
+                    '%s. Please check the log file (%s) for more information.'
+                    'Retrying with operation id %s.', operation,
+                    error_message, logs, retry_operation_id)
     return retry_operation_id
 
-  def _update_time_stamp_in_watchdog_file(self):
+  def _update_watchdog_file(self):
     if self._watchdog_file:
       with filesystems.FileSystems.create(self._watchdog_file) as file_to_write:
-        file_to_write.write(str(int(time.time())))
+        file_to_write.write('Watchdog file.')
 
   def _is_done(self, operation):
     # type: (str) -> bool
@@ -368,7 +370,7 @@ class VepRunner(object):
       raise ValueError('No files matched input_pattern: {}'.format(
           self._input_pattern))
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
-    vm_io_info = vep_runner_util.get_vm_io_infos(
+    vm_io_info = vep_runner_util.get_all_vm_io_info(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
     for vm_index, io_info in enumerate(vm_io_info):
       output_log_path = self._get_output_log_path(self._output_dir, vm_index)
@@ -391,7 +393,7 @@ class VepRunner(object):
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(
-        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
+        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
                           '/google/logs/output',
                           output_log_path,
                           flags=['ALWAYS_RUN']))
@@ -425,7 +427,7 @@ class VepRunner(object):
     local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
     if self._watchdog_file:
       action = self._make_action(self._vep_image_uri,
-                                 _VEP_RUN_IN_VT_SCRIPT,
+                                 _WATCHDOG_RUNNER_SCRIPT,
                                  _VEP_RUN_SCRIPT,
                                  str(_POLLING_INTERVAL_SECONDS),
                                  self._watchdog_file,
@@ -437,14 +439,14 @@ class VepRunner(object):
                                  local_input_file,
                                  _LOCAL_OUTPUT_FILE)
     return [
-        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp', input_file,
+        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp', input_file,
                           local_input_file),
         self._make_action(self._vep_image_uri, 'rm', '-r', '-f',
                           _LOCAL_OUTPUT_DIR),
         action,
         # TODO(bashir2): When the output files are local, the output directory
         # structure should be created as well otherwise gsutil fails.
-        self._make_action(_GCS_UTIL_IMAGE, 'gsutil', '-q', 'cp',
+        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
                           _LOCAL_OUTPUT_FILE, output_file)]
 
 

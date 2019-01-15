@@ -52,8 +52,8 @@ _GZ_FACTOR = 10
 _MIN_NUM_OF_VARIANT = 50 * 1000
 
 
-class SingleWorkerIOInfo(object):
-  """Holds information about input/output files info on a virtual machine.
+class WorkerIOInfo(object):
+  """Holds information about input/output on a virtual machine.
 
   This is a pure data object and attributes can be accessed directly but the
   intended pattern for mutating (creation) instances of this is only through
@@ -70,15 +70,15 @@ class SingleWorkerIOInfo(object):
         self.disk_size_bytes, str(self.io_map))
 
 
-def get_vm_io_infos(
+def get_all_vm_io_info(
     file_metadata_list,  # type: List[filesystem.FileMetadata]
     output_dir,  # type: str
     num_workers  # type: int
     ):
-  # type: (...) -> List[SingleWorkerIOInfo]
-  """Returns a list of `SingleWorkerIOInfo` for VMs.
+  # type: (...) -> List[WorkerIOInfo]
+  """Returns a list of `WorkerIOInfo` for VMs.
 
-  `SingleWorkerIOInfo` contains the input and expected output files for one VM.
+  `WorkerIOInfo` contains the input and expected output files for one VM.
   It also calculates some other configuration data for virtual machines running
   these files, like disk space.
   Args:
@@ -86,12 +86,12 @@ def get_vm_io_infos(
     output_dir: The location of output files.
     num_workers: Maximum number of workers to use.
   """
-  vm_io_info_list = []  # type: List[SingleWorkerIOInfo]
+  vm_io_info_list = []  # type: List[WorkerIOInfo]
   file_groups = _group_files(file_metadata_list, num_workers)
   for file_group in file_groups:
     if not file_group:
       continue  # This happens when `num_workers` > number of files.
-    current_worker = SingleWorkerIOInfo()
+    current_worker = WorkerIOInfo()
     for file_metadata in file_group:
       current_worker.io_map[file_metadata.path] = _map_to_output_dir(
           file_metadata.path, output_dir)
@@ -118,16 +118,17 @@ def _group_files(
   # type: (...) -> List[List[filesystem.FileMetadata]]
   """Groups the files in chunks bases on number of variants/files.
 
-  Each chunk of files would have roughly the same number of variants or same
+  Each group of files would have roughly the same number of variants or same
   number of files.
   """
   try:
     variant_num_in_each_file = [_get_variant_num(file_metadata.path)
                                 for file_metadata in file_metadata_list]
-    average_variant_num_per_vm = _MIN_NUM_OF_VARIANT
-    if sum(variant_num_in_each_file) > _MIN_NUM_OF_VARIANT * num_workers:
-      average_variant_num_per_vm = int(math.ceil(
-          sum(variant_num_in_each_file)/num_workers))
+    total_num_variants = sum(variant_num_in_each_file)
+    average_variant_num_per_vm = max(
+        int(math.ceil(total_num_variants/num_workers)),
+        _MIN_NUM_OF_VARIANT)
+
     logging.info('Each VM will annotate about %d variants',
                  average_variant_num_per_vm)
     file_groups = []  # type: List[List[filesystem.FileMetadata]]

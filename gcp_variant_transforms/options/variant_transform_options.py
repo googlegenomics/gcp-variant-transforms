@@ -287,7 +287,7 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
-        '--shard_input_files',
+        '--shard_variants',
         type='bool', default=True, nargs='?', const=True,
         help=('By default, the input files are sharded into smaller temporary '
               'VCF files before running VEP annotation. If the input files are '
@@ -303,7 +303,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/gcp-variant-annotation/vep_91_in_vt',
+        default='gcr.io/gcp-variant-annotation/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
@@ -360,7 +360,7 @@ class AnnotationOptions(VariantTransformsOptions):
         '--number_of_variants_per_shard',
         type=int, default=20000,
         help=('The maximum number of variants written to each shard if '
-              '`shard_input_files` is true. The default value should work '
+              '`shard_variants` is true. The default value should work '
               'for most cases. You may change this flag to a smaller value if '
               'you have a dataset with a lot of samples. Notice'
               'that it may take a longer time to run with a smaller value.'))

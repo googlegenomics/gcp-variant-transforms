@@ -23,12 +23,12 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 
 
-class _WriteToShardsFn(beam.DoFn):
+class _WriteVariantsToVCFShards(beam.DoFn):
   """Writes variants to VCF shards."""
 
   def __init__(self, vcf_shards_output_dir, number_of_variants_per_shard):
     # type: (str, int) -> None
-    """Initializes `_WriteToShardsFn` object.
+    """Initializes `_WriteVariantsToVCFShards` object.
 
     Args:
       vcf_shards_output_dir: The location for all VCF shards.
@@ -114,6 +114,6 @@ class WriteToShards(beam.PTransform):
   def expand(self, pcoll):
     _ = (pcoll
          | 'GenerateKeys' >> beam.ParDo(
-             _WriteToShardsFn(self._vcf_shards_output_dir,
-                              self._number_of_variants_per_shard),
+             _WriteVariantsToVCFShards(self._vcf_shards_output_dir,
+                                       self._number_of_variants_per_shard),
              self._call_names))
