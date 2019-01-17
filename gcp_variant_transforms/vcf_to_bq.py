@@ -85,8 +85,8 @@ _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _SHARDS_FOLDER = 'shards'
 
 
-def _read_variants(pipeline, known_args, pipeline_mode):
-  # type: (beam.Pipeline, argparse.Namespace, bool) -> pvalue.PCollection
+def _read_variants(input_pattern, pipeline, known_args, pipeline_mode):
+  # type: (str, beam.Pipeline, argparse.Namespace, bool) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
   representative_header_lines = None
   if known_args.representative_header_file:
@@ -95,14 +95,14 @@ def _read_variants(pipeline, known_args, pipeline_mode):
 
   if pipeline_mode:
     variants = (pipeline
-                | 'InputFilePattern' >> beam.Create([known_args.input_pattern])
+                | 'InputFilePattern' >> beam.Create([input_pattern])
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                     representative_header_lines=representative_header_lines,
                     allow_malformed_records=(
                         known_args.allow_malformed_records)))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-        known_args.input_pattern,
+        input_pattern,
         representative_header_lines=representative_header_lines,
         allow_malformed_records=known_args.allow_malformed_records,
         vcf_parser_type=vcfio.VcfParserType[known_args.vcf_parser])
@@ -131,7 +131,8 @@ def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
     raise ValueError('Merge strategy is not supported.')
 
 
-def _add_inferred_headers(pipeline,  # type: beam.Pipeline
+def _add_inferred_headers(input_pattern,  # type: str
+                          pipeline,  # type: beam.Pipeline
                           known_args,  # type: argparse.Namespace
                           merged_header,  # type: pvalue.PCollection
                           pipeline_mode  # type: bool
@@ -140,7 +141,7 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
   annotation_fields_to_infer = (known_args.annotation_fields if
                                 known_args.infer_annotation_types else [])
   inferred_headers = (
-      _read_variants(pipeline, known_args, pipeline_mode)
+      _read_variants(input_pattern, pipeline, known_args, pipeline_mode)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
@@ -157,9 +158,13 @@ def _add_inferred_headers(pipeline,  # type: beam.Pipeline
   return merged_header
 
 
-def _shard_vcf_files(known_args, pipeline_args, pipeline_mode):
-  # type: (argparse.Namespace, beam.Pipeline, bool) -> None
-  """Shards the VCF files."""
+def _shard_variants(known_args, pipeline_args, pipeline_mode):
+  # type: (argparse.Namespace, beam.Pipeline, bool) -> str
+  """Reads the variants and writes them to VCF shards.
+
+  Returns:
+   The VCF shards directory.
+  """
   options = pipeline_options.PipelineOptions(pipeline_args)
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   shard_files_job_name = pipeline_common.generate_unique_name(
@@ -168,7 +173,8 @@ def _shard_vcf_files(known_args, pipeline_args, pipeline_mode):
   vcf_shards_output_dir = filesystems.FileSystems.join(
       known_args.annotation_output_dir, _SHARDS_FOLDER)
   with beam.Pipeline(options=options) as p:
-    variants = _read_variants(p, known_args, pipeline_mode)
+    variants = _read_variants(known_args.input_pattern, p, known_args,
+                              pipeline_mode)
     call_names = (variants
                   | 'CombineCallNames' >>
                   combine_call_names.CallNamesCombiner())
@@ -180,13 +186,16 @@ def _shard_vcf_files(known_args, pipeline_args, pipeline_mode):
              beam.pvalue.AsSingleton(call_names),
              known_args.number_of_variants_per_shard))
 
-  known_args.input_pattern = vep_runner_util.format_dir_path(
-      vcf_shards_output_dir)
+  return vep_runner_util.format_dir_path(vcf_shards_output_dir)
 
 
-def _annotate_vcf_files(known_args, pipeline_args):
-  # type: (argparse.Namespace, beam.Pipeline) -> None
-  """Annotates the VCF files using VEP."""
+def _annotate_vcf_files(input_pattern, known_args, pipeline_args):
+  # type: (str, argparse.Namespace, beam.Pipeline) -> str
+  """Annotates the VCF files using VEP.
+
+  Returns:
+    The annotated VCF files directory.
+  """
   options = pipeline_options.PipelineOptions(pipeline_args)
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   annotate_files_job_name = pipeline_common.generate_unique_name(
@@ -195,11 +204,9 @@ def _annotate_vcf_files(known_args, pipeline_args):
 
   with beam.Pipeline(options=options) as p:
     _ = (p
-         | beam.Create([known_args.input_pattern])
+         | beam.Create([input_pattern])
          | 'AnnotateShards' >> beam.ParDo(
              annotate_files.AnnotateFile(known_args, pipeline_args)))
-  known_args.input_pattern = vep_runner_util.get_output_pattern(
-      known_args.annotation_output_dir)
   if known_args.annotation_fields:
     known_args.annotation_fields.append(known_args.vep_info_field)
   else:
@@ -212,6 +219,7 @@ def _annotate_vcf_files(known_args, pipeline_args):
   # When this is implemented, we may even consider removing use_allele_num flag
   # and always start by checking if ALLELE_NUM is present.
   known_args.use_allele_num = True
+  return vep_runner_util.get_output_pattern(known_args.annotation_output_dir)
 
 
 def _update_google_cloud_job_name(google_cloud_options, job_name):
@@ -221,9 +229,9 @@ def _update_google_cloud_job_name(google_cloud_options, job_name):
     google_cloud_options.job_name = job_name
 
 
-def _merge_headers(known_args, pipeline_args, pipeline_mode,
-                   original_input_pattern=None):
-  # type: (argparse.Namespace, List[str], int, str) -> None
+def _merge_headers(input_pattern, known_args, pipeline_args, pipeline_mode,
+                   annotated_vcf_pattern=None):
+  # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
   if known_args.representative_header_file:
     return
@@ -250,17 +258,20 @@ def _merge_headers(known_args, pipeline_args, pipeline_mode,
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
-    headers = pipeline_common.read_headers(p, pipeline_mode, known_args)
+    headers = pipeline_common.read_headers(p, pipeline_mode, input_pattern)
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
         known_args.allow_incompatible_records)
-    if original_input_pattern:
-      merged_header = pipeline_common.add_original_headers(
-          p, known_args, pipeline_mode, merged_header, original_input_pattern)
+    if annotated_vcf_pattern:
+      merged_header = pipeline_common.add_annotation_headers(
+          p, known_args, pipeline_mode, merged_header,
+          annotated_vcf_pattern)
     if known_args.infer_headers or known_args.infer_annotation_types:
+      infer_headers_input_pattern = annotated_vcf_pattern or input_pattern
       merged_header = _add_inferred_headers(p, known_args, merged_header,
-                                            pipeline_mode)
+                                            pipeline_mode,
+                                            infer_headers_input_pattern)
     pipeline_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path
 
@@ -281,33 +292,40 @@ def _validate_annotation_pipeline_args(known_args, pipeline_args):
                    'flags {}'.format(expected_flags, flags_dict))
 
 
+def _run_annotation_pipeline(known_args, pipeline_args):
+  # type: (argparse.Namespace, List[str]) -> str
+  annotated_vcf_pattern = None
+  if known_args.run_annotation_pipeline:
+    _validate_annotation_pipeline_args(known_args, pipeline_args)
+    known_args.omit_empty_sample_calls = True
+
+    if known_args.shard_variants:
+      pipeline_mode = pipeline_common.get_pipeline_mode(
+          known_args.input_pattern, known_args.optimize_for_large_inputs)
+      vcf_shards_dir = _shard_variants(known_args, pipeline_args, pipeline_mode)
+    annotated_vcf_pattern = _annotate_vcf_files(vcf_shards_dir,
+                                                known_args,
+                                                pipeline_args)
+  return annotated_vcf_pattern
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
-  # Note VepRunner creates new input files, so it should be run before any
-  # other access to known_args.input_pattern.
-  original_input_pattern = None
-  if known_args.run_annotation_pipeline:
-    _validate_annotation_pipeline_args(known_args, pipeline_args)
-    known_args.omit_empty_sample_calls = True
-    original_input_pattern = known_args.input_pattern
 
-    if known_args.shard_variants:
-      pipeline_mode = pipeline_common.get_pipeline_mode(
-          known_args.input_pattern, known_args.optimize_for_large_inputs)
-      _shard_vcf_files(known_args, pipeline_args, pipeline_mode)
-    _annotate_vcf_files(known_args, pipeline_args)
+  annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
 
+  input_pattern = annotated_vcf_pattern or known_args.input_pattern
   variant_merger = _get_variant_merge_strategy(known_args)
   pipeline_mode = pipeline_common.get_pipeline_mode(
-      known_args.input_pattern, known_args.optimize_for_large_inputs)
+      input_pattern, known_args.optimize_for_large_inputs)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
-  _merge_headers(known_args, pipeline_args, pipeline_mode,
-                 original_input_pattern)
+  _merge_headers(known_args.input_pattern, known_args, pipeline_args,
+                 pipeline_mode, annotated_vcf_pattern)
 
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQuery schema cannot yet be dynamically created based on input.
@@ -333,7 +351,7 @@ def run(argv=None):
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
-  variants = _read_variants(pipeline, known_args, pipeline_mode)
+  variants = _read_variants(input_pattern, pipeline, known_args, pipeline_mode)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if partitioner:
