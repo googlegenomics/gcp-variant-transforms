@@ -17,10 +17,12 @@
 from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
-from gcp_variant_transforms.beam_io import vcf_header_io # pylint: disable=unused-import
 
+from gcp_variant_transforms.beam_io import vcf_header_io # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_header_definitions_merger
 
+# An alias for the header key constants to make referencing easier.
+_VcfHeaderDefinitions = vcf_header_definitions_merger.VcfHeaderDefinitions
 
 class _MergeDefinitionsFn(beam.CombineFn):
   """Combiner function for merging definitions."""
@@ -33,26 +35,25 @@ class _MergeDefinitionsFn(beam.CombineFn):
   def create_accumulator(self):
     return vcf_header_definitions_merger.VcfHeaderDefinitions()
 
-  def add_input(self, source, to_merge):
-    # type: (vcf_header_definitions_merger.VcfHeaderDefinitions,
-    #        vcf_header_io.VcfHeader) ->
-    #            vcf_header_definitions_merger.VcfHeaderDefinitions
+  def add_input(self,
+                source,  # type: _VcfHeaderDefinitions
+                to_merge  # type: vcf_header_io.VcfHeader
+               ):
+    # type: (...) -> _VcfHeaderDefinitions
     return self.merge_accumulators(
         [source,
          vcf_header_definitions_merger.VcfHeaderDefinitions(
              vcf_header=to_merge)])
 
   def merge_accumulators(self, accumulators):
-    # type: (List[vcf_header_definitions_merger.VcfHeaderDefinitions]) ->
-    #            vcf_header_definitions_merger.VcfHeaderDefinitions
+    # type: (List[_VcfHeaderDefinitions]) -> _VcfHeaderDefinitions
     merged_definitions = self.create_accumulator()
     for to_merge in accumulators:
       self._definitions_merger.merge(merged_definitions, to_merge)
     return merged_definitions
 
   def extract_output(self, merged_definitions):
-    # type: (vcf_header_definitions_merger.VcfHeaderDefinitions) ->
-    #     vcf_header_definitions_merger.VcfHeaderDefinitions
+    # type: (_VcfHeaderDefinitions) -> _VcfHeaderDefinitions
     return merged_definitions
 
 

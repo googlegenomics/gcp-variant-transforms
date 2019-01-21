@@ -52,6 +52,9 @@ from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-impor
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_header_definitions_merger  # pylint: disable=unused-import
 
+# An alias for the header key constants to make referencing easier.
+_Definition = vcf_header_definitions_merger.Definition
+_VcfHeaderDefinitions = vcf_header_definitions_merger.VcfHeaderDefinitions
 
 _NO_SOLUTION_MESSAGE = 'Not resolved.'
 _PADDING_CHARACTER = ' '
@@ -73,8 +76,7 @@ class _HeaderLine(object):
 
 
 def generate_report(
-    # type: vcf_header_definitions_merger.VcfHeaderDefinitions
-    header_definitions,
+    header_definitions,  # type: _VcfHeaderDefinitions
     file_path,  # type: str
     resolved_headers=None,  # type: vcf_header_io.VcfHeader
     inferred_headers=None,  # type: vcf_header_io.VcfHeader
@@ -103,11 +105,9 @@ def generate_report(
 
 
 def _extract_conflicts(
-    # type: Dict[str, Dict[vcf_header_definitions_merger.Definition, List[str]]]
-    definitions
+    definitions  # type: Dict[str, Dict[_Definition, List[str]]]
     ):
-  # type: (...) ->
-  #     Dict[str, Dict[vcf_header_definitions_merger.Definition, List[str]]]
+  # type: (...) -> Dict[str, Dict[_Definition, List[str]]]
   """Extracts the fields that have conflicting definitions.
 
   Returns:
@@ -120,8 +120,7 @@ def _extract_conflicts(
 
 def _append_conflicting_headers_to_report(
     file_to_write,  # type: file
-    # type: vcf_header_definitions_merger.VcfHeaderDefinitions
-    header_definitions,
+    header_definitions,  # type: _VcfHeaderDefinitions
     resolved_headers  # type: vcf_header_io.VcfHeader
     ):
   # type: (...) -> None
@@ -187,8 +186,7 @@ def _append_malformed_records_to_report(file_to_write, malformed_records):
 
 
 def _generate_conflicting_headers_lines(
-    # type: Dict[str, Dict[vcf_header_definitions_merger.Definition, List[str]]]
-    conflicts,
+    conflicts,  # type: Dict[str, Dict[_Definition, List[str]]]
     resolved_headers,  # type: Dict[str, Dict[str, Union[str, int]]
     category  # type: str
     ):
