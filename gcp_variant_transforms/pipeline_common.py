@@ -87,16 +87,38 @@ def get_pipeline_mode(input_pattern, optimize_for_large_inputs=False):
   return PipelineModes.SMALL
 
 
-def read_headers(pipeline, pipeline_mode, known_args):
-  # type: (beam.Pipeline, int, argparse.Namespace) -> pvalue.PCollection
+def read_headers(pipeline, pipeline_mode, input_pattern):
+  # type: (beam.Pipeline, int, str) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
   if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
-               | beam.Create([known_args.input_pattern])
+               | beam.Create([input_pattern])
                | vcf_header_io.ReadAllVcfHeaders())
   else:
-    headers = pipeline | vcf_header_io.ReadVcfHeaders(known_args.input_pattern)
+    headers = pipeline | vcf_header_io.ReadVcfHeaders(input_pattern)
   return headers
+
+
+def add_annotation_headers(pipeline, known_args, pipeline_mode,
+                           merged_header,
+                           annotated_vcf_pattern):
+  if pipeline_mode == PipelineModes.LARGE:
+    annotation_headers = (pipeline
+                          | 'ReadAnnotatedVCF'
+                          >> beam.Create([annotated_vcf_pattern])
+                          | 'ReadHeaders' >> vcf_header_io.ReadAllVcfHeaders())
+  else:
+    annotation_headers = (
+        pipeline
+        | 'ReadHeaders'
+        >> vcf_header_io.ReadVcfHeaders(annotated_vcf_pattern))
+  merged_header = (
+      (merged_header, annotation_headers)
+      | beam.Flatten()
+      | 'MergeWithOriginalHeaders' >> merge_headers.MergeHeaders(
+          known_args.split_alternate_allele_info_fields,
+          known_args.allow_incompatible_records))
+  return merged_header
 
 
 def get_merged_headers(headers,
