@@ -23,8 +23,8 @@ from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_header_definitions
-from gcp_variant_transforms.transforms.merge_header_definitions import Definition
-from gcp_variant_transforms.transforms.merge_header_definitions import VcfHeaderDefinitions
+from gcp_variant_transforms.libs.vcf_header_definitions_merger import Definition
+from gcp_variant_transforms.libs.vcf_header_definitions_merger import VcfHeaderDefinitions
 
 
 class MergeHeadersTest(unittest.TestCase):
