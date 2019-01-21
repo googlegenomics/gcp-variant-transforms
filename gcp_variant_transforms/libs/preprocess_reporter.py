@@ -50,10 +50,11 @@ from apache_beam.io import filesystems
 
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
-from gcp_variant_transforms.transforms import merge_header_definitions  # pylint: disable=unused-import
-from gcp_variant_transforms.transforms.merge_header_definitions import Definition  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import vcf_header_definitions_merger  # pylint: disable=unused-import
 
+# An alias for the header key constants to make referencing easier.
+_Definition = vcf_header_definitions_merger.Definition
+_VcfHeaderDefinitions = vcf_header_definitions_merger.VcfHeaderDefinitions
 
 _NO_SOLUTION_MESSAGE = 'Not resolved.'
 _PADDING_CHARACTER = ' '
@@ -75,7 +76,7 @@ class _HeaderLine(object):
 
 
 def generate_report(
-    header_definitions,  # type: merge_header_definitions.VcfHeaderDefinitions
+    header_definitions,  # type: _VcfHeaderDefinitions
     file_path,  # type: str
     resolved_headers=None,  # type: vcf_header_io.VcfHeader
     inferred_headers=None,  # type: vcf_header_io.VcfHeader
@@ -92,7 +93,7 @@ def generate_report(
       fields that have conflicting definitions.
     inferred_headers: The `VcfHeader` that contains the inferred header
       definitions of the undefined/mismatched header fields.
-    malformed_records: A list of ``MalformedVcfRecord`` for which VCF parser
+    malformed_records: A list of `MalformedVcfRecord` for which VCF parser
       failed.
   """
   resolved_headers = resolved_headers or vcf_header_io.VcfHeader()
@@ -104,14 +105,14 @@ def generate_report(
 
 
 def _extract_conflicts(
-    definitions  # type: Dict[str, Dict[Definition, List[str]]]
+    definitions  # type: Dict[str, Dict[_Definition, List[str]]]
     ):
-  # type: (...) -> Dict[str, Dict[Definition, List[str]]]
+  # type: (...) -> Dict[str, Dict[_Definition, List[str]]]
   """Extracts the fields that have conflicting definitions.
 
   Returns:
     A dictionary that maps field id with conflicting definitions to a dictionary
-    which maps ``Definition`` to a list of file names.
+    which maps `Definition` to a list of file names.
   """
   # len(v) > 1 means there are conflicting definitions for this field.
   return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
@@ -119,7 +120,7 @@ def _extract_conflicts(
 
 def _append_conflicting_headers_to_report(
     file_to_write,  # type: file
-    header_definitions,  # type: merge_header_definitions.VcfHeaderDefinitions
+    header_definitions,  # type: _VcfHeaderDefinitions
     resolved_headers  # type: vcf_header_io.VcfHeader
     ):
   # type: (...) -> None
@@ -185,7 +186,7 @@ def _append_malformed_records_to_report(file_to_write, malformed_records):
 
 
 def _generate_conflicting_headers_lines(
-    conflicts,  # type: Dict[str, Dict[Definition, List[str]]]
+    conflicts,  # type: Dict[str, Dict[_Definition, List[str]]]
     resolved_headers,  # type: Dict[str, Dict[str, Union[str, int]]
     category  # type: str
     ):
@@ -198,7 +199,7 @@ def _generate_conflicting_headers_lines(
   the file names can be extremely long and there can be at most 5 of them), the
   conflicting definitions and the file names are split in the continuous rows
   such that each row/cell only contains one definition/file name. While
-  splitting, the empty cells are filled by ``_PADDING_CHARACTER`` as a
+  splitting, the empty cells are filled by `_PADDING_CHARACTER` as a
   placeholder so it can be easily viewed in both text editor and spreadsheets.
   Output example:
   NS    INFO        num=1 type=Float     file1         num=1 type=Float
@@ -260,25 +261,27 @@ def _extract_resolution(header, filed_id):
   """
   if filed_id not in header:  # It happens when no resolved_headers is provided.
     return _NO_SOLUTION_MESSAGE
-  return _format_definition(header[filed_id][VcfParserHeaderKeyConstants.NUM],
-                            header[filed_id][VcfParserHeaderKeyConstants.TYPE])
+  return _format_definition(
+      header[filed_id][vcf_header_io.VcfParserHeaderKeyConstants.NUM],
+      header[filed_id][vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
 
 
 def _format_definition(num_value, type_value):
   # type: (Union[str, int], str) -> str
   formatted_definition = [
-      '='.join([VcfParserHeaderKeyConstants.NUM, str(num_value)]),
-      '='.join([VcfParserHeaderKeyConstants.TYPE, str(type_value)])
+      '='.join([vcf_header_io.VcfParserHeaderKeyConstants.NUM, str(num_value)]),
+      '='.join(
+          [vcf_header_io.VcfParserHeaderKeyConstants.TYPE, str(type_value)])
   ]
   return ' '.join(formatted_definition)
 
 
 def _append_to_report(file_to_write, error_type, header, contents):
   # type: (file, str, str, List[str]) -> None
-  """Appends the contents to ``file_to_write``.
+  """Appends the contents to `file_to_write`.
 
-  The ``error_type``, ``header`` and the ``contents`` are written to
-  ``file_to_write`` sequentially.
+  The `error_type`, `header` and the `contents` are written to
+  `file_to_write` sequentially.
   """
   if not contents:
     file_to_write.write('No ' + error_type + ' Found.\n')

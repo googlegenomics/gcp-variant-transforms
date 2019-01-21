@@ -26,8 +26,8 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.testing import temp_dir
-from gcp_variant_transforms.transforms import merge_header_definitions
-from gcp_variant_transforms.transforms.merge_header_definitions import Definition
+from gcp_variant_transforms.libs.vcf_header_definitions_merger import Definition
+from gcp_variant_transforms.libs.vcf_header_definitions_merger import VcfHeaderDefinitions
 
 
 class PreprocessReporterTest(unittest.TestCase):
@@ -36,7 +36,7 @@ class PreprocessReporterTest(unittest.TestCase):
   def _generate_report_and_assert_contents_equal(
       self,
       expected_content,  # type: List[str]
-      header_definitions,  # type: merge_header_definitions.VcfHeaderDefinitions
+      header_definitions,  # type: VcfHeaderDefinitions
       resolved_headers=None,  # type: VcfHeader
       inferred_headers=None,  # type: VcfHeader
       malformed_records=None  # type: List[vcfio.MalformedVcfRecord]
@@ -55,7 +55,7 @@ class PreprocessReporterTest(unittest.TestCase):
         self.assertEqual(reader, expected_content)
 
   def test_report_no_conflicts(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1']}}
     header_definitions._formats = {'NS': {Definition(1, 'Float'): ['file2']}}
 
@@ -70,7 +70,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     resolved_headers)
 
   def test_report_conflicts(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Integer'): ['file1'],
                                         Definition(1, 'Float'): ['file2']}}
 
@@ -92,7 +92,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     resolved_headers)
 
   def test_report_multiple_files(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {
         'NS': {Definition(1, 'Float'): ['file1', 'file2'],
                Definition(1, 'Integer'): ['file3']}
@@ -118,7 +118,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     resolved_headers)
 
   def test_report_multiple_fields(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1'],
                                         Definition(1, 'Integer'): ['file2']}}
     header_definitions._formats = {'DP': {Definition(2, 'Float'): ['file3'],
@@ -149,7 +149,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     resolved_headers)
 
   def test_report_no_resolved_headers(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1'],
                                         Definition(1, 'Integer'): ['file2']}}
 
@@ -167,7 +167,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     header_definitions)
 
   def test_report_inferred_headers_only(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     formats = OrderedDict([('DP', Format('DP', 2, 'Float', 'Total Depth'))])
 
     inferred_headers = VcfHeader(formats=formats)
@@ -184,7 +184,7 @@ class PreprocessReporterTest(unittest.TestCase):
         expected, header_definitions, inferred_headers=inferred_headers)
 
   def test_report_conflicted_and_inferred_headers(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1'],
                                         Definition(1, 'Integer'): ['file2']}}
 
@@ -214,7 +214,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     inferred_headers)
 
   def test_report_malformed_records(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     inferred_headers = VcfHeader()
     records = [vcfio.MalformedVcfRecord('file1',
                                         'rs6054257  G  A  29  PASS',
@@ -235,7 +235,7 @@ class PreprocessReporterTest(unittest.TestCase):
         malformed_records=records)
 
   def test_report_no_inconsistencies(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     inferred_headers = VcfHeader()
     expected = [
         'No Header Conflicts Found.\n',
