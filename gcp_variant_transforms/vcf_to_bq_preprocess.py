@@ -97,8 +97,7 @@ def run(argv=None):
   pipeline_mode = pipeline_common.get_pipeline_mode(known_args.input_pattern)
 
   with beam.Pipeline(options=options) as p:
-    headers = pipeline_common.read_headers(p, pipeline_mode,
-                                           known_args.input_pattern)
+    headers = pipeline_common.read_headers(p, pipeline_mode, known_args)
     merged_headers = pipeline_common.get_merged_headers(headers)
     merged_definitions = (headers
                           | 'MergeDefinitions' >>

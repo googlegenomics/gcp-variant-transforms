@@ -16,8 +16,6 @@ from __future__ import absolute_import
 
 import unittest
 
-from apache_beam.io import filesystem
-
 from gcp_variant_transforms.libs.annotation.vep import file_metadata_stub
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 
@@ -41,7 +39,7 @@ class VepRunnerUtilTest(unittest.TestCase):
     output_dir = 'test/out/dir'
     file_metadata_list = [file_metadata_stub.FileMetadataStub(path, size) for
                           (path, size) in _INPUT_FILES_WITH_SIZE]
-    worker_actions_list = vep_runner_util.get_all_vm_io_info(
+    worker_actions_list = vep_runner_util.disribute_files_on_workers(
         file_metadata_list, output_dir, 1)
     self.assertEqual(1, len(worker_actions_list))
     single_worker_action_map = worker_actions_list[0].io_map
@@ -55,14 +53,14 @@ class VepRunnerUtilTest(unittest.TestCase):
     output_dir = 'test/out/dir'
     file_metadata_list = [file_metadata_stub.FileMetadataStub(path, size) for
                           (path, size) in _INPUT_FILES_WITH_SIZE]
-    worker_actions_list = vep_runner_util.get_all_vm_io_info(
+    worker_actions_list = vep_runner_util.disribute_files_on_workers(
         file_metadata_list, output_dir, 3)
     self.assertEqual(3, len(worker_actions_list))
     total_number_of_files = sum([len(l.io_map) for l in worker_actions_list])
     self.assertEqual(total_number_of_files,
                      len(_INPUT_FILES_WITH_SIZE))
     merged_dict = {}
-    for actions_list in worker_actions_list:
+    for actions_list in  worker_actions_list:
       for k, v in actions_list.io_map.iteritems():
         merged_dict[k] = v
     self.assertDictEqual(
@@ -70,33 +68,3 @@ class VepRunnerUtilTest(unittest.TestCase):
         {f.path: '{}/{}{}'.format(output_dir, f.path,
                                   vep_runner_util._VEP_OUTPUT_SUFFIX)
          for f in file_metadata_list})
-
-  def test_group_files_sufficient_workers(self):
-    file_metadata_list = self._get_file_metadata_list()
-    file_chunks = vep_runner_util._group_files(file_metadata_list, 4)
-    expected_file_chunks = [
-        [file_metadata_list[0]],
-        [file_metadata_list[1], file_metadata_list[2]],
-        [file_metadata_list[3], file_metadata_list[4]],
-        [file_metadata_list[5], file_metadata_list[6]]]
-
-    self.assertEqual(file_chunks, expected_file_chunks)
-
-  def test_group_files_insufficient_workers(self):
-    file_metadata_list = self._get_file_metadata_list()
-    file_chunks = vep_runner_util._group_files(file_metadata_list, 3)
-    expected_file_chunks = [
-        [file_metadata_list[0], file_metadata_list[1], file_metadata_list[2]],
-        [file_metadata_list[3], file_metadata_list[4], file_metadata_list[5]],
-        [file_metadata_list[6]]]
-
-    self.assertEqual(file_chunks, expected_file_chunks)
-
-  def _get_file_metadata_list(self):
-    return [filesystem.FileMetadata('gs://bucket/count_100000', 10),
-            filesystem.FileMetadata('gs://bucket/count_1', 10),
-            filesystem.FileMetadata('gs://bucket/count_100000', 10),
-            filesystem.FileMetadata('gs://bucket/count_1', 10),
-            filesystem.FileMetadata('gs://bucket/count_100000', 10),
-            filesystem.FileMetadata('gs://bucket/count_1', 10),
-            filesystem.FileMetadata('gs://bucket/count_1', 10)]

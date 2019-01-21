@@ -287,20 +287,11 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
-        '--shard_variants',
-        type='bool', default=True, nargs='?', const=True,
-        help=('By default, the input files are sharded into smaller temporary '
-              'VCF files before running VEP annotation. If the input files are '
-              'small, i.e., each VCF file contains less than 50,000 variants, '
-              'set this flag to false can be more time efficient.'))
-    parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default='',
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
-              'structure as input files with a suffix added to them. Note that '
-              'this is expected not to exist and will be created in the '
-              'process of running VEP pipelines.'))
+              'structure as input files with a suffix added to them.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
         default='gcr.io/gcp-variant-annotation/vep_91',
@@ -351,19 +342,6 @@ class AnnotationOptions(VariantTransformsOptions):
               'pass over all variants. Additionally, this flag will resolve '
               'conflicts for all headers as if `allow_incompatible_types` was '
               'true.'))
-    parser.add_argument(
-        '--run_with_garbage_collection',
-        type='bool', default=True, nargs='?', const=True,
-        help=('If set, in case of failure or cancellation, the VMs running '
-              'VEP annotation will be cleaned up automatically.'))
-    parser.add_argument(
-        '--number_of_variants_per_shard',
-        type=int, default=20000,
-        help=('The maximum number of variants written to each shard if '
-              '`shard_variants` is true. The default value should work '
-              'for most cases. You may change this flag to a smaller value if '
-              'you have a dataset with a lot of samples. Notice'
-              'that it may take a longer time to run with a smaller value.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
