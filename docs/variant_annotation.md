@@ -101,6 +101,18 @@ followed by `_vep_output.vcf`. Note that if this directory already exists, then
 Variant Transforms fails. This is to prevent unintentional overwriting of old
 annotated VCFs.
 
+* [`--shard_variants`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L290)
+by default, the input files are sharded into smaller temporary VCF files before
+running VEP annotation. If the input files are small, i.e., each VCF file
+contains less than 50,000 variants, set this flag to false can be more time
+efficient.
+
+* [`--number_of_variants_per_shard`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L360)
+the maximum number of variants written to each shard if `shard_variants` is
+true. The default value should work for most cases. You may change this flag to
+a smaller value if you have a dataset with a lot of samples. Notice that it may
+take a longer time to run with a smaller value.
+
 * [`--vep_image_uri`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L196)
 the docker image for VEP created using the
 [Dockerfile in variant-annotation](https://github.com/googlegenomics/variant-annotation/tree/master/batch/vep)
@@ -121,18 +133,15 @@ annotations; use this field to override the field name.
 * [`--vep_num_fork`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L208)
 number of forks when running VEP, see [`--fork` option of VEP](ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_fork).
 
+
 For other parameters, like how many VMs to use or where the VMs should be
 located, the same parameters for
 [Dataflow pipeline execution](https://cloud.google.com/dataflow/pipelines/specifying-exec-params)
-are reused, e.g., `--num_workers`.
+are reused, e.g., `--num_workers`. It is recommended to provide at least 100 
+workers for large inputs. Further increasing the number of workers can reduce 
+the running time.
 
 ### Caveats and troubleshooting
-
-Running VEP is slow especially if you have large VCF inputs. This is because in
-this first version of VEP integration with Variant Transforms, we are not
-sharding input files and so each input VCF is processed by one single VEP run.
-Therefore if your input VCFs are large, it is recommended to set `--num_workers`
-at least as big as number of input files.
 
 In the `annotation_output_dir`, beside output annotated VCFs, there is a `logs`
 directory which contains the logs from virtual machines on which VEP was run.
