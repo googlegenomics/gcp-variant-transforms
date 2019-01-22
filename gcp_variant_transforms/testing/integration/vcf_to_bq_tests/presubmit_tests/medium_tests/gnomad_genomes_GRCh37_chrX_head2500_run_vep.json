@@ -8,6 +8,7 @@
     "runner": "DataflowRunner",
     "run_annotation_pipeline": "True",
     "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
+    "shard_variants": "False",
     "num_workers": 2,
     "assertion_configs": [
       {

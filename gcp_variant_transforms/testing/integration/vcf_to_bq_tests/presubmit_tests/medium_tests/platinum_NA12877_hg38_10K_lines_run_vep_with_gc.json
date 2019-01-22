@@ -1,16 +1,16 @@
 [
   {
-    "test_name": "platinum-na12877-hg38-10k-lines-run-vep",
-    "table_name": "platinum_NA12877_hg38_10K_lines_run_vep",
+    "test_name": "platinum-na12877-hg38-10k-lines-run-vep-with-gc",
+    "table_name": "platinum_NA12877_hg38_10K_lines_run_vep_with_gc",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_NA12877_hg38_10K_lines_manual_vep_orig_output.vcf",
     "annotation_fields": "CSQ",
     "runner": "DataflowRunner",
     "run_annotation_pipeline": "True",
     "infer_annotation_types": "True",
-    "run_with_garbage_collection": "False",
-    "shard_variants": "False",
+    "run_with_garbage_collection": "True",
+    "shard_variants": "True",
     "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
-    "num_workers": 1,
+    "num_workers": 2,
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
