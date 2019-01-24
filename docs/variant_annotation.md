@@ -104,14 +104,14 @@ annotated VCFs.
 * [`--shard_variants`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L290)
 by default, the input files are sharded into smaller temporary VCF files before
 running VEP annotation. If the input files are small, i.e., each VCF file
-contains less than 50,000 variants, set this flag to false can be more time
-efficient.
+contains less than 50,000 variants, setting this flag can be computationally
+wasteful.
 
 * [`--number_of_variants_per_shard`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L360)
 the maximum number of variants written to each shard if `shard_variants` is
 true. The default value should work for most cases. You may change this flag to
-a smaller value if you have a dataset with a lot of samples. Notice that it may
-take a longer time to run with a smaller value.
+a smaller value if you have a dataset with a lot of samples. Notice that
+pipeline may take longer to finish for smaller value of this flag.
 
 * [`--vep_image_uri`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L196)
 the docker image for VEP created using the
@@ -137,9 +137,9 @@ number of forks when running VEP, see [`--fork` option of VEP](ensembl.org/info/
 For other parameters, like how many VMs to use or where the VMs should be
 located, the same parameters for
 [Dataflow pipeline execution](https://cloud.google.com/dataflow/pipelines/specifying-exec-params)
-are reused, e.g., `--num_workers`. It is recommended to provide at least 100 
-workers for large inputs. Further increasing the number of workers can reduce 
-the running time.
+are reused, e.g., `--num_workers`. It is recommended to provide one worker per
+50,000 variants. For instance, for a dataset with 5,000,000 variants, you may
+set `--num_workers` to 100.
 
 ### Caveats and troubleshooting
 

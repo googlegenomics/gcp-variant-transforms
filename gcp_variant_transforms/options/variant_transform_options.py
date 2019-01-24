@@ -292,7 +292,7 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('By default, the input files are sharded into smaller temporary '
               'VCF files before running VEP annotation. If the input files are '
               'small, i.e., each VCF file contains less than 50,000 variants, '
-              'set this flag to false can be more time efficient.'))
+              'setting this flag can be computationally wasteful.'))
     parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default='',
@@ -362,8 +362,9 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('The maximum number of variants written to each shard if '
               '`shard_variants` is true. The default value should work '
               'for most cases. You may change this flag to a smaller value if '
-              'you have a dataset with a lot of samples. Notice'
-              'that it may take a longer time to run with a smaller value.'))
+              'you have a dataset with a lot of samples. Notice that the '
+              'pipeline may take longer to finish for smaller value of this '
+              'flag.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
