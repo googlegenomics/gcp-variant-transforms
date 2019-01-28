@@ -92,7 +92,6 @@ class BigqueryUtilTest(unittest.TestCase):
             bigquery_type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
 
 
-
   def test_merge_field_schemas_no_same_id(self):
     field_schemas_1 = [
         bigquery.TableFieldSchema(
@@ -113,7 +112,7 @@ class BigqueryUtilTest(unittest.TestCase):
             mode=TableFieldConstants.MODE_NULLABLE,
             description='INFO foo desc')
     ]
-    merged_field_schemas = bigquery_util.get_merged_field_schemas(
+    merged_field_schemas = bigquery_util._get_merged_field_schemas(
         field_schemas_1, field_schemas_2)
     expected_merged_field_schemas = [
         bigquery.TableFieldSchema(
@@ -159,7 +158,7 @@ class BigqueryUtilTest(unittest.TestCase):
             mode=TableFieldConstants.MODE_NULLABLE,
             description='INFO foo desc')
     ]
-    merged_field_schemas = bigquery_util.get_merged_field_schemas(
+    merged_field_schemas = bigquery_util._get_merged_field_schemas(
         field_schemas_1, field_schemas_2)
     expected_merged_field_schemas = [
         bigquery.TableFieldSchema(
@@ -195,7 +194,7 @@ class BigqueryUtilTest(unittest.TestCase):
             mode=TableFieldConstants.MODE_REPEATED,
             description='INFO foo desc')
     ]
-    self.assertRaises(ValueError, bigquery_util.get_merged_field_schemas,
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
                       field_schemas_1, field_schemas_2)
 
   def test_merge_field_schemas_conflict_type(self):
@@ -213,7 +212,7 @@ class BigqueryUtilTest(unittest.TestCase):
             mode=TableFieldConstants.MODE_NULLABLE,
             description='INFO foo desc')
     ]
-    self.assertRaises(ValueError, bigquery_util.get_merged_field_schemas,
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
                       field_schemas_1, field_schemas_2)
 
   def test_merge_field_schemas_conflict_record_fields(self):
@@ -240,7 +239,7 @@ class BigqueryUtilTest(unittest.TestCase):
         mode=TableFieldConstants.MODE_NULLABLE,
         description='FORMAT foo desc'))
     field_schemas_2 = [call_record_2]
-    self.assertRaises(ValueError, bigquery_util.get_merged_field_schemas,
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
                       field_schemas_1, field_schemas_2)
 
   def test_merge_field_schemas_same_record(self):
@@ -260,8 +259,8 @@ class BigqueryUtilTest(unittest.TestCase):
 
     expected_merged_field_schemas = [call_record_1]
     self.assertEqual(
-        bigquery_util.get_merged_field_schemas(field_schemas_1,
-                                               field_schemas_2),
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
         expected_merged_field_schemas)
 
   def test_merge_field_schemas_merge_record_fields(self):
@@ -308,8 +307,8 @@ class BigqueryUtilTest(unittest.TestCase):
 
     expected_merged_field_schemas = [call_record_3]
     self.assertEqual(
-        bigquery_util.get_merged_field_schemas(field_schemas_1,
-                                               field_schemas_2),
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
         expected_merged_field_schemas)
 
   def test_merge_field_schemas_conflict_inner_record_fields(self):
@@ -348,7 +347,7 @@ class BigqueryUtilTest(unittest.TestCase):
         description='FORMAT foo desc'))
     record_2.fields.append(inner_record_2)
     field_schemas_2 = [record_2]
-    self.assertRaises(ValueError, bigquery_util.get_merged_field_schemas,
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
                       field_schemas_1, field_schemas_2)
 
   def test_merge_field_schemas_merge_inner_record_fields(self):
@@ -411,6 +410,6 @@ class BigqueryUtilTest(unittest.TestCase):
     merged_record.fields.append(merged_inner_record)
     expected_merged_field_schemas = [merged_record]
     self.assertEqual(
-        bigquery_util.get_merged_field_schemas(field_schemas_1,
-                                               field_schemas_2),
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
         expected_merged_field_schemas)

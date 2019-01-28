@@ -36,6 +36,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_sanitizer
+from gcp_variant_transforms.libs import infer_headers_util
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
 
@@ -353,7 +354,7 @@ class ProcessedVariantFactory(object):
     annotation_names = annotation_parser.extract_annotation_names(
         self._header_fields.infos[annot_field][_HeaderKeyConstants.DESC])
     for name in annotation_names:
-      type_key = annotation_parser.get_inferred_annotation_type_header_key(
+      type_key = infer_headers_util.get_inferred_annotation_type_header_key(
           annot_field, name)
       yield name, type_key
 
@@ -475,7 +476,7 @@ class _AnnotationProcessor(object):
         for name, value in annotation_map.iteritems():
           if name == annotation_parser.ANNOTATION_ALT:
             continue
-          type_key = annotation_parser.get_inferred_annotation_type_header_key(
+          type_key = infer_headers_util.get_inferred_annotation_type_header_key(
               annotation_field_name, name)
           vcf_type = self._vcf_type_from_annotation_header(
               annotation_field_name, type_key)

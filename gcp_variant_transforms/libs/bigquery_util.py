@@ -14,8 +14,8 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
-import exceptions
 import enum
+import exceptions
 import re
 from typing import List, Tuple, Union  # pylint: disable=unused-import
 
@@ -197,9 +197,10 @@ def get_avro_type_from_bigquery_type_mode(bigquery_type, bigquery_mode):
     return avro_type
 
 def update_bigquery_schema_on_append(schema_fields, output_table):
-  # type: (bool) -> None
+  # type: (bool, str) -> None
   # if table does not exist, do not need to update the schema.
   # TODO (yifangchen): Move the logic into validate().
+  """Update BQ schema by combining existing one with a new one, if possible."""
   output_table_re_match = re.match(
       r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
       output_table)
@@ -218,8 +219,8 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
     return
 
   new_schema = bigquery.TableSchema()
-  new_schema.fields = get_merged_field_schemas(existing_table.schema.fields,
-                                               schema_fields)
+  new_schema.fields = _get_merged_field_schemas(existing_table.schema.fields,
+                                                schema_fields)
   existing_table.schema = new_schema
   try:
     client.tables.Update(bigquery.BigqueryTablesUpdateRequest(
@@ -231,7 +232,7 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
     raise RuntimeError('BigQuery schema update failed: %s' % str(e))
 
 
-def get_merged_field_schemas(
+def _get_merged_field_schemas(
     field_schemas_1,  # type: List[bigquery.TableFieldSchema]
     field_schemas_2  # type: List[bigquery.TableFieldSchema]
     ):
@@ -241,9 +242,11 @@ def get_merged_field_schemas(
   Args:
     field_schemas_1: A list of `TableFieldSchema`.
     field_schemas_2: A list of `TableFieldSchema`.
+
   Returns:
     A new schema with new fields from `field_schemas_2` appended to
     `field_schemas_1`.
+
   Raises:
     ValueError: If there are fields with the same name, but different modes or
     different types.
@@ -272,6 +275,6 @@ def get_merged_field_schemas(
                                              existing_field_schema.type,
                                              field_schema.type))
       if field_schema.type == TableFieldConstants.TYPE_RECORD:
-        existing_field_schema.fields = get_merged_field_schemas(
+        existing_field_schema.fields = _get_merged_field_schemas(
             existing_field_schema.fields, field_schema.fields)
   return merged_field_schemas

@@ -43,9 +43,6 @@ _SYMBOLIC_ALT_RE = re.compile(r'^<(?P<ID>.*)>$')
 _BREAKEND_ALT_RE = (re.compile(
     r'^(?P<up_to_chr>.*([\[\]]).*):(?P<pos>.*)([\[\]]).*$'))
 
-# Filled with annotation field and name data, then used as a header ID.
-_BASE_ANNOTATION_TYPE_KEY = '{}_{}_TYPE'
-
 
 class AnnotationParserException(Exception):
   pass
@@ -423,17 +420,3 @@ def reconstruct_annotation_description(annotation_names):
   returns 'Format: Allele|Consequence|IMPACT|SYMBOL|Gene'.
   """
   return ' '.join(['Format:', '|'.join(annotation_names)])
-
-
-def get_inferred_annotation_type_header_key(annot_field, name):
-  # type: (str, str) -> str
-  """Creates ID values for annotation type info headers.
-
-  Args:
-    annot_field: field name representing annotation field (e.g. 'CSQ').
-    name: annotation data field names (e.g. 'IMPACT').
-
-  Returns:
-    Info ID value (e.g. CSQ_IMPACT_TYPE).
-  """
-  return _BASE_ANNOTATION_TYPE_KEY.format(annot_field, name)

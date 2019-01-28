@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A Helper module for Header Inference operations."""
+"""A Helper module for header inference operations."""
 
 from __future__ import absolute_import
 
@@ -25,14 +25,118 @@ from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
-from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
+from gcp_variant_transforms.libs.annotation import annotation_parser
 
 _FIELD_COUNT_ALTERNATE_ALLELE = 'A'
 
 # Alias for the header key/type constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 _HeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
+# Filled with annotation field and name data, then used as a header ID.
+_BASE_ANNOTATION_TYPE_KEY = '{}_{}_TYPE'
+
+def get_inferred_annotation_type_header_key(annot_field, name):
+  # type: (str, str) -> str
+  """Creates ID values for annotation type info headers.
+
+  Args:
+    annot_field: field name representing annotation field (e.g. 'CSQ').
+    name: annotation data field names (e.g. 'IMPACT').
+
+  Returns:
+    Info ID value (e.g. CSQ_IMPACT_TYPE).
+  """
+  return _BASE_ANNOTATION_TYPE_KEY.format(annot_field, name)
+
+def infer_info_fields(
+    variant,
+    defined_headers,
+    infer_headers=False,  # type: bool
+    annotation_fields_to_infer=None  # type: Optional[List[str]]
+    ):
+  """Returns inferred info fields.
+
+  Up to three types of info fields are inferred:
+
+  if `infer_headers` is True:
+  - The info fields are undefined in the headers.
+  - The info fields' definitions provided by the header does not match the
+    field value.
+  if `infer_annotation_types` is True:
+  - Fields containing type information of corresponding annotation Info
+    fields.
+
+  Args:
+    variant: variant object
+    defined_headers: header fields defined in header section of VCF files.
+    infer_headers: If true, header fields are inferred from variant data.
+    annotation_fields_to_infer: list of info fields treated as annotation
+        fields (e.g. ['CSQ', 'CSQ_VT']).
+
+  Returns:
+    infos: dict of (info_key, `Info`) for any info field in
+      `variant` that is not defined in the header or the definition mismatches
+      the field values.
+  """
+  infos = {}
+  if infer_headers:
+    _infer_non_annotation_info_fields(variant, infos, defined_headers)
+  if annotation_fields_to_infer:
+    _infer_annotation_type_info_fields(
+        variant, infos, defined_headers, annotation_fields_to_infer)
+  return infos
+
+def infer_format_fields(variant, defined_headers):
+  # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Format]
+  """Returns inferred format fields.
+
+  Two types of format fields are inferred:
+  - The format fields are undefined in the headers.
+  - The format definition provided by the headers does not match the field
+    values.
+
+  Args:
+    variant: variant object
+    defined_headers: header fields defined in header section of VCF files.
+
+  Returns:
+    A dict of (format_key, `Format`) for any format key in
+    `variant` that is not defined in the header or the definition mismatches
+    the field values.
+  """
+  formats = {}
+  for call in variant.calls:
+    for format_key, format_value in call.info.iteritems():
+      if not defined_headers or format_key not in defined_headers.formats:
+        if format_key in formats:
+          raise ValueError(
+              'Duplicate FORMAT field "{}" in variant "{}"'.format(
+                  format_key, variant))
+        logging.warning('Undefined FORMAT field "%s" in variant "%s"',
+                        format_key, str(variant))
+        formats[format_key] = Format(format_key,
+                                     _get_field_count(format_value),
+                                     _get_field_type(format_value),
+                                     '')  # NO_DESCRIPTION
+    # No point in proceeding. All other calls have the same FORMAT.
+    break
+  for call in variant.calls:
+    for format_key, format_value in call.info.iteritems():
+      if defined_headers and format_key in defined_headers.formats:
+        defined_header = defined_headers.formats.get(format_key)
+        corrected_format = _infer_mismatched_format_field(
+            format_key, format_value, defined_header)
+        if corrected_format:
+          logging.warning(
+              'Incorrect FORMAT field "%s". Defined as "type=%s,num=%s", '
+              'got "%s" in variant "%s"',
+              format_key, defined_header.get(_HeaderKeyConstants.TYPE),
+              str(defined_header.get(_HeaderKeyConstants.NUM)),
+              str(format_value), str(variant))
+          formats[format_key] = corrected_format
+  return formats
 
 def _get_field_count(field_value):
   # type: (Union[List, bool, int, str]) -> Optional[int]
@@ -114,11 +218,13 @@ def _infer_mismatched_info_field(field_key,  # type: str
     cardinality as the alternate bases. Correct the num to be `None`.
   - Defined type is `Integer`, but the provided value is float. Correct the
     type to be `Float`.
+
   Args:
     field_key: the info field key.
     field_value: the value of the field key given in the variant.
     defined_header: The definition of `field_key` in the header.
     num_alternate_bases: number of the alternate bases.
+
   Returns:
     Corrected info definition if there are mismatches.
   """
@@ -140,20 +246,19 @@ def _infer_mismatched_info_field(field_key,  # type: str
                 defined_header.get(_HeaderKeyConstants.VERSION))
   return None
 
-def _infer_mismatched_format_field(field_key,  # type: str
-                                   field_value,  # type: Any
-                                   defined_header  # type: Dict
-                                  ):
-  # type: (...) -> Optional[Format]
+def _infer_mismatched_format_field(field_key, field_value, defined_header):
+  # type: (str, Any, Dict) -> Optional[Format]
   """Returns corrected format if there are mismatches.
 
   One type of mismatches is handled:
   - Defined type is `Integer`, but the provided value is float. Correct the
     type to be `Float`.
+
   Args:
     field_key: the format field key.
     field_value: the value of the field key given in the variant.
     defined_header: The definition of `field_key` in the header.
+
   Returns:
     Corrected format definition if there are mismatches.
   """
@@ -166,7 +271,7 @@ def _infer_mismatched_format_field(field_key,  # type: str
                   defined_header.get(_HeaderKeyConstants.DESC))
   return None
 
-def _infer_standard_info_fields(variant, infos, defined_headers):
+def _infer_non_annotation_info_fields(variant, infos, defined_headers):
   # type: (vcfio.Variant, Dict[str, Info], vcf_header_io.VcfHeader) -> None
   """Updates `infos` with inferred info fields.
 
@@ -174,6 +279,7 @@ def _infer_standard_info_fields(variant, infos, defined_headers):
   - The info fields are undefined in the headers.
   - The info fields' definitions provided by the header does not match the
     field value.
+
   Args:
     variant: variant object
     infos: dict of (info_key, `Info`) for any info field in
@@ -223,6 +329,7 @@ def _infer_annotation_type_info_fields(variant,
   each variant potentially contains multiple values for each annotation
   header, a small 'merge' of value types is performed before VcfHeader
   creation for each variant.
+
   Args:
     variant: variant object
     infos: dict of (info_key, `Info`) for any info field in
@@ -264,7 +371,7 @@ def _infer_annotation_type_info_fields(variant,
             _get_field_type(v))
         if variant_merged_type == _HeaderTypeConstants.STRING:
           break
-      key_id = annotation_parser.get_inferred_annotation_type_header_key(
+      key_id = get_inferred_annotation_type_header_key(
           field, name)
       infos[key_id] = Info(key_id,
                            1,  # field count
@@ -273,88 +380,3 @@ def _infer_annotation_type_info_fields(variant,
                                name)),
                            '',  # UNKNOWN_SOURCE
                            '')  # UNKNOWN_VERSION
-
-def infer_info_fields(
-    variant,
-    defined_headers,
-    infer_headers=False,  # type: bool
-    annotation_fields_to_infer=None  # type: Optional[List[str]]
-    ):
-  """Returns inferred info fields.
-
-  Up to three types of info fields are inferred:
-
-  if `infer_headers` is True:
-  - The info fields are undefined in the headers.
-  - The info fields' definitions provided by the header does not match the
-    field value.
-  if `infer_annotation_types` is True:
-  - Fields containing type information of corresponding annotation Info
-    fields.
-
-  Args:
-    variant: variant object
-    defined_headers: header fields defined in header section of VCF files.
-    infer_headers: If true, header fields are inferred from variant data.
-    annotation_fields_to_infer: list of info fields treated as annotation
-        fields (e.g. ['CSQ', 'CSQ_VT']).
-  Returns:
-    infos: dict of (info_key, `Info`) for any info field in
-      `variant` that is not defined in the header or the definition mismatches
-      the field values.
-  """
-  infos = {}
-  if infer_headers:
-    _infer_standard_info_fields(variant, infos, defined_headers)
-  if annotation_fields_to_infer:
-    _infer_annotation_type_info_fields(
-        variant, infos, defined_headers, annotation_fields_to_infer)
-  return infos
-
-def infer_format_fields(variant, defined_headers):
-  # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Format]
-  """Returns inferred format fields.
-
-  Two types of format fields are inferred:
-  - The format fields are undefined in the headers.
-  - The format definition provided by the headers does not match the field
-    values.
-  Args:
-    variant: variant object
-    defined_headers: header fields defined in header section of VCF files.
-  Returns:
-    A dict of (format_key, `Format`) for any format key in
-    `variant` that is not defined in the header or the definition mismatches
-    the field values.
-  """
-  formats = {}
-  for call in variant.calls:
-    for format_key, format_value in call.info.iteritems():
-      if not defined_headers or format_key not in defined_headers.formats:
-        if format_key in formats:
-          raise ValueError(
-              'Duplicate FORMAT field "{}" in variant "{}"'.format(
-                  format_key, variant))
-        logging.warning('Undefined FORMAT field "%s" in variant "%s"',
-                        format_key, str(variant))
-        formats[format_key] = Format(format_key,
-                                     _get_field_count(format_value),
-                                     _get_field_type(format_value),
-                                     '')  # NO_DESCRIPTION
-    # No point in proceeding. All other calls have the same FORMAT.
-    break
-  for call in variant.calls:
-    for format_key, format_value in call.info.iteritems():
-      if defined_headers and format_key in defined_headers.formats:
-        defined_header = defined_headers.formats.get(format_key)
-        corrected_format = _infer_mismatched_format_field(
-            format_key, format_value, defined_header)
-        if corrected_format:
-          logging.warning(
-              'Incorrect FORMAT field "%s". Defined as "type=%s,num=%s", '
-              'got "%s" in variant "%s"',
-              format_key, defined_header.get(_HeaderKeyConstants.TYPE),
-              str(defined_header.get(_HeaderKeyConstants.NUM)),
-              str(format_value), str(variant))
-          formats[format_key] = corrected_format
-  return formats
