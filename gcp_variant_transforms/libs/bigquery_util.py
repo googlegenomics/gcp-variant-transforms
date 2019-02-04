@@ -197,7 +197,7 @@ def get_avro_type_from_bigquery_type_mode(bigquery_type, bigquery_mode):
     return avro_type
 
 def update_bigquery_schema_on_append(schema_fields, output_table):
-  # type: (bool, str) -> None
+  # type: (List[bigquery.TableFieldSchema], str) -> None
   # if table does not exist, do not need to update the schema.
   # TODO (yifangchen): Move the logic into validate().
   """Update BQ schema by combining existing one with a new one, if possible."""

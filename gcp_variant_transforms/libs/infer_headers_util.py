@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A Helper module for header inference operations."""
+"""A helper module for header inference operations."""
 
 from __future__ import absolute_import
 
@@ -51,8 +51,8 @@ def get_inferred_annotation_type_header_key(annot_field, name):
   return _BASE_ANNOTATION_TYPE_KEY.format(annot_field, name)
 
 def infer_info_fields(
-    variant,
-    defined_headers,
+    variant,  # type: vcfio.Variant
+    defined_headers,  # type: vcf_header_io.VcfHeader
     infer_headers=False,  # type: bool
     annotation_fields_to_infer=None  # type: Optional[List[str]]
     ):
