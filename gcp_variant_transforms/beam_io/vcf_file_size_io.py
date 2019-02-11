@@ -17,6 +17,7 @@
 from __future__ import absolute_import
 
 from typing import Iterable, List, Tuple  # pylint: disable=unused-import
+import itertools
 import logging
 
 import apache_beam as beam
@@ -31,18 +32,21 @@ from apache_beam.io import iobase
 from gcp_variant_transforms.beam_io import vcfio
 
 
-def _get_file_sizes(file_pattern):
+def _get_file_size(file_name):
   # type: (str) -> List[FileSizeInfo]
-  file_sizes = []
-  match_result = filesystems.FileSystems.match([file_pattern])[0]
-  for file_metadata in match_result.metadata_list:
-    compression_type = filesystem.CompressionTypes.detect_compression_type(
-        file_metadata.path)
-    if compression_type != filesystem.CompressionTypes.UNCOMPRESSED:
-      logging.error("VCF file %s is compressed; disk requirement estimator "
-                    "will not be accurate.", file_metadata.path)
-    file_sizes.append((file_metadata.path, file_metadata.size_in_bytes,))
-  return file_sizes
+  match_result = filesystems.FileSystems.match([file_name])[0]
+  if len(match_result.metadata_list) != 1:
+    raise IOError("File name {} did not correspond to exactly 1 result. "
+                  "Instead, got {}.".format(file_name,
+                                            len(match_result.metadata_list)))
+  file_metadata = match_result.metadata_list[0]
+
+  compression_type = filesystem.CompressionTypes.detect_compression_type(
+      file_metadata.path)
+  if compression_type != filesystem.CompressionTypes.UNCOMPRESSED:
+    logging.error("VCF file %s is compressed; disk requirement estimator "
+                  "will not be accurate.", file_metadata.path)
+  return file_metadata.size_in_bytes
 
 
 def _convert_variants_to_bytesize(variant):
@@ -64,7 +68,7 @@ class FileSizeInfo(object):
     Given the raw_file_size and measurements of several VCF lines from the file,
     estimate how much disk the file will take after expansion due to encoding
     lines as `vcfio.Variant` objects. The encoded_sample_size will be set as
-    `self.encoded`.
+    `self.encoded_size`.
 
     This is a simple ratio problem, solving for encoded_sample_size which is
     the only unknown:
@@ -111,8 +115,11 @@ class FileSizeInfoSumFn(beam.CombineFn):
 class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
   """A source for estimating the encoded size of a VCF file in `vcf_to_bq`.
 
-  This source first reads a limited number of variants from a set of VCF files,
-  then
+  This source first obtains the raw file sizes of a set of VCF files. Then,
+  the source reads a limited number of variants from a set of VCF files,
+  both as raw strings and encoded `Variant` objects. Finally, the reader
+  returns a single `FileSizeInfo` object with an estimate of the input size
+  if all sizes had been encoded as `Variant` objects.
 
   Lines that are malformed are skipped.
 
@@ -142,7 +149,7 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
       file_name,  # type: str
       range_tracker  # type: range_trackers.UnsplittableRangeTracker
       ):
-    # type: (...) -> Iterable[Tuple[str, str, vcfio.Variant]]
+    # type: (...) -> Iterable[FileSizeInfo]
     """This "generator" only emits a single FileSizeInfo object per file."""
     vcf_parser_class = vcfio.get_vcf_parser(self._vcf_parser_type)
     record_iterator = vcf_parser_class(
@@ -155,18 +162,20 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
         buffer_size=self.DEFAULT_VCF_READ_BUFFER_SIZE,
         skip_header_lines=0)
 
-    _, raw_file_size = _get_file_sizes(file_name)[0]
+    raw_file_size = _get_file_size(file_name)
 
     # Open distinct channel to read lines as raw bytestrings.
     with filesystems.FileSystems.open(file_name,
-                                      self._compression_type) as raw_reader:
-      raw_record = raw_reader.readline()
-      while raw_record and raw_record.startswith('#'):
-        # Skip headers, assume header size is negligible.
-        raw_record = raw_reader.readline()
-
+                                      self._compression_type) as raw_iterator:
       count, raw_size, encoded_size = 0, 0, 0
-      for encoded_record in record_iterator:
+      for encoded_record, raw_record in itertools.izip(record_iterator,
+                                                       raw_iterator):
+        while raw_record and raw_record.startswith('#'):
+          # Skip headers. Assume that header size is negligible.
+          raw_record = raw_iterator.next()
+        logging.debug(
+            "Reading record for disk usage estimation. Encoded variant: %s\n"
+            "Raw variant: %s", encoded_record, raw_record)
         if count >= self._sample_size:
           break
         if not isinstance(encoded_record, vcfio.Variant):
@@ -174,12 +183,13 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
               "Skipping VCF line that could not be decoded as a "
               "`vcfio.Variant` in file %s: %s", file_name, raw_record)
           continue
-
-        raw_size += len(raw_record)
+        # Encoding in `utf-8` should represent the string as one byte per char,
+        # even for non-ASCII chars. Python adds significant overhead to the
+        # bytesize of the full str object.
+        raw_size += len(raw_record.encode('utf-8'))
         encoded_size += _convert_variants_to_bytesize(encoded_record)
         count += 1
 
-        raw_record = raw_reader.readline()  # Increment raw iterator.
     file_size_info = FileSizeInfo(file_name, raw_file_size)
     file_size_info.estimate_encoded_file_size(raw_size, encoded_size)
     yield file_size_info

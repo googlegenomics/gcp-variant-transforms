@@ -74,7 +74,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                                     resolved_headers)
 
   def test_report_with_disk_estimate(self):
-    header_definitions = merge_header_definitions.VcfHeaderDefinitions()
+    header_definitions = VcfHeaderDefinitions()
     header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1']}}
     header_definitions._formats = {'NS': {Definition(1, 'Float'): ['file2']}}
 
@@ -82,7 +82,6 @@ class PreprocessReporterTest(unittest.TestCase):
         ('NS', Info('NS', 1, 'Integer', 'Number samples', None, None))])
     formats = OrderedDict([('NS', Format('NS', 1, 'Float', 'Number samples'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
-
     file_size_info = vcf_file_size_io.FileSizeInfo(
         'unused_name',
         raw_file_size=int(1e10),

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pipeline for preprocessing the VCF files.
+r"""Pipeline for preprocessing the VCF files.
 
 This pipeline is aimed to help the user to easily identify and further import
 the malformed/incompatible VCF files to BigQuery. It generates two files as the
@@ -68,6 +68,7 @@ from gcp_variant_transforms.transforms import merge_header_definitions
 _COMMAND_LINE_OPTIONS = [variant_transform_options.PreprocessOptions]
 
 # Number of lines from each VCF that should be read when estimating disk usage.
+# TODO(hanjohn): Convert this field to a flag.
 _SNIPPET_READ_SIZE = 50
 
 def _get_inferred_headers(variants,  # type: pvalue.PCollection
@@ -102,9 +103,6 @@ def _estimate_disk_resources(p, input_pattern):
           input_pattern, _SNIPPET_READ_SIZE)
       | 'SumFileSizeEstimates' >> beam.CombineGlobally(
           vcf_file_size_io.FileSizeInfoSumFn()))
-  result | ('PrintEstimate' >>  # pylint: disable=expression-not-assigned
-            beam.Map(lambda x: logging.info(
-                "Final estimate of encoded size: %d GB", x.encoded_size / 1e9)))
   return result
 
 

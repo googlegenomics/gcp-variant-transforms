@@ -45,6 +45,7 @@ Malformed Records
 File Path   Variant Record              Error Message
 file 1      rs6 G A 29 PASS NS=3;       invalid literal for int() with base 10.
 """
+import logging
 import math
 
 from typing import Dict, List, Optional, Union  # pylint: disable=unused-import
@@ -54,7 +55,6 @@ from apache_beam.io import filesystems
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_file_size_io  # pylint: disable=unused-import
-from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
 from gcp_variant_transforms.libs import vcf_header_definitions_merger  # pylint: disable=unused-import
 
 # An alias for the header key constants to make referencing easier.
@@ -290,6 +290,8 @@ def _append_disk_usage_estimate_to_report(file_to_write, disk_usage_estimate):
   # type: (file, vcf_file_size_io.FileSizeInfo) -> None
   if disk_usage_estimate is None:
     return
+  logging.info("Final estimate of encoded size: %d GB",
+               disk_usage_estimate.encoded_size / 1e9)
   file_to_write.write(
       'Estimated disk usage by Dataflow: {} GB\n'
       'Total raw file sizes: {} GB\n'.format(
