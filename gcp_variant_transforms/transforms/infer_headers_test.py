@@ -1,4 +1,4 @@
-# Copyright 2018 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google Inc.  All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.transforms import infer_headers
+
 
 
 class InferHeaderFieldsTest(unittest.TestCase):
@@ -255,139 +256,6 @@ class InferHeaderFieldsTest(unittest.TestCase):
                   asserts.header_fields_equal_ignore_order([expected]))
       p.run()
 
-  def test_infer_mismatched_info_field_no_mismatches(self):
-    variant = self._get_sample_variant_info_ia_float_2_0_in_list()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', 'A', 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    corrected_info = infer_header_fields._infer_mismatched_info_field(
-        'IA', variant.info.get('IA'),
-        vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
-        len(variant.alternate_bases))
-    self.assertEqual(None, corrected_info)
-
-  def test_infer_mismatched_info_field_correct_num(self):
-    variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Float', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    corrected_info = infer_header_fields._infer_mismatched_info_field(
-        'IA', variant.info.get('IA'),
-        vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
-        len(variant.alternate_bases))
-    expected = Info('IA', None, 'Float', '', '', '')
-    self.assertEqual(expected, corrected_info)
-
-  def test_infer_mismatched_info_field_correct_type(self):
-    variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', None, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    corrected_info = infer_header_fields._infer_mismatched_info_field(
-        'IA', variant.info.get('IA'),
-        vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
-        len(variant.alternate_bases)
-    )
-    expected = Info('IA', None, 'Float', '', '', '')
-    self.assertEqual(expected, corrected_info)
-
-  def test_infer_mismatched_info_field_correct_type_list(self):
-    variant = self._get_sample_variant_info_ia_float_in_list()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', None, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    corrected_info = infer_header_fields._infer_mismatched_info_field(
-        'IA', variant.info.get('IA'),
-        vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
-        len(variant.alternate_bases)
-    )
-    expected = Info('IA', None, 'Float', '', '', '')
-    self.assertEqual(expected, corrected_info)
-
-  def test_infer_info_fields_no_conflicts(self):
-    variant = self._get_sample_variant_1()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Float', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    inferred_infos = infer_header_fields._infer_info_fields(
-        variant, vcf_header_io.VcfHeader(infos=infos))
-    self.assertEqual({}, inferred_infos)
-
-  def test_infer_info_fields_combined_conflicts(self):
-    variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Integer', '', '', '')}
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    inferred_infos = infer_header_fields._infer_info_fields(
-        variant, vcf_header_io.VcfHeader(infos=infos))
-    expected_infos = {'IF': Info('IF', 1, 'Float', '', '', ''),
-                      'IA': Info('IA', None, 'Float', '', '', '')}
-    self.assertEqual(expected_infos, inferred_infos)
-
-  def test_infer_mismatched_format_field(self):
-    variant = self._get_sample_variant_format_fi_float_value()
-    formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    corrected_format = infer_header_fields._infer_mismatched_format_field(
-        'FI', variant.calls[0].info.get('FI'),
-        vcf_header_io.VcfHeader(formats=formats).formats.get('FI'))
-    expected_formats = Format('FI', 2, 'Float', 'desc')
-    self.assertEqual(expected_formats, corrected_format)
-
-  def test_infer_format_fields_no_conflicts(self):
-    variant = self._get_sample_variant_1()
-    formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    header = infer_header_fields._infer_format_fields(
-        variant, vcf_header_io.VcfHeader(formats=formats))
-    self.assertEqual({}, header)
-
-  def test_infer_format_fields_combined_conflicts(self):
-    variant = self._get_sample_variant_format_fi_float_value()
-    formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
-    infer_header_fields = infer_headers._InferHeaderFields(infer_headers=True)
-    inferred_formats = infer_header_fields._infer_format_fields(
-        variant, vcf_header_io.VcfHeader(formats=formats))
-    expected_formats = {'FI': Format('FI', 2, 'Float', 'desc'),
-                        'FU': Format('FU', field_counts['.'], 'Float', '')}
-    self.assertEqual(expected_formats, inferred_formats)
 
   def test_pipeline(self):
     infos = {'IS': Info('IS', 1, 'String', '', '', ''),
