@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly google_cloud_project="${PROJECT}"
+readonly google_cloud_project="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project)}"
 readonly temp_location="${TEMP_LOCATION}"
 readonly service_account_scopes="${SERVICE_ACCOUNT_SCOPE:-https://www.googleapis.com/auth/cloud-platform}"
 readonly vt_docker_image="${DOCKER_IMAGE:-gcr.io/gcp-variant-transforms/gcp-variant-transforms}"
@@ -22,7 +22,7 @@ readonly zones="${ZONES:-us-west1-b}"
 readonly pipelines_flags="${PIPELINES_FLAGS}"
 
 if [[ -z "${google_cloud_project}" ]]; then
-  echo "Please set the environment var $PROJECT."
+  echo "Please set the google cloud project through the environment var GOOGLE_CLOUD_PROJECT or use gcloud config set project myProject."
   exit 1
 fi
 
