@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
+import datetime
 import logging
 import time
 from typing import Any, Dict, List, Optional  # pylint: disable=unused-import
@@ -298,7 +299,13 @@ class VepRunner(object):
       A list of retry operation ids.
     """
     retry_operation_ids = []
+    start_time = datetime.datetime.now()
     for operation in self._running_operation_ids:
+      cur_time = datetime.datetime.now()
+      # Keeps the watchdog file updated for consecutive done operations.
+      if (cur_time - start_time).seconds >= _POLLING_INTERVAL_SECONDS:
+        self._update_watchdog_file()
+        start_time = datetime.datetime.now()
       while not self._is_done(operation):
         self._update_watchdog_file()
         time.sleep(_POLLING_INTERVAL_SECONDS)
@@ -372,7 +379,14 @@ class VepRunner(object):
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
     vm_io_info = vep_runner_util.get_all_vm_io_info(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
+    start_time = datetime.datetime.now()
     for vm_index, io_info in enumerate(vm_io_info):
+      # Keeps the watchdog file updated in case there are lots of operations to
+      # submit and some operations already start running VEP.
+      cur_time = datetime.datetime.now()
+      if (cur_time - start_time).seconds >= _POLLING_INTERVAL_SECONDS:
+        self._update_watchdog_file()
+        start_time = datetime.datetime.now()
       output_log_path = self._get_output_log_path(self._output_dir, vm_index)
       operation_name = self._call_pipelines_api(io_info, output_log_path)
       self._operation_name_to_io_infos.update({operation_name: io_info})
