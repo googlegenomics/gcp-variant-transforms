@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Copyright 2019 Google Inc.  All Rights Reserved.
 #
@@ -14,38 +15,101 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly google_cloud_project="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project)}"
-readonly temp_location="${TEMP_LOCATION}"
-readonly service_account_scopes="${SERVICE_ACCOUNT_SCOPE:-https://www.googleapis.com/auth/cloud-platform}"
-readonly vt_docker_image="${DOCKER_IMAGE:-gcr.io/gcp-variant-transforms/gcp-variant-transforms}"
-readonly zones="${ZONES:-us-west1-b}"
-readonly pipelines_flags="${PIPELINES_FLAGS}"
+PROJECT_OPT="--project"
+TEMP_LOCATION_OPT="--temp_location"
+DOCKER_IMAGE_OPT="--docker_image"
+ZONES_OPT="--zones"
+COMMAND_OPT="--command"
+SERVICE_ACCOUNT_SCOPES="https://www.googleapis.com/auth/cloud-platform"
 
-if [[ -z "${google_cloud_project}" ]]; then
-  echo "Please set the google cloud project through the environment var GOOGLE_CLOUD_PROJECT or use gcloud config set project myProject."
-  exit 1
-fi
+#################################################
+# Parses arguments and does some sanity checking.
+# Arguments:
+#   It is expected that this is called with $@ of the main script.
+#################################################
+function parse_args {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      ${PROJECT_OPT})
+        if [[ "$#" == 1 ]]; then
+          echo "ERROR: No project provided after $1!"
+          exit 1
+        fi
+        google_cloud_project="$2"
+        ;;
 
-script_to_run="$1"
-script_to_run_args="${@:2}"
+      ${TEMP_LOCATION_OPT})
+        if [[ "$#" == 1 ]]; then
+          echo "ERROR: No temp location provided after $1!"
+          exit 1
+        fi
+        temp_location="$2"
+        ;;
 
-supported_funcs=('vcf_to_bq' 'bq_to_vcf' 'vcf_to_bq_preprocessor')
+      ${DOCKER_IMAGE_OPT})
+        if [[ "$#" == 1 ]]; then
+          echo "ERROR: No docker image provided after $1!"
+          exit 1
+        fi
+        vt_docker_image="$2"
+        ;;
 
-if echo "${supported_funcs[@]}" | grep -q -w "${script_to_run}"; then
-  echo "Running ${script_to_run} starting at $(date)."
-else
-  echo "${script_to_run} is not supported, please choose one of the following: ${supported_funcs[@]}."
-  exit 1
-fi
+      ${ZONES_OPT})
+        if [[ "$#" == 1 ]]; then
+          echo "ERROR: No zones provided after $1!"
+          exit 1
+        fi
+        zones="$2"
+        ;;
 
-COMMAND="/opt/gcp_variant_transforms/bin/${script_to_run} \
-         ${script_to_run_args} \
-         --project ${google_cloud_project}"
+      ${COMMAND_OPT})
+        if [[ "$#" == 1 ]]; then
+          echo "ERROR: No command provided after $1!"
+          exit 1
+        fi
+        command="$2"
+        ;;
 
-gcloud alpha genomics pipelines run ${pipelines_flags} \
-  --project "${google_cloud_project}" \
-  --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
-  --service-account-scopes  "${service_account_scopes}" \
-  --zones "${zones}" \
-  --docker-image "${vt_docker_image}" \
-  --command-line "${COMMAND}"
+      *)
+        echo "Unrecognized flags $@."
+        exit 1
+        ;;
+    esac
+    shift 2
+  done
+}
+
+function main {
+  parse_args "$@"
+  google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
+  vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms}"
+  zones="${zones:-$(gcloud config get-value compute/zone)}"
+  temp_location="${temp_location:-''}"
+
+  if [[ -z "${google_cloud_project}" ]]; then
+    echo "Please set the google cloud project using flag --project PROJECT."
+    echo "Or set default project in your local client configuration using gcloud config set project PROJECT."
+    exit 1
+  fi
+
+  if [[ -z "${zones}" ]]; then
+    echo "Please set the zones using flags --zones."
+    echo "Or set default zone in your local client configuration using gcloud config set compute/zone ZONE."
+    exit 1
+  fi
+
+  if [[ ! -v command ]]; then
+    echo "Please specify the command."
+    exit 1
+  fi
+
+  gcloud alpha genomics pipelines run \
+    --project "${google_cloud_project}" \
+    --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
+    --service-account-scopes  "${SERVICE_ACCOUNT_SCOPES}" \
+    --zones "${zones}" \
+    --docker-image "${vt_docker_image}" \
+    --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}"
+}
+
+main "$@"

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM google/cloud-sdk
+FROM google/cloud-sdk:slim
 
 RUN mkdir -p /opt/gcp_variant_transforms
 ADD /docker/pipelines_runner/pipelines_runner.sh /opt/gcp_variant_transforms/pipelines_runner.sh
