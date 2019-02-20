@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import datetime
 import logging
 import time
 from typing import Any, Dict, List, Optional  # pylint: disable=unused-import
@@ -68,8 +67,9 @@ _POLLING_INTERVAL_SECONDS = 30
 _NUMBER_OF_API_CALL_RETRIES = 5
 
 
-def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
-  # type: (argparse.Namespace, List[str], str, Optional[str]) -> VepRunner
+def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
+                  watchdog_file_update_interval_seconds):
+  # type: (argparse.Namespace, List[str], str, Optional[str], int) -> VepRunner
   """Returns an instance of VepRunner using the provided args.
 
   Args:
@@ -78,8 +78,10 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
       determine resources like number of workers, machine type, etc.
     input_pattern: The VCF files to be annotated.
     watchdog_file: The file that will be updated by the Dataflow worker every
-      `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
-      process running in the VM will be killed.
+      `watchdog_file_update_interval_seconds`. Once the file is found to be
+      stale, the VEP process running in the VM will be killed.
+    watchdog_file_update_interval_seconds: The `watchdog_file` will be updated
+      by the Dataflow worker every `watchdog_file_update_interval_seconds`.
   """
   credentials = client.GoogleCredentials.get_application_default()
   pipeline_service = discovery.build(
@@ -89,7 +91,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
       input_pattern, known_args.annotation_output_dir,
       known_args.vep_info_field, known_args.vep_image_uri,
       known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args,
-      watchdog_file)
+      watchdog_file, watchdog_file_update_interval_seconds)
   return runner
 
 
@@ -111,7 +113,8 @@ class VepRunner(object):
       vep_cache_path,  # type: str
       vep_num_fork,  # type: int
       pipeline_args,  # type: List[str]
-      watchdog_file=None,  # type: str
+      watchdog_file,  # type: Optional[str]
+      watchdog_file_update_interval_seconds,  # type: int
       ):
     # type: (...) -> None
     """Constructs an instance for running VEP.
@@ -130,8 +133,10 @@ class VepRunner(object):
         running Beam; for simplicity we use the same arguments to decide how
         many and what type of workers to use, where to run, etc.
       watchdog_file: The file that will be updated by the Dataflow worker every
-        `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
-        process running in the VM will be killed.
+        `watchdog_file_update_interval_seconds`. Once the file is found to be
+        stale, the VEP process running in the VM will be killed.
+      watchdog_file_update_interval_seconds: The `watchdog_file` will be updated
+        by the Dataflow worker every `watchdog_file_update_interval_seconds`.
     """
     self._pipeline_service = pipeline_service
     self._species = species
@@ -144,6 +149,8 @@ class VepRunner(object):
     self._vep_info_field = vep_info_field
     self._process_pipeline_args(pipeline_args)
     self._watchdog_file = watchdog_file
+    self._watchdog_file_update_interval_seconds = (
+        watchdog_file_update_interval_seconds)
     self._running_operation_ids = []  # type: List[str]
     self._operation_name_to_io_infos = {}
     self._operation_name_to_logs = {}
@@ -299,15 +306,8 @@ class VepRunner(object):
       A list of retry operation ids.
     """
     retry_operation_ids = []
-    start_time = datetime.datetime.now()
     for operation in self._running_operation_ids:
-      cur_time = datetime.datetime.now()
-      # Keeps the watchdog file updated for consecutive done operations.
-      if (cur_time - start_time).seconds >= _POLLING_INTERVAL_SECONDS:
-        self._update_watchdog_file()
-        start_time = datetime.datetime.now()
       while not self._is_done(operation):
-        self._update_watchdog_file()
         time.sleep(_POLLING_INTERVAL_SECONDS)
       error_message = self._get_error_message(operation)
       if error_message:
@@ -330,11 +330,6 @@ class VepRunner(object):
                     'Retrying with operation id %s.', operation,
                     error_message, logs, retry_operation_id)
     return retry_operation_id
-
-  def _update_watchdog_file(self):
-    if self._watchdog_file:
-      with filesystems.FileSystems.create(self._watchdog_file) as file_to_write:
-        file_to_write.write('Watchdog file.')
 
   def _is_done(self, operation):
     # type: (str) -> bool
@@ -379,14 +374,7 @@ class VepRunner(object):
     logging.info('Number of files: %d', len(match_results[0].metadata_list))
     vm_io_info = vep_runner_util.get_all_vm_io_info(
         match_results[0].metadata_list, self._output_dir, self._max_num_workers)
-    start_time = datetime.datetime.now()
     for vm_index, io_info in enumerate(vm_io_info):
-      # Keeps the watchdog file updated in case there are lots of operations to
-      # submit and some operations already start running VEP.
-      cur_time = datetime.datetime.now()
-      if (cur_time - start_time).seconds >= _POLLING_INTERVAL_SECONDS:
-        self._update_watchdog_file()
-        start_time = datetime.datetime.now()
       output_log_path = self._get_output_log_path(self._output_dir, vm_index)
       operation_name = self._call_pipelines_api(io_info, output_log_path)
       self._operation_name_to_io_infos.update({operation_name: io_info})
@@ -440,13 +428,14 @@ class VepRunner(object):
     # type: (str, str) -> List
     local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
     if self._watchdog_file:
-      action = self._make_action(self._vep_image_uri,
-                                 _WATCHDOG_RUNNER_SCRIPT,
-                                 _VEP_RUN_SCRIPT,
-                                 str(_POLLING_INTERVAL_SECONDS),
-                                 self._watchdog_file,
-                                 local_input_file,
-                                 _LOCAL_OUTPUT_FILE)
+      action = self._make_action(
+          self._vep_image_uri,
+          _WATCHDOG_RUNNER_SCRIPT,
+          _VEP_RUN_SCRIPT,
+          str(self._watchdog_file_update_interval_seconds),
+          self._watchdog_file,
+          local_input_file,
+          _LOCAL_OUTPUT_FILE)
     else:
       action = self._make_action(self._vep_image_uri,
                                  _VEP_RUN_SCRIPT,
