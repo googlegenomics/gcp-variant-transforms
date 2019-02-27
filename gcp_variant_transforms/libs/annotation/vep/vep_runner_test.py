@@ -81,7 +81,7 @@ class VepRunnerTest(unittest.TestCase):
         self._mock_service, _ASSEMBLY, _SPECIES,
         _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
-        pipeline_args or self._get_pipeline_args())
+        pipeline_args or self._get_pipeline_args(), None, 30)
     return test_object
 
   def _get_pipeline_args(self, num_workers=1):
@@ -105,13 +105,15 @@ class VepRunnerTest(unittest.TestCase):
     self.assertEqual(test_instance._vep_cache_path, _CACHE)
     test_instance = vep_runner.VepRunner(
         self._mock_service, _SPECIES, _ASSEMBLY, _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
+        None, 30)
     self.assertEqual(test_instance._vep_cache_path,
                      ('gs://gcp-variant-annotation-vep-cache/'
                       'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
     test_instance = vep_runner.VepRunner(
         self._mock_service, 'mouse', 'mm9', _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
+        None, 30)
     self.assertEqual(test_instance._vep_cache_path,
                      ('gs://gcp-variant-annotation-vep-cache/'
                       'vep_cache_mouse_mm9_91.tar.gz'))

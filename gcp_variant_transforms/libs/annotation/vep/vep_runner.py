@@ -67,8 +67,9 @@ _POLLING_INTERVAL_SECONDS = 30
 _NUMBER_OF_API_CALL_RETRIES = 5
 
 
-def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
-  # type: (argparse.Namespace, List[str], str, Optional[str]) -> VepRunner
+def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
+                  watchdog_file_update_interval_seconds):
+  # type: (argparse.Namespace, List[str], str, Optional[str], int) -> VepRunner
   """Returns an instance of VepRunner using the provided args.
 
   Args:
@@ -77,8 +78,10 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
       determine resources like number of workers, machine type, etc.
     input_pattern: The VCF files to be annotated.
     watchdog_file: The file that will be updated by the Dataflow worker every
-      `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
-      process running in the VM will be killed.
+      `watchdog_file_update_interval_seconds`. Once the file is found to be
+      stale, the VEP process running in the VM will be killed.
+    watchdog_file_update_interval_seconds: The `watchdog_file` will be updated
+      by the Dataflow worker every `watchdog_file_update_interval_seconds`.
   """
   credentials = client.GoogleCredentials.get_application_default()
   pipeline_service = discovery.build(
@@ -88,7 +91,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file):
       input_pattern, known_args.annotation_output_dir,
       known_args.vep_info_field, known_args.vep_image_uri,
       known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args,
-      watchdog_file)
+      watchdog_file, watchdog_file_update_interval_seconds)
   return runner
 
 
@@ -110,7 +113,8 @@ class VepRunner(object):
       vep_cache_path,  # type: str
       vep_num_fork,  # type: int
       pipeline_args,  # type: List[str]
-      watchdog_file=None,  # type: str
+      watchdog_file,  # type: Optional[str]
+      watchdog_file_update_interval_seconds,  # type: int
       ):
     # type: (...) -> None
     """Constructs an instance for running VEP.
@@ -129,8 +133,10 @@ class VepRunner(object):
         running Beam; for simplicity we use the same arguments to decide how
         many and what type of workers to use, where to run, etc.
       watchdog_file: The file that will be updated by the Dataflow worker every
-        `_POLLING_INTERVAL_SECONDS`. Once the file is found to be stale, the VEP
-        process running in the VM will be killed.
+        `watchdog_file_update_interval_seconds`. Once the file is found to be
+        stale, the VEP process running in the VM will be killed.
+      watchdog_file_update_interval_seconds: The `watchdog_file` will be updated
+        by the Dataflow worker every `watchdog_file_update_interval_seconds`.
     """
     self._pipeline_service = pipeline_service
     self._species = species
@@ -143,6 +149,8 @@ class VepRunner(object):
     self._vep_info_field = vep_info_field
     self._process_pipeline_args(pipeline_args)
     self._watchdog_file = watchdog_file
+    self._watchdog_file_update_interval_seconds = (
+        watchdog_file_update_interval_seconds)
     self._running_operation_ids = []  # type: List[str]
     self._operation_name_to_io_infos = {}
     self._operation_name_to_logs = {}
@@ -300,7 +308,6 @@ class VepRunner(object):
     retry_operation_ids = []
     for operation in self._running_operation_ids:
       while not self._is_done(operation):
-        self._update_watchdog_file()
         time.sleep(_POLLING_INTERVAL_SECONDS)
       error_message = self._get_error_message(operation)
       if error_message:
@@ -323,11 +330,6 @@ class VepRunner(object):
                     'Retrying with operation id %s.', operation,
                     error_message, logs, retry_operation_id)
     return retry_operation_id
-
-  def _update_watchdog_file(self):
-    if self._watchdog_file:
-      with filesystems.FileSystems.create(self._watchdog_file) as file_to_write:
-        file_to_write.write('Watchdog file.')
 
   def _is_done(self, operation):
     # type: (str) -> bool
@@ -426,13 +428,14 @@ class VepRunner(object):
     # type: (str, str) -> List
     local_input_file = '/mnt/vep/{}'.format(_get_base_name(input_file))
     if self._watchdog_file:
-      action = self._make_action(self._vep_image_uri,
-                                 _WATCHDOG_RUNNER_SCRIPT,
-                                 _VEP_RUN_SCRIPT,
-                                 str(_POLLING_INTERVAL_SECONDS),
-                                 self._watchdog_file,
-                                 local_input_file,
-                                 _LOCAL_OUTPUT_FILE)
+      action = self._make_action(
+          self._vep_image_uri,
+          _WATCHDOG_RUNNER_SCRIPT,
+          _VEP_RUN_SCRIPT,
+          str(self._watchdog_file_update_interval_seconds),
+          self._watchdog_file,
+          local_input_file,
+          _LOCAL_OUTPUT_FILE)
     else:
       action = self._make_action(self._vep_image_uri,
                                  _VEP_RUN_SCRIPT,

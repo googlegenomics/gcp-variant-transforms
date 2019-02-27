@@ -14,14 +14,18 @@
 
 from __future__ import absolute_import
 
+import threading
+import time
 import uuid
 from datetime import datetime
-from typing import List  # pylint: disable=unused-import
+from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam.io import filesystems
 
 from gcp_variant_transforms.libs.annotation.vep import vep_runner
+
+_WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS = 30
 
 
 class AnnotateFile(beam.DoFn):
@@ -36,18 +40,30 @@ class AnnotateFile(beam.DoFn):
   def process(self, input_pattern):
     # type: (str) -> None
     watchdog_file = None
-    if self._known_args.run_with_garbage_collection:
-      unique_id = '-'.join(['watchdog_file',
-                            str(uuid.uuid4()),
-                            datetime.now().strftime('%Y%m%d-%H%M%S')])
-      watchdog_file = filesystems.FileSystems.join(
-          self._known_args.annotation_output_dir, unique_id)
+    if not self._known_args.run_with_garbage_collection:
+      self._annotate_files(input_pattern, watchdog_file)
+      return
+
+    unique_id = '-'.join(['watchdog_file',
+                          str(uuid.uuid4()),
+                          datetime.now().strftime('%Y%m%d-%H%M%S')])
+    watchdog_file = filesystems.FileSystems.join(
+        self._known_args.annotation_output_dir, unique_id)
+
+    t = threading.Thread(target=self._annotate_files,
+                         args=(input_pattern, watchdog_file,))
+    t.start()
+    while t.isAlive():
       with filesystems.FileSystems.create(watchdog_file) as file_to_write:
         file_to_write.write('Watchdog file.')
+      time.sleep(_WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS)
 
+  def _annotate_files(self, input_pattern, watchdog_file):
+    # type: (str, Optional[str]) -> None
     runner = vep_runner.create_runner(self._known_args,
                                       self._pipeline_args,
                                       input_pattern,
-                                      watchdog_file)
+                                      watchdog_file,
+                                      _WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS)
     runner.run_on_all_files()
     runner.wait_until_done()
