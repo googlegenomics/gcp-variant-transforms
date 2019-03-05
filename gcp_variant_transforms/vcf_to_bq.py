@@ -93,9 +93,12 @@ def _read_variants(input_pattern, pipeline, known_args, pipeline_mode):
     representative_header_lines = vcf_header_parser.get_metadata_header_lines(
         known_args.representative_header_file)
 
-  if pipeline_mode == pipeline_common.PipelineModes.LARGE:
+  if (pipeline_mode == pipeline_common.PipelineModes.LARGE or
+      known_args.input_file):
     variants = (pipeline
-                | 'InputFilePattern' >> beam.Create([input_pattern])
+                | 'InputFilePattern' >> beam.Create(
+                    [input_pattern] if input_pattern is not None
+                    else pipeline_common.get_file_names(known_args.input_file))
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                     representative_header_lines=representative_header_lines,
                     allow_malformed_records=(
@@ -106,6 +109,7 @@ def _read_variants(input_pattern, pipeline, known_args, pipeline_mode):
         representative_header_lines=representative_header_lines,
         allow_malformed_records=known_args.allow_malformed_records,
         vcf_parser_type=vcfio.VcfParserType[known_args.vcf_parser])
+
   return variants
 
 
@@ -141,7 +145,10 @@ def _add_inferred_headers(input_pattern,  # type: str
   annotation_fields_to_infer = (known_args.annotation_fields if
                                 known_args.infer_annotation_types else [])
   inferred_headers = (
-      _read_variants(input_pattern, pipeline, known_args, pipeline_mode)
+      _read_variants(input_pattern,
+                     pipeline,
+                     known_args,
+                     pipeline_mode)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
@@ -204,7 +211,9 @@ def _annotate_vcf_files(input_pattern, known_args, pipeline_args):
 
   with beam.Pipeline(options=options) as p:
     _ = (p
-         | beam.Create([input_pattern])
+         | beam.Create(
+             [input_pattern] if input_pattern
+             else pipeline_common.get_file_names(known_args.input_file))
          | 'AnnotateShards' >> beam.ParDo(
              annotate_files.AnnotateFile(known_args, pipeline_args)))
   if known_args.annotation_fields:
@@ -229,12 +238,14 @@ def _update_google_cloud_job_name(google_cloud_options, job_name):
     google_cloud_options.job_name = job_name
 
 
-def _merge_headers(input_pattern, known_args, pipeline_args, pipeline_mode,
-                   annotated_vcf_pattern=None):
+def _merge_headers(known_args, pipeline_args,
+                   pipeline_mode, annotated_vcf_pattern=None):
   # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
   if known_args.representative_header_file:
     return
+  input_pattern = known_args.input_pattern
+  input_file = known_args.input_file
 
   options = pipeline_options.PipelineOptions(pipeline_args)
 
@@ -258,7 +269,8 @@ def _merge_headers(input_pattern, known_args, pipeline_args, pipeline_mode,
       temp_directory, temp_merged_headers_file_name)
 
   with beam.Pipeline(options=options) as p:
-    headers = pipeline_common.read_headers(p, pipeline_mode, input_pattern)
+    headers = pipeline_common.read_headers(p, pipeline_mode, input_pattern,
+                                           input_file)
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -302,7 +314,9 @@ def _run_annotation_pipeline(known_args, pipeline_args):
     files_to_be_annotated = known_args.input_pattern
     if known_args.shard_variants:
       pipeline_mode = pipeline_common.get_pipeline_mode(
-          known_args.input_pattern, known_args.optimize_for_large_inputs)
+          known_args.input_pattern,
+          known_args.input_file,
+          known_args.optimize_for_large_inputs)
       files_to_be_annotated = _shard_variants(known_args,
                                               pipeline_args,
                                               pipeline_mode)
@@ -322,13 +336,16 @@ def run(argv=None):
   annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
 
   input_pattern = annotated_vcf_pattern or known_args.input_pattern
+  input_file = known_args.input_file
   variant_merger = _get_variant_merge_strategy(known_args)
+
   pipeline_mode = pipeline_common.get_pipeline_mode(
-      input_pattern, known_args.optimize_for_large_inputs)
+      input_pattern, input_file, known_args.optimize_for_large_inputs)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
-  _merge_headers(known_args.input_pattern, known_args, pipeline_args,
+  _merge_headers(known_args, pipeline_args,
                  pipeline_mode, annotated_vcf_pattern)
+
 
   # Retrieve merged headers prior to launching the pipeline. This is needed
   # since the BigQuery schema cannot yet be dynamically created based on input.
@@ -355,6 +372,8 @@ def run(argv=None):
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(input_pattern, pipeline, known_args, pipeline_mode)
+  logging.info('got here')
+  logging.info(variants)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if partitioner:

@@ -53,9 +53,16 @@ class VcfReadOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     """Adds all options of this transform to parser."""
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help=('Input pattern for VCF files to process. Either'
+              'this or --input_file flag has to be provided, exclusively.'))
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exlusively.'
+              'Note that using input_file than input_pattern is slower for '
+              'inputs that contain less than 50k files.'))
     parser.add_argument(
         '--allow_malformed_records',
         type='bool', default=False, nargs='?', const=True,
@@ -113,16 +120,45 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
-    try:
-      # Gets at most one pattern match result of type `filesystems.MatchResult`.
-      first_match = filesystems.FileSystems.match(
-          [parsed_args.input_pattern], [1])[0]
-      if not first_match.metadata_list:
-        raise ValueError('Input pattern {} did not match any files.'.format(
+    if ((parsed_args.input_pattern and parsed_args.input_file) or
+        (not parsed_args.input_pattern and not parsed_args.input_file)):
+      raise ValueError('One and only one of input_pattern and input_file has '
+                       'to be provided.')
+    if parsed_args.input_pattern is not None:
+      try:
+        # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
+        first_match = filesystems.FileSystems.match(
+            [parsed_args.input_pattern], [1])[0]
+        if not first_match.metadata_list:
+          raise ValueError('Input pattern {} did not match any files.'.format(
+              parsed_args.input_pattern))
+      except filesystem.BeamIOError:
+        raise ValueError('Invalid or inaccessible input pattern {}.'.format(
             parsed_args.input_pattern))
-    except filesystem.BeamIOError:
-      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
-          parsed_args.input_pattern))
+    else:
+      if not filesystems.FileSystems.exists(parsed_args.input_file):
+        raise ValueError('Input file {} doesn''t exist'.format(
+            parsed_args.input_file))
+      all_patterns = []
+      with filesystems.FileSystems.open(parsed_args.input_file) as f:
+        for _, l in enumerate(f):
+          all_patterns.append(l.strip())
+        if not all_patterns:
+          raise ValueError('Input file {} is empty.'.format(
+              parsed_args.input_file))
+      try:
+        # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
+        matches = filesystems.FileSystems.match(
+            all_patterns, [1] * len(all_patterns))
+        for match in matches:
+          if not match.metadata_list:
+            raise ValueError(
+                'Input pattern {} from {} did not match any files.'.format(
+                    match.pattern, parsed_args.input_file))
+      except filesystem.BeamIOError:
+        raise ValueError(
+            'Some patterns in {} are invalid or inaccessible.'.format(
+                parsed_args.input_file))
 
 
 class AvroWriteOptions(VariantTransformsOptions):
@@ -477,9 +513,16 @@ class PreprocessOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help='Input pattern for VCF files to process. Either'
+             'this or --input_file flag has to be provided, exclusively.')
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exlusively. '
+              'Note that using input_file than input_pattern is slower for '
+              'inputs that contain less than 50k files.'))
     parser.add_argument(
         '--report_all_conflicts',
         type='bool', default=False, nargs='?', const=True,
@@ -500,6 +543,48 @@ class PreprocessOptions(VariantTransformsOptions):
         help=('The full path of the resolved headers. The file will not be'
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
+
+  def validate(self, parsed_args):
+    if ((parsed_args.input_pattern and parsed_args.input_file) or
+        (not parsed_args.input_pattern and not parsed_args.input_file)):
+      raise ValueError('One and only one of input_pattern and input_file has '
+                       'to be provided.')
+    if parsed_args.input_pattern is not None:
+      try:
+        # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
+        first_match = filesystems.FileSystems.match(
+            [parsed_args.input_pattern], [1])[0]
+        if not first_match.metadata_list:
+          raise ValueError('Input pattern {} did not match any files.'.format(
+              parsed_args.input_pattern))
+      except filesystem.BeamIOError:
+        raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+            parsed_args.input_pattern))
+    else:
+      if not filesystems.FileSystems.exists(parsed_args.input_file):
+        raise ValueError('Input file {} doesn''t exist'.format(
+            parsed_args.input_file))
+      all_patterns = []
+      with filesystems.FileSystems.open(parsed_args.input_file) as f:
+        for _, l in enumerate(f):
+          all_patterns.append(l.strip())
+        if not all_patterns:
+          raise ValueError('Input file {} is empty.'.format(
+              parsed_args.input_file))
+      try:
+        # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
+        matches = filesystems.FileSystems.match(
+            all_patterns, [1] * len(all_patterns))
+        for match in matches:
+          if not match.metadata_list:
+            raise ValueError(
+                'Input pattern {} from {} did not match any files.'.format(
+                    match.pattern, parsed_args.input_file))
+      except filesystem.BeamIOError:
+        raise ValueError(
+            'Some patterns in {} are invalid or inaccessible.'.format(
+                parsed_args.input_file))
+
 
 class PartitionOptions(VariantTransformsOptions):
   """Options for partitioning Variant records."""

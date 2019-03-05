@@ -69,33 +69,80 @@ def parse_args(argv, command_line_options):
   return known_args, pipeline_args
 
 
-def get_pipeline_mode(input_pattern, optimize_for_large_inputs=False):
+def get_pipeline_mode(
+    input_pattern,
+    input_file,
+    optimize_for_large_inputs=False):
   # type: (str, bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
   if optimize_for_large_inputs:
     return PipelineModes.LARGE
 
-  match_results = filesystems.FileSystems.match([input_pattern])
-  if not match_results:
-    raise ValueError('No files matched input_pattern: {}'.format(input_pattern))
+  if input_pattern is not None:
+    total_files = _get_pipeline_mode_for_pattern_input(input_pattern)
+  else:
+    total_files = _get_pipeline_mode_for_file_input(input_file)
 
-  total_files = len(match_results[0].metadata_list)
   if total_files > _LARGE_DATA_THRESHOLD:
     return PipelineModes.LARGE
   elif total_files > _SMALL_DATA_THRESHOLD:
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
 
+def _get_pipeline_mode_for_pattern_input(input_pattern):
+  match_results = filesystems.FileSystems.match([input_pattern])
+  if not match_results:
+    raise ValueError('No files matched input_pattern: {}'.format(input_pattern))
+  return len(match_results[0].metadata_list)
 
-def read_headers(pipeline, pipeline_mode, input_pattern):
+def _get_pipeline_mode_for_file_input(input_file):
+  if not filesystems.FileSystems.exists(input_file):
+    raise ValueError('Input file {} doesn''t exist'.format(input_file))
+  all_patterns = []
+  with filesystems.FileSystems.open(input_file) as f:
+    for _, l in enumerate(f):
+      all_patterns.append(l.strip())
+    if not all_patterns:
+      raise ValueError('Input file {} is empty.'.format(input_file))
+  match_results = filesystems.FileSystems.match(all_patterns)
+  if not match_results:
+    raise ValueError(
+        'No files matched any input pattern in {} file'.format(input_file))
+  total_number = 0
+  for match in match_results:
+    if not match.metadata_list:
+      raise ValueError(
+          'Input pattern {} from {} did not match any files.'.format(
+              match.pattern, input_file))
+    total_number += len(match.metadata_list)
+  return total_number
+
+def get_file_names(input_file):
+  #if (input_pattern):
+  #  return [input_pattern]
+  result = []
+  if not filesystems.FileSystems.exists(input_file):
+    raise ValueError('Input file {} doesn''t exist'.format(input_file))
+  with filesystems.FileSystems.open(input_file) as f:
+    for _, l in enumerate(f):
+      result.append(l)
+    if not result:
+      raise ValueError('Input file {} is empty.'.format(input_file))
+    return result
+
+
+def read_headers(pipeline, pipeline_mode, input_pattern, input_file):
   # type: (beam.Pipeline, int, str) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
-  if pipeline_mode == PipelineModes.LARGE:
+  if pipeline_mode == PipelineModes.LARGE or input_file:
     headers = (pipeline
-               | beam.Create([input_pattern])
+               | beam.Create(
+                   [input_pattern] if input_pattern is not None
+                   else get_file_names(input_file))
                | vcf_header_io.ReadAllVcfHeaders())
   else:
     headers = pipeline | vcf_header_io.ReadVcfHeaders(input_pattern)
+
   return headers
 
 

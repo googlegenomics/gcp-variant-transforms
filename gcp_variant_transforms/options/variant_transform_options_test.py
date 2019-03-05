@@ -47,19 +47,53 @@ class VcfReadOptionsTest(unittest.TestCase):
     # type: (List[str]) -> argparse.Namespace
     return make_args(self._options, args)
 
-  def test_failure_for_conflicting_flags(self):
+  def test_no_inputs(self):
+    args = self._make_args([])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_headers(self):
     args = self._make_args(['--input_pattern', '*',
                             '--infer_headers',
                             '--representative_header_file', 'gs://some_file'])
     self.assertRaises(ValueError, self._options.validate, args)
 
-  def test_failure_for_conflicting_flags_no_errors(self):
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
     args = self._make_args(['--input_pattern', '*',
                             '--representative_header_file', 'gs://some_file'])
     self._options.validate(args)
 
+  def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/sample',
+        '--representative_header_file', 'gs://some_file'])
+    self._options.validate(args)
+
+  def test_failure_for_empty_input_file(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/empty',
+        '--representative_header_file', 'gs://some_file'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_wrong_pattern_in_input_file(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/wrong',
+        '--representative_header_file', 'gs://some_file'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
   def test_failure_for_invalid_input_pattern(self):
     args = self._make_args(['--input_pattern', 'nonexistent_file.vcf'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_invalid_input_file(self):
+    args = self._make_args(['--input_file', 'nonexistent_file.vcf'])
     self.assertRaises(ValueError, self._options.validate, args)
 
 
@@ -150,4 +184,62 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--annotation_output_dir', 'gs://GOOD_DIR',
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+
+class PreprocessOptionsTest(unittest.TestCase):
+  """Tests cases for the PreprocessOptions class."""
+
+  def setUp(self):
+    self._options = variant_transform_options.PreprocessOptions()
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    return make_args(self._options, args)
+
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)
+
+  def test_failure_for_invalid_input_pattern(self):
+    args = self._make_args(['--input_pattern', 'nonexistent_file.vcf',
+                            '--report_path', 'some_path'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_invalid_input_file(self):
+    args = self._make_args(['--input_file', 'nonexistent_file.vcf',
+                            '--report_path', 'some_path'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/sample',
+        '--report_path', 'some_path'])
+    self._options.validate(args)
+
+  def test_failure_for_empty_input_file(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/empty',
+        '--report_path', 'some_path'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_wrong_pattern_in_input_file(self):
+    args = self._make_args([
+        '--input_file',
+        'gcp_variant_transforms/testing/data/input_files/wrong',
+        '--report_path', 'some_path'])
     self.assertRaises(ValueError, self._options.validate, args)

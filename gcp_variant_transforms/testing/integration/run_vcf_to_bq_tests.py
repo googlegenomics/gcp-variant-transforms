@@ -16,7 +16,7 @@ r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
 To define a new integration test case, create a json file in
 `gcp_variant_transforms/testing/integration/vcf_to_bq_tests` directory and
-specify at least test_name, table_name, and input_pattern for the integration
+specify at least test_name and table_name for the integration
 test. You may add multiple test cases (Now at most two are supported) in one
 json file, and the second test case will run after the first one finishes.
 
@@ -66,7 +66,6 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
                context,  # type: TestContextManager
                test_name,  # type: str
                table_name,  # type: str
-               input_pattern,  # type: str
                assertion_configs,  # type: List[Dict]
                zones=None,  # type: List[str]
                **kwargs  # type: **str
@@ -78,8 +77,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     self._project = context.project
     output_table = '{}:{}'.format(context.project, self._table_name)
     self._assertion_configs = assertion_configs
-    args = ['--input_pattern {}'.format(input_pattern),
-            '--output_table {}'.format(output_table),
+    args = ['--output_table {}'.format(output_table),
             '--project {}'.format(context.project),
             '--staging_location {}'.format(context.staging_location),
             '--temp_location {}'.format(context.temp_location),
@@ -259,8 +257,7 @@ def _get_args():
 def _get_test_configs(run_presubmit_tests, run_all_tests, test_file_suffix=''):
   # type: (bool, bool, str) -> List[List[Dict]]
   """Gets all test configs."""
-  required_keys = ['test_name', 'table_name', 'input_pattern',
-                   'assertion_configs']
+  required_keys = ['test_name', 'table_name', 'assertion_configs']
   test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests,
                                        test_file_suffix)
   test_configs = run_tests_common.get_configs(test_file_path,

@@ -24,33 +24,34 @@ from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.pipeline_common import PipelineModes
 
 
-class VcfToBqCommonTest(unittest.TestCase):
-  """Tests cases for the `pipeline_common` script."""
+class PipelineCommonWithPatternTest(unittest.TestCase):
+  """Tests cases for the `pipeline_common` script with pattern input."""
 
   def _create_mock_args(self, **args):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
     return pipeline_common.get_pipeline_mode(args.input_pattern,
+                                             args.input_file,
                                              args.optimize_for_large_inputs)
 
   def test_get_mode_raises_error_for_no_match(self):
     args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
+        input_pattern='', input_file=None, optimize_for_large_inputs=False)
 
     with mock.patch.object(FileSystems, 'match', return_value=None), \
-         self.assertRaises(ValueError):
+        self.assertRaises(ValueError):
       self._get_pipeline_mode(args)
 
   def test_get_mode_optimize_set(self):
     args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=True)
+        input_pattern='', input_file=None, optimize_for_large_inputs=True)
 
     self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
     args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
+        input_pattern='', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
 
@@ -59,7 +60,7 @@ class VcfToBqCommonTest(unittest.TestCase):
 
   def test_get_mode_medium(self):
     args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
+        input_pattern='', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(101))
@@ -72,21 +73,12 @@ class VcfToBqCommonTest(unittest.TestCase):
 
   def test_get_mode_large(self):
     args = self._create_mock_args(
-        input_pattern='', optimize_for_large_inputs=False)
+        input_pattern='', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(50001))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
-
-  def test_default_optimize_for_large_inputs(self):
-    args = self._create_mock_args(input_pattern='')
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-
-    match = match_result(range(101))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(pipeline_common.get_pipeline_mode(args.input_pattern),
-                       PipelineModes.MEDIUM)
 
   def test_fail_on_invalid_flags(self):
     # Start with valid flags, without setup.py.
@@ -109,3 +101,87 @@ class VcfToBqCommonTest(unittest.TestCase):
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
     with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+
+class PipelineCommonWithFileTest(unittest.TestCase):
+  """Tests cases for the `pipeline_common` script with file input."""
+
+  def _create_mock_args(self, **args):
+    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+
+  def _get_pipeline_mode(self, args):
+    return pipeline_common.get_pipeline_mode(args.input_pattern,
+                                             args.input_file,
+                                             args.optimize_for_large_inputs)
+
+  def test_get_mode_raises_error_for_no_absent_file(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='nonexistent_file',
+        optimize_for_large_inputs=False)
+
+    self.assertRaises(ValueError, self._get_pipeline_mode, args)
+
+  def test_get_mode_raises_error_for_empty_file(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='gcp_variant_transforms/testing/data/input_files/empty',
+        optimize_for_large_inputs=False)
+
+    self.assertRaises(ValueError, self._get_pipeline_mode, args)
+
+  def test_get_mode_optimize_set(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='gcp_variant_transforms/testing/data/input_files/sample',
+        optimize_for_large_inputs=True)
+
+    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+
+  def test_get_mode_small(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='gcp_variant_transforms/testing/data/input_files/sample',
+        optimize_for_large_inputs=False)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+
+    match = match_result([None for _ in range(100)])
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.SMALL)
+
+  def test_get_mode_medium(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='gcp_variant_transforms/testing/data/input_files/sample',
+        optimize_for_large_inputs=False)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+
+    match = match_result(range(101))
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
+
+    matches = [match_result(range(60)),
+               match_result(range(40)),
+               match_result(range(1))]
+    with mock.patch.object(FileSystems, 'match', return_value=matches):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
+
+    match = match_result(range(50000))
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
+
+  def test_get_mode_large(self):
+    args = self._create_mock_args(
+        input_pattern=None,
+        input_file='gcp_variant_transforms/testing/data/input_files/sample',
+        optimize_for_large_inputs=False)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+
+    match = match_result(range(50001))
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+
+    matches = [match_result(range(25000)),
+               match_result(range(25000)),
+               match_result(range(1))]
+    with mock.patch.object(FileSystems, 'match', return_value=matches):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
