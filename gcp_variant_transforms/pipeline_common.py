@@ -66,60 +66,17 @@ def parse_args(argv, command_line_options):
   for transform_options in options:
     transform_options.validate(known_args)
   _raise_error_on_invalid_flags(pipeline_args)
+  known_args.input_patterns = _get_input_patterns(
+      known_args.input_pattern, known_args.input_file)
   return known_args, pipeline_args
 
+def _get_input_patterns(input_pattern, input_file):
+  return (
+      _get_file_names(input_file) if input_pattern is None else [input_pattern])
 
-def get_pipeline_mode(
-    input_pattern,
-    input_file,
-    optimize_for_large_inputs=False):
-  # type: (str, bool) -> int
-  """Returns the mode the pipeline should operate in based on input size."""
-  if optimize_for_large_inputs:
-    return PipelineModes.LARGE
-
-  if input_pattern is not None:
-    total_files = _get_pipeline_mode_for_pattern_input(input_pattern)
-  else:
-    total_files = _get_pipeline_mode_for_file_input(input_file)
-
-  if total_files > _LARGE_DATA_THRESHOLD:
-    return PipelineModes.LARGE
-  elif total_files > _SMALL_DATA_THRESHOLD:
-    return PipelineModes.MEDIUM
-  return PipelineModes.SMALL
-
-def _get_pipeline_mode_for_pattern_input(input_pattern):
-  match_results = filesystems.FileSystems.match([input_pattern])
-  if not match_results:
-    raise ValueError('No files matched input_pattern: {}'.format(input_pattern))
-  return len(match_results[0].metadata_list)
-
-def _get_pipeline_mode_for_file_input(input_file):
-  if not filesystems.FileSystems.exists(input_file):
-    raise ValueError('Input file {} doesn''t exist'.format(input_file))
-  all_patterns = []
-  with filesystems.FileSystems.open(input_file) as f:
-    for _, l in enumerate(f):
-      all_patterns.append(l.strip())
-    if not all_patterns:
-      raise ValueError('Input file {} is empty.'.format(input_file))
-  match_results = filesystems.FileSystems.match(all_patterns)
-  if not match_results:
-    raise ValueError(
-        'No files matched any input pattern in {} file'.format(input_file))
-  total_number = 0
-  for match in match_results:
-    if not match.metadata_list:
-      raise ValueError(
-          'Input pattern {} from {} did not match any files.'.format(
-              match.pattern, input_file))
-    total_number += len(match.metadata_list)
-  return total_number
-
-def get_file_names(input_file):
-  #if (input_pattern):
-  #  return [input_pattern]
+def _get_file_names(input_file):
+  # type (str) -> List(str)
+  """ Reads all input file and extracts list of patterns out of it."""
   result = []
   if not filesystems.FileSystems.exists(input_file):
     raise ValueError('Input file {} doesn''t exist'.format(input_file))
@@ -130,18 +87,47 @@ def get_file_names(input_file):
       raise ValueError('Input file {} is empty.'.format(input_file))
     return result
 
+def get_pipeline_mode(
+    input_patterns,
+    input_file=None,
+    optimize_for_large_inputs=False):
+  # type: (str, bool) -> int
+  """Returns the mode the pipeline should operate in based on input size."""
+  if optimize_for_large_inputs:
+    return PipelineModes.LARGE
 
-def read_headers(pipeline, pipeline_mode, input_pattern, input_file):
+  match_results = filesystems.FileSystems.match(input_patterns)
+  if not match_results:
+    if input_file:
+      raise ValueError(
+          'No files matched any input pattern in {} file'.format(input_file))
+    else:
+      raise ValueError(
+          'No files matched {} input pattern'.format(input_patterns[0]))
+
+  total_files = 0
+  for match in match_results:
+    if not match.metadata_list:
+      raise ValueError(
+          'Input pattern {} did not match any files.'.format(match.pattern))
+    total_files += len(match.metadata_list)
+
+  if total_files > _LARGE_DATA_THRESHOLD:
+    return PipelineModes.LARGE
+  elif total_files > _SMALL_DATA_THRESHOLD:
+    return PipelineModes.MEDIUM
+  return PipelineModes.SMALL
+
+
+def read_headers(pipeline, pipeline_mode, input_patterns):
   # type: (beam.Pipeline, int, str) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
-  if pipeline_mode == PipelineModes.LARGE or input_file:
+  if pipeline_mode == PipelineModes.LARGE or len(input_patterns) > 1:
     headers = (pipeline
-               | beam.Create(
-                   [input_pattern] if input_pattern is not None
-                   else get_file_names(input_file))
+               | beam.Create(input_patterns)
                | vcf_header_io.ReadAllVcfHeaders())
   else:
-    headers = pipeline | vcf_header_io.ReadVcfHeaders(input_pattern)
+    headers = pipeline | vcf_header_io.ReadVcfHeaders(input_patterns[0])
 
   return headers
 

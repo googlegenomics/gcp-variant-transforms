@@ -16,7 +16,7 @@ r"""Integration testing runner for Variant Transforms' Preprocessor pipeline.
 
 To define a new preprocessor_tests integration test case, create a json file in
 gcp_variant_transforms/testing/integration/preprocessor_tests directory and
-specify at least test_name, input_pattern, blob_name and expected_contents
+specify at least test_name, blob_name and expected_contents
 for the integration test.
 
 Execute the following command from the root source directory:
@@ -55,7 +55,6 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
   def __init__(self,
                parser_args,  # type: Namespace
                test_name,  # type: str
-               input_pattern,  # type: str
                expected_contents,  # type: List[str]
                report_blob_name,  # type: str
                header_blob_name=None,  # type: str
@@ -71,8 +70,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     self._report_blob_name = self._append_suffix(report_blob_name, suffix)
     self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._report_blob_name])
     self._project = parser_args.project
-    args = ['--input_pattern {}'.format(input_pattern),
-            '--report_path {}'.format(self._report_path),
+    args = ['--report_path {}'.format(self._report_path),
             '--project {}'.format(parser_args.project),
             '--staging_location {}'.format(parser_args.staging_location),
             '--temp_location {}'.format(parser_args.temp_location),
@@ -150,8 +148,7 @@ def _get_args():
 def _get_test_configs():
   # type: () -> List[List[Dict]]
   """Gets all test configs in preprocessor_tests."""
-  required_keys = ['test_name', 'report_blob_name', 'input_pattern',
-                   'expected_contents']
+  required_keys = ['test_name', 'report_blob_name', 'expected_contents']
   test_file_path = os.path.join(os.getcwd(), _TEST_FOLDER)
   return run_tests_common.get_configs(test_file_path, required_keys)
 

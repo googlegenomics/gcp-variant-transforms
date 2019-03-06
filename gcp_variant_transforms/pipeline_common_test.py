@@ -31,7 +31,9 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
-    return pipeline_common.get_pipeline_mode(args.input_pattern,
+    input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
+                                                         args.input_file)
+    return pipeline_common.get_pipeline_mode(input_patterns,
                                              args.input_file,
                                              args.optimize_for_large_inputs)
 
@@ -109,7 +111,9 @@ class PipelineCommonWithFileTest(unittest.TestCase):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
-    return pipeline_common.get_pipeline_mode(args.input_pattern,
+    input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
+                                                         args.input_file)
+    return pipeline_common.get_pipeline_mode(input_patterns,
                                              args.input_file,
                                              args.optimize_for_large_inputs)
 

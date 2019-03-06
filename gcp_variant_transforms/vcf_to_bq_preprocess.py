@@ -94,25 +94,23 @@ def run(argv=None):
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  pipeline_mode = pipeline_common.get_pipeline_mode(known_args.input_pattern,
+  input_patterns = known_args.input_patterns
+  pipeline_mode = pipeline_common.get_pipeline_mode(input_patterns,
                                                     known_args.input_file)
 
   with beam.Pipeline(options=options) as p:
-    headers = pipeline_common.read_headers(p, pipeline_mode,
-                                           known_args.input_pattern,
-                                           known_args.input_file)
+    headers = pipeline_common.read_headers(p, pipeline_mode, input_patterns)
     merged_headers = pipeline_common.get_merged_headers(headers)
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
     if known_args.report_all_conflicts:
-      if known_args.input_pattern:
+      if len(input_patterns) == 1:
         variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-            known_args.input_pattern, allow_malformed_records=True)
+            input_patterns[0], allow_malformed_records=True)
       else:
         variants = (p
-                    | 'InputFilePattern' >> beam.Create(
-                        pipeline_common.get_file_names(known_args.input_file))
+                    | 'InputFilePattern' >> beam.Create(input_patterns)
                     | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                         allow_malformed_records=True))
 
