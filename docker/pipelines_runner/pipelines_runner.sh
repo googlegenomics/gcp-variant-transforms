@@ -15,64 +15,33 @@ set -euo pipefail
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PROJECT_OPT="--project"
-TEMP_LOCATION_OPT="--temp_location"
-DOCKER_IMAGE_OPT="--docker_image"
-ZONES_OPT="--zones"
-COMMAND_OPT="--command"
-SERVICE_ACCOUNT_SCOPES="https://www.googleapis.com/auth/cloud-platform"
-
 #################################################
-# Parses arguments and does some sanity checking.
+# Parses arguments.
 # Arguments:
 #   It is expected that this is called with $@ of the main script.
 #################################################
 function parse_args {
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
-      ${PROJECT_OPT})
-        if [[ "$#" == 1 ]]; then
-          echo "ERROR: No project provided after $1!"
-          exit 1
-        fi
+      --project)
         google_cloud_project="$2"
         ;;
 
-      ${TEMP_LOCATION_OPT})
-        if [[ "$#" == 1 ]]; then
-          echo "ERROR: No temp location provided after $1!"
-          exit 1
-        fi
+      --temp_location)
         temp_location="$2"
         ;;
 
-      ${DOCKER_IMAGE_OPT})
-        if [[ "$#" == 1 ]]; then
-          echo "ERROR: No docker image provided after $1!"
-          exit 1
-        fi
+      --docker_image)
         vt_docker_image="$2"
         ;;
 
-      ${ZONES_OPT})
-        if [[ "$#" == 1 ]]; then
-          echo "ERROR: No zones provided after $1!"
-          exit 1
-        fi
+      --zones)
         zones="$2"
         ;;
 
-      ${COMMAND_OPT})
-        if [[ "$#" == 1 ]]; then
-          echo "ERROR: No command provided after $1!"
-          exit 1
-        fi
-        command="$2"
-        ;;
-
       *)
-        echo "Unrecognized flags $@."
-        exit 1
+        command="$@"
+        break
         ;;
     esac
     shift 2
@@ -80,7 +49,9 @@ function parse_args {
 }
 
 function main {
+  options=`getopt -o '' -l project:,temp_location:,docker_image:,zones: -- "$@"`
   parse_args "$@"
+
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms}"
   zones="${zones:-$(gcloud config get-value compute/zone)}"
@@ -99,14 +70,14 @@ function main {
   fi
 
   if [[ ! -v command ]]; then
-    echo "Please specify the command."
+    echo "Please specify a command to run Variant Transforms."
     exit 1
   fi
 
   gcloud alpha genomics pipelines run \
     --project "${google_cloud_project}" \
     --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
-    --service-account-scopes  "${SERVICE_ACCOUNT_SCOPES}" \
+    --service-account-scopes "https://www.googleapis.com/auth/cloud-platform" \
     --zones "${zones}" \
     --docker-image "${vt_docker_image}" \
     --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}"
