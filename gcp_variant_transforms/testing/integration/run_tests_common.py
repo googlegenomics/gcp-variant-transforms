@@ -165,7 +165,7 @@ def form_pipelines_api_request(project,  # type: str
                   'commands': ['/bin/sh', '-c', ' '.join([script_path] + args)]
               },
               {
-                  'imageUri': 'google/cloud-sdk',
+                  'imageUri': 'gcr.io/cloud-genomics-pipelines/io',
                   'commands': [
                       'sh', '-c',
                       'gsutil cp /google/logs/output %s' % logging_location
