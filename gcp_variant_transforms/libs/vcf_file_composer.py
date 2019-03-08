@@ -179,6 +179,8 @@ class MultiProcessComposer(object):
     """
     blobs_to_be_composed = list(self._bucket.list_blobs(prefix=blob_prefix))
     logging.info('Total number of blobs is %d.', len(blobs_to_be_composed))
+    if not blobs_to_be_composed:
+      raise RuntimeError('No VCF shards found.')
     if len(blobs_to_be_composed) == 1:
       return blobs_to_be_composed[0]
     new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')
