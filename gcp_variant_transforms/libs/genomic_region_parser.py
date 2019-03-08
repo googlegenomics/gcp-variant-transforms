@@ -43,7 +43,7 @@ def parse_genomic_region(genomic_region):
   matched = _REGION_LITERAL_REGEXP.match(genomic_region)
   if matched:
     ref_name, start, end = matched.groups()
-    ref_name = ref_name.strip().lower()
+    ref_name = ref_name.strip()
     start = _parse_position(start)
     end = _parse_position(end)
     if start < 0:
@@ -54,7 +54,7 @@ def parse_genomic_region(genomic_region):
                        'vs {}'.format(end, start))
   else:
     # This region includes a full chromosome
-    ref_name = genomic_region.strip().lower()
+    ref_name = genomic_region.strip()
     start = 0
     end = _DEFAULT_END_POSITION
   return ref_name, start, end

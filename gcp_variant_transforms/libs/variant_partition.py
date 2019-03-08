@@ -189,6 +189,7 @@ class VariantPartition(object):
 
       for r in regions:
         ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
+        ref_name = ref_name.lower()
         self._ref_name_to_partitions_map[ref_name].add_region(
             start, end, partition_index)
 
