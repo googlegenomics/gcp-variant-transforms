@@ -50,7 +50,7 @@ steps:
       - '--run_unit_tests'
       - '--run_preprocessor_tests'
       - '--run_bq_to_vcf_tests'
-      - '--run_presubmit_tests'
+      - '--run_all_tests'
       - '--test_name_prefix cloud-ci-'
     id: 'test-gcp-variant-transforms-docker'
       # By default the script uses a GS bucket of gcp-variant-transforms-test
