@@ -49,7 +49,8 @@ function parse_args {
 }
 
 function main {
-  options=`getopt -o '' -l project:,temp_location:,docker_image:,zones: -- "$@"`
+  # getopt command is only for checking arguments.
+  getopt -o '' -l project:,temp_location:,docker_image:,zones: -- "$@"
   parse_args "$@"
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
