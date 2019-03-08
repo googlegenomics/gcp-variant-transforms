@@ -29,8 +29,8 @@ class GenomicRegionParserTest(unittest.TestCase):
         ('chr1', 1000000, 2000000)
     )
     self.assertEqual(
-        genomic_region_parser.parse_genomic_region('chr1:1000000-2000000'),
-        ('chr1', 1000000, 2000000)
+        genomic_region_parser.parse_genomic_region('chrY:1000000-2000000'),
+        ('chrY', 1000000, 2000000)
     )
     self.assertEqual(
         genomic_region_parser.parse_genomic_region('chr'),
