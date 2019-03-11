@@ -13,55 +13,32 @@
 # limitations under the License.
 
 # This is meant to be used by the Build Trigger set in Cloud Build for auto
-# release. This is what it does:
-# - Builds an image using the last GitHub commit hash as the tag.
-# - Pushes that image to the test project's Container Registry.
-# - Runs all integration test from that very image.
-# - Pushes the verified image to the main project (gcp-variant-transforms).
+# release. It tags the verified image and pushes to the main project
+# (gcp-variant-transforms).
 
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-      - '-f'
-      - 'docker/Dockerfile'
-      - '.'
-    id: 'build-image'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'deploy-to-test-project'
-
-  - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-    args:
-      - 'bash'
-      - './deploy_and_run_tests.sh'
-      - '--keep_image'
-      - '--skip_build'
-      - '--project ${PROJECT_ID}'
-      - '--image_tag ${COMMIT_SHA}'
-      - '--run_unit_tests'
-      - '--run_preprocessor_tests'
-      - '--run_bq_to_vcf_tests'
-      - '--run_all_tests'
-      - '--test_name_prefix cloud-ci-'
-    id: 'test-image'
-
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'tag-image'
+    id: 'tag-image-commit-sha'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
-      - 'push'
+      - 'tag'
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'deploy-to-serving-project'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
+    id: 'tag-image-release-version'
 
-timeout: 150m
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
+    id: 'tag-image-latest'
+
+images:
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
