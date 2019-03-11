@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # This is meant to be used by the Build Trigger set in Cloud Build for auto
-# release. It pushes the verified image to the main project
-# (gcp-variant-transforms) and tags it with `TAG_NAME` and `latest`.
+# release. It tags the verified image and pushes to the main project
+# (gcp-variant-transforms).
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
@@ -23,12 +23,6 @@ steps:
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
     id: 'tag-image-commit-sha'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'deploy-to-serving-project'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -44,4 +38,7 @@ steps:
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
     id: 'tag-image-latest'
 
-timeout: 10m
+images:
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
