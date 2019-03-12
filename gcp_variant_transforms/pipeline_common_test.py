@@ -34,26 +34,17 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
                                                          args.input_file)
     return pipeline_common.get_pipeline_mode(input_patterns,
-                                             args.input_file,
                                              args.optimize_for_large_inputs)
-
-  def test_get_mode_raises_error_for_no_match(self):
-    args = self._create_mock_args(
-        input_pattern='', input_file=None, optimize_for_large_inputs=False)
-
-    with mock.patch.object(FileSystems, 'match', return_value=None), \
-        self.assertRaises(ValueError):
-      self._get_pipeline_mode(args)
 
   def test_get_mode_optimize_set(self):
     args = self._create_mock_args(
-        input_pattern='', input_file=None, optimize_for_large_inputs=True)
+        input_pattern='test', input_file=None, optimize_for_large_inputs=True)
 
     self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
     args = self._create_mock_args(
-        input_pattern='', input_file=None, optimize_for_large_inputs=False)
+        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
 
@@ -62,7 +53,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
   def test_get_mode_medium(self):
     args = self._create_mock_args(
-        input_pattern='', input_file=None, optimize_for_large_inputs=False)
+        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(101))
@@ -75,7 +66,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
   def test_get_mode_large(self):
     args = self._create_mock_args(
-        input_pattern='', input_file=None, optimize_for_large_inputs=False)
+        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(50001))
@@ -114,24 +105,7 @@ class PipelineCommonWithFileTest(unittest.TestCase):
     input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
                                                          args.input_file)
     return pipeline_common.get_pipeline_mode(input_patterns,
-                                             args.input_file,
                                              args.optimize_for_large_inputs)
-
-  def test_get_mode_raises_error_for_no_absent_file(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='nonexistent_file',
-        optimize_for_large_inputs=False)
-
-    self.assertRaises(ValueError, self._get_pipeline_mode, args)
-
-  def test_get_mode_raises_error_for_empty_file(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='gcp_variant_transforms/testing/data/input_files/empty',
-        optimize_for_large_inputs=False)
-
-    self.assertRaises(ValueError, self._get_pipeline_mode, args)
 
   def test_get_mode_optimize_set(self):
     args = self._create_mock_args(

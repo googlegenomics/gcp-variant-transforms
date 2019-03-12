@@ -95,8 +95,7 @@ def run(argv=None):
                                                          _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
   input_patterns = known_args.input_patterns
-  pipeline_mode = pipeline_common.get_pipeline_mode(input_patterns,
-                                                    known_args.input_file)
+  pipeline_mode = pipeline_common.get_pipeline_mode(input_patterns)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(p, pipeline_mode, input_patterns)

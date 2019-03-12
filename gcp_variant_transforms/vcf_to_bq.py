@@ -310,7 +310,6 @@ def _run_annotation_pipeline(known_args, pipeline_args):
     if known_args.shard_variants:
       pipeline_mode = pipeline_common.get_pipeline_mode(
           files_to_be_annotated,
-          known_args.input_file,
           known_args.optimize_for_large_inputs)
       files_to_be_annotated = _shard_variants(known_args,
                                               pipeline_args,
@@ -336,7 +335,6 @@ def run(argv=None):
 
   pipeline_mode = pipeline_common.get_pipeline_mode(
       input_patterns,
-      known_args.input_file,
       known_args.optimize_for_large_inputs)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD

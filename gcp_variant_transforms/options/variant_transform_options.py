@@ -600,7 +600,7 @@ def _validate_inputs(parsed_args):
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '
                      'provided.')
-  if parsed_args.input_pattern is not None:
+  if parsed_args.input_pattern:
     try:
       # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
       first_match = filesystems.FileSystems.match(

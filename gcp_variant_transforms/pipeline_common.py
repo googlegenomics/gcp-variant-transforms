@@ -71,8 +71,7 @@ def parse_args(argv, command_line_options):
   return known_args, pipeline_args
 
 def _get_input_patterns(input_pattern, input_file):
-  return (
-      _get_file_names(input_file) if input_pattern is None else [input_pattern])
+  return [input_pattern] if input_pattern else _get_file_names(input_file)
 
 def _get_file_names(input_file):
   # type (str) -> List(str)
@@ -89,7 +88,6 @@ def _get_file_names(input_file):
 
 def get_pipeline_mode(
     input_patterns,
-    input_file=None,
     optimize_for_large_inputs=False):
   # type: (str, bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
@@ -97,19 +95,9 @@ def get_pipeline_mode(
     return PipelineModes.LARGE
 
   match_results = filesystems.FileSystems.match(input_patterns)
-  if not match_results:
-    if input_file:
-      raise ValueError(
-          'No files matched any input pattern in {} file'.format(input_file))
-    else:
-      raise ValueError(
-          'No files matched {} input pattern'.format(input_patterns[0]))
 
   total_files = 0
   for match in match_results:
-    if not match.metadata_list:
-      raise ValueError(
-          'Input pattern {} did not match any files.'.format(match.pattern))
     total_files += len(match.metadata_list)
 
   if total_files > _LARGE_DATA_THRESHOLD:
