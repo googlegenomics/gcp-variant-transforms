@@ -60,4 +60,4 @@ steps:
       # - '--gs_dir bashir-variant_integration_test_runs'
 images:
   - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-timeout: 60m
+timeout: 150m
