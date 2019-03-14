@@ -227,6 +227,9 @@ if [[ -n "${run_unit_tests}" ]]; then
 fi
 pip install --upgrade .[int_test]
 
+# Force an upgrade to avoid SSL certificate verification errors (issue #453).
+pip install --upgrade httplib2
+
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --project "${project}" \
