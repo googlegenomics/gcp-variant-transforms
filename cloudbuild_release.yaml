@@ -19,6 +19,12 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
+      - 'pull'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+    id: 'pull-image'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
