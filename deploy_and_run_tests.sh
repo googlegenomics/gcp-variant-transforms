@@ -227,9 +227,7 @@ if [[ -n "${run_unit_tests}" ]]; then
 fi
 pip install --upgrade .[int_test]
 
-# Due to the dependency issue, we have to manually upgrade httplib2 in order to
-# circumvent the CERTIFICATE_VERIFY_FAILED error. For more info, visit
-# https://github.com/googlegenomics/gcp-variant-transforms/issues/453.
+# Force an upgrade to avoid SSL certificate verification errors (issue #453).
 pip install --upgrade httplib2
 
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
