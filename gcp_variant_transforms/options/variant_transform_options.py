@@ -17,8 +17,6 @@ from __future__ import absolute_import
 import argparse  # pylint: disable=unused-import
 import re
 
-from apache_beam.io import filesystem
-from apache_beam.io import filesystems
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
@@ -600,38 +598,3 @@ def _validate_inputs(parsed_args):
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '
                      'provided.')
-  if parsed_args.input_pattern:
-    try:
-      # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
-      first_match = filesystems.FileSystems.match(
-          [parsed_args.input_pattern], [1])[0]
-      if not first_match.metadata_list:
-        raise ValueError('Input pattern {} did not match any files.'.format(
-            parsed_args.input_pattern))
-    except filesystem.BeamIOError:
-      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
-          parsed_args.input_pattern))
-  else:
-    if not filesystems.FileSystems.exists(parsed_args.input_file):
-      raise ValueError('Input file {} doesn''t exist'.format(
-          parsed_args.input_file))
-    all_patterns = []
-    with filesystems.FileSystems.open(parsed_args.input_file) as f:
-      for _, l in enumerate(f):
-        all_patterns.append(l.strip())
-      if not all_patterns:
-        raise ValueError('Input file {} is empty.'.format(
-            parsed_args.input_file))
-    try:
-      # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
-      matches = filesystems.FileSystems.match(
-          all_patterns, [1] * len(all_patterns))
-      for match in matches:
-        if not match.metadata_list:
-          raise ValueError(
-              'Input pattern {} from {} did not match any files.'.format(
-                  match.pattern, parsed_args.input_file))
-    except filesystem.BeamIOError:
-      raise ValueError(
-          'Some patterns in {} are invalid or inaccessible.'.format(
-              parsed_args.input_file))

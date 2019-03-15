@@ -22,7 +22,16 @@ import mock
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.pipeline_common import PipelineModes
+from gcp_variant_transforms.testing import temp_dir
 
+
+SAMPLE_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+WRONG_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+               'non_existent.vcf\n',
+               './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+EMPTY_LINES = []
 
 class PipelineCommonWithPatternTest(unittest.TestCase):
   """Tests cases for the `pipeline_common` script with pattern input."""
@@ -31,20 +40,26 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
-    input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
-                                                         args.input_file)
+    input_patterns = pipeline_common.get_input_patterns(args.input_pattern,
+                                                        args.input_file)
     return pipeline_common.get_pipeline_mode(input_patterns,
                                              args.optimize_for_large_inputs)
 
+  def test_validation_failure_for_invalid_input_pattern(self):
+    with self.assertRaisesRegexp(
+        ValueError, 'Input pattern .* did not match any files.'):
+      pipeline_common.get_input_patterns(
+          input_pattern='nonexistent_file.vcf', input_file=None)
+
   def test_get_mode_optimize_set(self):
     args = self._create_mock_args(
-        input_pattern='test', input_file=None, optimize_for_large_inputs=True)
+        input_pattern='*', input_file=None, optimize_for_large_inputs=True)
 
     self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
     args = self._create_mock_args(
-        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
+        input_pattern='*', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
 
@@ -53,7 +68,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
   def test_get_mode_medium(self):
     args = self._create_mock_args(
-        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
+        input_pattern='*', input_file=None, optimize_for_large_inputs=False)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(101))
@@ -102,64 +117,69 @@ class PipelineCommonWithFileTest(unittest.TestCase):
     return collections.namedtuple('MockArgs', args.keys())(*args.values())
 
   def _get_pipeline_mode(self, args):
-    input_patterns = pipeline_common._get_input_patterns(args.input_pattern,
-                                                         args.input_file)
+    input_patterns = pipeline_common.get_input_patterns(args.input_pattern,
+                                                        args.input_file)
     return pipeline_common.get_pipeline_mode(input_patterns,
                                              args.optimize_for_large_inputs)
 
   def test_get_mode_optimize_set(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='gcp_variant_transforms/testing/data/input_files/sample',
-        optimize_for_large_inputs=True)
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=SAMPLE_LINES)
+      args = self._create_mock_args(
+          input_pattern=None,
+          input_file=filename,
+          optimize_for_large_inputs=True)
 
-    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
-  def test_get_mode_small(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='gcp_variant_transforms/testing/data/input_files/sample',
-        optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+  def test_get_mode_small_still_large(self):
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=SAMPLE_LINES)
+      args = self._create_mock_args(
+          input_pattern=None,
+          input_file=filename,
+          optimize_for_large_inputs=False)
+      match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
-    match = match_result([None for _ in range(100)])
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.SMALL)
-
-  def test_get_mode_medium(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='gcp_variant_transforms/testing/data/input_files/sample',
-        optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-
-    match = match_result(range(101))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
-
-    matches = [match_result(range(60)),
-               match_result(range(40)),
-               match_result(range(1))]
-    with mock.patch.object(FileSystems, 'match', return_value=matches):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
-
-    match = match_result(range(50000))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
+      match = match_result([None for _ in range(100)])
+      with mock.patch.object(FileSystems, 'match', return_value=[match]):
+        self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_large(self):
-    args = self._create_mock_args(
-        input_pattern=None,
-        input_file='gcp_variant_transforms/testing/data/input_files/sample',
-        optimize_for_large_inputs=False)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=SAMPLE_LINES)
+      args = self._create_mock_args(
+          input_pattern=None,
+          input_file=filename,
+          optimize_for_large_inputs=False)
+      match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
-    match = match_result(range(50001))
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+      match = match_result(range(50001))
+      with mock.patch.object(FileSystems, 'match', return_value=[match]):
+        self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
-    matches = [match_result(range(25000)),
-               match_result(range(25000)),
-               match_result(range(1))]
-    with mock.patch.object(FileSystems, 'match', return_value=matches):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+      matches = [match_result(range(25000)),
+                 match_result(range(25000)),
+                 match_result(range(1))]
+      with mock.patch.object(FileSystems, 'match', return_value=matches):
+        self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+
+  def test_validation_failure_for_invalid_input_file(self):
+    with self.assertRaisesRegexp(ValueError, 'Input file .* doesn\'t exist'):
+      pipeline_common.get_input_patterns(
+          input_pattern=None, input_file='nonexistent_file.vcf')
+
+  def test_validation_failure_for_empty_input_file(self):
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=EMPTY_LINES)
+      with self.assertRaisesRegexp(ValueError, 'Input file .* is empty.'):
+        pipeline_common.get_input_patterns(
+            input_pattern=None, input_file=filename)
+
+  def test_validation_failure_for_wrong_pattern_in_input_file(self):
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=WRONG_LINES)
+      with self.assertRaisesRegexp(
+          ValueError, 'Input pattern .* from .* did not match any files.'):
+        pipeline_common.get_input_patterns(
+            input_pattern=None, input_file=filename)

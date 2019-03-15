@@ -26,6 +26,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 
 from gcp_variant_transforms.options import variant_transform_options
+from gcp_variant_transforms.testing import temp_dir
 
 
 def make_args(options, args):
@@ -36,6 +37,13 @@ def make_args(options, args):
   assert not remaining_args
   return namespace
 
+SAMPLE_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+WRONG_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+               'non_existent.vcf\n',
+               './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+EMPTY_LINES = []
 
 class VcfReadOptionsTest(unittest.TestCase):
   """Tests cases for the VcfReadOptions class."""
@@ -68,33 +76,13 @@ class VcfReadOptionsTest(unittest.TestCase):
     self._options.validate(args)
 
   def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/sample',
-        '--representative_header_file', 'gs://some_file'])
-    self._options.validate(args)
-
-  def test_failure_for_empty_input_file(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/empty',
-        '--representative_header_file', 'gs://some_file'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_wrong_pattern_in_input_file(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/wrong',
-        '--representative_header_file', 'gs://some_file'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_invalid_input_pattern(self):
-    args = self._make_args(['--input_pattern', 'nonexistent_file.vcf'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_invalid_input_file(self):
-    args = self._make_args(['--input_file', 'nonexistent_file.vcf'])
-    self.assertRaises(ValueError, self._options.validate, args)
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=SAMPLE_LINES)
+      args = self._make_args([
+          '--input_file',
+          filename,
+          '--representative_header_file', 'gs://some_file'])
+      self._options.validate(args)
 
 
 class BigQueryWriteOptionsTest(unittest.TestCase):
@@ -208,38 +196,7 @@ class PreprocessOptionsTest(unittest.TestCase):
                             '--report_path', 'some_path'])
     self._options.validate(args)
 
-  def test_failure_for_invalid_input_pattern(self):
-    args = self._make_args(['--input_pattern', 'nonexistent_file.vcf',
-                            '--report_path', 'some_path'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_invalid_input_file(self):
-    args = self._make_args(['--input_file', 'nonexistent_file.vcf',
-                            '--report_path', 'some_path'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
   def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
     args = self._make_args(['--input_pattern', '*',
                             '--report_path', 'some_path'])
     self._options.validate(args)
-
-  def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/sample',
-        '--report_path', 'some_path'])
-    self._options.validate(args)
-
-  def test_failure_for_empty_input_file(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/empty',
-        '--report_path', 'some_path'])
-    self.assertRaises(ValueError, self._options.validate, args)
-
-  def test_failure_for_wrong_pattern_in_input_file(self):
-    args = self._make_args([
-        '--input_file',
-        'gcp_variant_transforms/testing/data/input_files/wrong',
-        '--report_path', 'some_path'])
-    self.assertRaises(ValueError, self._options.validate, args)

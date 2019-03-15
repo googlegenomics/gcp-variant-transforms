@@ -93,8 +93,7 @@ def _read_variants(input_patterns, pipeline, known_args, pipeline_mode):
     representative_header_lines = vcf_header_parser.get_metadata_header_lines(
         known_args.representative_header_file)
 
-  if (pipeline_mode == pipeline_common.PipelineModes.LARGE or
-      len(input_patterns) > 1):
+  if pipeline_mode == pipeline_common.PipelineModes.LARGE:
     variants = (pipeline
                 | 'InputFilePattern' >> beam.Create(input_patterns)
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
@@ -367,8 +366,6 @@ def run(argv=None):
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(input_patterns, pipeline, known_args, pipeline_mode)
-  logging.info('got here')
-  logging.info(variants)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
   if partitioner:

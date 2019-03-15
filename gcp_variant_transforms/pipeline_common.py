@@ -26,6 +26,7 @@ from datetime import datetime
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
+from apache_beam.io import filesystem
 from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
@@ -66,22 +67,44 @@ def parse_args(argv, command_line_options):
   for transform_options in options:
     transform_options.validate(known_args)
   _raise_error_on_invalid_flags(pipeline_args)
-  known_args.input_patterns = _get_input_patterns(
+  known_args.input_patterns = get_input_patterns(
       known_args.input_pattern, known_args.input_file)
   return known_args, pipeline_args
 
-def _get_input_patterns(input_pattern, input_file):
-  return [input_pattern] if input_pattern else _get_file_names(input_file)
+def get_input_patterns(input_pattern, input_file):
+  patterns = [input_pattern] if input_pattern else _get_file_names(input_file)
+
+  # Validate inputs.
+  try:
+    # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
+    matches = filesystems.FileSystems.match(patterns, [1] * len(patterns))
+    for match in matches:
+      if input_file and not match.metadata_list:
+        raise ValueError(
+            'Input pattern {} from {} did not match any files.'.format(
+                match.pattern, input_file))
+      elif not match.metadata_list:
+        raise ValueError(
+            'Input pattern {} did not match any files.'.format(match.pattern))
+  except filesystem.BeamIOError:
+    if input_file:
+      raise ValueError(
+          'Some patterns in {} are invalid or inaccessible.'.format(
+              input_file))
+    else:
+      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+          input_pattern))
+  return patterns
 
 def _get_file_names(input_file):
   # type (str) -> List(str)
   """ Reads all input file and extracts list of patterns out of it."""
   result = []
   if not filesystems.FileSystems.exists(input_file):
-    raise ValueError('Input file {} doesn''t exist'.format(input_file))
+    raise ValueError('Input file {} doesn\'t exist'.format(input_file))
   with filesystems.FileSystems.open(input_file) as f:
     for _, l in enumerate(f):
-      result.append(l)
+      result.append(l.strip())
     if not result:
       raise ValueError('Input file {} is empty.'.format(input_file))
     return result
@@ -91,7 +114,7 @@ def get_pipeline_mode(
     optimize_for_large_inputs=False):
   # type: (str, bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
-  if optimize_for_large_inputs:
+  if optimize_for_large_inputs or len(input_patterns) > 1:
     return PipelineModes.LARGE
 
   match_results = filesystems.FileSystems.match(input_patterns)
@@ -106,11 +129,10 @@ def get_pipeline_mode(
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
 
-
 def read_headers(pipeline, pipeline_mode, input_patterns):
   # type: (beam.Pipeline, int, str) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
-  if pipeline_mode == PipelineModes.LARGE or len(input_patterns) > 1:
+  if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
                | beam.Create(input_patterns)
                | vcf_header_io.ReadAllVcfHeaders())

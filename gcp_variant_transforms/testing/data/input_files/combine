@@ -1,1 +1,2 @@
-gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0*.vcf
+gs://tural-test-runner/vcf_files/small/valid-4.1*
+gs://tural-test-runner/vcf_files/small/valid-4.2.*

@@ -9,15 +9,15 @@
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 21}
+        "expected_result": {"num_rows": 19790}
       },
       {
         "query": ["SELECT SUM(DP) AS sum FROM {TABLE_NAME}"],
-        "expected_result": {"sum": 241}
+        "expected_result": {"sum": 262}
       },
       {
         "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 8}
+        "expected_result": {"cnt": 4}
       }
     ]
   }
