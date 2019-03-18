@@ -25,6 +25,12 @@ steps:
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
+      - 'pull'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms-runner:${COMMIT_SHA}'
+    id: 'pull-docker-runner-image'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
@@ -44,7 +50,31 @@ steps:
       - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
     id: 'tag-image-latest'
 
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms-runner:${COMMIT_SHA}'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${COMMIT_SHA}'
+    id: 'tag-docker-runner-image-commit-sha'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${COMMIT_SHA}'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${TAG_NAME}'
+    id: 'tag-docker-runner-image-release-version'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'tag'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${COMMIT_SHA}'
+      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:latest'
+    id: 'tag-docker-runner-image-latest'
+
 images:
   - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
   - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
   - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${COMMIT_SHA}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:${TAG_NAME}'
+  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms-runner:latest'
