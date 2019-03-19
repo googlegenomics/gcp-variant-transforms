@@ -2,7 +2,7 @@
   {
     "test_name": "gnomad-genomes-grch37-chr-x-head2500-run-vep",
     "table_name": "gnomad_genomes_GRCh37_chrX_head2500_run_vep",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/gnomad_input",
+    "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/gnomad_input",
     "annotation_fields": "CSQ",
     "vep_assembly": "GRCh37",
     "runner": "DataflowRunner",

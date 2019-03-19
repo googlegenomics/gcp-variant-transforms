@@ -1,7 +1,7 @@
 [
   {
     "test_name": "no-conflicts",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
+    "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
     "report_blob_name": "temp/report_no_conflicts.tsv",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],

@@ -37,14 +37,6 @@ def make_args(options, args):
   assert not remaining_args
   return namespace
 
-SAMPLE_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
-                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
-                './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
-WRONG_LINES = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
-               'non_existent.vcf\n',
-               './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
-EMPTY_LINES = []
-
 class VcfReadOptionsTest(unittest.TestCase):
   """Tests cases for the VcfReadOptions class."""
 
@@ -76,8 +68,11 @@ class VcfReadOptionsTest(unittest.TestCase):
     self._options.validate(args)
 
   def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
+    lines = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
     with temp_dir.TempDir() as tempdir:
-      filename = tempdir.create_temp_file(lines=SAMPLE_LINES)
+      filename = tempdir.create_temp_file(lines=lines)
       args = self._make_args([
           '--input_file',
           filename,

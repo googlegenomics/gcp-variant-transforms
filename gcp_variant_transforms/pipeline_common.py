@@ -67,11 +67,13 @@ def parse_args(argv, command_line_options):
   for transform_options in options:
     transform_options.validate(known_args)
   _raise_error_on_invalid_flags(pipeline_args)
-  known_args.input_patterns = get_input_patterns(
+  known_args.all_patterns = _get_all_patterns(
       known_args.input_pattern, known_args.input_file)
   return known_args, pipeline_args
 
-def get_input_patterns(input_pattern, input_file):
+
+def _get_all_patterns(input_pattern, input_file):
+  # type: (str, str) -> List[str]
   patterns = [input_pattern] if input_pattern else _get_file_names(input_file)
 
   # Validate inputs.
@@ -79,13 +81,14 @@ def get_input_patterns(input_pattern, input_file):
     # Gets at most 1 pattern match result of type `filesystems.MatchResult`.
     matches = filesystems.FileSystems.match(patterns, [1] * len(patterns))
     for match in matches:
-      if input_file and not match.metadata_list:
-        raise ValueError(
-            'Input pattern {} from {} did not match any files.'.format(
-                match.pattern, input_file))
-      elif not match.metadata_list:
-        raise ValueError(
-            'Input pattern {} did not match any files.'.format(match.pattern))
+      if not match.metadata_list:
+        if input_file:
+          raise ValueError(
+              'Input pattern {} from {} did not match any files.'.format(
+                  match.pattern, input_file))
+        else:
+          raise ValueError(
+              'Input pattern {} did not match any files.'.format(match.pattern))
   except filesystem.BeamIOError:
     if input_file:
       raise ValueError(
@@ -96,48 +99,47 @@ def get_input_patterns(input_pattern, input_file):
           input_pattern))
   return patterns
 
+
 def _get_file_names(input_file):
-  # type (str) -> List(str)
-  """ Reads all input file and extracts list of patterns out of it."""
-  result = []
+  # type (str) -> List[str]
+  """Reads the input file and extracts list of patterns out of it."""
   if not filesystems.FileSystems.exists(input_file):
     raise ValueError('Input file {} doesn\'t exist'.format(input_file))
   with filesystems.FileSystems.open(input_file) as f:
-    for _, l in enumerate(f):
-      result.append(l.strip())
-    if not result:
+    contents = map(str.strip, f.readlines())
+    if not contents:
       raise ValueError('Input file {} is empty.'.format(input_file))
-    return result
+    return contents
 
-def get_pipeline_mode(
-    input_patterns,
-    optimize_for_large_inputs=False):
-  # type: (str, bool) -> int
+
+def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
+  # type: (List[str], bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
-  if optimize_for_large_inputs or len(input_patterns) > 1:
+  if optimize_for_large_inputs or len(all_patterns) > 1:
     return PipelineModes.LARGE
 
-  match_results = filesystems.FileSystems.match(input_patterns)
+  match_results = filesystems.FileSystems.match(all_patterns)
+  if not match_results:
+    raise ValueError(
+        'No files matched input_pattern: {}'.format(all_patterns[0]))
 
-  total_files = 0
-  for match in match_results:
-    total_files += len(match.metadata_list)
-
+  total_files = len(match_results[0].metadata_list)
   if total_files > _LARGE_DATA_THRESHOLD:
     return PipelineModes.LARGE
   elif total_files > _SMALL_DATA_THRESHOLD:
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
 
-def read_headers(pipeline, pipeline_mode, input_patterns):
-  # type: (beam.Pipeline, int, str) -> pvalue.PCollection
+
+def read_headers(pipeline, pipeline_mode, all_patterns):
+  # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
   if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
-               | beam.Create(input_patterns)
+               | beam.Create(all_patterns)
                | vcf_header_io.ReadAllVcfHeaders())
   else:
-    headers = pipeline | vcf_header_io.ReadVcfHeaders(input_patterns[0])
+    headers = pipeline | vcf_header_io.ReadVcfHeaders(all_patterns[0])
 
   return headers
 

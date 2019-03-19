@@ -94,22 +94,22 @@ def run(argv=None):
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  input_patterns = known_args.input_patterns
-  pipeline_mode = pipeline_common.get_pipeline_mode(input_patterns)
+  all_patterns = known_args.all_patterns
+  pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns)
 
   with beam.Pipeline(options=options) as p:
-    headers = pipeline_common.read_headers(p, pipeline_mode, input_patterns)
+    headers = pipeline_common.read_headers(p, pipeline_mode, all_patterns)
     merged_headers = pipeline_common.get_merged_headers(headers)
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
     if known_args.report_all_conflicts:
-      if len(input_patterns) == 1:
+      if len(all_patterns) == 1:
         variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-            input_patterns[0], allow_malformed_records=True)
+            all_patterns[0], allow_malformed_records=True)
       else:
         variants = (p
-                    | 'InputFilePattern' >> beam.Create(input_patterns)
+                    | 'InputFilePattern' >> beam.Create(all_patterns)
                     | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                         allow_malformed_records=True))
 
