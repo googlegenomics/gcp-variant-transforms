@@ -112,7 +112,6 @@ class VcfReadOptions(VariantTransformsOptions):
               'is not recommended.'.format(vcfio.VcfParserType.PYVCF.name,
                                            vcfio.VcfParserType.NUCLEUS.name)))
 
-
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
     if parsed_args.infer_headers and parsed_args.representative_header_file:

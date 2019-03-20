@@ -37,6 +37,7 @@ def make_args(options, args):
   assert not remaining_args
   return namespace
 
+
 class VcfReadOptionsTest(unittest.TestCase):
   """Tests cases for the VcfReadOptions class."""
 

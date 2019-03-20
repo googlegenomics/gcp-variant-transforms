@@ -85,8 +85,12 @@ _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _SHARDS_FOLDER = 'shards'
 
 
-def _read_variants(all_patterns, pipeline, known_args, pipeline_mode):
-  # type: (str, beam.Pipeline, argparse.Namespace, int) -> pvalue.PCollection
+def _read_variants(all_patterns, # type: List[str]
+                   pipeline, # type: beam.Pipeline
+                   known_args, # type: argparse.Namespace
+                   pipeline_mode # type: int
+                  ):
+  # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
   representative_header_lines = None
   if known_args.representative_header_file:
@@ -132,7 +136,7 @@ def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
     raise ValueError('Merge strategy is not supported.')
 
 
-def _add_inferred_headers(all_patterns,  # type: str
+def _add_inferred_headers(all_patterns,  # type: List[str]
                           pipeline,  # type: beam.Pipeline
                           known_args,  # type: argparse.Namespace
                           merged_header,  # type: pvalue.PCollection
@@ -194,7 +198,7 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
 
 
 def _annotate_vcf_files(all_patterns, known_args, pipeline_args):
-  # type: (str, argparse.Namespace, List[str]) -> str
+  # type: (List[str], argparse.Namespace, List[str]) -> str
   """Annotates the VCF files using VEP.
 
   Returns:

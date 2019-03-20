@@ -101,7 +101,7 @@ def _get_all_patterns(input_pattern, input_file):
 
 
 def _get_file_names(input_file):
-  # type (str) -> List[str]
+  # type: (str) -> List[str]
   """Reads the input file and extracts list of patterns out of it."""
   if not filesystems.FileSystems.exists(input_file):
     raise ValueError('Input file {} doesn\'t exist'.format(input_file))
