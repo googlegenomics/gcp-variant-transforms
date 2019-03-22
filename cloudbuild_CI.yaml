@@ -22,6 +22,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--build-arg'
+      - 'IMAGE_TAG=${COMMIT_SHA}'
       - '--tag=gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - '--file=docker/Dockerfile'
       - '.'
@@ -34,32 +36,9 @@ steps:
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     id: 'push-gcp-variant-transforms-docker'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '--tag=gcr.io/${PROJECT_ID}/gcp-variant-transforms-runner:${COMMIT_SHA}'
-      - '--file=docker/pipelines_runner/Dockerfile'
-      - '.'
-    id: 'build-gcp-variant-transforms-runner-docker'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms-runner:${COMMIT_SHA}'
-    id: 'push-gcp-variant-transforms-runner-docker'
-
-  # TODO(yifangchen): add the test for the image above.
-  # Run the test script from the first image we built and pushed.
-  #
-  # Note that ./deploy_and_run_tests.sh that is referenced here is coming from
-  # the source downloaded from GitHub and not the file in the docker image.
-  # The only reason that we use the built image in the 'name' argument is
-  # convenience, i.e., to avoid installing python, virtualenv, etc. on the
-  # image.
+  # Run the test script from the very image we built and pushed.
   - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     args:
-      - 'bash'
-      - './deploy_and_run_tests.sh'
       - '--keep_image'
       - '--skip_build'
       - '--project ${PROJECT_ID}'
@@ -70,6 +49,8 @@ steps:
       - '--run_all_tests'
       - '--test_name_prefix cloud-ci-'
     id: 'test-gcp-variant-transforms-docker'
+    entrypoint: './deploy_and_run_tests.sh'
+
       # By default the script uses a GS bucket of gcp-variant-transforms-test
       # project. For other projects we should either use the following option
       # or change the script to create a temporary bucket on the fly.

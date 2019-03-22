@@ -41,9 +41,8 @@ from apache_beam.io import filesystems
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 
-_PIPELINE_NAME = 'gcp-variant-transforms-bq-to-vcf-integration-test'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/bq_to_vcf_tests'
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/bq_to_vcf'
+_SCRIPT_PATH = 'bq_to_vcf'
 
 
 class BqToVcfTestCase(run_tests_common.TestCaseInterface):
@@ -78,11 +77,11 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+    self.run_test_command = run_tests_common.form_command(
         parsed_args.project,
         filesystems.FileSystems.join(parsed_args.logging_location,
                                      '_'.join([test_name, timestamp])),
-        parsed_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+        parsed_args.image, _SCRIPT_PATH, zones, args)
 
   def validate_result(self):
     """Validates the results.

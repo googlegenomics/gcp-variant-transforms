@@ -17,6 +17,9 @@
 
 FROM google/cloud-sdk
 
+ARG IMAGE_TAG
+ENV image_tag=${IMAGE_TAG}
+
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
 ADD / /opt/gcp_variant_transforms/src/
 
@@ -47,3 +50,5 @@ RUN printf '#!/bin/bash\n%s\n%s' \
       'python -m gcp_variant_transforms.bq_to_vcf --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/bq_to_vcf && \
     chmod +x /opt/gcp_variant_transforms/bin/bq_to_vcf
+
+ENTRYPOINT ["/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh"]
