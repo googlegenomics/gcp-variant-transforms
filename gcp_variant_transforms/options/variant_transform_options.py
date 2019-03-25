@@ -17,8 +17,6 @@ from __future__ import absolute_import
 import argparse  # pylint: disable=unused-import
 import re
 
-from apache_beam.io import filesystem
-from apache_beam.io import filesystems
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
@@ -53,9 +51,16 @@ class VcfReadOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     """Adds all options of this transform to parser."""
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help=('Input pattern for VCF files to process. Either'
+              'this or --input_file flag has to be provided, exclusively.'))
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exclusively.'
+              'Note that using input_file rather than input_pattern is slower '
+              'for inputs that contain less than 50k files.'))
     parser.add_argument(
         '--allow_malformed_records',
         type='bool', default=False, nargs='?', const=True,
@@ -113,16 +118,7 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
-    try:
-      # Gets at most one pattern match result of type `filesystems.MatchResult`.
-      first_match = filesystems.FileSystems.match(
-          [parsed_args.input_pattern], [1])[0]
-      if not first_match.metadata_list:
-        raise ValueError('Input pattern {} did not match any files.'.format(
-            parsed_args.input_pattern))
-    except filesystem.BeamIOError:
-      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
-          parsed_args.input_pattern))
+    _validate_inputs(parsed_args)
 
 
 class AvroWriteOptions(VariantTransformsOptions):
@@ -477,9 +473,16 @@ class PreprocessOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help='Input pattern for VCF files to process. Either'
+             'this or --input_file flag has to be provided, exclusively.')
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exlusively. '
+              'Note that using input_file than input_pattern is slower for '
+              'inputs that contain less than 50k files.'))
     parser.add_argument(
         '--report_all_conflicts',
         type='bool', default=False, nargs='?', const=True,
@@ -500,6 +503,10 @@ class PreprocessOptions(VariantTransformsOptions):
         help=('The full path of the resolved headers. The file will not be'
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
+
+  def validate(self, parsed_args):
+    _validate_inputs(parsed_args)
+
 
 class PartitionOptions(VariantTransformsOptions):
   """Options for partitioning Variant records."""
@@ -583,3 +590,10 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'be the same as the BigQuery table, but it requires all '
               'extracted variants to have the same call name ordering (usually '
               'true for tables from single VCF file import).'))
+
+
+def _validate_inputs(parsed_args):
+  if ((parsed_args.input_pattern and parsed_args.input_file) or
+      (not parsed_args.input_pattern and not parsed_args.input_file)):
+    raise ValueError('Exactly one of input_pattern and input_file has to be '
+                     'provided.')

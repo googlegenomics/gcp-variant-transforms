@@ -26,6 +26,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 
 from gcp_variant_transforms.options import variant_transform_options
+from gcp_variant_transforms.testing import temp_dir
 
 
 def make_args(options, args):
@@ -47,20 +48,37 @@ class VcfReadOptionsTest(unittest.TestCase):
     # type: (List[str]) -> argparse.Namespace
     return make_args(self._options, args)
 
-  def test_failure_for_conflicting_flags(self):
+  def test_no_inputs(self):
+    args = self._make_args([])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_headers(self):
     args = self._make_args(['--input_pattern', '*',
                             '--infer_headers',
                             '--representative_header_file', 'gs://some_file'])
     self.assertRaises(ValueError, self._options.validate, args)
 
-  def test_failure_for_conflicting_flags_no_errors(self):
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
     args = self._make_args(['--input_pattern', '*',
                             '--representative_header_file', 'gs://some_file'])
     self._options.validate(args)
 
-  def test_failure_for_invalid_input_pattern(self):
-    args = self._make_args(['--input_pattern', 'nonexistent_file.vcf'])
-    self.assertRaises(ValueError, self._options.validate, args)
+  def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
+    lines = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=lines)
+      args = self._make_args([
+          '--input_file',
+          filename,
+          '--representative_header_file', 'gs://some_file'])
+      self._options.validate(args)
 
 
 class BigQueryWriteOptionsTest(unittest.TestCase):
@@ -151,3 +169,30 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
     self.assertRaises(ValueError, self._options.validate, args)
+
+
+class PreprocessOptionsTest(unittest.TestCase):
+  """Tests cases for the PreprocessOptions class."""
+
+  def setUp(self):
+    self._options = variant_transform_options.PreprocessOptions()
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    return make_args(self._options, args)
+
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)

@@ -1,0 +1,24 @@
+[
+  {
+    "test_name": "combine-from-multiple-inputs",
+    "table_name": "combine_from_multiple_inputs",
+    "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
+    "allow_incompatible_records": "True",
+    "runner": "DirectRunner",
+    "zones": ["us-west1-b"],
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 19790}
+      },
+      {
+        "query": ["SELECT SUM(DP) AS sum FROM {TABLE_NAME}"],
+        "expected_result": {"sum": 262}
+      },
+      {
+        "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
+        "expected_result": {"cnt": 4}
+      }
+    ]
+  }
+]

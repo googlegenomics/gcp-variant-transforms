@@ -1,0 +1,53 @@
+[
+  {
+    "test_name": "test-annotation-pipeline-from-file-with-sharding",
+    "table_name": "test_annotation_pipeline_from_file_with_sharding",
+    "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
+    "vep_assembly": "GRCh37",
+    "runner": "DataflowRunner",
+    "run_annotation_pipeline": "True",
+    "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
+    "shard_variants": "True",
+    "infer_headers": "True",
+    "num_workers": 2,
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 19778}
+      },
+      {
+        "query": [
+          "SELECT COUNT(0) AS num_annotation_sets ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_annotation_sets": 16898}
+      },
+      {
+        "query": [
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "FROM ( ",
+          "  SELECT start_position, reference_bases, A.alt, ",
+          "         COUNT(0) AS number_of_annotations ",
+          "  FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
+          "  GROUP BY 1, 2, 3",
+          ")"
+        ],
+        "expected_result": {"hash_sum": 13631192958}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_features": 417}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
+          "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_symbol": 92}
+      }
+    ]
+  }
+]
