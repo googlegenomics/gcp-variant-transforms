@@ -67,8 +67,9 @@ def parse_args(argv, command_line_options):
   for transform_options in options:
     transform_options.validate(known_args)
   _raise_error_on_invalid_flags(pipeline_args)
-  known_args.all_patterns = _get_all_patterns(
-      known_args.input_pattern, known_args.input_file)
+  if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
+    known_args.all_patterns = _get_all_patterns(
+        known_args.input_pattern, known_args.input_file)
   return known_args, pipeline_args
 
 
