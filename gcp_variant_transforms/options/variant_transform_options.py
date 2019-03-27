@@ -597,3 +597,22 @@ def _validate_inputs(parsed_args):
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '
                      'provided.')
+
+
+class ExperimentalOptions(VariantTransformsOptions):
+  """Options for experimental features.
+
+  All big releases should be protected behind flags. During the release, the
+  flag should be turned on - in case of a breakage either a roll back, or a roll
+  forward that modifies the default value to False is required. After the
+  release has been active for a certain amount of time, the flag and all its
+  invocations should be removed.
+  """
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        '--auto_flags_experiment',
+        default=False,
+        help=('Experiment: Default flag to more optimal values based on '
+              'heuristics extracted from other inputs'))
