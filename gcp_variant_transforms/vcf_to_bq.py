@@ -48,6 +48,7 @@ from apache_beam.options import pipeline_options
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
+from gcp_variant_transforms.libs import optimize_flags
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_partition
@@ -410,7 +411,9 @@ def run(argv=None):
                                                          _COMMAND_LINE_OPTIONS)
 
   if known_args.auto_flags_experiment:
+    supplied_args = pipeline_common.extract_supplied_args(argv)
     _get_input_dimensions(known_args, pipeline_args)
+    optimize_flags.optimize_flags(supplied_args, known_args, pipeline_args)
 
   annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
 

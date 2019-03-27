@@ -22,6 +22,7 @@ from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
 import os
+import sys
 import uuid
 from datetime import datetime
 
@@ -74,6 +75,21 @@ def parse_args(argv, command_line_options):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
   return known_args, pipeline_args
+
+
+def extract_supplied_args(args):
+  # type (List[str]) -> List[str]
+  """Filters out all manually supplied arguments from argv by finding args that
+    start with '--', then droping the prefix and potentially '=*' suffix.
+  """
+  supplied_args = []
+  for arg in args or sys.argv:
+    if '--' in arg:
+      flag = arg[2:(arg + '=').find('=')]
+      supplied_args.append('infer_headers' if
+                           flag == 'infer_undefined_headers' else flag)
+
+  return supplied_args
 
 
 def _get_all_patterns(input_pattern, input_file):
