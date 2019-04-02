@@ -2,7 +2,7 @@
 
 This page summarizes common error scenarios when running the pipeline and
 provide recommanded workarounds. If you are still unable to successfully load
-your VCF files, please post on the
+or export your VCF files, please post on the
 [google-genomics-discuss](https://groups.google.com/forum/#!forum/google-genomics-discuss)
 group or file a GitHub issue if you believe that there is a bug in the pipeline.
 
@@ -83,4 +83,16 @@ You can fix this by:
 ## Error: "BigQuery schema has no such field"
 
 Same as [above](#error-json-parsing-error--no-such-field-field_name).
+
+## BigQuery to VCF fails: "A work item was attempted 4 times without success."
+
+The error "Each time the worker eventually lost contact with the service." may
+relate to insufficient memory. 
+
+* Try changing `--worker_machine_type` to a larger machine (e.g.
+  `n1-standard-64`). See
+  [predefined machine types](https://cloud.google.com/compute/pricing#predefined_machine_types)
+  for the full list.
+
+* Try lowering the value of `--number_of_bases_per_shard` (e.g. `10000`)
 
