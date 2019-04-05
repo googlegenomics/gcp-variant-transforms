@@ -75,16 +75,15 @@ function main {
     exit 1
   fi
 
-  operation_info=$( (`gcloud alpha genomics pipelines run \
-    --project "${google_cloud_project}" \
-    --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
-    --service-account-scopes "https://www.googleapis.com/auth/cloud-platform" \
+  pipelines --project "${google_cloud_project}" run \
+    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}" \
+    --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
+    --wait \
+    --scopes "https://www.googleapis.com/auth/cloud-platform" \
     --zones "${zones}" \
-    --docker-image "${vt_docker_image}" \
-    --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}"`) 2>&1)
-
-  operation_id="$(echo ${operation_info} | grep -o -P '(?<=operations/).*(?=])')"
-  gcloud alpha genomics operations wait ${operation_id}
+    --image "${vt_docker_image}" \
+    --pvm-attempts 0 \
+    --attempts 1
 }
 
 main "$@"
