@@ -2,7 +2,7 @@
   {
     "test_name": "option-optimize-for-large-inputs",
     "table_name": "option_optimize_for_large_inputs",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/valid-70000-copies/*.vcf",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/valid-70000-copies/**.vcf",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "optimize_for_large_inputs": true,
     "runner": "DataflowRunner",
