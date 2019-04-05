@@ -17,8 +17,8 @@
 
 FROM google/cloud-sdk
 
-ARG IMAGE_TAG
-ENV image_tag=${IMAGE_TAG}
+ARG commit_sha
+ENV COMMIT_SHA=${commit_sha}
 
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
 ADD / /opt/gcp_variant_transforms/src/

@@ -53,7 +53,7 @@ from google.cloud import bigquery
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
-_SCRIPT_PATH = 'vcf_to_bq'
+_TOOL_NAME = 'vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
 
@@ -88,7 +88,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     self.run_test_command = run_tests_common.form_command(
         context.project,
         filesystems.FileSystems.join(context.logging_location, output_table),
-        context.image, _SCRIPT_PATH, zones, args)
+        context.image, _TOOL_NAME, zones, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""

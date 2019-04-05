@@ -42,7 +42,7 @@ from gcp_variant_transforms.testing.integration import run_tests_common
 
 
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/bq_to_vcf_tests'
-_SCRIPT_PATH = 'bq_to_vcf'
+_TOOL_NAME = 'bq_to_vcf'
 
 
 class BqToVcfTestCase(run_tests_common.TestCaseInterface):
@@ -81,7 +81,7 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
         parsed_args.project,
         filesystems.FileSystems.join(parsed_args.logging_location,
                                      '_'.join([test_name, timestamp])),
-        parsed_args.image, _SCRIPT_PATH, zones, args)
+        parsed_args.image, _TOOL_NAME, zones, args)
 
   def validate_result(self):
     """Validates the results.

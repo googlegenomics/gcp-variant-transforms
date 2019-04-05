@@ -44,7 +44,7 @@ from google.cloud import storage
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _BUCKET_NAME = 'integration_test_runs'
-_SCRIPT_PATH = 'vcf_to_bq_preprocess'
+_TOOL_NAME = 'vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
@@ -90,7 +90,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
         parser_args.project,
         filesystems.FileSystems.join(parser_args.logging_location,
                                      self._report_blob_name),
-        parser_args.image, _SCRIPT_PATH, zones, args)
+        parser_args.image, _TOOL_NAME, zones, args)
 
   def validate_result(self):
     """Validates the results.

@@ -126,14 +126,14 @@ class TestRunner(object):
     return 0
 
 
-def form_command(project, temp_location, image, script_path, zones, args):
+def form_command(project, temp_location, image, tool_name, zones, args):
   # type: (str, str, str, str, Optional[List[str]], List[str]) -> List[str]
   return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
           '--project', project,
           '--docker_image', image,
           '--temp_location', temp_location,
           '--zones', str(' '.join(zones or _DEFAULT_ZONES)),
-          ' '.join([script_path] + args)]
+          ' '.join([tool_name] + args)]
 
 
 def add_args(parser):

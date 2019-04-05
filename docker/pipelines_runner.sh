@@ -54,7 +54,7 @@ function main {
   parse_args "$@"
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
-  vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms:${image_tag}}"
+  vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}}"
   zones="${zones:-$(gcloud config get-value compute/zone)}"
   temp_location="${temp_location:-''}"
 
