@@ -22,16 +22,14 @@ It provides common functions and classes for both run_vcf_to_bq_tests
 import argparse  # pylint: disable=unused-import
 import json
 import os
+import subprocess
 import time
 from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
-from googleapiclient import discovery
-from oauth2client.client import GoogleCredentials
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
 _DEFAULT_ZONES = ['us-east1-b']
-_CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
 # `TestCaseState` saves current running test and the remaining tests in the same
 # test script (.json).
@@ -64,13 +62,9 @@ class TestRunner(object):
       revalidate: If True, only run the result validation part of the tests.
     """
     self._tests = tests
-    self._service = discovery.build(
-        'genomics',
-        'v2alpha1',
-        credentials=GoogleCredentials.get_application_default())
     self._revalidate = revalidate
-    self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
-    self._operation_names_to_test_case_names = {}  # type: Dict[str, str]
+    self._test_names_to_test_states = {}  # type: Dict[str, TestCaseState]
+    self._test_names_to_processes = {}  # type: Dict[str, subprocess.Popen]
 
   def run(self):
     """Runs all tests."""
@@ -89,56 +83,40 @@ class TestRunner(object):
     """Runs the first test case in `test_cases`.
 
     The first test case and the remaining test cases form `TestCaseState` and
-    are added into `_operation_names_to_test_states` for future usage.
+    are added into `_test_names_to_test_states` for future usage.
     """
     if not test_cases:
       return
-    # The following pylint hint is needed because `pipelines` is a method that
-    # is dynamically added to the returned `service` object above. See
-    # `googleapiclient.discovery.Resource._set_service_methods`.
-    # pylint: disable=no-member
-    request = self._service.pipelines().run(
-        body=test_cases[0].pipelines_api_request)
-    operation_name = request.execute()['name']
-    self._operation_names_to_test_states.update(
-        {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
-    self._operation_names_to_test_case_names.update(
-        {operation_name: test_cases[0]._name})
+    self._test_names_to_test_states.update({
+        test_cases[0].get_name(): TestCaseState(test_cases[0], test_cases[1:])})
+    self._test_names_to_processes.update(
+        {test_cases[0].get_name(): subprocess.Popen(
+            test_cases[0].run_test_command, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)})
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
-    # pylint: disable=no-member
-    operations = self._service.projects().operations()
-    while self._operation_names_to_test_states:
+    while self._test_names_to_processes:
       time.sleep(10)
-      running_operation_names = self._operation_names_to_test_states.keys()
-      for operation_name in running_operation_names:
-        request = operations.get(name=operation_name)
-        response = request.execute()
-        if response['done']:
-          self._handle_failure(operation_name, response)
-          test_case_state = self._operation_names_to_test_states.get(
-              operation_name)
-          del self._operation_names_to_test_states[operation_name]
+      running_test_names = self._test_names_to_processes.keys()
+      for test_name in running_test_names:
+        running_proc = self._test_names_to_processes.get(test_name)
+        return_code = running_proc.poll()
+        if return_code is not None:
+          test_case_state = self._test_names_to_test_states.get(test_name)
+          self._handle_failure(running_proc, test_case_state.running_test)
+          del self._test_names_to_processes[test_name]
           test_case_state.running_test.validate_result()
           self._run_test(test_case_state.remaining_tests)
 
-  def _handle_failure(self, operation_name, response):
+  def _handle_failure(self, proc, test_case):
     """Raises errors if test case failed."""
-    if 'error' in response:
-      if 'message' in response['error']:
-        raise TestCaseFailure(
-            'Test case {} (Operation {}) failed: {}'.format(
-                self._operation_names_to_test_case_names[operation_name],
-                operation_name,
-                response['error']['message']))
-      else:
-        # This case should never happen.
-        raise TestCaseFailure(
-            'Test case {} (Operation {}) failed: No traceback. '
-            'See logs for more information on error.'.format(
-                self._operation_names_to_test_case_names[operation_name],
-                operation_name))
+    if proc.returncode != 0:
+      stdout, stderr = proc.communicate()
+      raise TestCaseFailure('Test case {} failed. stdout: {}, stderr: {}, '
+                            'return code: {}.'.format(test_case.get_name(),
+                                                      stdout, stderr,
+                                                      proc.returncode))
 
   def print_results(self):
     """Prints results of test cases."""
@@ -148,43 +126,14 @@ class TestRunner(object):
     return 0
 
 
-def form_pipelines_api_request(project,  # type: str
-                               logging_location,  # type: str
-                               image,  # type: str
-                               pipeline_name,  # type: str
-                               script_path,  # type: str
-                               zones,  # type: Optional[List[str]]
-                               args  # type: List[str]
-                              ):
-  # type: (...) -> Dict
-  return {
-      'pipeline': {
-          'actions': [
-              {
-                  'imageUri': image,
-                  'commands': ['/bin/sh', '-c', ' '.join([script_path] + args)]
-              },
-              {
-                  'imageUri': 'gcr.io/cloud-genomics-pipelines/io',
-                  'commands': [
-                      'sh', '-c',
-                      'gsutil cp /google/logs/output %s' % logging_location
-                  ],
-                  'flags': ['ALWAYS_RUN'],
-              }
-          ],
-          'resources': {
-              'projectId': project,
-              'zones': zones or _DEFAULT_ZONES,
-              'virtualMachine': {
-                  'machineType': 'n1-standard-1',
-                  'serviceAccount': {'scopes': [_CLOUD_PLATFORM_SCOPE]},
-                  'bootDiskSizeGb': 100,
-                  'labels': {'pipeline_name': pipeline_name}
-              }
-          }
-      }
-  }
+def form_command(project, temp_location, image, tool_name, zones, args):
+  # type: (str, str, str, str, Optional[List[str]], List[str]) -> List[str]
+  return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
+          '--project', project,
+          '--docker_image', image,
+          '--temp_location', temp_location,
+          '--zones', str(' '.join(zones or _DEFAULT_ZONES)),
+          ' '.join([tool_name] + args)]
 
 
 def add_args(parser):

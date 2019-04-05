@@ -44,8 +44,7 @@ from google.cloud import storage
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _BUCKET_NAME = 'integration_test_runs'
-_PIPELINE_NAME = 'gcp-variant-transforms-preprocessor-integration-test'
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
+_TOOL_NAME = 'vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
@@ -87,11 +86,11 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+    self.run_test_command = run_tests_common.form_command(
         parser_args.project,
         filesystems.FileSystems.join(parser_args.logging_location,
                                      self._report_blob_name),
-        parser_args.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+        parser_args.image, _TOOL_NAME, zones, args)
 
   def validate_result(self):
     """Validates the results.

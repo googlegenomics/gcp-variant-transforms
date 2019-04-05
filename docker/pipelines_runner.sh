@@ -54,7 +54,7 @@ function main {
   parse_args "$@"
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
-  vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms}"
+  vt_docker_image="${vt_docker_image:-gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}}"
   zones="${zones:-$(gcloud config get-value compute/zone)}"
   temp_location="${temp_location:-''}"
 
@@ -75,13 +75,16 @@ function main {
     exit 1
   fi
 
-  gcloud alpha genomics pipelines run \
+  operation_info=$( (`gcloud alpha genomics pipelines run \
     --project "${google_cloud_project}" \
     --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
     --service-account-scopes "https://www.googleapis.com/auth/cloud-platform" \
     --zones "${zones}" \
     --docker-image "${vt_docker_image}" \
-    --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}"
+    --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}"`) 2>&1)
+
+  operation_id="$(echo ${operation_info} | grep -o -P '(?<=operations/).*(?=])')"
+  gcloud alpha genomics operations wait ${operation_id}
 }
 
 main "$@"

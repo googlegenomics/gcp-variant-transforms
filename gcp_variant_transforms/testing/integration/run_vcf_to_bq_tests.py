@@ -50,12 +50,10 @@ from apache_beam.io import filesystems
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
-from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
-_PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
+_TOOL_NAME = 'vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
 
 
@@ -87,10 +85,10 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
       if isinstance(v, basestring):
         value = v.format(TABLE_NAME=self._table_name)
       args.append('--{} {}'.format(k, value))
-    self.pipelines_api_request = run_tests_common.form_pipelines_api_request(
+    self.run_test_command = run_tests_common.form_command(
         context.project,
         filesystems.FileSystems.join(context.logging_location, output_table),
-        context.image, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+        context.image, _TOOL_NAME, zones, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
@@ -186,7 +184,6 @@ class TestContextManager(object):
     self.temp_location = args.temp_location
     self.logging_location = args.logging_location
     self.project = args.project
-    self.credentials = GoogleCredentials.get_application_default()
     self.image = args.image
     self._keep_tables = args.keep_tables
     self.revalidation_dataset_id = args.revalidation_dataset_id
