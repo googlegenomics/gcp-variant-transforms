@@ -45,9 +45,11 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
   def test_get_mode_optimize_set(self):
     args = self._create_mock_args(
-        input_pattern='*', input_file=None, optimize_for_large_inputs=True)
-
-    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+        input_pattern='**', input_file=None, optimize_for_large_inputs=True)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+    match = match_result([None for _ in range(100)])
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
     args = self._create_mock_args(

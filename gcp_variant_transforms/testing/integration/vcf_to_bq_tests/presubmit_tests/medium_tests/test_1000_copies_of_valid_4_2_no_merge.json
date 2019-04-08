@@ -2,7 +2,7 @@
   {
     "test_name": "test-1000-copies-of-valid-4-2-no-merge",
     "table_name": "test_1000_copies_of_valid_4_2_no_merge",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/valid-1000-copies/*.vcf",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/valid-1000-copies/**.vcf",
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-16",
     "max_num_workers": "20",
