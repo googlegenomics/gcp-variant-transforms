@@ -15,7 +15,13 @@
 # To build a new docker image, run the following from the root source dir:
 # $ docker build . -f docker/Dockerfile -t $IMAGE_NAME
 
-FROM google/cloud-sdk
+FROM golang:1.11
+
+RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
+
+FROM google/cloud-sdk:slim
+
+COPY --from=0 /go/bin/pipelines /usr/bin
 
 ARG commit_sha
 ENV COMMIT_SHA=${commit_sha}
