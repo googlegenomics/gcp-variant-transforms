@@ -18,8 +18,7 @@ import setuptools
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
-    # TODO(bashir2): Drop the <=2.4 condition once the build is fixed with 2.5.
-    'apache-beam[gcp]>=2.3,<=2.4',
+    'apache-beam[gcp]',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
@@ -30,16 +29,11 @@ REQUIRED_PACKAGES = [
     # Nucleus needs uptodate protocol buffer compiler (protoc).
     'protobuf>=3.6.1',
     'mmh3<2.6',
-    # Need to explicitly install v<=1.2.0. apache-beam requires
-    # google-cloud-pubsub 0.26.0, which relies on google-cloud-core<0.26dev,
-    # >=0.25.0. google-cloud-storage also has requirements on google-cloud-core,
-    # and version 1.2.0 resolves the dependency conflicts.
-    'google-cloud-storage<=1.2.0'
-]
-
-INTEGRATION_TEST_REQUIREMENTS = [
-    # Need to explicitly install v>0.25 as the BigQuery python API has changed.
-    'google-cloud-bigquery>0.25'
+    # Need to explicitly install v<=1.13.0. apache-beam requires
+    # google-cloud-pubsub 0.39.0, which relies on google-cloud-core<0.30dev,
+    # >=0.29.0. google-cloud-storage also has requirements on google-cloud-core,
+    # and version 1.13.0 resolves the dependency conflicts.
+    'google-cloud-storage<=1.13.0'
 ]
 
 REQUIRED_SETUP_PACKAGES = [
@@ -69,9 +63,6 @@ setuptools.setup(
 
     setup_requires=REQUIRED_SETUP_PACKAGES,
     install_requires=REQUIRED_PACKAGES,
-    extras_require={
-        'int_test': INTEGRATION_TEST_REQUIREMENTS,
-    },
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
     package_data={

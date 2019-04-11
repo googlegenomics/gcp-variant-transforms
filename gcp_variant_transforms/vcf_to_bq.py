@@ -83,6 +83,7 @@ _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 _ANNOTATE_FILES_JOB_NAME = 'annotate-files'
 _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _SHARDS_FOLDER = 'shards'
+_GCS_RECURSIVE_WILDCARD = '**'
 
 
 def _read_variants(all_patterns, # type: List[str]
@@ -194,7 +195,8 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
              beam.pvalue.AsSingleton(call_names),
              known_args.number_of_variants_per_shard))
 
-  return [vep_runner_util.format_dir_path(vcf_shards_output_dir)]
+  return [vep_runner_util.format_dir_path(vcf_shards_output_dir) +
+          _GCS_RECURSIVE_WILDCARD]
 
 
 def _annotate_vcf_files(all_patterns, known_args, pipeline_args):

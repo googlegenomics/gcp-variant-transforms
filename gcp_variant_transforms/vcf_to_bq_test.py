@@ -18,9 +18,9 @@ import collections
 import unittest
 
 from gcp_variant_transforms import vcf_to_bq
+from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.options.variant_transform_options import MergeOptions
 from gcp_variant_transforms.vcf_to_bq import _get_variant_merge_strategy
-from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 
 
 class VcfToBqTest(unittest.TestCase):
@@ -56,7 +56,7 @@ class VcfToBqTest(unittest.TestCase):
                           move_to_calls_strategy.MoveToCallsStrategy)
 
   def test_invalid_annotation_output_directory_raises_error(self):
-    known_args = self._create_mock_args(annotation_output_dir='*')
+    known_args = self._create_mock_args(annotation_output_dir='./*')
     pipeline_args = []
     with self.assertRaisesRegexp(ValueError, 'directory .* already exists'):
       vcf_to_bq._validate_annotation_pipeline_args(known_args, pipeline_args)
