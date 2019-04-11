@@ -83,7 +83,8 @@ function main {
     --zones "${zones}" \
     --image "${vt_docker_image}" \
     --pvm-attempts 0 \
-    --attempts 1
+    --attempts 1 \
+    --disk-size 10
 }
 
 main "$@"
