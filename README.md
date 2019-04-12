@@ -44,6 +44,11 @@ The easiest way to run the VCF to BigQuery pipeline is to use the
 dependencies pre-installed. Please ensure you have the latest `gcloud` tool by
 running `gcloud components update` (more details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
 
+Use the following command to get the latest version of Variant Transforms.
+```bash
+docker pull gcr.io/gcp-variant-transforms/gcp-variant-transforms
+```
+
 Run the script below and replace the following parameters:
 
 * `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
