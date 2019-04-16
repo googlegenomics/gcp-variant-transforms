@@ -82,7 +82,8 @@ class BigQueryRowGenerator(object):
   def get_rows(self,
                variant,
                allow_incompatible_records=False,
-               omit_empty_sample_calls=False):
+               omit_empty_sample_calls=False,
+               write_to_pet=False):
     # type: (processed_variant.ProcessedVariant, bool, bool) -> Dict
     """Yields BigQuery rows according to the schema from the given variant.
 
@@ -96,6 +97,7 @@ class BigQueryRowGenerator(object):
         schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given
         call will be omitted.
+      write_to_pet: should i write to PET or VET
     Yields:
       A dict representing a BigQuery row from the given variant. The row may
       have a subset of the calls if it exceeds the maximum allowed BigQuery
@@ -103,31 +105,32 @@ class BigQueryRowGenerator(object):
     Raises:
       ValueError: If variant data is inconsistent or invalid.
     """
-    base_row = self._get_base_row_from_variant(
-        variant, allow_incompatible_records)
-    call_limit_per_row = self._get_call_limit_per_row(variant)
-    if call_limit_per_row < len(variant.calls):
-      # Keep base_row intact if we need to split rows.
-      row = copy.deepcopy(base_row)
-    else:
-      row = base_row
+    if len(variant.alternate_data_list) > 1 and not write_to_pet:
+        base_row = self._get_base_row_from_variant(
+            variant, allow_incompatible_records)
+        call_limit_per_row = self._get_call_limit_per_row(variant)
+        if call_limit_per_row < len(variant.calls):
+          # Keep base_row intact if we need to split rows.
+          row = copy.deepcopy(base_row)
+        else:
+          row = base_row
 
-    call_record_schema_descriptor = (
-        self._schema_descriptor.get_record_schema_descriptor(
-            bigquery_util.ColumnKeyConstants.CALLS))
-    num_calls_in_row = 0
-    for call in variant.calls:
-      call_record, empty = self._get_call_record(
-          call, call_record_schema_descriptor, allow_incompatible_records)
-      if omit_empty_sample_calls and empty:
-        continue
-      num_calls_in_row += 1
-      if num_calls_in_row > call_limit_per_row:
+        call_record_schema_descriptor = (
+            self._schema_descriptor.get_record_schema_descriptor(
+                bigquery_util.ColumnKeyConstants.CALLS))
+        num_calls_in_row = 0
+        for call in variant.calls:
+          call_record, empty = self._get_call_record(
+              call, call_record_schema_descriptor, allow_incompatible_records)
+          if omit_empty_sample_calls and empty:
+            continue
+          num_calls_in_row += 1
+          if num_calls_in_row > call_limit_per_row:
+            yield row
+            num_calls_in_row = 1
+            row = copy.deepcopy(base_row)
+          row[bigquery_util.ColumnKeyConstants.CALLS].append(call_record)
         yield row
-        num_calls_in_row = 1
-        row = copy.deepcopy(base_row)
-      row[bigquery_util.ColumnKeyConstants.CALLS].append(call_record)
-    yield row
 
   def _get_call_record(
       self,
