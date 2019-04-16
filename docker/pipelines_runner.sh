@@ -51,6 +51,9 @@ function parse_args {
 }
 
 function main {
+  if [[ $1 == /opt/gcp_variant_transforms/bin/* ]]; then
+    exec $@
+  fi
   parse_args "$@"
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
