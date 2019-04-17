@@ -34,18 +34,20 @@ INPUT_TABLE=GOOGLE_CLOUD_PROJECT:DATASET.TABLE
 OUTPUT_FILE=gs://BUCKET/loaded_file.vcf
 TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="bq_to_vcf \
+COMMAND="/opt/gcp_variant_transforms/bin/bq_to_vcf \
+  --project ${GOOGLE_CLOUD_PROJECT} \
   --input_table ${INPUT_TABLE} \
   --output_file ${OUTPUT_FILE} \
   --temp_location ${TEMP_LOCATION} \
   --job_name bq-to-vcf \
   --runner DataflowRunner"
-
-docker run -v ~/.config:/root/.config \
-  gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+gcloud alpha genomics pipelines run \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
   --zones us-west1-b \
-  "${COMMAND}"
+  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
+  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  --command-line "${COMMAND}"
 ```
 
 In addition, the following optional flags can be specified in the `COMMAND`

@@ -71,7 +71,8 @@ REPORT_PATH=gs://BUCKET/report.tsv
 RESOLVED_HEADERS_PATH=gs://BUCKET/resolved_headers.vcf
 TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="vcf_to_bq_preprocess \
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
+  --project ${GOOGLE_CLOUD_PROJECT} \
   --input_pattern ${INPUT_PATTERN} \
   --report_path ${REPORT_PATH} \
   --resolved_headers_path ${RESOLVED_HEADERS_PATH} \
@@ -79,12 +80,13 @@ COMMAND="vcf_to_bq_preprocess \
   --temp_location ${TEMP_LOCATION} \
   --job_name vcf-to-bigquery-preprocess \
   --runner DataflowRunner"
-
-docker run -v ~/.config:/root/.config \
-  gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+gcloud alpha genomics pipelines run \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
   --zones us-west1-b \
-  "${COMMAND}"
+  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
+  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  --command-line "${COMMAND}"
 ```
 
 ### Running from github

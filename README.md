@@ -40,9 +40,11 @@ data science with BigQuery.
 ### Using docker
 
 The easiest way to run the VCF to BigQuery pipeline is to use the
-[docker](https://www.docker.com/) image, as it has the binaries and all
-dependencies pre-installed. Please ensure you have the latest `gcloud` tool by
-running `gcloud components update` (more details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
+[docker](https://www.docker.com/) image and run it with the
+[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run)
+as it has the binaries and all dependencies pre-installed. Please ensure you
+have the latest `gcloud` tool by running `gcloud components update` (more
+details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
 
 Use the following command to get the latest version of Variant Transforms.
 ```bash
@@ -73,26 +75,32 @@ INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
 TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="vcf_to_bq \
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq \
+  --project ${GOOGLE_CLOUD_PROJECT} \
   --input_pattern ${INPUT_PATTERN} \
   --output_table ${OUTPUT_TABLE} \
   --temp_location ${TEMP_LOCATION} \
   --job_name vcf-to-bigquery \
   --runner DataflowRunner"
-
-docker run -v ~/.config:/root/.config \
-  gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+gcloud alpha genomics pipelines run \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
   --zones us-west1-b \
-  "${COMMAND}"
+  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
+  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  --command-line "${COMMAND}"
 ```
-The flags `--project` and `--zones` are optional, given that these properties
-are set in your local configuration. You may set the default project and zones
-using the following commands:
+
+Please note the operation ID returned by the above script. You can track the
+status of your operation by running:
+
 ```bash
-gcloud config set project GOOGLE_CLOUD_PROJECT
-gcloud config set compute/zone ZONE
+gcloud alpha genomics operations describe <operation-id>
 ```
+
+The returned data will have `done: true` when the operation is done.
+A detailed description of the Operation resource can be found in the
+[API documentation](https://cloud.google.com/genomics/reference/rest/v2alpha1/projects.operations).
 
 The underlying pipeline uses
 [Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
