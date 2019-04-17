@@ -83,7 +83,8 @@ class BigQueryRowGenerator(object):
                variant,
                allow_incompatible_records=False,
                omit_empty_sample_calls=False,
-               write_to_pet=False):
+               write_to_pet=False,
+               write_variants=True):
     # type: (processed_variant.ProcessedVariant, bool, bool) -> Dict
     """Yields BigQuery rows according to the schema from the given variant.
 
@@ -105,7 +106,7 @@ class BigQueryRowGenerator(object):
     Raises:
       ValueError: If variant data is inconsistent or invalid.
     """
-    if len(variant.alternate_data_list) > 1 and not write_to_pet:
+    if len(variant.alternate_data_list) > 1 and not write_to_pet and write_variants:
         base_row = self._get_base_row_from_variant(
             variant, allow_incompatible_records)
         call_limit_per_row = self._get_call_limit_per_row(variant)

@@ -47,7 +47,9 @@ class ConvertVariantToRow(beam.DoFn):
       row_generator,  # type: bigquery_vcf_data_converter.BigQueryRowGenerator
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      write_to_pet = False  # type: bool
+      write_to_pet = False,  # type: bool
+      write_variants = True  # type: bool
+
   ):
     # type: (...) -> None
     super(ConvertVariantToRow, self).__init__()
@@ -55,10 +57,11 @@ class ConvertVariantToRow(beam.DoFn):
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._bigquery_row_generator = row_generator
     self.write_to_pet = write_to_pet
+    self.write_variants = write_variants
 
   def process(self, record):
     return self._bigquery_row_generator.get_rows(
-        record, self._allow_incompatible_records, self._omit_empty_sample_calls, self.write_to_pet)
+        record, self._allow_incompatible_records, self._omit_empty_sample_calls, self.write_to_pet, self.write_variants)
 
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
@@ -138,7 +141,8 @@ class VariantToBigQuery(beam.PTransform):
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls,
-            False))
+            False,
+            True))
     if self._num_bigquery_write_shards > 1:
       # We split data into self._num_bigquery_write_shards random partitions
       # and then write each part to final BQ by appending them together.
