@@ -62,6 +62,16 @@ _NUM_CALL_SAMPLES = 5
 # this many calls.
 _MIN_NUM_CALLS_FOR_ROW_SIZE_ESTIMATION = 100
 
+VARIANT_STATE = 1
+NV_MEDIUM_GQ_STATE = 2
+NV_LOW_GQ_STATE = 3
+STAR_STATE = 4
+MISSING_STATE = 5
+
+PET_SAMPLE_COLUMN = 'sample'
+PET_POSITION_COLUMN = 'position'
+PET_STATE_COLUMN = 'state'
+PET_CHROMOSOME_COLUMN = 'chrom'
 
 class BigQueryRowGenerator(object):
   """Class to generate BigQuery row from a variant."""
@@ -83,8 +93,7 @@ class BigQueryRowGenerator(object):
                variant,
                allow_incompatible_records=False,
                omit_empty_sample_calls=False,
-               write_to_pet=False,
-               write_variants=True):
+               write_to_pet=False):
     # type: (processed_variant.ProcessedVariant, bool, bool) -> Dict
     """Yields BigQuery rows according to the schema from the given variant.
 
@@ -106,7 +115,12 @@ class BigQueryRowGenerator(object):
     Raises:
       ValueError: If variant data is inconsistent or invalid.
     """
-    if len(variant.alternate_data_list) > 1 and not write_to_pet and write_variants:
+
+    sample_name = variant.calls[0].name
+    chrom = variant.reference_name
+    start = variant.start
+
+    if len(variant.alternate_data_list) > 1 and not write_to_pet:
         base_row = self._get_base_row_from_variant(
             variant, allow_incompatible_records)
         call_limit_per_row = self._get_call_limit_per_row(variant)
@@ -132,6 +146,45 @@ class BigQueryRowGenerator(object):
             row = copy.deepcopy(base_row)
           row[bigquery_util.ColumnKeyConstants.CALLS].append(call_record)
         yield row
+
+    if write_to_pet:
+        if len(variant.alternate_data_list) > 1:
+            row = {}
+            row[PET_POSITION_COLUMN] = variant.start
+            row[PET_SAMPLE_COLUMN] = sample_name
+            row[PET_STATE_COLUMN] = VARIANT_STATE
+            row[PET_CHROMOSOME_COLUMN] = chrom
+            yield row
+
+            block_size = variant.end - start
+            for offset in range(1, block_size):
+                row = {}
+                row[PET_POSITION_COLUMN] = start + offset
+                row[PET_SAMPLE_COLUMN] = sample_name
+                row[PET_STATE_COLUMN] = STAR_STATE
+                row[PET_CHROMOSOME_COLUMN] = chrom
+                yield row
+
+        if len(variant.alternate_data_list) == 1:
+            gq = variant.calls[0].info['GQ']
+            if gq < 20:
+                non_ref_state = NV_LOW_GQ_STATE
+            elif gq < 60:
+                non_ref_state = NV_MEDIUM_GQ_STATE
+            else:
+                non_ref_state = None
+
+            if non_ref_state:
+                block_size = variant.end - start
+                for offset in range(0, block_size):
+                    row = {}
+                    row[PET_POSITION_COLUMN] = start + offset
+                    row[PET_SAMPLE_COLUMN] = sample_name
+                    row[PET_STATE_COLUMN] = non_ref_state
+                    row[PET_CHROMOSOME_COLUMN] = chrom
+                    yield row
+
+
 
   def _get_call_record(
       self,

@@ -19,6 +19,8 @@ from __future__ import absolute_import
 import random
 from typing import Dict, List  # pylint: disable=unused-import
 
+from apache_beam.io.gcp.internal.clients import bigquery
+
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
@@ -38,6 +40,12 @@ from gcp_variant_transforms.transforms import limit_write
 _WRITE_SHARDS_LIMIT = 1000
 
 
+PET_SAMPLE_COLUMN = 'sample'
+PET_POSITION_COLUMN = 'position'
+PET_STATE_COLUMN = 'state'
+PET_CHROMOSOME_COLUMN = 'chrom'
+
+
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
 class ConvertVariantToRow(beam.DoFn):
   """Converts a ``Variant`` record to a BigQuery row."""
@@ -47,8 +55,7 @@ class ConvertVariantToRow(beam.DoFn):
       row_generator,  # type: bigquery_vcf_data_converter.BigQueryRowGenerator
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      write_to_pet = False,  # type: bool
-      write_variants = True  # type: bool
+      write_to_pet=False  # type: bool
 
   ):
     # type: (...) -> None
@@ -57,11 +64,10 @@ class ConvertVariantToRow(beam.DoFn):
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._bigquery_row_generator = row_generator
     self.write_to_pet = write_to_pet
-    self.write_variants = write_variants
 
   def process(self, record):
     return self._bigquery_row_generator.get_rows(
-        record, self._allow_incompatible_records, self._omit_empty_sample_calls, self.write_to_pet, self.write_variants)
+        record, self._allow_incompatible_records, self._omit_empty_sample_calls, self.write_to_pet)
 
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
@@ -136,26 +142,72 @@ class VariantToBigQuery(beam.PTransform):
                                                      self._output_table)
 
   def expand(self, pcoll):
-    bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
+
+    table_schema = bigquery.TableSchema()
+
+    state_field = bigquery.TableFieldSchema()
+    state_field.name = PET_STATE_COLUMN
+    state_field.type = 'INTEGER'
+    state_field.mode = 'NULLABLE'
+    table_schema.fields.append(state_field)
+
+    chromosome_field = bigquery.TableFieldSchema()
+    chromosome_field.name = PET_CHROMOSOME_COLUMN
+    chromosome_field.type = 'STRING'
+    chromosome_field.mode = 'NULLABLE'
+    table_schema.fields.append(chromosome_field)
+
+    position_field = bigquery.TableFieldSchema()
+    position_field.name = PET_POSITION_COLUMN
+    position_field.type = 'INTEGER'
+    position_field.mode = 'NULLABLE'
+    table_schema.fields.append(position_field)
+
+    sample_id_field = bigquery.TableFieldSchema()
+    sample_id_field.name = PET_SAMPLE_COLUMN
+    sample_id_field.type = 'STRING'
+    sample_id_field.mode = 'NULLABLE'
+    table_schema.fields.append(sample_id_field)
+
+    write_table_spec = bigquery.TableReference(
+        projectId='broad-dsp-spec-ops',
+        datasetId='gvcf_test',
+        tableId='pet_subsetted'
+    )
+
+    pet_bq_rows = pcoll | 'ConvertToBigQueryTableRow_PET' >> beam.ParDo(
         ConvertVariantToRow(
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls,
-            False,
             True))
+
+    pet_bq_rows | 'Writing to BigQuery_PET' >> beam.io.WriteToBigQuery(
+        write_table_spec,
+        schema=table_schema,
+        write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+        create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
+    )
+
+    vet_bq_rows = pcoll | 'ConvertToBigQueryTableRow_VET' >> beam.ParDo(
+        ConvertVariantToRow(
+            self._bigquery_row_generator,
+            self._allow_incompatible_records,
+            self._omit_empty_sample_calls,
+            False))
     if self._num_bigquery_write_shards > 1:
       # We split data into self._num_bigquery_write_shards random partitions
       # and then write each part to final BQ by appending them together.
       # Combined with LimitWrite transform, this will avoid the BQ failure.
-      bq_row_partitions = bq_rows | beam.Partition(
+      bq_row_partitions = vet_bq_rows | beam.Partition(
           lambda _, n: random.randint(0, n - 1),
           self._num_bigquery_write_shards)
       bq_writes = []
       for i in range(self._num_bigquery_write_shards):
-        bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
+        vet_bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
                    limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
         bq_writes.append(
-            bq_rows | 'WriteToBigQuery' + str(i) >>
+            vet_bq_rows | 'WriteToBigQuery' + str(i) >>
             beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,
                 schema=self._schema,
@@ -165,8 +217,8 @@ class VariantToBigQuery(beam.PTransform):
                     beam.io.BigQueryDisposition.WRITE_APPEND))))
       return bq_writes
     else:
-      return (bq_rows
-              | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
+      return (vet_bq_rows
+              | 'WriteToBigQuery_VET' >> beam.io.Write(beam.io.BigQuerySink(
                   self._output_table,
                   schema=self._schema,
                   create_disposition=(

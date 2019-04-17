@@ -91,8 +91,7 @@ class VariantToAvroFiles(beam.PTransform):
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls,
-            False,
-            True))
+            False))
     return (avro_records
             | 'WriteToAvroFiles' >>
             beam.io.WriteToAvro(self._output_path, self._avro_schema))
