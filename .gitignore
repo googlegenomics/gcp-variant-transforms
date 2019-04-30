@@ -9,3 +9,4 @@ dist/
 venv/
 .vscode/
 .coverage
+*.DS_Store
