@@ -37,8 +37,6 @@ import argparse  # pylint: disable=unused-import
 import logging
 import sys
 import tempfile
-import uuid
-from datetime import datetime
 from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
@@ -82,7 +80,7 @@ _COMMAND_LINE_OPTIONS = [
     variant_transform_options.ExperimentalOptions,
 ]
 
-_ESTIMATE_SIZES_FILE_NAME = 'estimate_sizes'
+_ESTIMATE_SIZES_FILE_NAME = 'estimate-sizes'
 _ESTIMATE_SIZES_JOB_NAME = 'estimate-input-size'
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
@@ -234,8 +232,6 @@ def _get_input_dimensions(known_args, pipeline_args, pipeline_mode):
   temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
   temp_estimated_line_count_file_name = '-'.join(
       [google_cloud_options.job_name,
-       datetime.now().strftime('%Y%m%d-%H%M%S'),
-       str(uuid.uuid4()),
        _ESTIMATE_SIZES_FILE_NAME])
   temp_estimated_line_count_file_path = filesystems.FileSystems.join(
       temp_directory, temp_estimated_line_count_file_name)

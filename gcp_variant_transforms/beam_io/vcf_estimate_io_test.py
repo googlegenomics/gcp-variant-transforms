@@ -32,9 +32,9 @@ from gcp_variant_transforms.testing import testdata_util
 
 
 def _construct_estimate(headers, records, file_name=None):
-  single_line_size = len(records[0].encode('utf8'))
-  total_record_size = sum([len(x.encode('utf8')) for x in records])
-  total_header_size = sum([len(x.encode('utf8')) for x in headers])
+  single_line_size = len(records[0])
+  total_record_size = sum([len(x) for x in records])
+  total_header_size = sum([len(x) for x in headers])
   return VcfEstimate(
       file_name=file_name,
       estimated_line_count=float(total_record_size)/single_line_size,
