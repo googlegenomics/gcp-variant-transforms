@@ -224,17 +224,16 @@ def _get_input_dimensions(known_args, pipeline_args, pipeline_mode):
 
   estimate_sizes_job_name = pipeline_common.generate_unique_name(
       _ESTIMATE_SIZES_JOB_NAME)
-  current_job_name = google_cloud_options.job_name
   if google_cloud_options.job_name:
     google_cloud_options.job_name += '-' + estimate_sizes_job_name
   else:
     google_cloud_options.job_name = estimate_sizes_job_name
   temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
-  temp_estimated_line_count_file_name = '-'.join(
+  temp_estimated_input_size_file_name = '-'.join(
       [google_cloud_options.job_name,
        _ESTIMATE_SIZES_FILE_NAME])
-  temp_estimated_line_count_file_path = filesystems.FileSystems.join(
-      temp_directory, temp_estimated_line_count_file_name)
+  temp_estimated_input_size_file_path = filesystems.FileSystems.join(
+      temp_directory, temp_estimated_input_size_file_name)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     estimates = pipeline_common.get_estimates(
         p, pipeline_mode, known_args.all_patterns)
@@ -249,25 +248,24 @@ def _get_input_dimensions(known_args, pipeline_args, pipeline_mode):
                               | extract_input_size.GetEstimatedRecordCount())
     estimated_sample_count = (sample_map
                               | extract_input_size.GetEstimatedSampleCount())
-    estimated_line_count = (estimates
-                            | 'GetEstimatedLineCount'
-                            >> extract_input_size.GetEstimatedLineCount())
-    _ = (estimated_line_count
+    estimated_variant_count = (estimates
+                               | 'GetEstimatedVariantCount'
+                               >> extract_input_size.GetEstimatedVariantCount())
+    _ = (estimated_variant_count
          | beam.ParDo(extract_input_size.print_estimates_to_file,
                       beam.pvalue.AsSingleton(estimated_sample_count),
                       beam.pvalue.AsSingleton(estimated_record_count),
                       beam.pvalue.AsSingleton(files_size),
                       beam.pvalue.AsSingleton(file_count),
-                      temp_estimated_line_count_file_path))
+                      temp_estimated_input_size_file_path))
 
-  google_cloud_options.job_name = current_job_name
-  with filesystems.FileSystems.open(temp_estimated_line_count_file_path) as f:
+  with filesystems.FileSystems.open(temp_estimated_input_size_file_path) as f:
     estimates = f.readlines()
   if len(estimates) != 5:
     raise ValueError('Exactly 5 estimates were expected in {}.'.format(
-        temp_estimated_line_count_file_path))
+        temp_estimated_input_size_file_path))
 
-  known_args.estimated_line_count = int(estimates[0].strip())
+  known_args.estimated_variant_count = int(estimates[0].strip())
   known_args.estimated_sample_count = int(estimates[1].strip())
   known_args.estimated_record_count = int(estimates[2].strip())
   known_args.files_size = int(estimates[3].strip())

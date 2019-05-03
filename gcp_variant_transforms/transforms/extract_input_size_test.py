@@ -31,15 +31,15 @@ from gcp_variant_transforms.transforms import extract_input_size
 class ExtractInputSizeTest(unittest.TestCase):
   def _create_vcf_estimates(self):
     vcf_estimate_1 = VcfEstimate(file_name='vcf_estimate_1',
-                                 estimated_line_count=10,
+                                 estimated_variant_count=10,
                                  samples=['s1', 's2'],
                                  size_in_bytes=100)
     vcf_estimate_2 = VcfEstimate(file_name='vcf_estimate_2',
-                                 estimated_line_count=15,
+                                 estimated_variant_count=15,
                                  samples=['s1', 's3'],
                                  size_in_bytes=200)
     vcf_estimate_3 = VcfEstimate(file_name='vcf_estimate_3',
-                                 estimated_line_count=7,
+                                 estimated_variant_count=7,
                                  samples=['s2', 's3', 's4'],
                                  size_in_bytes=300)
     return [vcf_estimate_1, vcf_estimate_2, vcf_estimate_3]
@@ -59,16 +59,16 @@ class ExtractInputSizeTest(unittest.TestCase):
     assert_that(size, equal_to([600]))
     pipeline.run()
 
-  def test_get_estimated_line_count(self):
+  def test_get_estimated_variant_count(self):
     vcf_estimates = self._create_vcf_estimates()
 
     pipeline = TestPipeline()
-    estimated_line_count = (
+    estimated_variant_count = (
         pipeline
         | transforms.Create(vcf_estimates)
-        | 'GetEstimatedLineCount' >>
-        extract_input_size.GetEstimatedLineCount())
-    assert_that(estimated_line_count, equal_to([32]))
+        | 'GetEstimatedVariantCount' >>
+        extract_input_size.GetEstimatedVariantCount())
+    assert_that(estimated_variant_count, equal_to([32]))
     pipeline.run()
 
   def test_get_sample_map(self):

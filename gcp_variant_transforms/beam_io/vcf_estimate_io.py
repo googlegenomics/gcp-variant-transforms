@@ -22,10 +22,10 @@ from typing import Dict, Iterable  # pylint: disable=unused-import
 
 from apache_beam import transforms
 from apache_beam.io import filebasedsource
-from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import filesystem
 from apache_beam.io import filesystems
 from apache_beam.io import iobase
+from apache_beam.io import range_trackers  # pylint: disable=unused-import
 
 
 class VcfEstimate(object):
@@ -33,21 +33,21 @@ class VcfEstimate(object):
 
   def __init__(self,
                file_name,  # type: str
-               estimated_line_count=None,  # type: float
-               samples=None,  # type: List[str]
-               size_in_bytes=None  # type: int
+               estimated_variant_count,  # type: float
+               samples,  # type: List[str]
+               size_in_bytes  # type: int
               ):
     # type: (...) -> None
     """Initializes a VcfEstimate object.
 
     Args:
-      file_name: name of file
-      estimated_line_count: estimated number of variants
-      samples: sample names in the file
-      size_in_bytes: size of the file
+      file_name: Name of file.
+      estimated_variant_count: Estimated number of variants.
+      samples: Sample names in the file.
+      size_in_bytes: Size of the file.
     """
     self.file_name = file_name
-    self.estimated_line_count = estimated_line_count
+    self.estimated_variant_count = estimated_variant_count
     self.samples = samples
     self.size_in_bytes = size_in_bytes
 
@@ -55,9 +55,9 @@ class VcfEstimate(object):
     return self.file_name == other.file_name
 
   def __repr__(self):
-    return 'File Name: {}, Line Count: {}, Samples: {}, Size: {}'.format(
+    return 'File Name: {}, Variant Count: {}, Samples: {}, Size: {}'.format(
         self.file_name,
-        self.estimated_line_count,
+        self.estimated_variant_count,
         self.samples,
         self.size_in_bytes
     )
@@ -77,8 +77,8 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
                                             splittable=False)
     self._compression_type = compression_type
 
-  def _get_header_size(self, file_to_read, file_name):
-    """Helper function to extract last header line and total header size."""
+  def _get_header_info(self, file_to_read, file_name):
+    """Helper function to extract header data from VCF file"""
     header_size = 0
     header_line = file_to_read.readline()
     # Read and skip all header lines starting with ##. Make sure to calculate
@@ -92,14 +92,16 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
                         .format(file_name)))
 
     header_size += len(header_line)
-    return header_size, header_line
+
+    calls = header_line.split()[8:] # Remove #CHROME..INFO mandatory fields.
+    return (header_size,
+            calls if (not calls or calls[0] != 'FORMAT') else calls[1:])
 
   def _extract_samples(self, header_line):
     """Removes the common fields from last header line to get sample names."""
-    calls = header_line.split()[8:] # Remove #CHROME..INFO mandatory fields.
-    return calls if (not calls or calls[0] != 'FORMAT') else calls[1:]
 
-  def _estimate_line_count(self, file_to_read, file_name, header_size):
+
+  def _estimated_variant_count(self, file_to_read, file_name, header_size):
     """Calculates the approximate number of data lines in the file.
 
     Extracts the size of the first records data line, and gets the size of the
@@ -128,22 +130,18 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     # type: (...) -> Iterable[VcfEstimate]
     with filesystems.FileSystems.open(
         file_name, compression_type=self._compression_type) as file_to_read:
-      header_size, header_line = self._get_header_size(file_to_read, file_name)
-      samples = self._extract_samples(header_line)
-      estimated_line_count, size_in_bytes = self._estimate_line_count(
+      header_size, samples = self._get_header_info(file_to_read, file_name)
+      estimated_variant_count, size_in_bytes = self._estimated_variant_count(
           file_to_read, file_name, header_size)
 
     yield VcfEstimate(file_name=file_name,
                       samples=samples,
-                      estimated_line_count=estimated_line_count,
+                      estimated_variant_count=estimated_variant_count,
                       size_in_bytes=size_in_bytes)
 
 
 class GetEstimates(transforms.PTransform):
-  """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading the
-  vcf files, finding the last header line and first data line and to extract
-  estimates from them.
-  """
+  """Reads the last header line and first data line to extract input sizes"""
 
   def __init__(
       self,
@@ -182,12 +180,9 @@ def _create_vcf_estimate_source(file_pattern=None,
 
 
 class GetAllEstimates(transforms.PTransform):
-  """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading the
-  vcf files, finding the last header line and first data line and to extract
-  estimates from them.
+  """Reads the last header line and first data line to extract input sizes
 
-  This transform should be used when reading from massive (>70,000) number of
-  files.
+  This transform is to be preffered over GetEstimates for large number of files.
   """
 
   DEFAULT_DESIRED_BUNDLE_SIZE = 64 * 1024 * 1024  # 64MB

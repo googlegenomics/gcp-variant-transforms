@@ -37,7 +37,7 @@ def _construct_estimate(headers, records, file_name=None):
   total_header_size = sum([len(x) for x in headers])
   return VcfEstimate(
       file_name=file_name,
-      estimated_line_count=float(total_record_size)/single_line_size,
+      estimated_variant_count=float(total_record_size)/single_line_size,
       samples=headers[-1].split()[9:],
       size_in_bytes=total_record_size+total_header_size)
 
@@ -102,17 +102,17 @@ class VcfEstimateSourceTest(unittest.TestCase):
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_single_file_large(self):
     test_data_conifgs = [
-        {'file': 'valid-4.0.vcf', 'line_count': 4, 'size': 1500},
-        {'file': 'valid-4.0.vcf.gz', 'line_count': 6, 'size': 727},
-        {'file': 'valid-4.0.vcf.bz2', 'line_count': 7, 'size': 781},
-        {'file': 'valid-4.1-large.vcf', 'line_count': 14425, 'size': 832396},
-        {'file': 'valid-4.2.vcf', 'line_count': 10, 'size': 3195},
+        {'file': 'valid-4.0.vcf', 'variant_count': 4, 'size': 1500},
+        {'file': 'valid-4.0.vcf.gz', 'variant_count': 6, 'size': 727},
+        {'file': 'valid-4.0.vcf.bz2', 'variant_count': 7, 'size': 781},
+        {'file': 'valid-4.1-large.vcf', 'variant_count': 14425, 'size': 832396},
+        {'file': 'valid-4.2.vcf', 'variant_count': 10, 'size': 3195},
     ]
     for config in test_data_conifgs:
       read_data = source_test_utils.read_from_source(VcfEstimateSource(
           testdata_util.get_full_file_path(config['file'])))
-      self.assertEqual(config['line_count'],
-                       int(read_data[0].estimated_line_count))
+      self.assertEqual(config['variant_count'],
+                       int(read_data[0].estimated_variant_count))
       self.assertEqual(config['size'], read_data[0].size_in_bytes)
 
   def test_pipeline_read_file_headers(self):

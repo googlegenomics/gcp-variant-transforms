@@ -12,50 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A PTransform to output a PCollection of ``Variant`` records to BigQuery."""
+"""A PTransform to extract comprehensive size signals from ``VcfEstimates``."""
 
 from __future__ import absolute_import
 
 import apache_beam as beam
 
 from apache_beam.io import filesystems
-from apache_beam.typehints import Any, List, Iterable
+from apache_beam.typehints import Any, Iterable
 from apache_beam.typehints import with_input_types
 from apache_beam.typehints import with_output_types
 from gcp_variant_transforms.beam_io import vcf_estimate_io
 
 
 @beam.typehints.with_input_types(vcf_estimate_io.VcfEstimate)
-class ExtractLineCount(beam.DoFn):
+class ExtractVariantCount(beam.DoFn):
   def process(self, estimate):
-    yield estimate.estimated_line_count
+    yield estimate.estimated_variant_count
 
 
 @beam.typehints.with_input_types(vcf_estimate_io.VcfEstimate)
 class ExtractFileSize(beam.DoFn):
   def process(self, estimate):
     yield estimate.size_in_bytes
-
-
-@with_input_types(List[int])
-@with_output_types(int)
-class SumEstimations(beam.CombineFn):
-  """CombineFn for computing PCollection size."""
-
-  def create_accumulator(self):
-    return 0
-
-  def add_input(self, accumulator, element):
-    return accumulator + element
-
-  def add_inputs(self, accumulator, elements):
-    return sum(elements) + accumulator
-
-  def merge_accumulators(self, accumulators):
-    return sum(accumulators)
-
-  def extract_output(self, accumulator):
-    return accumulator
 
 
 @with_input_types(Iterable[Any])
@@ -83,14 +62,14 @@ class GetFilesSize(beam.PTransform):
   def expand(self, estimates):
     return (estimates
             | 'ExtractFileSize' >> beam.ParDo(ExtractFileSize())
-            | 'SumFileSizes' >> beam.CombineGlobally(SumEstimations()))
+            | 'SumFileSizes' >> beam.CombineGlobally(sum))
 
 
-class GetEstimatedLineCount(beam.PTransform):
+class GetEstimatedVariantCount(beam.PTransform):
   def expand(self, estimates):
     return (estimates
-            | 'ExtractLineCount' >> beam.ParDo(ExtractLineCount())
-            | 'SumLineCounts' >> beam.CombineGlobally(SumEstimations()))
+            | 'ExtractVariantCount' >> beam.ParDo(ExtractVariantCount())
+            | 'SumVariantCounts' >> beam.CombineGlobally(sum))
 
 
 class GetSampleMap(beam.PTransform):
@@ -99,7 +78,7 @@ class GetSampleMap(beam.PTransform):
     """Returns the names of all calls for the variant."""
     return tuple(
         zip(estimate.samples,
-            [estimate.estimated_line_count] * len(estimate.samples)))
+            [estimate.estimated_variant_count] * len(estimate.samples)))
 
   def expand(self, estimates):
     return (estimates
@@ -120,14 +99,14 @@ class GetEstimatedSampleCount(beam.PTransform):
             | 'CountAllUniqueSamples' >> beam.combiners.Count.Globally())
 
 
-def print_estimates_to_file(line_count,
+def print_estimates_to_file(variant_count,
                             sample_count,
                             record_count,
                             files_size,
                             file_count,
                             file_path):
   with filesystems.FileSystems.create(file_path) as file_to_write:
-    file_to_write.write('{}\n{}\n{}\n{}\n{}\n'.format(int(line_count),
+    file_to_write.write('{}\n{}\n{}\n{}\n{}\n'.format(int(variant_count),
                                                       sample_count,
                                                       int(record_count),
                                                       files_size,
