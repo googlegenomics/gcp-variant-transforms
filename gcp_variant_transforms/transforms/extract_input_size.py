@@ -1,4 +1,4 @@
-# Copyright 2019 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,67 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A PTransform to extract comprehensive size signals from ``VcfEstimates``."""
+"""A PTransform to extract comprehensive size signals from ``VcfEstimates``.
+
+This module is used to create 5 main signals that describe the supplied input:
+  - variant count: approximate number of variants in all VCF files.
+  - sample count: number of distinct samples across all VCF files.
+  - record count: approximate number of variant by sample data points.
+  - files size: total size of all supplied files.
+  - file count: number of input files.
+"""
 
 from __future__ import absolute_import
 
 import apache_beam as beam
 
 from apache_beam.io import filesystems
-from apache_beam.typehints import Any, Iterable
-from apache_beam.typehints import with_input_types
-from apache_beam.typehints import with_output_types
-from gcp_variant_transforms.beam_io import vcf_estimate_io
-
-
-@beam.typehints.with_input_types(vcf_estimate_io.VcfEstimate)
-class ExtractVariantCount(beam.DoFn):
-  def process(self, estimate):
-    yield estimate.estimated_variant_count
-
-
-@beam.typehints.with_input_types(vcf_estimate_io.VcfEstimate)
-class ExtractFileSize(beam.DoFn):
-  def process(self, estimate):
-    yield estimate.size_in_bytes
-
-
-@with_input_types(Iterable[Any])
-@with_output_types(int)
-class SumRecordCounts(beam.CombineFn):
-  """CombineFn for computing PCollection size."""
-
-  def create_accumulator(self):
-    return 0
-
-  def add_input(self, accumulator, element):
-    return accumulator + sum(element)
-
-  def add_inputs(self, accumulator, elements):
-    return accumulator + sum(map(sum, elements))
-
-  def merge_accumulators(self, accumulators):
-    return sum(accumulators)
-
-  def extract_output(self, accumulator):
-    return accumulator
 
 
 class GetFilesSize(beam.PTransform):
   def expand(self, estimates):
     return (estimates
-            | 'ExtractFileSize' >> beam.ParDo(ExtractFileSize())
+            | 'ExtractFileSize' >> beam.Map(
+                lambda estimate: estimate.size_in_bytes)
             | 'SumFileSizes' >> beam.CombineGlobally(sum))
 
 
 class GetEstimatedVariantCount(beam.PTransform):
   def expand(self, estimates):
     return (estimates
-            | 'ExtractVariantCount' >> beam.ParDo(ExtractVariantCount())
+            | 'ExtractVariantCount' >> beam.Map(
+                lambda estimate: estimate.estimated_variant_count)
             | 'SumVariantCounts' >> beam.CombineGlobally(sum))
 
 
 class GetSampleMap(beam.PTransform):
+  """ Converts estimate objects into a distinct sample->List[variant count] map.
+
+  The keys of this map will be used to find the count of distinct samples, while
+  the sum of values will give us estimated record count.
+  """
   def _get_call_names(self, estimate):
     # type: (vcf_parser.Variant) -> Tuple[str]
     """Returns the names of all calls for the variant."""
@@ -90,7 +68,8 @@ class GetEstimatedRecordCount(beam.PTransform):
   def expand(self, sample_map):
     return (sample_map
             | 'GetListsOfRecordCounts' >> beam.Values()
-            | 'SumRecordCounts' >> beam.CombineGlobally(SumRecordCounts()))
+            | 'SumRecordCountsPerSample' >> beam.Map(sum)
+            | 'SumTotalRecordCounts' >> beam.CombineGlobally(sum))
 
 class GetEstimatedSampleCount(beam.PTransform):
   def expand(self, sample_map):

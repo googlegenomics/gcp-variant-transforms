@@ -217,7 +217,10 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
           _GCS_RECURSIVE_WILDCARD]
 
 
-def _get_input_dimensions(known_args, pipeline_args, pipeline_mode):
+def _get_input_dimensions(known_args, pipeline_args):
+  pipeline_mode = pipeline_common.get_pipeline_mode(
+      known_args.all_patterns,
+      known_args.optimize_for_large_inputs)
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   google_cloud_options = beam_pipeline_options.view_as(
       pipeline_options.GoogleCloudOptions)
@@ -407,11 +410,7 @@ def run(argv=None):
                                                          _COMMAND_LINE_OPTIONS)
 
   if known_args.auto_flags_experiment:
-    pipeline_mode = pipeline_common.get_pipeline_mode(
-        known_args.all_patterns,
-        known_args.optimize_for_large_inputs)
-
-    _get_input_dimensions(known_args, pipeline_args, pipeline_mode)
+    _get_input_dimensions(known_args, pipeline_args)
 
   annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
 

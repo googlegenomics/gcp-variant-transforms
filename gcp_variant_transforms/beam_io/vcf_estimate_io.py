@@ -78,7 +78,8 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
 
   def _get_header_info(self, file_to_read, file_name):
-    """Helper function to extract header data from VCF file"""
+    # type: (str, str) -> (int, str)
+    """Returns the header size and sample names."""
     header_size = 0
     header_line = file_to_read.readline()
     # Read and skip all header lines starting with ##. Make sure to calculate
@@ -93,15 +94,11 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
 
     header_size += len(header_line)
 
-    calls = header_line.split()[8:] # Remove #CHROME..INFO mandatory fields.
+    calls = header_line.split()[8:] # Removes #CHROME..INFO mandatory fields.
     return (header_size,
             calls if (not calls or calls[0] != 'FORMAT') else calls[1:])
 
-  def _extract_samples(self, header_line):
-    """Removes the common fields from last header line to get sample names."""
-
-
-  def _estimated_variant_count(self, file_to_read, file_name, header_size):
+  def _estimate_variant_count(self, file_to_read, file_name, header_size):
     """Calculates the approximate number of data lines in the file.
 
     Extracts the size of the first records data line, and gets the size of the
@@ -109,18 +106,19 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     by subtracting header size from total size and diving it by the single line
     size.
     """
-    first_record = file_to_read.readline()
-    while not first_record or not first_record.strip():
-      first_record = file_to_read.readline()
-
     size_in_bytes = filesystems.FileSystems.match(
         [file_name])[0].metadata_list[0].size_in_bytes
     all_lines_size = size_in_bytes
     if not isinstance(file_to_read, filesystem.CompressedFile):
       # TODO(#482): Find a better solution to handling compressed files.
       all_lines_size -= header_size
+
+    first_record = file_to_read.readline()
+    while not first_record or not first_record.strip():
+      first_record = file_to_read.readline()
     line_size = len(first_record)
-    return float(all_lines_size) / line_size, size_in_bytes
+
+    return float(all_lines_size) / line_size
 
   def read_records(
       self,
@@ -131,9 +129,11 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     with filesystems.FileSystems.open(
         file_name, compression_type=self._compression_type) as file_to_read:
       header_size, samples = self._get_header_info(file_to_read, file_name)
-      estimated_variant_count, size_in_bytes = self._estimated_variant_count(
+      estimated_variant_count = self._estimate_variant_count(
           file_to_read, file_name, header_size)
 
+    size_in_bytes = filesystems.FileSystems.match(
+        [file_name])[0].metadata_list[0].size_in_bytes
     yield VcfEstimate(file_name=file_name,
                       samples=samples,
                       estimated_variant_count=estimated_variant_count,
@@ -141,7 +141,7 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
 
 
 class GetEstimates(transforms.PTransform):
-  """Reads the last header line and first data line to extract input sizes"""
+  """Reads files until the first data line and extracts input sizes."""
 
   def __init__(
       self,
@@ -173,14 +173,14 @@ class GetEstimates(transforms.PTransform):
     return pvalue.pipeline | iobase.Read(self._source)
 
 
-def _create_vcf_estimate_source(file_pattern=None,
+def _create_vcf_estimate_source(file_pattern,
                                 compression_type=None):
   return VcfEstimateSource(file_pattern=file_pattern,
                            compression_type=compression_type)
 
 
 class GetAllEstimates(transforms.PTransform):
-  """Reads the last header line and first data line to extract input sizes
+  """Reads files until the first data line and extracts input sizes.
 
   This transform is to be preffered over GetEstimates for large number of files.
   """

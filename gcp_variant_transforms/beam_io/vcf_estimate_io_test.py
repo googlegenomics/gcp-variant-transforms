@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for vcfio_header_io module."""
+"""Tests for vcf_estimate_io module."""
 
 import os
 import unittest
 
 import apache_beam as beam
-from apache_beam.testing.util import assert_that
-from apache_beam.testing.util import equal_to
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
-from gcp_variant_transforms.beam_io.vcf_estimate_io import VcfEstimate
-from gcp_variant_transforms.beam_io.vcf_estimate_io import VcfEstimateSource
+from apache_beam.testing.util import assert_that
+from apache_beam.testing.util import equal_to
+
 from gcp_variant_transforms.beam_io.vcf_estimate_io import GetAllEstimates
 from gcp_variant_transforms.beam_io.vcf_estimate_io import GetEstimates
+from gcp_variant_transforms.beam_io.vcf_estimate_io import VcfEstimate
+from gcp_variant_transforms.beam_io.vcf_estimate_io import VcfEstimateSource
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util

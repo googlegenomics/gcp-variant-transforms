@@ -33,8 +33,8 @@ from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
 
 from gcp_variant_transforms.beam_io import bgzf_io
-from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
+from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
