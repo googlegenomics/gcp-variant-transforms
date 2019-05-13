@@ -24,14 +24,14 @@ from functools import partial
 import enum
 
 import apache_beam as beam
+from apache_beam import transforms
 from apache_beam.coders import coders
 from apache_beam.io import filebasedsource
+from apache_beam.io import filesystem
 from apache_beam.io import filesystems
+from apache_beam.io import iobase
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import textio
-from apache_beam.io import filesystem
-from apache_beam.io import iobase
-from apache_beam import transforms
 
 from gcp_variant_transforms.beam_io import vcf_parser
 

@@ -17,29 +17,29 @@
 from __future__ import absolute_import
 
 from typing import Iterable, List, Tuple  # pylint: disable=unused-import
-import itertools
 import logging
+import itertools
 
 import apache_beam as beam
 from apache_beam import coders
 from apache_beam import transforms
 from apache_beam.io import filebasedsource
-from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import filesystem
 from apache_beam.io import filesystems
 from apache_beam.io import iobase
+from apache_beam.io import range_trackers  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
 
 
 def _get_file_size(file_name):
   # type: (str) -> List[FileSizeInfo]
-  match_result = filesystems.FileSystems.match([file_name])[0]
-  if len(match_result.metadata_list) != 1:
+  matched_files = filesystems.FileSystems.match([file_name])[0].metadata_list
+  if len(matched_files) != 1:
     raise IOError("File name {} did not correspond to exactly 1 result. "
-                  "Instead, got {}.".format(file_name,
-                                            len(match_result.metadata_list)))
-  file_metadata = match_result.metadata_list[0]
+                  "Instead, got {} matches.".format(file_name,
+                                                    len(matched_files)))
+  file_metadata = matched_files[0]
 
   compression_type = filesystem.CompressionTypes.detect_compression_type(
       file_metadata.path)
