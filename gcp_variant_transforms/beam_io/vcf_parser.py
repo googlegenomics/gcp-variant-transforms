@@ -20,10 +20,10 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 from __future__ import absolute_import
 
 import logging
-from collections import namedtuple
-
 import os
 import tempfile
+import zlib
+from collections import namedtuple
 
 try:
   from nucleus.io.python import vcf_reader as nucleus_vcf_reader
@@ -34,8 +34,12 @@ except ImportError:
 import vcf
 
 from apache_beam.coders import coders
+from apache_beam.io import filesystem
+from apache_beam.io import filesystems
 from apache_beam.io import textio
+from apache_beam.io.gcp import gcsio
 
+from gcp_variant_transforms.beam_io import bgzf_io
 
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
@@ -250,6 +254,7 @@ class VcfParser(object):
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
                representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -259,17 +264,40 @@ class VcfParser(object):
     self._file_name = file_name
     self._allow_malformed_records = allow_malformed_records
 
-    text_source = textio._TextSource(
-        file_pattern,
-        0,  # min_bundle_size
-        compression_type,
-        True,  # strip_trailing_newlines
-        coders.StrUtf8Coder(),  # coder
-        validate=False,
-        header_processor_fns=(
-            lambda x: not x.strip() or x.startswith('#'),
-            self._process_header_lines),
-        **kwargs)
+    if splittable_bgzf:
+      text_source = BGZFBlockSource(
+          file_name,
+          range_tracker,
+          representative_header_lines,
+          compression_type,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
+    elif compression_type == filesystems.CompressionTypes.GZIP:
+      text_source = BGZFSource(
+          file_pattern,
+          0,  # min_bundle_size
+          compression_type,
+          True,  # strip_trailing_newlines
+          coders.StrUtf8Coder(),  # coder
+          validate=False,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
+    else:
+      text_source = textio._TextSource(
+          file_pattern,
+          0,  # min_bundle_size
+          compression_type,
+          True,  # strip_trailing_newlines
+          coders.StrUtf8Coder(),  # coder
+          validate=False,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
 
     self._text_lines = text_source.read_records(self._file_name,
                                                 range_tracker)
@@ -330,10 +358,11 @@ class PyVcfParser(VcfParser):
   def __init__(self,
                file_name,  # type: str
                range_tracker,  # type: range_trackers.OffsetRangeTracker
-               file_pattern,  # type: str
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
                representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -343,6 +372,7 @@ class PyVcfParser(VcfParser):
                                       compression_type,
                                       allow_malformed_records,
                                       representative_header_lines,
+                                      splittable_bgzf,
                                       **kwargs)
     self._header_lines = []
     self._next_line_to_process = None
@@ -483,9 +513,9 @@ class NucleusParser(VcfParser):
   def __init__(self,
                file_name,  # type: str
                range_tracker,  # type: range_trackers.OffsetRangeTracker
-               file_pattern,  # type: str
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
                representative_header_lines=None,  # type:  List[str]
                **kwargs  # type: **str
               ):
@@ -660,3 +690,166 @@ class NucleusParser(VcfParser):
         call.info[k] = data
       calls.append(call)
     return calls
+
+
+def open_bgzf(file_name):
+  compression_type = filesystems.CompressionTypes.GZIP
+  mime_type = filesystems.CompressionTypes.mime_type(compression_type)
+  raw_file = gcsio.GcsIO().open(file_name, 'rb', mime_type=mime_type)
+  return BGZF(raw_file)
+
+
+class BGZFSource(textio._TextSource):
+
+  def open_file(self, file_name):
+    return open_bgzf(file_name)
+
+
+class BGZF(filesystem.CompressedFile):
+  """File wrapper for easier handling of BGZF compressed files.
+
+  It supports reading concatenated GZIP files.
+  """
+
+  def _fetch_to_internal_buffer(self, num_bytes):
+    """Fetch up to num_bytes into the internal buffer."""
+    if (not self._read_eof and self._read_position > 0 and
+        (self._read_buffer.tell() - self._read_position) < num_bytes):
+      # There aren't enough number of bytes to accommodate a read, so we
+      # prepare for a possibly large read by clearing up all internal buffers
+      # but without dropping any previous held data.
+      self._read_buffer.seek(self._read_position)
+      data = self._read_buffer.read()
+      self._clear_read_buffer()
+      self._read_buffer.write(data)
+
+    while not self._read_eof and (self._read_buffer.tell() - self._read_position
+                                 ) < num_bytes:
+      self._decompress_decompressor_unused_data(num_bytes)
+      if (self._read_buffer.tell() - self._read_position) >= num_bytes:
+        return
+      buf = self._file.read(self._read_size)
+      if buf:
+        decompressed = self._decompressor.decompress(buf)
+        del buf
+        self._read_buffer.write(decompressed)
+        self._decompress_decompressor_unused_data(num_bytes)
+      else:
+        self._read_eof = True
+
+  def _decompress_decompressor_unused_data(self, num_bytes):
+    while (self._decompressor.unused_data != b'' and
+           self._read_buffer.tell() - self._read_position < num_bytes):
+      buf = self._decompressor.unused_data
+      self._decompressor = zlib.decompressobj(self._gzip_mask)
+      decompressed = self._decompressor.decompress(buf)
+      del buf
+      self._read_buffer.write(decompressed)
+
+
+class BGZFBlockSource(textio._TextSource):
+
+  def __init__(self,
+               file_name,
+               blocks,
+               header_lines,
+               compression_type,
+               header_processor_fns,
+               strip_trailing_newlines=True,
+               min_bundle_size=0,
+               coder=coders.StrUtf8Coder(),
+               validate=True
+              ):
+    """A source for reading BGZF Block."""
+    super(BGZFBlockSource, self).__init__(
+        file_name,
+        min_bundle_size,
+        compression_type,
+        strip_trailing_newlines,
+        coder,
+        validate=validate,
+        header_processor_fns=header_processor_fns)
+    self._blocks = blocks
+    self._header_lines = header_lines
+
+  def open_file(self, file_name):
+    compression_type = filesystem.CompressionTypes.GZIP
+    mime_type = filesystem.CompressionTypes.mime_type(compression_type)
+    raw_file = gcsio.GcsIO().open(file_name, 'rb', mime_type=mime_type,
+                                  read_buffer_size=bgzf_io.MAX_BLOCK_SIZE)
+    return BGZFBlock(raw_file, self._blocks)
+
+  def read_records(self, file_name, _):
+    read_buffer = textio._TextSource.ReadBuffer(b'', 0)
+    # Processes the header. It appends the header line `#CHROM...` (which
+    # contains sample info that is unique for `file_name`) to `header_lines`.
+    with open_bgzf(file_name) as file_to_read:
+      self._process_header(file_to_read, read_buffer)
+    with self.open_file(file_name) as file_to_read:
+      while True:
+        record = file_to_read.readline()
+        if not record or not record.strip():
+          break
+        if record and not record.startswith('#'):
+          yield self._coder.decode(record)
+
+
+class BGZFBlock(filesystem.CompressedFile):
+  """File wrapper to handle one BGZF Block."""
+
+  def __init__(self,
+               fileobj,
+               blocks,
+               compression_type=filesystem.CompressionTypes.GZIP):
+    super(BGZFBlock, self).__init__(fileobj,
+                                    compression_type)
+    self._blocks = blocks
+    self._fetch_first_block = True
+
+  def _fetch_to_internal_buffer(self, num_bytes):
+    """Fetch up to num_bytes into the internal buffer.
+
+    It reads contents from `self._blocks[0]`, after skipping the str before
+    first `\n`, and completes the last row by reading the first line in
+    `blocks[1]`. It assumes one row can at most spans in two Blocks.
+    """
+    if self._read_eof:
+      return
+    # Read the first block data
+    if self._fetch_first_block:
+      buf = self._file.raw._downloader.get_range(self._blocks[0].start,
+                                                 self._blocks[0].end)
+      decompressed = self._decompressor.decompress(buf)
+      del buf
+      lines = decompressed.split('\n')
+      self._read_buffer.write('\n'.join(lines[1:]))
+      self._fetch_first_block = False
+    # There aren't enough number of bytes to accommodate a read, so we
+    # prepare for a possibly large read by clearing up all internal buffers
+    # but without dropping any previous held data.
+    if (self._read_position > 0 and
+        self._read_buffer.tell() - self._read_position < num_bytes):
+        self._read_buffer.seek(self._read_position)
+        data = self._read_buffer.read()
+        self._clear_read_buffer()
+        self._read_buffer.write(data)
+    # Decompress the data until there are at least `num_bytes` in the buffer.
+    while self._decompressor.unused_data != b'':
+      buf = self._decompressor.unused_data
+      self._decompressor = zlib.decompressobj(self._gzip_mask)
+      decompressed = self._decompressor.decompress(buf)
+      del buf
+      self._read_buffer.write(decompressed)
+      if (self._read_buffer.tell() - self._read_position) >= num_bytes:
+        return
+
+    # Fetch the first line in the second block.
+    if len(self._blocks) == 2:
+      buf2 = self._file.raw._downloader.get_range(self._blocks[1].start,
+                                                  self._blocks[1].end)
+      self._decompressor = zlib.decompressobj(self._gzip_mask)
+      decompressed2 = self._decompressor.decompress(buf2)
+      del buf2
+      self._read_buffer.write(decompressed2.split('\n')[0] + '\n')
+
+    self._read_eof = True

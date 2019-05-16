@@ -21,6 +21,8 @@ PTransforms and writing the output.
 from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
+import logging
+import os
 import uuid
 from datetime import datetime
 
@@ -31,6 +33,7 @@ from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
 
+from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
 
@@ -101,6 +104,40 @@ def _get_all_patterns(input_pattern, input_file):
   return patterns
 
 
+def get_compression_type(input_patterns):
+  # type: (List[str]) -> filesystem.CompressionTypes
+  """Returns the compression type.
+
+  Raises:
+    ValueError: if the input files are not in the same format.
+  """
+  matches = filesystems.FileSystems.match(input_patterns)
+  extensions = [os.path.splitext(metadata.path)[1] for match in matches
+                for metadata in match.metadata_list]
+  if len(set(extensions)) != 1:
+    raise ValueError('All input files must be in the same format.')
+  if extensions[0].endswith('.bgz') or extensions[0].endswith('.gz'):
+    return filesystem.CompressionTypes.GZIP
+  else:
+    return filesystem.CompressionTypes.AUTO
+
+
+def get_splittable_bgzf(all_patterns):
+  # type: (List[str]) -> List[str]
+  """Returns the splittable bgzf matching `all_patterns`."""
+  matches = filesystems.FileSystems.match(all_patterns)
+  files = []
+  for match in matches:
+    for metadata in match.metadata_list:
+      if not (metadata.path.startswith('gs://') and
+              bgzf_io.exists_tbi_file(metadata.path)):
+        logging.info("Cannot find the index file for %s.", metadata.path)
+        return []
+      else:
+        files.append(metadata.path)
+  return files
+
+
 def _get_file_names(input_file):
   # type: (str) -> List[str]
   """Reads the input file and extracts list of patterns out of it."""
@@ -135,12 +172,15 @@ def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
 def read_headers(pipeline, pipeline_mode, all_patterns):
   # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
+  compression_type = get_compression_type(all_patterns)
   if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
                | beam.Create(all_patterns)
-               | vcf_header_io.ReadAllVcfHeaders())
+               | vcf_header_io.ReadAllVcfHeaders(
+                   compression_type=compression_type))
   else:
-    headers = pipeline | vcf_header_io.ReadVcfHeaders(all_patterns[0])
+    headers = pipeline | vcf_header_io.ReadVcfHeaders(
+        all_patterns[0], compression_type=compression_type)
 
   return headers
 

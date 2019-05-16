@@ -1,0 +1,22 @@
+[
+  {
+    "test_name": "test-non-splittable-gzip",
+    "table_name": "test_non_splittable_gzip",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/non-splittable-gzip/**.bgz",
+    "runner": "DataflowRunner",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 409932}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 32190612292607}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 32190612813885}
+      }
+    ]
+  }
+]

@@ -29,6 +29,7 @@ from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.beam_io import vcfio
 
 
@@ -147,8 +148,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                     file_name=file_name)
 
   def _read_headers(self, file_name):
-    with FileSystems.open(
-        file_name, compression_type=self._compression_type) as file_to_read:
+    with self.open_file(file_name) as file_to_read:
       while True:
         record = file_to_read.readline()
         while not record or not record.strip():  # Skip empty lines.
@@ -157,6 +157,13 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
           yield record
         else:
           break
+
+  def open_file(self, file_name):
+    if self._compression_type == CompressionTypes.GZIP:
+      return vcf_parser.open_bgzf(file_name)
+    else:
+      return FileSystems.open(file_name,
+                              compression_type=self._compression_type)
 
 
 class ReadVcfHeaders(PTransform):

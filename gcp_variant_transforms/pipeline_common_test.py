@@ -18,6 +18,7 @@ import collections
 import unittest
 
 from apache_beam.io.filesystems import FileSystems
+from apache_beam.io import filesystem
 import mock
 
 from gcp_variant_transforms import pipeline_common
@@ -103,6 +104,60 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
     with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+
+  def test_get_compression_type(self):
+    vcf_metadata_list = [filesystem.FileMetadata(path, size) for
+                         (path, size) in [('gs://1.vcf', 100), ('2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('vcf', vcf_metadata_list)]):
+      self.assertEqual(pipeline_common.get_compression_type(['vcf']),
+                       filesystem.CompressionTypes.AUTO)
+
+    gzip_metadata_list = [
+        filesystem.FileMetadata(path, size) for
+        (path, size) in [('gs://1.vcf.gz', 100), ('2.vcf.gz', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('gzip', gzip_metadata_list)]):
+      self.assertEqual(pipeline_common.get_compression_type('gzip'),
+                       filesystem.CompressionTypes.GZIP)
+
+    mixed_metadata_list = [
+        filesystem.FileMetadata(path, size) for
+        (path, size) in [('gs://1.vcf.gz', 100), ('2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('mixed', mixed_metadata_list)]):
+      with self.assertRaises(ValueError):
+        pipeline_common.get_compression_type('mixed')
+
+  def test_get_splittable_bgzf(self):
+    non_gs_metadata_list = [filesystem.FileMetadata(path, size) for
+                            (path, size) in [('1.vcf', 100),
+                                             ('gs://2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('non_gs', non_gs_metadata_list)]):
+      self.assertEqual(pipeline_common.get_splittable_bgzf(['non_gs']),
+                       [])
+
+    gs_metadata_list = [filesystem.FileMetadata(path, size) for
+                        (path, size) in [('gs://1.vcf.bgz', 100),
+                                         ('gs://2.vcf.bgz', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('gs', gs_metadata_list)]):
+      with mock.patch.object(FileSystems, 'exists', return_value=True):
+        self.assertEqual(
+            pipeline_common.get_splittable_bgzf(['index file exists']),
+            ['gs://1.vcf.bgz', 'gs://2.vcf.bgz'])
+
+      with mock.patch.object(FileSystems, 'exists', return_value=False):
+        self.assertEqual(
+            pipeline_common.get_splittable_bgzf(['no index file']),
+            [])
+
 
 class PipelineCommonWithFileTest(unittest.TestCase):
   """Tests cases for the `pipeline_common` script with file input."""
