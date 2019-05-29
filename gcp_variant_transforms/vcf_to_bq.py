@@ -462,7 +462,11 @@ def run(argv=None):
 
 
 class FusionBreak(beam.PTransform):
+  """PTransform that returns a PCollection equivalent to its input.
 
+  It prevents fusion of the surrounding transforms. Read more:
+  https://cloud.google.com/dataflow/docs/guides/deploying-a-pipeline#fusion-optimization
+  """
   def expand(self, pcoll):
     # Create an empty PCollection that depends on pcoll.
     empty = pcoll | beam.FlatMap(lambda x: ())

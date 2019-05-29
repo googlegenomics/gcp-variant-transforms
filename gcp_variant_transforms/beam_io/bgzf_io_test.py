@@ -37,19 +37,6 @@ class BgzfIOTest(unittest.TestCase):
     self.assertEqual(valid_blocks,
                      [bgzf_io.Block(start=3, end=9)])
 
-  def test_fill_in_gap(self):
-    blocks = [bgzf_io.Block(start=5, end=100),
-              bgzf_io.Block(start=150, end=200),
-              bgzf_io.Block(start=200, end=250),
-              bgzf_io.Block(start=300, end=300)]
-    valid_blocks = bgzf_io._fill_in_gap(blocks)
-    self.assertEqual(valid_blocks, [bgzf_io.Block(start=5, end=100),
-                                    bgzf_io.Block(start=100, end=150),
-                                    bgzf_io.Block(start=150, end=200),
-                                    bgzf_io.Block(start=200, end=250),
-                                    bgzf_io.Block(start=250, end=300),
-                                    bgzf_io.Block(start=300, end=300)])
-
   def test_merge_chunks(self):
     blocks = [bgzf_io.Block(start=0, end=100),
               bgzf_io.Block(start=90, end=99),

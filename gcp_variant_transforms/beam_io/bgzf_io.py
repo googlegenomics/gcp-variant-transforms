@@ -27,11 +27,13 @@ Block = namedtuple('Block', ['start', 'end'])
 
 _INDEX_FILE_APPENDIX = '.tbi'
 
-# `MAX_BLOCK_SIZE` defines the maximum amount of data included in one `Block`.
-MAX_BLOCK_SIZE = 1 * 1024 * 1024
-# It beyonds the normal bin range (1-37449), and contains other meta data rather
-# than file offsets of GZIP blocks.
-_RESERVED_BIN_ID = 37450
+# `_MAX_BLOCK_SIZE` defines the maximum amount of data included in one `Block`
+# when merging multiple blocks together.
+_MAX_BLOCK_SIZE = 1 * 1024 * 1024
+
+# The normal bin range is 1-37449, any bin index beyond `_MAX_BIN_ID` contain
+# index metadata and are not used to address blocks.
+_MAX_BIN_ID = 37449
 
 
 def split_bgzf(file_path):
@@ -42,8 +44,6 @@ def split_bgzf(file_path):
   Given (`file_path`, `Block`), one is able to decompress the data within
   `Block`. It further:
   - Removes invalid Blocks.
-  - Fills in the gap (by inserting a new Block) if there are gaps between two
-    adjacent Blocks to make sure it has full coverage of the variant data.
   - Merges Blocks. It eliminates overlapping Blocks, and merges adjacent Blocks
     if their combined size is smaller than `MAX_BLOCK_SIZE`.
 
@@ -55,7 +55,6 @@ def split_bgzf(file_path):
   """
   blocks = _get_block_offsets(_get_tbi_file(file_path))
   blocks = _remove_invalid_blocks(blocks)
-  blocks = _fill_in_gap(blocks)
   blocks = _merge_blocks(blocks)
 
   for block in blocks:
@@ -78,7 +77,7 @@ def _get_block_offsets(index_file):
   """
   read_buffer = _read(index_file)
   offset = 4
-  n_ref, offset = _get_next_int(read_buffer, offset)
+  n_ref, _ = _get_next_int(read_buffer, offset)
   offset = 32
   l_mn, offset = _get_next_int(read_buffer, offset)
   offset += l_mn
@@ -92,7 +91,7 @@ def _get_block_offsets(index_file):
       for _ in range(n_chunk):
         start, offset = _get_next_unsigned_long_int(read_buffer, offset)
         end, offset = _get_next_unsigned_long_int(read_buffer, offset)
-        if bin_id != _RESERVED_BIN_ID:
+        if bin_id <= _MAX_BIN_ID:
           chunk_virtual_file_offsets.append((start, end))
 
     n_intv, offset = _get_next_int(read_buffer, offset)
@@ -123,23 +122,13 @@ def _read(index_file):
 def _remove_invalid_blocks(blocks):
   valid_blocks = []
   for block in blocks:
-    if block.start != block.end:
+    if block.start < block.end:
       valid_blocks.append(block)
   return valid_blocks
 
 
-def _fill_in_gap(blocks):
+def _merge_blocks(blocks, size_limit=_MAX_BLOCK_SIZE):
   blocks = sorted(blocks, key=lambda t: t.start)
-  valid_blocks = []
-  for i in range(len(blocks) - 1):
-    valid_blocks.append(blocks[i])
-    if blocks[i].end < blocks[i + 1].start:
-      valid_blocks.append(Block(blocks[i].end, blocks[i + 1].start))
-  valid_blocks.append(blocks[-1])
-  return valid_blocks
-
-
-def _merge_blocks(blocks, size_limit=MAX_BLOCK_SIZE):
   current_start = blocks[0].start
   current_end = blocks[0].end
   merged = []

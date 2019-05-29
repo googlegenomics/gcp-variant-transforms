@@ -2,7 +2,7 @@
   {
     "test_name": "test-splittable-gzip",
     "table_name": "test_splittable_gzip",
-    "input_pattern": "gs:///gcp-variant-transforms-testfiles/medium_tests/splittable-gzip/**.bgz",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/splittable-gzip/**.bgz",
     "runner": "DataflowRunner",
     "assertion_configs": [
       {
