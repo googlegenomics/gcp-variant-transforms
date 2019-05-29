@@ -39,8 +39,6 @@ from apache_beam.io import filesystems
 from apache_beam.io import textio
 from apache_beam.io.gcp import gcsio
 
-from gcp_variant_transforms.beam_io import bgzf_io
-
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
 # failed in.
@@ -751,7 +749,7 @@ class BGZFBlockSource(textio._TextSource):
 
   def __init__(self,
                file_name,
-               blocks,
+               block,
                header_lines,
                compression_type,
                header_processor_fns,
@@ -769,15 +767,14 @@ class BGZFBlockSource(textio._TextSource):
         coder,
         validate=validate,
         header_processor_fns=header_processor_fns)
-    self._blocks = blocks
+    self._block = block
     self._header_lines = header_lines
 
   def open_file(self, file_name):
     compression_type = filesystem.CompressionTypes.GZIP
     mime_type = filesystem.CompressionTypes.mime_type(compression_type)
-    raw_file = gcsio.GcsIO().open(file_name, 'rb', mime_type=mime_type,
-                                  read_buffer_size=bgzf_io.MAX_BLOCK_SIZE)
-    return BGZFBlock(raw_file, self._blocks)
+    raw_file = gcsio.GcsIO().open(file_name, 'rb', mime_type=mime_type)
+    return BGZFBlock(raw_file, self._block)
 
   def read_records(self, file_name, _):
     read_buffer = textio._TextSource.ReadBuffer(b'', 0)
@@ -797,59 +794,75 @@ class BGZFBlockSource(textio._TextSource):
 class BGZFBlock(filesystem.CompressedFile):
   """File wrapper to handle one BGZF Block."""
 
+  # Each block in BGZF is no larger than `_MAX_GZIP_SIZE`.
+  _MAX_GZIP_SIZE = 64 * 1024
+
   def __init__(self,
                fileobj,
-               blocks,
+               block,
                compression_type=filesystem.CompressionTypes.GZIP):
     super(BGZFBlock, self).__init__(fileobj,
                                     compression_type)
-    self._blocks = blocks
-    self._fetch_first_block = True
+    self._block = block
+    self._start_offset = self._block.start
+    self._last_char = ''
 
   def _fetch_to_internal_buffer(self, num_bytes):
     """Fetch up to num_bytes into the internal buffer.
 
-    It reads contents from `self._blocks[0]`, after skipping the str before
-    first `\n`, and completes the last row by reading the first line in
-    `blocks[1]`. It assumes one row can at most spans in two Blocks.
+    It reads contents from `self._block`.
+    - The string before first `\n` is discarded.
+    - If the last row does not end with `\n`, it further decompress the next
+      64KB and reads the first line. It assumes one row can at most spans in two
+      Blocks.
     """
     if self._read_eof:
       return
-    # Read the first block data
-    if self._fetch_first_block:
-      buf = self._file.raw._downloader.get_range(self._blocks[0].start,
-                                                 self._blocks[0].end)
+    # First time enter this method, read the first block data
+    if self._start_offset == self._block.start:
+      buf = self._read_data_from_block()
       decompressed = self._decompressor.decompress(buf)
+      self._last_char = decompressed[-1]
       del buf
       lines = decompressed.split('\n')
       self._read_buffer.write('\n'.join(lines[1:]))
-      self._fetch_first_block = False
     # There aren't enough number of bytes to accommodate a read, so we
     # prepare for a possibly large read by clearing up all internal buffers
     # but without dropping any previous held data.
     if (self._read_position > 0 and
         self._read_buffer.tell() - self._read_position < num_bytes):
-        self._read_buffer.seek(self._read_position)
-        data = self._read_buffer.read()
-        self._clear_read_buffer()
-        self._read_buffer.write(data)
+      self._read_buffer.seek(self._read_position)
+      data = self._read_buffer.read()
+      self._clear_read_buffer()
+      self._read_buffer.write(data)
     # Decompress the data until there are at least `num_bytes` in the buffer.
     while self._decompressor.unused_data != b'':
       buf = self._decompressor.unused_data
+      if (len(buf) < self._MAX_GZIP_SIZE and
+          self._start_offset < self._block.end):
+        buf = ''.join([buf, self._read_data_from_block()])
+
       self._decompressor = zlib.decompressobj(self._gzip_mask)
       decompressed = self._decompressor.decompress(buf)
+      self._last_char = decompressed[-1]
       del buf
       self._read_buffer.write(decompressed)
       if (self._read_buffer.tell() - self._read_position) >= num_bytes:
         return
 
-    # Fetch the first line in the second block.
-    if len(self._blocks) == 2:
-      buf2 = self._file.raw._downloader.get_range(self._blocks[1].start,
-                                                  self._blocks[1].end)
+    # Fetch the first line in the next `self._MAX_GZIP_SIZE` bytes.
+    if self._last_char != '\n':
+      buf2 = self._file.raw._downloader.get_range(
+          self._block.end, self._block.end + self._MAX_GZIP_SIZE)
       self._decompressor = zlib.decompressobj(self._gzip_mask)
       decompressed2 = self._decompressor.decompress(buf2)
       del buf2
       self._read_buffer.write(decompressed2.split('\n')[0] + '\n')
 
     self._read_eof = True
+
+  def _read_data_from_block(self):
+    buf = self._file.raw._downloader.get_range(self._start_offset,
+                                               self._block.end)
+    self._start_offset += len(buf)
+    return buf

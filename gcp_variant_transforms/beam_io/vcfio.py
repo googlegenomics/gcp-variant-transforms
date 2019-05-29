@@ -258,16 +258,12 @@ class ReadFromBGZF(beam.PTransform):
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
 
-  def _read_records(self, (file_path, blocks)):
-    # type: (Tuple[str, Tuple[Block,Block]]) -> Iterable(Variant)
-    """Read records from file_path in `blocks[0]`.
-
-    The records are read in `blocks[0]`, by skipping the str before first `\n`,
-    and complete the last row by reading the first line in `blocks[1]`.
-    """
+  def _read_records(self, (file_path, block)):
+    # type: (Tuple[str, Block]) -> Iterable(Variant)
+    """Reads records from `file_path` in `block`."""
     record_iterator = vcf_parser.PyVcfParser(
         file_path,
-        blocks,
+        block,
         filesystems.CompressionTypes.GZIP,
         self._allow_malformed_records,
         representative_header_lines=self._representative_header_lines,

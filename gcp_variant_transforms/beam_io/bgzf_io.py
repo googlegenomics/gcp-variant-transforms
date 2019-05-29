@@ -28,11 +28,14 @@ Block = namedtuple('Block', ['start', 'end'])
 _INDEX_FILE_APPENDIX = '.tbi'
 
 # `MAX_BLOCK_SIZE` defines the maximum amount of data included in one `Block`.
-MAX_BLOCK_SIZE = 64 * 1024 * 1024
+MAX_BLOCK_SIZE = 1 * 1024 * 1024
+# It beyonds the normal bin range (1-37449), and contains other meta data rather
+# than file offsets of GZIP blocks.
+_RESERVED_BIN_ID = 37450
 
 
 def split_bgzf(file_path):
-  # type: (str) -> Iterable[Tuple[str, Tuple[Block, Block]]]
+  # type: (str) -> Iterable[Tuple[str, Block]]
   """Splits BGZF to multiple blocks.
 
   It reads the `Block` (GZIP block offsets) from the corresponding index file.
@@ -48,24 +51,15 @@ def split_bgzf(file_path):
     file_path: The BGZF path.
 
   Yields:
-    (file_path, (Block_i, Block_(i+1))). Block_(i+1) can be used to complete the
-    last row of Block_i if needed. It assumes one VCF record can at most spans
-    in two Blocks.
-
-  Raises:
-    ValueError: If a block is larger than `MAX_BLOCK_SIZE`.
+    (file_path, Block).
   """
   blocks = _get_block_offsets(_get_tbi_file(file_path))
   blocks = _remove_invalid_blocks(blocks)
   blocks = _fill_in_gap(blocks)
   blocks = _merge_blocks(blocks)
 
-  for i in range(len(blocks)-1):
-    if blocks[i].end - blocks[i].start > MAX_BLOCK_SIZE:
-      raise ValueError("The Block size is too large!")
-    yield (file_path, (blocks[i], blocks[i+1]))
-
-  yield (file_path, (blocks[-1],))
+  for block in blocks:
+    yield (file_path, block)
 
 
 def exists_tbi_file(file_path):
@@ -92,13 +86,14 @@ def _get_block_offsets(index_file):
   chunk_virtual_file_offsets = []
   for _ in range(n_ref):
     n_bin, offset = _get_next_int(read_buffer, offset)
-    for _ in range(n_bin):
-      _, offset = _get_next_unsigned_int(read_buffer, offset)
+    for bin_id in range(n_bin):
+      bin_id, offset = _get_next_unsigned_int(read_buffer, offset)
       n_chunk, offset = _get_next_int(read_buffer, offset)
       for _ in range(n_chunk):
         start, offset = _get_next_unsigned_long_int(read_buffer, offset)
         end, offset = _get_next_unsigned_long_int(read_buffer, offset)
-        chunk_virtual_file_offsets.append((start, end))
+        if bin_id != _RESERVED_BIN_ID:
+          chunk_virtual_file_offsets.append((start, end))
 
     n_intv, offset = _get_next_int(read_buffer, offset)
     offset += 8 * n_intv
@@ -128,8 +123,7 @@ def _read(index_file):
 def _remove_invalid_blocks(blocks):
   valid_blocks = []
   for block in blocks:
-    if (block.start <= block.end and
-        block.end - block.start <= MAX_BLOCK_SIZE):
+    if block.start != block.end:
       valid_blocks.append(block)
   return valid_blocks
 

@@ -23,22 +23,19 @@ class BgzfIOTest(unittest.TestCase):
   def test_read_tbi(self):
     blocks = bgzf_io.split_bgzf(testdata_util.get_full_file_path(
         'Y.vcf.bgz'))
-    self.assertEqual(len(list(blocks)), 1)
+    self.assertEqual(len(list(blocks)), 19)
 
   def test_get_block_offsets(self):
     blocks = bgzf_io._get_block_offsets(testdata_util.get_full_file_path(
         'Y.vcf.bgz.tbi'))
-    self.assertEqual(len(blocks), 110)
+    self.assertEqual(len(blocks), 108)
 
   def test_remove_invalid_blocks(self):
-    blocks = [bgzf_io.Block(start=5, end=bgzf_io.MAX_BLOCK_SIZE+5),
-              bgzf_io.Block(start=5, end=bgzf_io.MAX_BLOCK_SIZE+6),
-              bgzf_io.Block(start=20, end=19),
+    blocks = [bgzf_io.Block(start=5, end=5),
               bgzf_io.Block(start=3, end=9)]
     valid_blocks = bgzf_io._remove_invalid_blocks(blocks)
     self.assertEqual(valid_blocks,
-                     [bgzf_io.Block(start=5, end=bgzf_io.MAX_BLOCK_SIZE+5),
-                      bgzf_io.Block(start=3, end=9)])
+                     [bgzf_io.Block(start=3, end=9)])
 
   def test_fill_in_gap(self):
     blocks = [bgzf_io.Block(start=5, end=100),
