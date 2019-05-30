@@ -64,7 +64,7 @@ class VcfEstimate(object):
 
 
 class VcfEstimateSource(filebasedsource.FileBasedSource):
-  """A source for reading VCF file estimates."""
+  """A source for inferring the estimate input sizes of VCF file."""
 
   def __init__(self,
                file_pattern,
@@ -84,12 +84,12 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     header_line = file_to_read.readline()
     # Read and skip all header lines starting with ##. Make sure to calculate
     # their total size, to marginally better approximate the line count.
-    while (not header_line or
-           not header_line.strip() or header_line.startswith('##')):
+    while (header_line.startswith('##') or not header_line or
+           not header_line.strip()):
       header_size += len(header_line)
       header_line = file_to_read.readline()
     if not header_line.startswith('#'):
-      raise ValueError(('No column-defining header line  was found in file {}.'
+      raise ValueError(('No column-defining header line was found in file {}.'
                         .format(file_name)))
 
     header_size += len(header_line)
@@ -112,6 +112,8 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     if not isinstance(file_to_read, filesystem.CompressedFile):
       # TODO(#482): Find a better solution to handling compressed files.
       all_lines_size -= header_size
+    else:
+      all_lines_size *= 2
 
     first_record = file_to_read.readline()
     while not first_record or not first_record.strip():
@@ -134,6 +136,8 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
 
     size_in_bytes = filesystems.FileSystems.match(
         [file_name])[0].metadata_list[0].size_in_bytes
+    if isinstance(file_to_read, filesystem.CompressedFile):
+      size_in_bytes *= 2
     yield VcfEstimate(file_name=file_name,
                       samples=samples,
                       estimated_variant_count=estimated_variant_count,

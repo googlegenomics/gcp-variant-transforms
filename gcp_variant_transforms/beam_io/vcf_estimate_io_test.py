@@ -49,9 +49,6 @@ def _get_estimate_from_lines(lines, file_name=None):
   raise ValueError('Missing record line.')
 
 class VcfEstimateSourceTest(unittest.TestCase):
-
-  # TODO(msaul): Replace get_full_dir() with function from utils.
-  # Distribution should skip tests that need VCF files due to large size
   VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
 
   def setUp(self):
@@ -104,9 +101,11 @@ class VcfEstimateSourceTest(unittest.TestCase):
   def test_read_single_file_large(self):
     test_data_conifgs = [
         {'file': 'valid-4.0.vcf', 'variant_count': 4, 'size': 1500},
-        {'file': 'valid-4.0.vcf.gz', 'variant_count': 6, 'size': 727},
-        {'file': 'valid-4.0.vcf.bz2', 'variant_count': 7, 'size': 781},
+        {'file': 'valid-4.0.vcf.gz', 'variant_count': 13, 'size': 1454},
+        {'file': 'valid-4.0.vcf.bz2', 'variant_count': 14, 'size': 1562},
         {'file': 'valid-4.1-large.vcf', 'variant_count': 14425, 'size': 832396},
+        {'file': 'valid-4.1-large.vcf.gz', 'variant_count': 5498,
+         'size': 313430},
         {'file': 'valid-4.2.vcf', 'variant_count': 10, 'size': 3195},
     ]
     for config in test_data_conifgs:
