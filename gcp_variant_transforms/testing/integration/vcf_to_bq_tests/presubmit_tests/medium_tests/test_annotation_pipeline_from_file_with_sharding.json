@@ -13,14 +13,14 @@
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 19778}
+        "expected_result": {"num_rows": 9889}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
           "FROM {TABLE_NAME} AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_annotation_sets": 16898}
+        "expected_result": {"num_annotation_sets": 8449}
       },
       {
         "query": [
@@ -32,7 +32,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 13631192958}
+        "expected_result": {"hash_sum": 6815596479}
       },
       {
         "query": [
