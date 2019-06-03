@@ -22,6 +22,7 @@ from apache_beam.io.gcp import gcsio
 
 
 class BGZFSource(textio._TextSource):
+  """A source for reading `BGZF` files."""
 
   def open_file(self, file_name):
     return open_bgzf(file_name)
@@ -38,6 +39,19 @@ class BGZF(filesystem.CompressedFile):
   """File wrapper for easier handling of BGZF compressed files.
 
   It supports reading concatenated GZIP files.
+
+  `CompressedFile` reads the file and loads `self._read_size` of data into the
+  `buf`, decompress it, and repeats (read and decompress) until there is no more
+  contents in the file.
+  If it is concatenated GZIP files, the `CompressedFile` fails since the
+  decompressor can only decompress one GZIP block, and other GZIP compressed
+  data shall be left as `unused_data` in the decompressor. For instance, if
+  there are 10 GZIP blocks in the buf, calling `decompress` on the buf only
+  decompresses 1 GZIP block, and leaves 9 GZIP blocks in
+  `decompressor.unused_data`.
+
+  This class repeatedly fetches the `unused_data` from the decompressor until
+  all GZIP blocks are decompressed.
   """
 
   def _fetch_to_internal_buffer(self, num_bytes):
@@ -136,16 +150,14 @@ class BGZFBlock(filesystem.CompressedFile):
                                     compression_type)
     self._block = block
     self._start_offset = self._block.start
-    self._last_char = ''
 
   def _fetch_to_internal_buffer(self, num_bytes):
     """Fetches up to num_bytes into the internal buffer.
 
     It reads contents from `self._block`.
     - The string before first `\n` is discarded.
-    - If the last row does not end with `\n`, it further decompress the next
-      64KB and reads the first line. It assumes one row can at most spans in two
-      Blocks.
+    - Decompress the next 64KB after self._block and reads the first line. It
+      assumes one row can at most spans in two Blocks.
     """
     if self._read_eof or self._enough_data_in_buffer(num_bytes):
       return
@@ -168,7 +180,6 @@ class BGZFBlock(filesystem.CompressedFile):
   def _read_first_gzip_block_into_buffer(self):
     buf = self._read_data_from_block()
     decompressed = self._decompressor.decompress(buf)
-    self._last_char = decompressed[-1]
     del buf
     lines = decompressed.split('\n')
     self._read_buffer.write('\n'.join(lines[1:]))
@@ -193,19 +204,17 @@ class BGZFBlock(filesystem.CompressedFile):
 
       self._decompressor = zlib.decompressobj(self._gzip_mask)
       decompressed = self._decompressor.decompress(buf)
-      self._last_char = decompressed[-1]
       del buf
       self._read_buffer.write(decompressed)
 
   def _complete_last_line(self):
     # Fetch the first line in the next `self._MAX_GZIP_SIZE` bytes.
-    if self._last_char != '\n':
-      buf = self._file.raw._downloader.get_range(
-          self._block.end, self._block.end + self._MAX_GZIP_SIZE)
-      self._decompressor = zlib.decompressobj(self._gzip_mask)
-      decompressed = self._decompressor.decompress(buf)
-      del buf
-      self._read_buffer.write(decompressed.split('\n')[0] + '\n')
+    buf = self._file.raw._downloader.get_range(
+        self._block.end, self._block.end + self._MAX_GZIP_SIZE)
+    self._decompressor = zlib.decompressobj(self._gzip_mask)
+    decompressed = self._decompressor.decompress(buf)
+    del buf
+    self._read_buffer.write(decompressed.split('\n')[0] + '\n')
 
   def _read_data_from_block(self):
     buf = self._file.raw._downloader.get_range(self._start_offset,

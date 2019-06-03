@@ -52,13 +52,6 @@ class BgzfBlockTest(unittest.TestCase):
       self.assertEqual(len(lines), 52)
       self._validate_last_line_is_complete(lines[-1])
 
-  def test_last_block(self):
-    with self._open_bgzf_block(self._file_name,
-                               bgzf_io.Block(16375305, 16417644)) as f:
-      lines = self._read_all_lines(f)
-      self.assertEqual(len(lines), 18)
-      self._validate_last_line_is_complete(lines[-1])
-
   def test_block_size_larger_than_gcs_buffer(self):
     with self._open_bgzf_block(self._file_name,
                                bgzf_io.Block(9287, 949900),
