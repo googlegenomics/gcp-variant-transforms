@@ -36,19 +36,17 @@ def open_bgzf(file_name):
 
 
 class BGZF(filesystem.CompressedFile):
-  """File wrapper for easier handling of BGZF compressed files.
+  """File wrapper for handling of BGZF compressed files.
 
-  It supports reading concatenated GZIP files.
+  It provides support for reading GZIP file and concatenated GZIP files.
 
-  `CompressedFile` reads the file and loads `self._read_size` of data into the
-  `buf`, decompress it, and repeats (read and decompress) until there is no more
-  contents in the file.
-  If it is concatenated GZIP files, the `CompressedFile` fails since the
-  decompressor can only decompress one GZIP block, and other GZIP compressed
-  data shall be left as `unused_data` in the decompressor. For instance, if
-  there are 10 GZIP blocks in the buf, calling `decompress` on the buf only
-  decompresses 1 GZIP block, and leaves 9 GZIP blocks in
-  `decompressor.unused_data`.
+  `CompressedFile` periodically reads a fixed amount of data from a file, loads
+  the contents into a buffer and decompresses until it reaches the end of the
+  GZIP block. Therefore, when handling block-GZIP or concatenated GZIP files,
+  only the first block would be processed while the rest of the data will be
+  discarded and stored in `decompressor.unused_data` field. For instance, if
+  there are 10 GZIP blocks in the buffer, it would only decompresses 1 GZIP
+  block, and 9 GZIP blocks will be left in `decompressor.unused_data`.
 
   This class repeatedly fetches the `unused_data` from the decompressor until
   all GZIP blocks are decompressed.
@@ -68,7 +66,7 @@ class BGZF(filesystem.CompressedFile):
 
     while not self._read_eof and (self._read_buffer.tell() - self._read_position
                                  ) < num_bytes:
-      self._decompress_decompressor_unused_data(num_bytes)
+      self._decompress_unused_data(num_bytes)
       if (self._read_buffer.tell() - self._read_position) >= num_bytes:
         return
       buf = self._file.read(self._read_size)
@@ -76,11 +74,11 @@ class BGZF(filesystem.CompressedFile):
         decompressed = self._decompressor.decompress(buf)
         del buf
         self._read_buffer.write(decompressed)
-        self._decompress_decompressor_unused_data(num_bytes)
+        self._decompress_unused_data(num_bytes)
       else:
         self._read_eof = True
 
-  def _decompress_decompressor_unused_data(self, num_bytes):
+  def _decompress_unused_data(self, num_bytes):
     while (self._decompressor.unused_data != b'' and
            self._read_buffer.tell() - self._read_position < num_bytes):
       buf = self._decompressor.unused_data
