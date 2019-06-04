@@ -207,15 +207,7 @@ class TestContextManager(object):
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
       dataset = bigquery.Dataset(dataset_ref)
-      tables = client.list_tables(dataset)
-      # Delete tables, otherwise dataset deletion will fail because it is still
-      # "in use".
-      for table in tables:
-        # The returned tables are of type TableListItem, but delete_table
-        # needs Table or TableReference.
-        client.delete_table(
-            bigquery.TableReference(dataset_ref, table.table_id))
-      client.delete_dataset(dataset)
+      client.delete_dataset(dataset, delete_contents=True)
 
 
 def _get_args():
