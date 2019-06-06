@@ -21,7 +21,6 @@ PTransforms and writing the output.
 from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
-import logging
 import os
 import uuid
 from datetime import datetime
@@ -126,16 +125,18 @@ def get_splittable_bgzf(all_patterns):
   # type: (List[str]) -> List[str]
   """Returns the splittable bgzf matching `all_patterns`."""
   matches = filesystems.FileSystems.match(all_patterns)
-  files = []
+  splittable_bgzf = []
+  count = 0
   for match in matches:
     for metadata in match.metadata_list:
-      if not (metadata.path.startswith('gs://') and
-              bgzf_io.exists_tbi_file(metadata.path)):
-        logging.info("Cannot find the index file for %s.", metadata.path)
-        return []
-      else:
-        files.append(metadata.path)
-  return files
+      count += 1
+      if (metadata.path.startswith('gs://') and
+          bgzf_io.exists_tbi_file(metadata.path)):
+        splittable_bgzf.append(metadata.path)
+  if splittable_bgzf and len(splittable_bgzf) < count:
+    raise ValueError("Some index files are missing for {}.".format(
+        all_patterns))
+  return splittable_bgzf
 
 
 def _get_file_names(input_file):

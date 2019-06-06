@@ -135,7 +135,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
   def test_get_splittable_bgzf(self):
     non_gs_metadata_list = [filesystem.FileMetadata(path, size) for
                             (path, size) in [('1.vcf', 100),
-                                             ('gs://2.vcf', 100)]]
+                                             ('2.vcf', 100)]]
     with mock.patch.object(
         FileSystems, 'match',
         return_value=[filesystem.MatchResult('non_gs', non_gs_metadata_list)]):

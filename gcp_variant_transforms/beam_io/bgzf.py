@@ -1,4 +1,4 @@
-# Copyright 2019 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,8 @@ def open_bgzf(file_name):
 class BGZF(filesystem.CompressedFile):
   """File wrapper for handling of BGZF compressed files.
 
-  It provides support for reading GZIP file and concatenated GZIP files.
+  It provides support for reading GZIP file and concatenated GZIP files ("block
+  gzip" or BGZF files).
 
   `CompressedFile` periodically reads a fixed amount of data from a file, loads
   the contents into a buffer and decompresses until it reaches the end of the
@@ -53,39 +54,52 @@ class BGZF(filesystem.CompressedFile):
   """
 
   def _fetch_to_internal_buffer(self, num_bytes):
-    """Fetch up to num_bytes into the internal buffer."""
-    if (not self._read_eof and self._read_position > 0 and
-        (self._read_buffer.tell() - self._read_position) < num_bytes):
-      # There aren't enough number of bytes to accommodate a read, so we
-      # prepare for a possibly large read by clearing up all internal buffers
-      # but without dropping any previous held data.
+    """Fetches up to `num_bytes` into the internal buffer."""
+    if self._read_eof or self._enough_data_in_buffer(num_bytes):
+      return
+    self._reset_read_buffer_to_accommodate_more_data()
+    self._fetch_and_decompress_data_to_buffer(num_bytes)
+
+  def _enough_data_in_buffer(self, num_bytes):
+    return self._read_buffer.tell() - self._read_position >= num_bytes
+
+  def _reset_read_buffer_to_accommodate_more_data(self):
+    if not self._is_first_time():
+     # There aren't enough number of bytes to accommodate a read, so we prepare
+     # for a possibly large read by clearing up all internal buffers but without
+     # dropping any previous held data.
       self._read_buffer.seek(self._read_position)
       data = self._read_buffer.read()
       self._clear_read_buffer()
       self._read_buffer.write(data)
 
-    while not self._read_eof and (self._read_buffer.tell() - self._read_position
-                                 ) < num_bytes:
+  def _fetch_and_decompress_data_to_buffer(self, num_bytes):
+    while not self._read_eof and not self._enough_data_in_buffer(num_bytes):
       self._decompress_unused_data(num_bytes)
-      if (self._read_buffer.tell() - self._read_position) >= num_bytes:
+      if self._enough_data_in_buffer(num_bytes):
         return
-      buf = self._file.read(self._read_size)
+      buf = self._read_data_from_source()
       if buf:
         decompressed = self._decompressor.decompress(buf)
         del buf
         self._read_buffer.write(decompressed)
-        self._decompress_unused_data(num_bytes)
       else:
         self._read_eof = True
 
   def _decompress_unused_data(self, num_bytes):
     while (self._decompressor.unused_data != b'' and
-           self._read_buffer.tell() - self._read_position < num_bytes):
+           not self._enough_data_in_buffer(num_bytes)):
       buf = self._decompressor.unused_data
       self._decompressor = zlib.decompressobj(self._gzip_mask)
       decompressed = self._decompressor.decompress(buf)
       del buf
       self._read_buffer.write(decompressed)
+
+  def _read_data_from_source(self):
+    return self._file.read(self._read_size)
+
+  def _is_first_time(self):
+    return self._read_position == 0
 
 
 class BGZFBlockSource(textio._TextSource):
@@ -134,8 +148,14 @@ class BGZFBlockSource(textio._TextSource):
           yield self._coder.decode(record)
 
 
-class BGZFBlock(filesystem.CompressedFile):
-  """File wrapper to handle one BGZF Block."""
+class BGZFBlock(BGZF):
+  """File wrapper to handle one BGZF Block.
+
+  It reads contents from `self._block`.
+    - The string before first `\n` is discarded.
+    - Decompress the next 64KB after self._block and reads the first line. It
+      assumes one row can at most spans in two Blocks.
+  """
 
   # Each block in BGZF is no larger than `_MAX_GZIP_SIZE`.
   _MAX_GZIP_SIZE = 64 * 1024
@@ -149,61 +169,27 @@ class BGZFBlock(filesystem.CompressedFile):
     self._block = block
     self._start_offset = self._block.start
 
-  def _fetch_to_internal_buffer(self, num_bytes):
-    """Fetches up to num_bytes into the internal buffer.
-
-    It reads contents from `self._block`.
-    - The string before first `\n` is discarded.
-    - Decompress the next 64KB after self._block and reads the first line. It
-      assumes one row can at most spans in two Blocks.
-    """
-    if self._read_eof or self._enough_data_in_buffer(num_bytes):
-      return
+  def _fetch_and_decompress_data_to_buffer(self, num_bytes):
     if self._is_first_time():
       self._read_first_gzip_block_into_buffer()
-    else:
-      self._reset_read_buffer_to_accommodate_more_data()
-    self._fetch_data_to_read_buffer(num_bytes)
-    if self._enough_data_in_buffer(num_bytes):
-      return
-    self._complete_last_line()
-    self._read_eof = True
-
-  def _enough_data_in_buffer(self, num_bytes):
-    return self._read_buffer.tell() - self._read_position >= num_bytes
-
-  def _is_first_time(self):
-    return self._start_offset == self._block.start
+    super(BGZFBlock, self)._fetch_and_decompress_data_to_buffer(num_bytes)
+    if self._read_eof:
+      self._complete_last_line()
 
   def _read_first_gzip_block_into_buffer(self):
-    buf = self._read_data_from_block()
+    buf = self._read_data_from_source()
     decompressed = self._decompressor.decompress(buf)
     del buf
     lines = decompressed.split('\n')
     self._read_buffer.write('\n'.join(lines[1:]))
 
-  def _reset_read_buffer_to_accommodate_more_data(self):
-    # There aren't enough number of bytes to accommodate a read, so we
-    # prepare for a possibly large read by clearing up all internal buffers
-    # but without dropping any previous held data.
-    self._read_buffer.seek(self._read_position)
-    data = self._read_buffer.read()
-    self._clear_read_buffer()
-    self._read_buffer.write(data)
-
-  def _fetch_data_to_read_buffer(self, num_bytes):
-    # Decompress the data until there are at least `num_bytes` in the buffer.
-    while (self._decompressor.unused_data != b'' and
-           not self._enough_data_in_buffer(num_bytes)):
-      buf = self._decompressor.unused_data
-      if (len(buf) < self._MAX_GZIP_SIZE and
-          self._start_offset < self._block.end):
-        buf = ''.join([buf, self._read_data_from_block()])
-
-      self._decompressor = zlib.decompressobj(self._gzip_mask)
-      decompressed = self._decompressor.decompress(buf)
-      del buf
-      self._read_buffer.write(decompressed)
+  def _read_data_from_source(self):
+    if self._start_offset == self._block.end:
+      return ''
+    buf = self._file.raw._downloader.get_range(self._start_offset,
+                                               self._block.end)
+    self._start_offset += len(buf)
+    return buf
 
   def _complete_last_line(self):
     # Fetch the first line in the next `self._MAX_GZIP_SIZE` bytes.
@@ -213,9 +199,3 @@ class BGZFBlock(filesystem.CompressedFile):
     decompressed = self._decompressor.decompress(buf)
     del buf
     self._read_buffer.write(decompressed.split('\n')[0] + '\n')
-
-  def _read_data_from_block(self):
-    buf = self._file.raw._downloader.get_range(self._start_offset,
-                                               self._block.end)
-    self._start_offset += len(buf)
-    return buf

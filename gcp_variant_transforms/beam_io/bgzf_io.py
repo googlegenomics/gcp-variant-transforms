@@ -1,4 +1,4 @@
-# Copyright 2019 Google Inc.  All Rights Reserved.
+# Copyright 2019 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,8 +79,8 @@ def _get_block_offsets(index_file):
   offset = 4
   n_ref, _ = _get_next_int(read_buffer, offset)
   offset = 32
-  l_mn, offset = _get_next_int(read_buffer, offset)
-  offset += l_mn
+  name_len, offset = _get_next_int(read_buffer, offset)
+  offset += name_len
 
   chunk_virtual_file_offsets = []
   for _ in range(n_ref):
