@@ -55,6 +55,7 @@ class VcfParserType(enum.Enum):
   """An Enum specifying the parser used for reading VCF files."""
   PYVCF = 0
   NUCLEUS = 1
+  PYSAM = 2
 
 
 class _ToVcfRecordCoder(coders.Coder):
@@ -219,6 +220,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
       vcf_parser_class = vcf_parser.PyVcfParser
     elif self._vcf_parser_type == VcfParserType.NUCLEUS:
       vcf_parser_class = vcf_parser.NucleusParser
+    elif self._vcf_parser_type == VcfParserType.PYSAM:
+      vcf_parser_class = vcf_parser.PySamParser
     else:
       raise ValueError(
           'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))

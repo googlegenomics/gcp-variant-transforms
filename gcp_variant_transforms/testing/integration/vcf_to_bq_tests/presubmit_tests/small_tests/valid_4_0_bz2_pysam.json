@@ -1,0 +1,24 @@
+[
+  {
+    "test_name": "valid-4-0-bz2-pysam",
+    "table_name": "valid_4_0_bz2_pysam",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf.bz2",
+    "runner": "DirectRunner",
+    "zones": ["us-west1-b"],
+    "vcf_parser": "PYVCF",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 5}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 3607195}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 3607203}
+      }
+    ]
+  }
+]

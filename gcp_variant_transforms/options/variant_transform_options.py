@@ -107,10 +107,15 @@ class VcfReadOptions(VariantTransformsOptions):
         default=vcfio.VcfParserType.PYVCF.name,
         choices=[parser.name for parser in vcfio.VcfParserType],
         help=('Choose the underlying parser for reading VCF files. Currently '
-              'we only support `{}` (default) and `{}`. Note: Nucleus parser '
-              'is still in experimental stage so using it for production jobs '
-              'is not recommended.'.format(vcfio.VcfParserType.PYVCF.name,
-                                           vcfio.VcfParserType.NUCLEUS.name)))
+              'we only support ``{}`` (default), ``{}`` and ``{}``. Note: '
+              'Nucleus parser is still in experimental stage so using it for '
+              'production jobs is not recommended. Additionally, if you are '
+              'running using PySam in a ``DirectRunner``, you may need to '
+              'install additional compression libraries on your machines, like '
+              '``zlib1g-dev``, ``libbz2-dev`` and ``liblzma-dev``'.format(
+                  vcfio.VcfParserType.PYVCF.name,
+                  vcfio.VcfParserType.NUCLEUS.name,
+                  vcfio.VcfParserType.PYSAM.name)))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None

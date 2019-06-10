@@ -19,10 +19,14 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
+from collections import namedtuple
+
+import sys
+import tempfile
+
 import logging
 import os
-import tempfile
-from collections import namedtuple
+from pysam import libcbcf
 
 try:
   from nucleus.io.python import vcf_reader as nucleus_vcf_reader
@@ -501,6 +505,162 @@ class PyVcfParser(VcfParser):
           data = [data]
         call.info[field] = data
       calls.append(call)
+    return calls
+
+
+class PySamParser(VcfParser):
+  """An Iterator for processing a single VCF file using PySam.
+
+  PySam allows reading a file through either stdin stream, or through as actual
+  VCF files, for which it requires legitimate file descriptor. Since we want to
+  perform our own parallelization, we will fork our process, to use 2 pipelines
+  that will feed into PySam object - 1 will feed the data from main thread into
+  the child one, while second will get that data in child thread and feed it to
+  PySam library.
+
+  The requirement of using two pipelines comes from the design of VcfParser base
+  class - we could only use a single pipe, but it will divert the parsers.
+  """
+
+  def __init__(self,
+               file_name,  # type: str
+               range_tracker,  # type: range_trackers.OffsetRangeTracker
+               compression_type,  # type: str
+               allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
+               representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
+               **kwargs  # type: **str
+              ):
+    # type: (...) -> None
+    super(PySamParser, self).__init__(file_name,
+                                      range_tracker,
+                                      file_pattern,
+                                      compression_type,
+                                      allow_malformed_records,
+                                      representative_header_lines,
+                                      **kwargs)
+    self._header_lines = []
+    self._next_line_to_process = None
+    self._current_line = None
+    # This member will be properly initiated in _init_with_header().
+    self._vcf_reader = None
+    self._to_child = None
+
+  def _init_with_header(self, header_lines):
+    # The first header line must be similar to '##fileformat=VCFv.*'.
+    if header_lines and not header_lines[0].startswith(
+        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+      header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+
+    p_read, c_write = os.pipe()
+    c_read, p_write = os.pipe()
+
+    processid = os.fork()
+    if processid:
+      os.close(c_read)
+      os.close(c_write)
+      into_pysam = os.fdopen(p_read)
+      self._to_child = os.fdopen(p_write, 'w')
+      self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
+    else:
+      os.close(p_read)
+      os.close(p_write)
+      from_parent = os.fdopen(c_read)
+      to_pysam = os.fdopen(c_write, 'w')
+      # Feed the data with a break line, since we read data line by line - if
+      # we would use the conventional ``read()`` method, both pipes would lock,
+      # while waiting for an EOF signal.
+      for header in header_lines:
+        to_pysam.write(header.strip() + '\n')
+      to_pysam.flush()
+
+      while 1:
+        text_line = from_parent.readline()
+        if not text_line:
+          break
+        to_pysam.write(text_line)
+        to_pysam.flush()
+
+      from_parent.close()
+      to_pysam.close()
+      sys.exit(0)
+
+  def _get_variant(self, data_line):
+    try:
+      self._to_child.write(data_line + '\n')
+      self._to_child.flush()
+      return self._convert_to_variant(next(self._vcf_reader))
+    except (MemoryError, IOError) as e:
+      logging.warning('VCF record read failed in %s for line %s: %s',
+                      self._file_name, data_line, str(e))
+      return MalformedVcfRecord(self._file_name, data_line, str(e))
+
+  def _convert_to_variant(
+      self,
+      record,  # type: libcbcf.VariantRecord
+      ):
+    # type: (...) -> Variant
+    """Converts the PySAM record to a :class:`Variant` object.
+
+    Args:
+      record: An object containing info about a variant.
+      formats: The PyVCF dict storing FORMAT extracted from the VCF header.
+        The key is the FORMAT key and the value is
+        :class:`~vcf.parser._Format`.
+    Returns:
+      A :class:`Variant` object from the given record.
+    Raises:
+      ValueError: if ``record`` is semantically invalid.
+    """
+
+    return Variant(
+        reference_name=record.chrom,
+        start=record.start,
+        end=record.stop,
+        reference_bases=record.ref,
+        alternate_bases=list(record.alts) if record.alts else [],
+        names=record.id.split(';') if record.id else [],
+        quality=float(record.qual),
+        filters=['PASS'] if not record.filter.keys() else record.filter.keys(),
+        info=self._get_variant_info(record),
+        calls=self._get_variant_calls(record.samples))
+
+  def _get_variant_info(self,
+                        record  # type: libcbcf.VariantRecord
+                       ):
+    info = {}
+    for k, v in record.info.iteritems():
+      if k != END_INFO_KEY:
+        if isinstance(v, tuple):
+          info[k] = list(v)
+        else:
+          info[k] = v
+
+    return info
+
+  def _get_variant_calls(self,
+                         samples  # type: libcvcf.VariantRecordSamples
+                        ):
+    calls = []
+
+    for (name, sample) in samples.iteritems():
+      if sample.phased:
+        phaseset = DEFAULT_PHASESET_VALUE
+      else:
+        phaseset = None
+      genotype = None
+      info = {}
+      for (key, value) in sample.iteritems():
+        if key == GENOTYPE_FORMAT_KEY:
+          genotype = list(value) if isinstance(value, tuple) else value
+        elif key == PHASESET_FORMAT_KEY:
+          phaseset = list(value) if isinstance(value, tuple) else value
+        else:
+          info[key] = list(value) if isinstance(value, tuple) else value
+
+      calls.append(VariantCall(name, genotype, phaseset, info))
+
     return calls
 
 
