@@ -52,7 +52,10 @@ class VcfEstimate(object):
     self.size_in_bytes = size_in_bytes
 
   def __eq__(self, other):
-    return self.file_name == other.file_name
+    return (self.file_name == other.file_name and
+            self.estimated_variant_count == other.estimated_variant_count and
+            self.samples == other.samples and
+            self.size_in_bytes == other.size_in_bytes)
 
   def __repr__(self):
     return 'File Name: {}, Variant Count: {}, Samples: {}, Size: {}'.format(
@@ -186,7 +189,7 @@ def _create_vcf_estimate_source(file_pattern,
 class GetAllEstimates(transforms.PTransform):
   """Reads files until the first data line and extracts input sizes.
 
-  This transform is to be preffered over GetEstimates for large number of files.
+  This transform is to be preferred over GetEstimates for large number of files.
   """
 
   DEFAULT_DESIRED_BUNDLE_SIZE = 64 * 1024 * 1024  # 64MB

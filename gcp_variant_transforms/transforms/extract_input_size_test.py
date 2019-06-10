@@ -82,16 +82,16 @@ class ExtractInputSizeTest(unittest.TestCase):
     assert_that(sample_map, equal_to(self._create_sample_map()))
     pipeline.run()
 
-  def test_get_estimated_record_count(self):
+  def test_get_estimated_value_count(self):
     sample_map = self._create_sample_map()
 
     pipeline = TestPipeline()
-    estimated_record_count = (
+    estimated_value_count = (
         pipeline
         | transforms.Create(sample_map)
-        | 'GetEstimatedRecordCount' >>
-        extract_input_size.GetEstimatedRecordCount())
-    assert_that(estimated_record_count, equal_to([71]))
+        | 'GetEstimatedValueCount' >>
+        extract_input_size.GetEstimatedValueCount())
+    assert_that(estimated_value_count, equal_to([71]))
     pipeline.run()
 
   def test_get_estimated_sample_count(self):

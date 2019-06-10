@@ -607,5 +607,5 @@ class ExperimentalOptions(VariantTransformsOptions):
     parser.add_argument(
         '--auto_flags_experiment',
         default=False,
-        help=('Experiment: Default flag to more optimal values based on '
-              'heuristics extracted from other inputs'))
+        help=('Set flag values automatically based on heuristics extracted '
+              'from input files'))

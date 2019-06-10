@@ -17,7 +17,7 @@
 This module is used to create 5 main signals that describe the supplied input:
   - variant count: approximate number of variants in all VCF files.
   - sample count: number of distinct samples across all VCF files.
-  - record count: approximate number of variant by sample data points.
+  - value count: approximate number of variant by sample data points.
   - files size: total size of all supplied files.
   - file count: number of input files.
 """
@@ -49,7 +49,7 @@ class GetSampleMap(beam.PTransform):
   """ Converts estimate objects into a distinct sample->List[variant count] map.
 
   The keys of this map will be used to find the count of distinct samples, while
-  the sum of values will give us estimated record count.
+  the sum of values will give us estimated value count.
   """
   def _get_call_names(self, estimate):
     # type: (vcf_parser.Variant) -> Tuple[str]
@@ -60,16 +60,16 @@ class GetSampleMap(beam.PTransform):
 
   def expand(self, estimates):
     return (estimates
-            | 'MapSamplesToRecordCount' >> beam.FlatMap(self._get_call_names)
+            | 'MapSamplesToValueCount' >> beam.FlatMap(self._get_call_names)
             | 'GroupAllSamples' >> beam.GroupByKey())
 
 
-class GetEstimatedRecordCount(beam.PTransform):
+class GetEstimatedValueCount(beam.PTransform):
   def expand(self, sample_map):
     return (sample_map
-            | 'GetListsOfRecordCounts' >> beam.Values()
-            | 'SumRecordCountsPerSample' >> beam.Map(sum)
-            | 'SumTotalRecordCounts' >> beam.CombineGlobally(sum))
+            | 'GetListsOfValueCounts' >> beam.Values()
+            | 'SumValueCountsPerSample' >> beam.Map(sum)
+            | 'SumTotalValueCounts' >> beam.CombineGlobally(sum))
 
 class GetEstimatedSampleCount(beam.PTransform):
   def expand(self, sample_map):
@@ -80,13 +80,13 @@ class GetEstimatedSampleCount(beam.PTransform):
 
 def print_estimates_to_file(variant_count,
                             sample_count,
-                            record_count,
+                            value_count,
                             files_size,
                             file_count,
                             file_path):
   with filesystems.FileSystems.create(file_path) as file_to_write:
     file_to_write.write('{}\n{}\n{}\n{}\n{}\n'.format(int(variant_count),
                                                       sample_count,
-                                                      int(record_count),
+                                                      int(value_count),
                                                       files_size,
                                                       file_count))

@@ -247,8 +247,8 @@ def _get_input_dimensions(known_args, pipeline_args):
                   | 'CountAllFiles' >> beam.combiners.Count.Globally())
     sample_map = (estimates
                   | 'ExtractSampleMap' >> extract_input_size.GetSampleMap())
-    estimated_record_count = (sample_map
-                              | extract_input_size.GetEstimatedRecordCount())
+    estimated_value_count = (sample_map
+                             | extract_input_size.GetEstimatedValueCount())
     estimated_sample_count = (sample_map
                               | extract_input_size.GetEstimatedSampleCount())
     estimated_variant_count = (estimates
@@ -257,7 +257,7 @@ def _get_input_dimensions(known_args, pipeline_args):
     _ = (estimated_variant_count
          | beam.ParDo(extract_input_size.print_estimates_to_file,
                       beam.pvalue.AsSingleton(estimated_sample_count),
-                      beam.pvalue.AsSingleton(estimated_record_count),
+                      beam.pvalue.AsSingleton(estimated_value_count),
                       beam.pvalue.AsSingleton(files_size),
                       beam.pvalue.AsSingleton(file_count),
                       temp_estimated_input_size_file_path))
@@ -270,7 +270,7 @@ def _get_input_dimensions(known_args, pipeline_args):
 
   known_args.estimated_variant_count = int(estimates[0].strip())
   known_args.estimated_sample_count = int(estimates[1].strip())
-  known_args.estimated_record_count = int(estimates[2].strip())
+  known_args.estimated_value_count = int(estimates[2].strip())
   known_args.files_size = int(estimates[3].strip())
   known_args.file_count = int(estimates[4].strip())
 
