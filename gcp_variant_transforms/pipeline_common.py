@@ -35,6 +35,7 @@ from apache_beam.runners.direct import direct_runner
 from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
@@ -199,6 +200,45 @@ def read_headers(pipeline, pipeline_mode, all_patterns):
   return headers
 
 
+def read_variants(pipeline,  # type: beam.Pipeline
+                  all_patterns,  # type: List[str]
+                  pipeline_mode,  # type: int
+                  allow_malformed_records,  # type: bool
+                  representative_header_lines=None,  # type: List[str]
+                  vcf_parser=vcfio.VcfParserType.PYVCF  # type: int
+                 ):
+  # type: (...) -> pvalue.PCollection
+  """Returns a PCollection of Variants by reading VCFs."""
+  compression_type = get_compression_type(all_patterns)
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    splittable_bgzf = get_splittable_bgzf(all_patterns)
+    if splittable_bgzf:
+      return (pipeline
+              | 'ReadVariants'
+              >> vcfio.ReadFromBGZF(splittable_bgzf,
+                                    representative_header_lines,
+                                    allow_malformed_records))
+
+  if pipeline_mode == PipelineModes.LARGE:
+    variants = (pipeline
+                | 'InputFilePattern' >> beam.Create(all_patterns)
+                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    representative_header_lines=representative_header_lines,
+                    compression_type=compression_type,
+                    allow_malformed_records=allow_malformed_records))
+  else:
+    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+        all_patterns[0],
+        representative_header_lines=representative_header_lines,
+        compression_type=compression_type,
+        allow_malformed_records=allow_malformed_records,
+        vcf_parser_type=vcf_parser)
+
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    variants |= 'FusionBreak' >> FusionBreak()
+  return variants
+
+
 def add_annotation_headers(pipeline, known_args, pipeline_mode,
                            merged_header,
                            annotated_vcf_pattern):
@@ -274,3 +314,15 @@ def generate_unique_name(job_name):
   return '-'.join([job_name,
                    datetime.now().strftime('%Y%m%d-%H%M%S'),
                    str(uuid.uuid4())])
+
+
+class FusionBreak(beam.PTransform):
+  """PTransform that returns a PCollection equivalent to its input.
+
+  It prevents fusion of the surrounding transforms. Read more:
+  https://cloud.google.com/dataflow/docs/guides/deploying-a-pipeline#fusion-optimization
+  """
+  def expand(self, pcoll):
+    # Create an empty PCollection that depends on pcoll.
+    empty = pcoll | beam.FlatMap(lambda x: ())
+    return pcoll | beam.Map(lambda x, unused: x, beam.pvalue.AsIter(empty))

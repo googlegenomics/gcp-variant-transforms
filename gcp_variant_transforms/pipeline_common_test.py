@@ -17,13 +17,18 @@
 import collections
 import unittest
 
-from apache_beam.io.filesystems import FileSystems
 from apache_beam.io import filesystem
+from apache_beam.io.filesystems import FileSystems
+from apache_beam.testing import test_pipeline
+from apache_beam.testing.util import assert_that
+
 import mock
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.pipeline_common import PipelineModes
+from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
+from gcp_variant_transforms.testing import testdata_util
 
 
 class PipelineCommonWithPatternTest(unittest.TestCase):
@@ -240,3 +245,26 @@ class PipelineCommonWithFileTest(unittest.TestCase):
           ValueError, 'Input pattern .* from .* did not match any files.'):
         pipeline_common._get_all_patterns(
             input_pattern=None, input_file=filename)
+
+
+class CommonPipelineTest(unittest.TestCase):
+
+  def test_read_variants(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.SMALL,
+                                             False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
+  def test_read_variants_large_mode(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.LARGE,
+                                             False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
