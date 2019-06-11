@@ -33,6 +33,7 @@ from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
 
 from gcp_variant_transforms.beam_io import bgzf_io
+from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.transforms import merge_headers
 
@@ -168,6 +169,18 @@ def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
   elif total_files > _SMALL_DATA_THRESHOLD:
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
+
+def get_estimates(pipeline, pipeline_mode, all_patterns):
+  # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
+  """Creates a PCollection by reading the VCF files and deriving estimates."""
+  if pipeline_mode == PipelineModes.LARGE:
+    estimates = (pipeline
+                 | beam.Create(all_patterns)
+                 | vcf_estimate_io.GetAllEstimates())
+  else:
+    estimates = pipeline | vcf_estimate_io.GetEstimates(all_patterns[0])
+
+  return estimates
 
 
 def read_headers(pipeline, pipeline_mode, all_patterns):

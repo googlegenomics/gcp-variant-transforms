@@ -59,6 +59,7 @@ from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
 from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
+from gcp_variant_transforms.transforms import extract_input_size
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
@@ -76,8 +77,11 @@ _COMMAND_LINE_OPTIONS = [
     variant_transform_options.FilterOptions,
     variant_transform_options.MergeOptions,
     variant_transform_options.PartitionOptions,
+    variant_transform_options.ExperimentalOptions,
 ]
 
+_ESTIMATE_SIZES_FILE_NAME = 'estimate-sizes'
+_ESTIMATE_SIZES_JOB_NAME = 'estimate-input-size'
 _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 _ANNOTATE_FILES_JOB_NAME = 'annotate-files'
@@ -213,6 +217,64 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
           _GCS_RECURSIVE_WILDCARD]
 
 
+def _get_input_dimensions(known_args, pipeline_args):
+  pipeline_mode = pipeline_common.get_pipeline_mode(
+      known_args.all_patterns,
+      known_args.optimize_for_large_inputs)
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  google_cloud_options = beam_pipeline_options.view_as(
+      pipeline_options.GoogleCloudOptions)
+
+  estimate_sizes_job_name = pipeline_common.generate_unique_name(
+      _ESTIMATE_SIZES_JOB_NAME)
+  if google_cloud_options.job_name:
+    google_cloud_options.job_name += '-' + estimate_sizes_job_name
+  else:
+    google_cloud_options.job_name = estimate_sizes_job_name
+  temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
+  temp_estimated_input_size_file_name = '-'.join(
+      [google_cloud_options.job_name,
+       _ESTIMATE_SIZES_FILE_NAME])
+  temp_estimated_input_size_file_path = filesystems.FileSystems.join(
+      temp_directory, temp_estimated_input_size_file_name)
+  with beam.Pipeline(options=beam_pipeline_options) as p:
+    estimates = pipeline_common.get_estimates(
+        p, pipeline_mode, known_args.all_patterns)
+
+    files_size = (estimates
+                  | 'GetFilesSize' >> extract_input_size.GetFilesSize())
+    file_count = (estimates
+                  | 'CountAllFiles' >> beam.combiners.Count.Globally())
+    sample_map = (estimates
+                  | 'ExtractSampleMap' >> extract_input_size.GetSampleMap())
+    estimated_value_count = (sample_map
+                             | extract_input_size.GetEstimatedValueCount())
+    estimated_sample_count = (sample_map
+                              | extract_input_size.GetEstimatedSampleCount())
+    estimated_variant_count = (estimates
+                               | 'GetEstimatedVariantCount'
+                               >> extract_input_size.GetEstimatedVariantCount())
+    _ = (estimated_variant_count
+         | beam.ParDo(extract_input_size.print_estimates_to_file,
+                      beam.pvalue.AsSingleton(estimated_sample_count),
+                      beam.pvalue.AsSingleton(estimated_value_count),
+                      beam.pvalue.AsSingleton(files_size),
+                      beam.pvalue.AsSingleton(file_count),
+                      temp_estimated_input_size_file_path))
+
+  with filesystems.FileSystems.open(temp_estimated_input_size_file_path) as f:
+    estimates = f.readlines()
+  if len(estimates) != 5:
+    raise ValueError('Exactly 5 estimates were expected in {}.'.format(
+        temp_estimated_input_size_file_path))
+
+  known_args.estimated_variant_count = int(estimates[0].strip())
+  known_args.estimated_sample_count = int(estimates[1].strip())
+  known_args.estimated_value_count = int(estimates[2].strip())
+  known_args.files_size = int(estimates[3].strip())
+  known_args.file_count = int(estimates[4].strip())
+
+
 def _annotate_vcf_files(all_patterns, known_args, pipeline_args):
   # type: (List[str], argparse.Namespace, List[str]) -> str
   """Annotates the VCF files using VEP.
@@ -298,6 +360,7 @@ def _merge_headers(known_args, pipeline_args,
       merged_header = _add_inferred_headers(infer_headers_input_pattern, p,
                                             known_args, merged_header,
                                             pipeline_mode)
+
     pipeline_common.write_headers(merged_header, temp_merged_headers_file_path)
     known_args.representative_header_file = temp_merged_headers_file_path
 
@@ -345,6 +408,9 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
+
+  if known_args.auto_flags_experiment:
+    _get_input_dimensions(known_args, pipeline_args)
 
   annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
 

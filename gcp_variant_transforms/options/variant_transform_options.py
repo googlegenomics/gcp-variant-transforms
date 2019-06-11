@@ -597,3 +597,15 @@ def _validate_inputs(parsed_args):
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '
                      'provided.')
+
+
+class ExperimentalOptions(VariantTransformsOptions):
+  """Options for experimental features."""
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        '--auto_flags_experiment',
+        default=False,
+        help=('Set flag values automatically based on heuristics extracted '
+              'from input files'))
