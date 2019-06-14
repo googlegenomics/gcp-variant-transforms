@@ -144,7 +144,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     with mock.patch.object(
         FileSystems, 'match',
         return_value=[filesystem.MatchResult('non_gs', non_gs_metadata_list)]):
-      self.assertEqual(pipeline_common.get_splittable_bgzf(['non_gs']),
+      self.assertEqual(pipeline_common._get_splittable_bgzf(['non_gs']),
                        [])
 
     gs_metadata_list = [filesystem.FileMetadata(path, size) for
@@ -155,12 +155,12 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
         return_value=[filesystem.MatchResult('gs', gs_metadata_list)]):
       with mock.patch.object(FileSystems, 'exists', return_value=True):
         self.assertEqual(
-            pipeline_common.get_splittable_bgzf(['index file exists']),
+            pipeline_common._get_splittable_bgzf(['index file exists']),
             ['gs://1.vcf.bgz', 'gs://2.vcf.bgz'])
 
       with mock.patch.object(FileSystems, 'exists', return_value=False):
         self.assertEqual(
-            pipeline_common.get_splittable_bgzf(['no index file']),
+            pipeline_common._get_splittable_bgzf(['no index file']),
             [])
 
 

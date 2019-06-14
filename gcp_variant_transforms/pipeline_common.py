@@ -123,7 +123,7 @@ def get_compression_type(input_patterns):
     return filesystem.CompressionTypes.AUTO
 
 
-def get_splittable_bgzf(all_patterns):
+def _get_splittable_bgzf(all_patterns):
   # type: (List[str]) -> List[str]
   """Returns the splittable bgzf matching `all_patterns`."""
   matches = filesystems.FileSystems.match(all_patterns)
@@ -202,7 +202,7 @@ def read_headers(pipeline, pipeline_mode, all_patterns):
 
 def read_variants(pipeline,  # type: beam.Pipeline
                   all_patterns,  # type: List[str]
-                  pipeline_mode,  # type: int
+                  pipeline_mode,  # type: PipelineModes
                   allow_malformed_records,  # type: bool
                   representative_header_lines=None,  # type: List[str]
                   vcf_parser=vcfio.VcfParserType.PYVCF  # type: int
@@ -211,7 +211,7 @@ def read_variants(pipeline,  # type: beam.Pipeline
   """Returns a PCollection of Variants by reading VCFs."""
   compression_type = get_compression_type(all_patterns)
   if compression_type == filesystem.CompressionTypes.GZIP:
-    splittable_bgzf = get_splittable_bgzf(all_patterns)
+    splittable_bgzf = _get_splittable_bgzf(all_patterns)
     if splittable_bgzf:
       return (pipeline
               | 'ReadVariants'
