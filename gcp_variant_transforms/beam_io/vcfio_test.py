@@ -242,11 +242,13 @@ class VcfSourceTest(unittest.TestCase):
         suffix=suffix, lines=lines, compression_type=compression_type)
 
   def _read_records(self, file_or_pattern, representative_header_lines=None,
-                    vcf_parser_type=VcfParserType.PYVCF, **kwargs):
+                    vcf_parser_type=VcfParserType.PYVCF,
+                    file_path_to_file_hash=None, **kwargs):
     return source_test_utils.read_from_source(
         VcfSource(file_or_pattern,
                   representative_header_lines=representative_header_lines,
                   vcf_parser_type=vcf_parser_type,
+                  file_path_to_file_hash=file_path_to_file_hash,
                   **kwargs))
 
   def _create_temp_file_and_read_records(
@@ -386,6 +388,25 @@ class VcfSourceTest(unittest.TestCase):
       read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'))
       self.assertEqual(3, len(read_data))
       self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
+  def test_file_pattern_with_file_hash(self):
+    variant_1, vcf_line_1 = _get_sample_variant_1()
+    variant_2, vcf_line_2 = _get_sample_variant_2()
+    variant_3, vcf_line_3 = _get_sample_variant_3()
+
+    with TempDir() as tempdir:
+      file_name_1 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + [vcf_line_1], tempdir)
+      file_name_2 = self._create_temp_vcf_file(
+          _SAMPLE_HEADER_LINES + [vcf_line_2, vcf_line_3], tempdir)
+      file_path_to_file_hash = {file_name_1: 'ySMXGDdKTtQ4Y6Vbcl1kXA==',
+                                file_name_2: 'xSMXgDdKTtQ396Vbcl8kXB=='}
+      read_data = self._read_records(
+          os.path.join(tempdir.get_path(), '*.vcf'),
+          file_path_to_file_hash=file_path_to_file_hash)
+      self.assertEqual(3, len(read_data))
+      self.assertNotEqual(sorted([variant_1, variant_2, variant_3]),
+                          sorted(read_data))
 
   @unittest.skipIf(NUCLEUS_IMPORT_MISSING, 'Nucleus is not imported')
   def test_file_pattern_verify_details_nucleus(self):

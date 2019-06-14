@@ -29,8 +29,11 @@ import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystem
 from apache_beam.io import filesystems
+from apache_beam.io.gcp import gcsio
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
+
+from google.cloud import storage
 
 from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
@@ -150,6 +153,20 @@ def _get_file_names(input_file):
     if not contents:
       raise ValueError('Input file {} is empty.'.format(input_file))
     return contents
+
+
+def create_file_path_to_file_hash_map(input_patterns, project):
+  # type: (List[str], str) -> Dict[str, str]
+  matches = filesystems.FileSystems.match(input_patterns)
+  all_files = [metadata.path for match in matches
+               for metadata in match.metadata_list]
+  file_path_to_file_hash = {}
+  for input_file in all_files:
+    bucket_name, blob_name = gcsio.parse_gcs_path(input_file)
+    bucket = storage.Client(project).get_bucket(bucket_name)
+    file_blob = bucket.get_blob(blob_name)
+    file_path_to_file_hash.update({input_file: file_blob.md5_hash})
+  return file_path_to_file_hash
 
 
 def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):

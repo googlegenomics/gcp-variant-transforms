@@ -19,7 +19,7 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
-from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
+from typing import Any, Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
 import enum
 
@@ -197,7 +197,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
                allow_malformed_records=False,  # type: bool
-               vcf_parser_type=VcfParserType.PYVCF  # type: int
+               vcf_parser_type=VcfParserType.PYVCF,  # type: int
+               file_path_to_file_hash=None  # type: Dict[str, str]
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -208,6 +209,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
     self._vcf_parser_type = vcf_parser_type
+    self._file_path_to_file_hash = file_path_to_file_hash
 
   def read_records(self,
                    file_name,  # type: str
@@ -222,12 +224,16 @@ class _VcfSource(filebasedsource.FileBasedSource):
     else:
       raise ValueError(
           'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
+    file_hash = None
+    if self._file_path_to_file_hash:
+      file_hash = self._file_path_to_file_hash.get(file_name)
     record_iterator = vcf_parser_class(
         file_name,
         range_tracker,
         self._compression_type,
         self._allow_malformed_records,
         file_pattern=self._pattern,
+        file_hash=file_hash,
         representative_header_lines=self._representative_header_lines,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
@@ -243,8 +249,9 @@ class ReadFromBGZF(beam.PTransform):
   def __init__(self,
                input_files,
                representative_header_lines,
-               allow_malformed_records):
-    # type: (List[str], List[str], bool) -> None
+               allow_malformed_records,
+               file_path_to_file_hash):
+    # type: (List[str], List[str], bool, Dict[str, str]) -> None
     """Initializes the transform.
 
     Args:
@@ -253,19 +260,26 @@ class ReadFromBGZF(beam.PTransform):
         VCF files.
       allow_malformed_records: If true, malformed records from VCF files will be
         returned as `MalformedVcfRecord` instead of failing the pipeline.
+      file_path_to_file_hash: A map that maps file path to the corresponding
+        hash that uniquely identifies a file.
     """
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
+    self._file_path_to_file_hash = file_path_to_file_hash
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
+    file_hash = None
+    if self._file_path_to_file_hash:
+      file_hash = self._file_path_to_file_hash.get(file_path)
     record_iterator = vcf_parser.PyVcfParser(
         file_path,
         block,
         filesystems.CompressionTypes.GZIP,
         self._allow_malformed_records,
+        file_hash=file_hash,
         representative_header_lines=self._representative_header_lines,
         splittable_bgzf=True)
 
@@ -293,6 +307,7 @@ class ReadFromVcf(PTransform):
   def __init__(
       self,
       file_pattern=None,  # type: str
+      file_path_to_file_hash=None,  # type: Dict[str, str]
       representative_header_lines=None,  # type: List[str]
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
@@ -306,6 +321,8 @@ class ReadFromVcf(PTransform):
     Args:
       file_pattern: The file path to read from either as a single file or a
         glob pattern.
+      file_path_to_file_hash: A map that maps file path to the corresponding
+        hash that uniquely identifies a file.
       representative_header_lines: Header definitions to be used for parsing
         VCF files. If supplied, header definitions in VCF files are ignored.
       compression_type: Used to handle compressed input files. Typical value is
@@ -322,7 +339,8 @@ class ReadFromVcf(PTransform):
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=vcf_parser_type)
+        vcf_parser_type=vcf_parser_type,
+        file_path_to_file_hash=file_path_to_file_hash)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -330,11 +348,12 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None):
+    allow_malformed_records=None, file_path_to_file_hash=None):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records)
+                    allow_malformed_records=allow_malformed_records,
+                    file_path_to_file_hash=file_path_to_file_hash)
 
 
 class ReadAllFromVcf(PTransform):
@@ -357,6 +376,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
+      file_path_to_file_hash=None,  # type: Dict[str, str]
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -381,7 +401,8 @@ class ReadAllFromVcf(PTransform):
         _create_vcf_source,
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        file_path_to_file_hash=file_path_to_file_hash)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

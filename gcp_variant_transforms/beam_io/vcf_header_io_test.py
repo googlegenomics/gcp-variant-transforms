@@ -42,6 +42,7 @@ def _get_header_from_reader(vcf_reader, file_name=None):
                    alts=vcf_reader.alts,
                    formats=vcf_reader.formats,
                    contigs=vcf_reader.contigs,
+                   samples=vcf_reader.samples,
                    file_name=file_name)
 
 

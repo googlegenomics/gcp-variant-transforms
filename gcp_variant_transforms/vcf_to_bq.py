@@ -57,6 +57,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
+from gcp_variant_transforms.transforms import sample_info_to_bigquery
 from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
@@ -90,10 +91,11 @@ _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 
 
-def _read_variants(all_patterns, # type: List[str]
+def _read_variants(all_patterns,  # type: List[str]
                    pipeline, # type: beam.Pipeline
                    known_args, # type: argparse.Namespace
-                   pipeline_mode # type: int
+                   pipeline_mode,  # type: int
+                   file_map
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -110,7 +112,8 @@ def _read_variants(all_patterns, # type: List[str]
                   | 'ReadVariants'
                   >> vcfio.ReadFromBGZF(splittable_bgzf,
                                         representative_header_lines,
-                                        known_args.allow_malformed_records))
+                                        known_args.allow_malformed_records,
+                                        file_map))
       return variants
 
   if pipeline_mode == pipeline_common.PipelineModes.LARGE:
@@ -120,10 +123,13 @@ def _read_variants(all_patterns, # type: List[str]
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=(
-                        known_args.allow_malformed_records)))
+                        known_args.allow_malformed_records),
+                    file_path_to_file_hash=file_map,
+                    ))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
+        file_map,
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=known_args.allow_malformed_records,
@@ -402,6 +408,24 @@ def _run_annotation_pipeline(known_args, pipeline_args):
   return annotated_vcf_pattern
 
 
+def _create_sample_info_table(pipeline,  # type: beam.Pipeline
+                              pipeline_mode,  # type: PipelineModes
+                              known_args,  # type: argparse.Namespace
+                              file_path_to_file_hash  # type: Dict[str, str]
+                             ):
+  # type: (...) -> None
+  headers = pipeline_common.read_headers(pipeline,
+                                         pipeline_mode,
+                                         known_args.all_patterns)
+  sample_info_table = ''.join([
+      known_args.output_table,
+      variant_transform_options.BigQueryWriteOptions._SAMPLE_INFO_APPENDIX])
+  _ = (headers | 'CallInfoToBigQuery' >>
+       sample_info_to_bigquery.SampleInfoToBigQuery(sample_info_table,
+                                                    file_path_to_file_hash,
+                                                    known_args.append))
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -453,9 +477,19 @@ def run(argv=None):
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
-  variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
+  google_cloud_options = beam_pipeline_options.view_as(
+      pipeline_options.GoogleCloudOptions)
+  file_path_to_file_hash = pipeline_common.create_file_path_to_file_hash_map(
+      known_args.all_patterns, google_cloud_options.project)
+  if known_args.create_sample_info_table:
+    _create_sample_info_table(pipeline,  pipeline_mode, known_args,
+                              file_path_to_file_hash)
+
+  variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode,
+                            file_map)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
+
   if partitioner:
     num_partitions = partitioner.get_num_partitions()
     partitioned_variants = variants | 'PartitionVariants' >> beam.Partition(
@@ -501,7 +535,8 @@ def run(argv=None):
                omit_empty_sample_calls=known_args.omit_empty_sample_calls,
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
-                   known_args.null_numeric_value_replacement)))
+                   known_args.null_numeric_value_replacement),
+               add_sample_id=known_args.create_sample_info_table))
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

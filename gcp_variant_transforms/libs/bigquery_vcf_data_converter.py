@@ -27,6 +27,7 @@ from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: di
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 
 
@@ -153,6 +154,9 @@ class BigQueryRowGenerator(object):
         bigquery_util.ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
         bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE: call.genotype or []
     }
+    if call.sample_id:
+      call_record.update({
+          sample_info_table_schema_generator.SAMPLE_ID: call.sample_id})
     is_empty = (not call.genotype or
                 set(call.genotype) == set((vcfio.MISSING_GENOTYPE_VALUE,)))
     for key, data in call.info.iteritems():

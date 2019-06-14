@@ -28,8 +28,9 @@ from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
@@ -61,7 +62,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     self.assertEqual(expected_fields, _get_fields_from_schema(actual_schema))
 
   def _generate_expected_fields(self, alt_fields=None, call_fields=None,
-                                info_fields=None):
+                                info_fields=None, add_sample_id=None):
     fields = [ColumnKeyConstants.REFERENCE_NAME,
               ColumnKeyConstants.START_POSITION,
               ColumnKeyConstants.END_POSITION,
@@ -77,8 +78,11 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
                    ColumnKeyConstants.FILTER,
                    ColumnKeyConstants.CALLS,
                    '.'.join([ColumnKeyConstants.CALLS,
-                             ColumnKeyConstants.CALLS_NAME]),
-                   '.'.join([ColumnKeyConstants.CALLS,
+                             ColumnKeyConstants.CALLS_NAME])])
+    if add_sample_id:
+      fields.extend(['.'.join([ColumnKeyConstants.CALLS,
+                               sample_info_table_schema_generator.SAMPLE_ID])])
+    fields.extend(['.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_GENOTYPE]),
                    '.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_PHASESET])])
@@ -207,6 +211,31 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields),
             variant_merger=_DummyVariantMergeStrategy()))
+
+  def test_add_sample_id(self):
+    infos = OrderedDict([
+        ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+        # GT and PS should not be set as they're already included in special
+        # 'genotype' and 'phaseset' fields.
+    formats = OrderedDict([
+        ('F1', Format('F1', 1, 'String', 'desc')),
+        ('F2', Format('F2', 2, 'Integer', 'desc')),
+        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
+        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+    header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
+    self._validate_schema(
+        self._generate_expected_fields(
+            alt_fields=['IA'],
+            call_fields=['F1', 'F2', 'FU'],
+            info_fields=['I1'],
+            add_sample_id=True
+        ),
+        schema_converter.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields),
+            add_sample_id=True))
 
 
 class ConvertTableSchemaToJsonAvroSchemaTest(
