@@ -259,6 +259,18 @@ class CommonPipelineTest(unittest.TestCase):
     assert_that(variants, asserts.count_equals_to(5))
     pipeline.run()
 
+  def test_read_variants_with_sample_id(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    file_path_to_file_hash = {all_patterns[0]: 'file_hash_1'}
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.SMALL,
+                                             False,
+                                             file_path_to_file_hash)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
   def test_read_variants_large_mode(self):
     pipeline = test_pipeline.TestPipeline()
     all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
@@ -266,5 +278,17 @@ class CommonPipelineTest(unittest.TestCase):
                                              all_patterns,
                                              PipelineModes.LARGE,
                                              False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
+  def test_read_variants_large_mode_with_sample_id(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    file_path_to_file_hash = {all_patterns[0]: 'file_hash_1'}
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.LARGE,
+                                             False,
+                                             file_path_to_file_hash)
     assert_that(variants, asserts.count_equals_to(5))
     pipeline.run()

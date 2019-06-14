@@ -27,6 +27,7 @@ from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: di
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 
 
@@ -48,6 +49,8 @@ RESERVED_VARIANT_CALL_COLUMNS = [
     bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
     bigquery_util.ColumnKeyConstants.CALLS_PHASESET
 ]
+
+EXCLUDED_VARIANT_CALL_COLUMNS = [sample_info_table_schema_generator.SAMPLE_ID]
 
 # Constants for calculating row size. This is needed because the maximum size of
 # a BigQuery row is 100MB. See
@@ -153,6 +156,9 @@ class BigQueryRowGenerator(object):
         bigquery_util.ColumnKeyConstants.CALLS_PHASESET: call.phaseset,
         bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE: call.genotype or []
     }
+    if call.sample_id:
+      call_record.update({
+          sample_info_table_schema_generator.SAMPLE_ID: call.sample_id})
     is_empty = (not call.genotype or
                 set(call.genotype) == set((vcfio.MISSING_GENOTYPE_VALUE,)))
     for key, data in call.info.iteritems():
@@ -343,6 +349,8 @@ class VariantGenerator(object):
     for call_record in variant_call_records:
       info = {}
       for key, value in call_record.iteritems():
+        if key in EXCLUDED_VARIANT_CALL_COLUMNS:
+          continue
         if (key not in RESERVED_VARIANT_CALL_COLUMNS and
             not self._is_null_or_empty(value)):
           info.update({key: value})

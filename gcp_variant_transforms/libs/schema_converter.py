@@ -28,9 +28,10 @@ from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import bigquery_sanitizer
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_reserved_fields
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -63,6 +64,7 @@ _CONSTANT_ALTERNATE_BASES_FIELDS = [
 def generate_schema_from_header_fields(
     header_fields,  # type: vcf_header_io.VcfHeader
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
+    add_sample_id=False,  # type: bool
     variant_merger=None  # type: variant_merge_strategy.VariantMergeStrategy
     ):
   # type: (...) -> bigquery.TableSchema
@@ -74,6 +76,7 @@ def generate_schema_from_header_fields(
       instances to ProcessedVariant. As a side effect it also knows how to
       modify BigQuery schema based on the ProcessedVariants that it generates.
       The latter functionality is what is needed here.
+    add_sample_id: Add a sub field in call record for sample id if True.
     variant_merger: The strategy used for merging variants (if any). Some
       strategies may change the schema, which is why this may be needed here.
   """
@@ -132,6 +135,9 @@ def generate_schema_from_header_fields(
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Name of the call.'))
+  if add_sample_id:
+    calls_record.fields.append(
+        sample_info_table_schema_generator.create_sample_id_field())
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,

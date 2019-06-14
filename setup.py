@@ -33,7 +33,8 @@ REQUIRED_PACKAGES = [
     # google-cloud-pubsub 0.39.1, which relies on google-cloud-core<0.30dev,
     # >=0.29.1. google-cloud-storage also has requirements on google-cloud-core,
     # and version 1.14.0 resolves the dependency conflicts.
-    'google-cloud-storage<=1.14.0'
+    'google-cloud-storage<=1.14.0',
+    'cityhash'
 ]
 
 REQUIRED_SETUP_PACKAGES = [

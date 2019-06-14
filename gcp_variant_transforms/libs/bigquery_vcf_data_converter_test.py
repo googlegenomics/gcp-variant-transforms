@@ -29,6 +29,7 @@ from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
@@ -157,10 +158,14 @@ def _get_big_query_row():
           unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
           unicode(ColumnKeyConstants.CALLS): [
               {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
+               unicode(sample_info_table_schema_generator.SAMPLE_ID):
+                   -6504288776684423615,
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
                unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
                unicode('GQ'): 20, unicode('FIR'): [10, 20]},
               {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
+               unicode(sample_info_table_schema_generator.SAMPLE_ID):
+                   6504288776684423615,
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
                unicode(ColumnKeyConstants.CALLS_PHASESET): None,
                unicode('GQ'): 10, unicode('FB'): True}
@@ -806,6 +811,9 @@ class ConverterCombinationTest(unittest.TestCase):
     variant = self._variant_generator.convert_bq_row_to_variant(row)
     proc_variant = _get_processed_variant(variant, header_num_dict)
     converted_row = list(self._row_generator.get_rows(proc_variant))
+    calls = row.get(ColumnKeyConstants.CALLS)
+    for call in calls:
+      del call[sample_info_table_schema_generator.SAMPLE_ID]
     self.assertEqual([row], converted_row)
 
   def test_variant_to_bq_row_to_variant(self):

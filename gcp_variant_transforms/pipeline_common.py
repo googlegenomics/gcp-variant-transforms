@@ -18,7 +18,7 @@ It includes parsing the command line arguments, reading the input, applying the
 PTransforms and writing the output.
 """
 
-from typing import List  # pylint: disable=unused-import
+from typing import Dict, List  # pylint: disable=unused-import
 import argparse
 import enum
 import os
@@ -29,8 +29,11 @@ import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
 from apache_beam.io import filesystem
 from apache_beam.io import filesystems
+from apache_beam.io.gcp import gcsio
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
+
+from google.cloud import storage
 
 from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
@@ -154,6 +157,20 @@ def _get_file_names(input_file):
     return contents
 
 
+def create_file_path_to_file_hash_map(input_patterns, project):
+  # type: (List[str], str) -> Dict[str, str]
+  matches = filesystems.FileSystems.match(input_patterns)
+  all_files = [metadata.path for match in matches
+               for metadata in match.metadata_list]
+  file_path_to_file_hash = {}
+  for input_file in all_files:
+    bucket_name, blob_name = gcsio.parse_gcs_path(input_file)
+    bucket = storage.Client(project).get_bucket(bucket_name)
+    file_blob = bucket.get_blob(blob_name)
+    file_path_to_file_hash.update({input_file: file_blob.md5_hash})
+  return file_path_to_file_hash
+
+
 def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
   # type: (List[str], bool) -> int
   """Returns the mode the pipeline should operate in based on input size."""
@@ -206,6 +223,7 @@ def read_variants(
     all_patterns,  # type: List[str]
     pipeline_mode,  # type: PipelineModes
     allow_malformed_records,  # type: bool
+    file_path_to_file_hash=None,  # type: Dict[str, str]
     representative_header_lines=None,  # type: List[str]
     vcf_parser=vcfio.VcfParserType.PYVCF  # type: vcfio.VcfParserType
     ):
@@ -219,7 +237,8 @@ def read_variants(
               | 'ReadVariants'
               >> vcfio.ReadFromBGZF(splittable_bgzf,
                                     representative_header_lines,
-                                    allow_malformed_records))
+                                    allow_malformed_records,
+                                    file_path_to_file_hash))
 
   if pipeline_mode == PipelineModes.LARGE:
     variants = (pipeline
@@ -227,10 +246,12 @@ def read_variants(
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records))
+                    allow_malformed_records=allow_malformed_records,
+                    file_path_to_file_hash=file_path_to_file_hash))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
+        file_path_to_file_hash,
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,

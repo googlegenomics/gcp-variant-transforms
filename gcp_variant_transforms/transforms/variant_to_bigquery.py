@@ -76,7 +76,8 @@ class VariantToBigQuery(beam.PTransform):
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1,  # type: int
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      add_sample_id=False  # type: bool
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -105,6 +106,7 @@ class VariantToBigQuery(beam.PTransform):
         numeric (float/int/long) lists. For instance, [0, None, 1] will become
         [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
+      add_sample_id: Add a sub field in call record for sample id if True.
     """
     self._output_table = output_table
     self._header_fields = header_fields
@@ -113,7 +115,8 @@ class VariantToBigQuery(beam.PTransform):
     self._append = append
     self._schema = (
         schema_converter.generate_schema_from_header_fields(
-            self._header_fields, self._proc_var_factory, self._variant_merger))
+            self._header_fields, self._proc_var_factory, add_sample_id,
+            self._variant_merger))
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
     self._bigquery_row_generator = (
