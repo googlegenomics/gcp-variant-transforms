@@ -36,6 +36,7 @@ from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.transforms import fusion_break
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
@@ -200,13 +201,14 @@ def read_headers(pipeline, pipeline_mode, all_patterns):
   return headers
 
 
-def read_variants(pipeline,  # type: beam.Pipeline
-                  all_patterns,  # type: List[str]
-                  pipeline_mode,  # type: PipelineModes
-                  allow_malformed_records,  # type: bool
-                  representative_header_lines=None,  # type: List[str]
-                  vcf_parser=vcfio.VcfParserType.PYVCF  # type: int
-                 ):
+def read_variants(
+    pipeline,  # type: beam.Pipeline
+    all_patterns,  # type: List[str]
+    pipeline_mode,  # type: PipelineModes
+    allow_malformed_records,  # type: bool
+    representative_header_lines=None,  # type: List[str]
+    vcf_parser=vcfio.VcfParserType.PYVCF  # type: vcfio.VcfParserType
+    ):
   # type: (...) -> pvalue.PCollection
   """Returns a PCollection of Variants by reading VCFs."""
   compression_type = get_compression_type(all_patterns)
@@ -235,7 +237,7 @@ def read_variants(pipeline,  # type: beam.Pipeline
         vcf_parser_type=vcf_parser)
 
   if compression_type == filesystem.CompressionTypes.GZIP:
-    variants |= 'FusionBreak' >> FusionBreak()
+    variants |= 'FusionBreak' >> fusion_break.FusionBreak()
   return variants
 
 
@@ -314,15 +316,3 @@ def generate_unique_name(job_name):
   return '-'.join([job_name,
                    datetime.now().strftime('%Y%m%d-%H%M%S'),
                    str(uuid.uuid4())])
-
-
-class FusionBreak(beam.PTransform):
-  """PTransform that returns a PCollection equivalent to its input.
-
-  It prevents fusion of the surrounding transforms. Read more:
-  https://cloud.google.com/dataflow/docs/guides/deploying-a-pipeline#fusion-optimization
-  """
-  def expand(self, pcoll):
-    # Create an empty PCollection that depends on pcoll.
-    empty = pcoll | beam.FlatMap(lambda x: ())
-    return pcoll | beam.Map(lambda x, unused: x, beam.pvalue.AsIter(empty))
