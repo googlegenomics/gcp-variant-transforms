@@ -35,6 +35,8 @@ from apache_beam.runners.direct import direct_runner
 from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.transforms import fusion_break
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
@@ -122,7 +124,7 @@ def get_compression_type(input_patterns):
     return filesystem.CompressionTypes.AUTO
 
 
-def get_splittable_bgzf(all_patterns):
+def _get_splittable_bgzf(all_patterns):
   # type: (List[str]) -> List[str]
   """Returns the splittable bgzf matching `all_patterns`."""
   matches = filesystems.FileSystems.match(all_patterns)
@@ -197,6 +199,46 @@ def read_headers(pipeline, pipeline_mode, all_patterns):
         all_patterns[0], compression_type=compression_type)
 
   return headers
+
+
+def read_variants(
+    pipeline,  # type: beam.Pipeline
+    all_patterns,  # type: List[str]
+    pipeline_mode,  # type: PipelineModes
+    allow_malformed_records,  # type: bool
+    representative_header_lines=None,  # type: List[str]
+    vcf_parser=vcfio.VcfParserType.PYVCF  # type: vcfio.VcfParserType
+    ):
+  # type: (...) -> pvalue.PCollection
+  """Returns a PCollection of Variants by reading VCFs."""
+  compression_type = get_compression_type(all_patterns)
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    splittable_bgzf = _get_splittable_bgzf(all_patterns)
+    if splittable_bgzf:
+      return (pipeline
+              | 'ReadVariants'
+              >> vcfio.ReadFromBGZF(splittable_bgzf,
+                                    representative_header_lines,
+                                    allow_malformed_records))
+
+  if pipeline_mode == PipelineModes.LARGE:
+    variants = (pipeline
+                | 'InputFilePattern' >> beam.Create(all_patterns)
+                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    representative_header_lines=representative_header_lines,
+                    compression_type=compression_type,
+                    allow_malformed_records=allow_malformed_records))
+  else:
+    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+        all_patterns[0],
+        representative_header_lines=representative_header_lines,
+        compression_type=compression_type,
+        allow_malformed_records=allow_malformed_records,
+        vcf_parser_type=vcf_parser)
+
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    variants |= 'FusionBreak' >> fusion_break.FusionBreak()
+  return variants
 
 
 def add_annotation_headers(pipeline, known_args, pipeline_mode,

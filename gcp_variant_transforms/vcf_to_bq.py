@@ -41,7 +41,6 @@ from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
-from apache_beam.io import filesystem
 from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
@@ -90,10 +89,10 @@ _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 
 
-def _read_variants(all_patterns, # type: List[str]
-                   pipeline, # type: beam.Pipeline
-                   known_args, # type: argparse.Namespace
-                   pipeline_mode # type: int
+def _read_variants(all_patterns,  # type: List[str]
+                   pipeline,  # type: beam.Pipeline
+                   known_args,  # type: argparse.Namespace
+                   pipeline_mode  # type: int
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -101,36 +100,13 @@ def _read_variants(all_patterns, # type: List[str]
   if known_args.representative_header_file:
     representative_header_lines = vcf_header_parser.get_metadata_header_lines(
         known_args.representative_header_file)
-  compression_type = pipeline_common.get_compression_type(all_patterns)
-  if compression_type == filesystem.CompressionTypes.GZIP:
-    splittable_bgzf = pipeline_common.get_splittable_bgzf(
-        all_patterns)
-    if splittable_bgzf:
-      variants = (pipeline
-                  | 'ReadVariants'
-                  >> vcfio.ReadFromBGZF(splittable_bgzf,
-                                        representative_header_lines,
-                                        known_args.allow_malformed_records))
-      return variants
-
-  if pipeline_mode == pipeline_common.PipelineModes.LARGE:
-    variants = (pipeline
-                | 'InputFilePattern' >> beam.Create(all_patterns)
-                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
-                    representative_header_lines=representative_header_lines,
-                    compression_type=compression_type,
-                    allow_malformed_records=(
-                        known_args.allow_malformed_records)))
-  else:
-    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-        all_patterns[0],
-        representative_header_lines=representative_header_lines,
-        compression_type=compression_type,
-        allow_malformed_records=known_args.allow_malformed_records,
-        vcf_parser_type=vcfio.VcfParserType[known_args.vcf_parser])
-  if compression_type == filesystem.CompressionTypes.GZIP:
-    variants |= 'FusionBreak' >> FusionBreak()
-  return variants
+  return pipeline_common.read_variants(
+      pipeline,
+      all_patterns,
+      pipeline_mode,
+      known_args.allow_malformed_records,
+      representative_header_lines,
+      vcfio.VcfParserType[known_args.vcf_parser])
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -525,18 +501,6 @@ def run(argv=None):
   result.wait_until_finish()
 
   metrics_util.log_all_counters(result)
-
-
-class FusionBreak(beam.PTransform):
-  """PTransform that returns a PCollection equivalent to its input.
-
-  It prevents fusion of the surrounding transforms. Read more:
-  https://cloud.google.com/dataflow/docs/guides/deploying-a-pipeline#fusion-optimization
-  """
-  def expand(self, pcoll):
-    # Create an empty PCollection that depends on pcoll.
-    empty = pcoll | beam.FlatMap(lambda x: ())
-    return pcoll | beam.Map(lambda x, unused: x, beam.pvalue.AsIter(empty))
 
 
 if __name__ == '__main__':
