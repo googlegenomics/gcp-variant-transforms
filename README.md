@@ -46,7 +46,7 @@ running `gcloud components update` (more details [here](https://cloud.google.com
 
 Use the following command to get the latest version of Variant Transforms.
 ```bash
-docker pull gcr.io/gcp-variant-transforms/gcp-variant-transforms
+docker pull gcr.io/cloud-lifesciences/gcp-variant-transforms
 ```
 
 Run the script below and replace the following parameters:
@@ -81,7 +81,7 @@ COMMAND="vcf_to_bq \
   --runner DataflowRunner"
 
 docker run -v ~/.config:/root/.config \
-  gcr.io/gcp-variant-transforms/gcp-variant-transforms \
+  gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
   --zones us-west1-b \
   "${COMMAND}"
