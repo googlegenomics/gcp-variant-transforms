@@ -20,6 +20,7 @@ import logging
 import unittest
 from itertools import permutations
 
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
@@ -67,6 +68,11 @@ class VariantTest(unittest.TestCase):
     self.assertEqual(base_variant, equal_variant)
     self.assertNotEqual(base_variant, different_calls)
     self.assertNotEqual(base_variant, missing_field)
+
+  def test_call_id(self):
+    hash_code = vcf_parser.generate_int64_hash_code('gs://bucket/blob',
+                                                    'sample 1')
+    self.assertEqual(hash_code, 8612294357080414679)
 
 
 class VariantCallTest(unittest.TestCase):

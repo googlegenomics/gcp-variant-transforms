@@ -37,7 +37,7 @@ import argparse  # pylint: disable=unused-import
 import logging
 import sys
 import tempfile
-from typing import List, Optional  # pylint: disable=unused-import
+from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
@@ -56,6 +56,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
+from gcp_variant_transforms.transforms import sample_info_to_bigquery
 from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
@@ -378,6 +379,24 @@ def _run_annotation_pipeline(known_args, pipeline_args):
   return annotated_vcf_pattern
 
 
+def _create_sample_info_table(pipeline,  # type: beam.Pipeline
+                              pipeline_mode,  # type: PipelineModes
+                              known_args,  # type: argparse.Namespace
+                              file_path_to_file_hash  # type: Dict[str, str]
+                             ):
+  # type: (...) -> None
+  headers = pipeline_common.read_headers(pipeline,
+                                         pipeline_mode,
+                                         known_args.all_patterns)
+  sample_info_table = ''.join([
+      known_args.output_table,
+      variant_transform_options.BigQueryWriteOptions._SAMPLE_INFO_APPENDIX])
+  _ = (headers | 'CallInfoToBigQuery' >>
+       sample_info_to_bigquery.SampleInfoToBigQuery(sample_info_table,
+                                                    file_path_to_file_hash,
+                                                    known_args.append))
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -429,6 +448,14 @@ def run(argv=None):
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
+  google_cloud_options = beam_pipeline_options.view_as(
+      pipeline_options.GoogleCloudOptions)
+  file_path_to_file_hash = pipeline_common.create_file_path_to_file_hash_map(
+      known_args.all_patterns, google_cloud_options.project)
+  if known_args.create_sample_info_table:
+    _create_sample_info_table(pipeline, pipeline_mode, known_args,
+                              file_path_to_file_hash)
+
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
