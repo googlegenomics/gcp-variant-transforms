@@ -20,25 +20,21 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 from __future__ import absolute_import
 
 from collections import namedtuple
-
+import logging
+import os
 import sys
 import tempfile
 
-import logging
-import os
-from pysam import libcbcf
-
+from apache_beam.coders import coders
+from apache_beam.io import filesystems
+from apache_beam.io import textio
 try:
   from nucleus.io.python import vcf_reader as nucleus_vcf_reader
   from nucleus.protos import variants_pb2
 except ImportError:
   logging.warning('Nucleus is not installed. Cannot use the Nucleus parser.')
-
+from pysam import libcbcf
 import vcf
-
-from apache_beam.coders import coders
-from apache_beam.io import filesystems
-from apache_beam.io import textio
 
 from gcp_variant_transforms.beam_io import bgzf
 
@@ -596,18 +592,12 @@ class PySamParser(VcfParser):
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
-  def _convert_to_variant(
-      self,
-      record,  # type: libcbcf.VariantRecord
-      ):
-    # type: (...) -> Variant
+  def _convert_to_variant(self, record):
+    # type: (libcbcf.VariantRecord) -> Variant
     """Converts the PySAM record to a :class:`Variant` object.
 
     Args:
       record: An object containing info about a variant.
-      formats: The PyVCF dict storing FORMAT extracted from the VCF header.
-        The key is the FORMAT key and the value is
-        :class:`~vcf.parser._Format`.
     Returns:
       A :class:`Variant` object from the given record.
     Raises:
@@ -621,7 +611,7 @@ class PySamParser(VcfParser):
         reference_bases=record.ref,
         alternate_bases=list(record.alts) if record.alts else [],
         names=record.id.split(';') if record.id else [],
-        quality=float(record.qual),
+        quality=float(record.qual) if record.qual else None,
         filters=['PASS'] if not record.filter.keys() else record.filter.keys(),
         info=self._get_variant_info(record),
         calls=self._get_variant_calls(record.samples))
@@ -639,9 +629,8 @@ class PySamParser(VcfParser):
 
     return info
 
-  def _get_variant_calls(self,
-                         samples  # type: libcvcf.VariantRecordSamples
-                        ):
+  def _get_variant_calls(self, samples):
+    # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
     calls = []
 
     for (name, sample) in samples.iteritems():

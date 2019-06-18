@@ -5,7 +5,7 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.1-large.vcf",
     "runner": "DirectRunner",
     "zones": ["us-west1-b"],
-    "vcf_parser": "PYVCF",
+    "vcf_parser": "PYSAM",
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],
