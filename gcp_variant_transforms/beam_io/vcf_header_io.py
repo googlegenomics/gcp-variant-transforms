@@ -18,7 +18,7 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, Iterable  # pylint: disable=unused-import
+from typing import Dict, Iterable, List  # pylint: disable=unused-import
 import vcf
 
 import apache_beam as beam
@@ -62,6 +62,7 @@ class VcfHeader(object):
                alts=None,  # type: OrderedDict[str, vcf.parser._Alt]
                formats=None,  # type: OrderedDict[str, vcf.parser._Format]
                contigs=None,  # type: OrderedDict[str, vcf.parser._Contig]
+               samples=None,  # type: List[str]
                file_path=None  # type: str
               ):
     # type: (...) -> None
@@ -77,6 +78,7 @@ class VcfHeader(object):
       alts: A dictionary mapping alt keys to vcf alt metadata values.
       formats: A dictionary mapping format keys to vcf format metadata values.
       contigs: A dictionary mapping contig keys to vcf contig metadata values.
+      samples: A list of sample names.
       file_path: The full file path of the vcf file.
     """
     # type: OrderedDict[str, OrderedDict]
@@ -85,6 +87,7 @@ class VcfHeader(object):
     self.alts = self._values_asdict(alts or {})
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
+    self.samples = samples
     self.file_path = file_path
 
   def __eq__(self, other):
@@ -145,6 +148,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                     alts=vcf_reader.alts,
                     formats=vcf_reader.formats,
                     contigs=vcf_reader.contigs,
+                    samples=vcf_reader.samples,
                     file_path=file_path)
 
   def _read_headers(self, file_path):

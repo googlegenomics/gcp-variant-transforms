@@ -93,7 +93,8 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
   def test_valid_table_path(self):
     args = self._make_args(['--append',
-                            '--output_table', 'project:dataset.table'])
+                            '--output_table', 'project:dataset.table',
+                            '--schema_version', '1'])
     client = mock.Mock()
     client.datasets.Get.return_value = bigquery.Dataset(
         datasetReference=bigquery.DatasetReference(

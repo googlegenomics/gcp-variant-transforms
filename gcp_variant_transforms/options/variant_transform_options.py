@@ -22,6 +22,7 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import call_info_table_schema_generator
 
 
 class VariantTransformsOptions(object):
@@ -145,6 +146,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                         default='',
                         help='BigQuery table to store the results.')
     parser.add_argument(
+        '--schema_version',
+        type=int, default=0,
+        help=('If set to 1, a new schema will be applied when running VCF to '
+              'BQ. For now, a call info table with the name output_table + {} '
+              'will be created. [EXPERIMENTAL]').format(
+                  call_info_table_schema_generator.TABLE_SUFFIX))
+
+    parser.add_argument(
         '--split_alternate_allele_info_fields',
         type='bool', default=True, nargs='?', const=True,
         help=('If true, all INFO fields with Number=A (i.e. one value for each '
@@ -207,10 +216,17 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       if parsed_args.update_schema_on_append:
         raise ValueError('--update_schema_on_append requires --append to be '
                          'true.')
-      bigquery_util.raise_error_if_table_exists(client,
-                                                project_id,
-                                                dataset_id,
-                                                table_id)
+      if parsed_args.schema_version == 1:
+        bigquery_util.raise_error_if_table_exists(
+            client,
+            project_id,
+            dataset_id,
+            table_id + call_info_table_schema_generator.TABLE_SUFFIX)
+      else:
+        bigquery_util.raise_error_if_table_exists(client,
+                                                  project_id,
+                                                  dataset_id,
+                                                  table_id)
 
 
 class AnnotationOptions(VariantTransformsOptions):
