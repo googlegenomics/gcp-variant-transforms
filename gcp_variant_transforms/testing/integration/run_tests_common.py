@@ -28,7 +28,7 @@ from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 
-_DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
+_DEFAULT_IMAGE_NAME = 'gcr.io/cloud-lifesciences/gcp-variant-transforms'
 _DEFAULT_ZONES = ['us-east1-b']
 
 # `TestCaseState` saves current running test and the remaining tests in the same
