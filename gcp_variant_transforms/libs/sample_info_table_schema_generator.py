@@ -26,11 +26,7 @@ def generate_schema():
   # type: () -> bigquery.TableSchema
   schema = bigquery.TableSchema()
   schema.fields.append(create_sample_id_field())
-  schema.fields.append(bigquery.TableFieldSchema(
-      name=FILE_PATH,
-      type=bigquery_util.TableFieldConstants.TYPE_STRING,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('File path of the sample.')))
+  schema.fields.append(_create_file_path_field())
   return schema
 
 
@@ -40,3 +36,11 @@ def create_sample_id_field():
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='An Integer that uniquely identifies a sample.')
+
+
+def _create_file_path_field():
+  return bigquery.TableFieldSchema(
+      name=FILE_PATH,
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description=('File path of the sample.'))

@@ -223,10 +223,11 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                                                 table_id)
 
       if parsed_args.create_sample_info_table:
-        bigquery_util.raise_error_if_table_exists(client, project_id,
-                                                  dataset_id,
-                                                  table_id +
-                                                  self._SAMPLE_INFO_APPENDIX)
+        bigquery_util.raise_error_if_table_exists(
+            client,
+            project_id,
+            dataset_id,
+            table_id + self._SAMPLE_INFO_APPENDIX)
 
 
 class AnnotationOptions(VariantTransformsOptions):

@@ -32,7 +32,6 @@ from apache_beam.io import filesystems
 from apache_beam.io.gcp import gcsio
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
-
 from google.cloud import storage
 
 from gcp_variant_transforms.beam_io import bgzf_io
