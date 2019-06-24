@@ -14,7 +14,6 @@ Default settings:
   --worker_machine_type <default n1-standard-1> \
   --disk_size_gb <default 250> \
   --worker_disk_type <default PD> \
-  --num_bigquery_write_shards <default 1> \
   --partition_config_path <default None> \
 ```
 
@@ -98,8 +97,7 @@ transforms (e.g. the sample name is repeated in every record in the BigQuery
 output rather than just being specified once as in the VCF header), you
 typically need 3 to 4 times the total size of the raw VCF files.
 
-In addition, if [merging](variant_merging.md) or
-[--num_bigquery_write_shards](#--num_bigquery_write_shards) is enabled, you may
+In addition, if [merging](variant_merging.md) is enabled, you may
 need more disk per worker (e.g. 500GB) as the same variants need to be
 aggregated together on one machine.
 
@@ -110,31 +108,13 @@ more expensive. However, when choosing a large machine (e.g. `n1-standard-16`),
 they can reduce cost as they can avoid idle CPU cycles due to disk IOPS
 limitations.
 
-As a result, we recommend using SSDs if [merging](variant_merge.md) or
-[--num_bigquery_write_shards](#--num_bigquery_write_shards) is enabled: these
-operations require "shuffling" the data (i.e. redistributing the data among
-workers), which require significant disk I/O.
+As a result, we recommend using SSDs if [merging](variant_merge.md) is enabled:
+this operation requires "shuffling" the data (i.e. redistributing the data
+among workers), which requires significant disk I/O.
 
 Set
 `--worker_disk_type compute.googleapis.com/projects//zones//diskTypes/pd-ssd`
 to use SSDs.
-
-### `--num_bigquery_write_shards`
-
-Currently, the write operation to BigQuery in Dataflow is performed as a
-postprocessing step after the main transforms are done. As a workaround for
-BigQuery write limitations (more details
-[here](https://github.com/googlegenomics/gcp-variant-transforms/issues/199)),
-we have added "sharding" when writing to BigQuery. This makes the data load
-to BigQuery significantly faster as it parallelizes the process and enables
-loading large (>5TB) data to BigQuery at once.
-
-As a result, we recommend setting `--num_bigquery_write_shards 20` when loading
-any data that has more than 1 billion rows (after merging) or 1TB of final
-output. You may use a smaller number of write shards (e.g. 5) when using
-[sharded output](#--sharding_config_path) as each partition also acts as a
-"shard". Note that using a larger value (e.g. 50) can cause BigQuery write to
-fail as there is a maximum limit on the number of concurrent writes per table.
 
 ### `--sharding_config_path`
 
@@ -146,4 +126,3 @@ partition).
 As a result, we recommend setting the partition config for very large data
 where possible. Please see the [documentation](sharding.md) for more
 details.
-

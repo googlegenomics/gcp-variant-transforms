@@ -389,7 +389,8 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 
 def _create_sample_info_table(pipeline,  # type: beam.Pipeline
                               pipeline_mode,  # type: PipelineModes
-                              known_args,  # type: argparse.Namespace
+                              known_args,  # type: argparse.Namespace,
+                              pipeline_args,  # type: List[str]
                              ):
   # type: (...) -> None
   headers = pipeline_common.read_headers(
@@ -409,7 +410,6 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
-
   if known_args.auto_flags_experiment:
     _get_input_dimensions(known_args, pipeline_args)
 
@@ -494,11 +494,11 @@ def run(argv=None):
                update_schema_on_append=known_args.update_schema_on_append,
                allow_incompatible_records=known_args.allow_incompatible_records,
                omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-               num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
                    known_args.null_numeric_value_replacement)))
       if known_args.generate_sample_info_table:
-        _create_sample_info_table(pipeline, pipeline_mode, known_args)
+        _create_sample_info_table(
+            pipeline, pipeline_mode, known_args, pipeline_args)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

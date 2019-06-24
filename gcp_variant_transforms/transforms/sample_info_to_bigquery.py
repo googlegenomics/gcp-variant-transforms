@@ -69,6 +69,7 @@ class SampleInfoToBigQuery(beam.PTransform):
     self._append = append
     self._sample_name_encoding = sample_name_encoding
     self._schema = sample_info_table_schema_generator.generate_schema()
+    self._temp_location = temp_location
 
   def expand(self, pcoll):
     return (pcoll
@@ -82,4 +83,6 @@ class SampleInfoToBigQuery(beam.PTransform):
                 write_disposition=(
                     beam.io.BigQueryDisposition.WRITE_APPEND
                     if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE),
+                method=beam.io.WriteToBigQuery.Method.FILE_LOADS,
+                custom_gcs_temp_location=self._temp_location))

@@ -77,6 +77,9 @@ def parse_args(argv, command_line_options):
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
+
+  # Enable new BQ sink experiment.
+  pipeline_args += ['--experiment', 'use_beam_bq_sink']
   return known_args, pipeline_args
 
 

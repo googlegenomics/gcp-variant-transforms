@@ -38,8 +38,7 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
     'mmh3<2.6',
-    # Refer to issue #528
-    'google-cloud-storage<1.23.0',
+    'google-cloud-storage',
     'pyfarmhash',
     'pyyaml'
 ]
