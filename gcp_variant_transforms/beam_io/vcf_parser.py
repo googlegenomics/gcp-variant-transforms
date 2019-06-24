@@ -425,8 +425,10 @@ class PyVcfParser(VcfParser):
       formats: The PyVCF dict storing FORMAT extracted from the VCF header.
         The key is the FORMAT key and the value is
         :class:`~vcf.parser._Format`.
+
     Returns:
       A :class:`Variant` object from the given record.
+
     Raises:
       ValueError: if ``record`` is semantically invalid.
     """
@@ -536,12 +538,36 @@ class PySamParser(VcfParser):
                                       allow_malformed_records,
                                       representative_header_lines,
                                       **kwargs)
-    self._header_lines = []
-    self._next_line_to_process = None
-    self._current_line = None
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
     self._to_child = None
+
+  def _init_child_thread(self, p_read, c_write, c_read, p_write, header_lines):
+    # Child thread's task is to populate data into the pipe that feeds
+    # VariantFile class - first by populating all of the header lines, and then
+    # by redirecting the data received from the second pipe.
+
+    os.close(p_read)
+    os.close(p_write)
+    from_parent = os.fdopen(c_read)
+    to_pysam = os.fdopen(c_write, 'w')
+    # Feed the data with a break line, since we read data line by line - if
+    # we would use the conventional ``read()`` method, both pipes would lock,
+    # while waiting for an EOF signal.
+    for header in header_lines:
+      to_pysam.write(header.strip() + '\n')
+    to_pysam.flush()
+
+    while 1:
+      text_line = from_parent.readline()
+      if not text_line:
+        break
+      to_pysam.write(text_line)
+      to_pysam.flush()
+
+    from_parent.close()
+    to_pysam.close()
+    sys.exit(0)
 
   def _init_with_header(self, header_lines):
     # The first header line must be similar to '##fileformat=VCFv.*'.
@@ -549,38 +575,24 @@ class PySamParser(VcfParser):
         FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
       header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
 
+    # First pipe is repsonsible for supplying data from child thread into the
+    # VariantFile, since it only takes an actual file descriptor as its input.
     p_read, c_write = os.pipe()
+    # Since vcf_parser is setup to parse 1 line at a time, second pipe is used
+    # to send 1 record at a time to the child thread, to pass it downstream back
+    # to parent thread via the first pipe/VariantFile class.
     c_read, p_write = os.pipe()
 
     processid = os.fork()
     if processid:
+      # Parent Thread
       os.close(c_read)
       os.close(c_write)
       into_pysam = os.fdopen(p_read)
       self._to_child = os.fdopen(p_write, 'w')
       self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
     else:
-      os.close(p_read)
-      os.close(p_write)
-      from_parent = os.fdopen(c_read)
-      to_pysam = os.fdopen(c_write, 'w')
-      # Feed the data with a break line, since we read data line by line - if
-      # we would use the conventional ``read()`` method, both pipes would lock,
-      # while waiting for an EOF signal.
-      for header in header_lines:
-        to_pysam.write(header.strip() + '\n')
-      to_pysam.flush()
-
-      while 1:
-        text_line = from_parent.readline()
-        if not text_line:
-          break
-        to_pysam.write(text_line)
-        to_pysam.flush()
-
-      from_parent.close()
-      to_pysam.close()
-      sys.exit(0)
+      self._init_child_thread(p_read, c_write, c_read, p_write, header_lines)
 
   def _get_variant(self, data_line):
     try:
@@ -598,10 +610,12 @@ class PySamParser(VcfParser):
 
     Args:
       record: An object containing info about a variant.
+
     Returns:
       A :class:`Variant` object from the given record.
+
     Raises:
-      ValueError: if ``record`` is semantically invalid.
+      ValueError: if `record` is semantically invalid.
     """
 
     return Variant(
@@ -616,9 +630,8 @@ class PySamParser(VcfParser):
         info=self._get_variant_info(record),
         calls=self._get_variant_calls(record.samples))
 
-  def _get_variant_info(self,
-                        record  # type: libcbcf.VariantRecord
-                       ):
+  def _get_variant_info(self, record):
+    # type: (libcbcf.VariantRecord) -> Dict[str, Any]
     info = {}
     for k, v in record.info.iteritems():
       if k != END_INFO_KEY:
@@ -634,10 +647,7 @@ class PySamParser(VcfParser):
     calls = []
 
     for (name, sample) in samples.iteritems():
-      if sample.phased:
-        phaseset = DEFAULT_PHASESET_VALUE
-      else:
-        phaseset = None
+      phaseset = DEFAULT_PHASESET_VALUE if sample.phased else None
       genotype = None
       info = {}
       for (key, value) in sample.iteritems():
