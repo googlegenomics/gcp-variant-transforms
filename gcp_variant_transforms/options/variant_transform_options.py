@@ -299,20 +299,20 @@ class AnnotationOptions(VariantTransformsOptions):
               'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/gcp-variant-annotation/vep_91',
+        default='gcr.io/cloud-lifesciences/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
         default='',
         help=('The path for VEP cache on Google Cloud Storage. By default, '
-              'this will be set to gs://gcp-variant-annotation-vep-cache/'
+              'this will be set to gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh38_91.tar.gz, assuming neither the '
               '`--vep_species` nor the `--vep_assembly` flags have been set. '
               'For convenience, if either of those flags are provided, this '
               'path will be automatically updated to reflect the new cache, '
               'given values are a species and/or assembly we maintain. For '
               'example, `--vep_assembly GRCh37` is satisfactory for specifying '
-              'our gs://gcp-variant-annotation-vep-cache/'
+              'our gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh37_91.tar.gz cache.'))
     parser.add_argument(
         '--vep_info_field',
