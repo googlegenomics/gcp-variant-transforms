@@ -108,14 +108,14 @@ class VepRunnerTest(unittest.TestCase):
         _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
         None, 30)
     self.assertEqual(test_instance._vep_cache_path,
-                     ('gs://gcp-variant-annotation-vep-cache/'
+                     ('gs://cloud-lifesciences/vep/'
                       'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
     test_instance = vep_runner.VepRunner(
         self._mock_service, 'mouse', 'mm9', _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
         None, 30)
     self.assertEqual(test_instance._vep_cache_path,
-                     ('gs://gcp-variant-annotation-vep-cache/'
+                     ('gs://cloud-lifesciences/vep/'
                       'vep_cache_mouse_mm9_91.tar.gz'))
 
   def test_get_output_pattern(self):
