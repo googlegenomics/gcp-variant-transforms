@@ -652,7 +652,13 @@ class PySamParser(VcfParser):
       info = {}
       for (key, value) in sample.iteritems():
         if key == GENOTYPE_FORMAT_KEY:
-          genotype = list(value) if isinstance(value, tuple) else value
+          if isinstance(value, tuple):
+            genotype = []
+            for elem in value:
+              genotype.append(elem if elem else MISSING_GENOTYPE_VALUE)
+          else:
+            genotype = value if value else MISSING_GENOTYPE_VALUE
+
         elif key == PHASESET_FORMAT_KEY:
           phaseset = list(value) if isinstance(value, tuple) else value
         else:
