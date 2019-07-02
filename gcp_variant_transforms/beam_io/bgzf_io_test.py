@@ -22,6 +22,9 @@ class BgzfIOTest(unittest.TestCase):
 
   def test_read_tbi(self):
     blocks = bgzf_io.split_bgzf(testdata_util.get_full_file_path(
+        'empty.vcf.gz'))
+    self.assertEqual(len(list(blocks)), 0)
+    blocks = bgzf_io.split_bgzf(testdata_util.get_full_file_path(
         'Y.vcf.bgz'))
     self.assertEqual(len(list(blocks)), 19)
 
