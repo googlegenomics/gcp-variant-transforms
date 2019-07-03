@@ -128,6 +128,8 @@ def _remove_invalid_blocks(blocks):
 
 
 def _merge_blocks(blocks, size_limit=_MAX_BLOCK_SIZE):
+  if not blocks:
+    return blocks
   blocks = sorted(blocks, key=lambda t: t.start)
   current_start = blocks[0].start
   current_end = blocks[0].end
