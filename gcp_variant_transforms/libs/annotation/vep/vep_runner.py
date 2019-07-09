@@ -195,7 +195,7 @@ class VepRunner(object):
                 # VEP database for a wrong reference sequence is being used
                 # and this has to caught and communicated to the user.
                 'OTHER_VEP_OPTS':
-                    '--everything --check_ref --allow_non_variant',
+                    '--everything --check_ref --allow_non_variant --format vcf',
             },
             'resources': {
                 'projectId': self._project,
