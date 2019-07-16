@@ -66,7 +66,9 @@ class BgzfBlockTest(unittest.TestCase):
     mime_type = filesystem.CompressionTypes.mime_type(compression_type)
     raw_file = self.gcs.open(file_name, mime_type=mime_type,
                              read_buffer_size=read_buffer_size)
-    return bgzf.BGZFBlock(raw_file, block)
+    bgzf_block = bgzf.BGZFBlock(raw_file, block)
+    bgzf_block._read_size = 8*1024*1024
+    return bgzf_block
 
   def _read_all_lines(self, file_to_read):
     lines = []
