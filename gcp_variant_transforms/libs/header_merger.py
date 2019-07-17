@@ -55,7 +55,7 @@ class HeaderMerger(object):
     self._merge_header_fields(first.formats, second.formats)
     self._merge_header_fields(first.contigs, second.contigs)
 
-  def _merge_header_fields(
+  def _dummy_fields(
       self,
       first,  # type: Dict[str, OrderedDict[str, Union[str, int]]]
       second  # type: Dict[str, OrderedDict[str, Union[str, int]]]
@@ -93,3 +93,20 @@ class HeaderMerger(object):
                                first_value, second_value, str(e)))
 
       first[second_key] = merged_value
+
+  def _merge_header_fields(
+      self,
+      first,  # type: Dict[str, OrderedDict[str, Union[str, int]]]
+      second  # type: Dict[str, OrderedDict[str, Union[str, int]]]
+      ):
+    # type: (...) -> None
+    """Modifies `first` to add any keys from `second` not in `first`.
+
+    Args:
+      first: first header fields.
+      second: second header fields.
+    Raises:
+      ValueError: If the header fields are incompatible (e.g. same key with
+        different types or numbers).
+    """
+    self._dummy_fields(first, second)
