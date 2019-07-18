@@ -18,8 +18,8 @@ from __future__ import absolute_import
 
 import unittest
 
+import apache_beam as beam
 from apache_beam.io.gcp.internal.clients import bigquery
-from apache_beam import ParDo
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
@@ -243,7 +243,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
-        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
@@ -257,7 +257,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator, omit_empty_sample_calls=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
@@ -272,7 +272,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertVariantToRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator, allow_incompatible_records=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()

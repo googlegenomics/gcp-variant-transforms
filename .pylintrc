@@ -121,6 +121,13 @@ disable =
   # OK as we don't call in all PTransforms.
   super-init-not-called,
 
+[TYPECHECK]
+generated-members =
+  # The transforms (e.g. Create) in beam declared in __all__ cannot be detected
+  # by pylint.
+  beam.*,
+  apache_beam.*,
+
 [REPORTS]
 # Tells whether to display a full report or only the messages
 reports=no

@@ -28,6 +28,6 @@ class PartitionVariants(beam.PartitionFn):
     # type: (variant_partition.VariantPartition) -> None
     self._partition = partition
 
-  def partition_for(self, variant, num_partitions):
+  def partition_for(self, variant, _):
     # type: (vcfio.Variant, int) -> int
     return self._partition.get_partition(variant.reference_name, variant.start)
