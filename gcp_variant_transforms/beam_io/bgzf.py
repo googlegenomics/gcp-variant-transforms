@@ -52,6 +52,11 @@ class BGZF(filesystem.CompressedFile):
   This class repeatedly fetches the `unused_data` from the decompressor until
   all GZIP blocks are decompressed.
   """
+  def __init__(self,
+               fileobj,
+               compression_type=filesystem.CompressionTypes.GZIP):
+    super(BGZF, self).__init__(fileobj, compression_type)
+    self._first_fetch = True
 
   def _fetch_to_internal_buffer(self, num_bytes):
     """Fetches up to `num_bytes` into the internal buffer."""
@@ -59,12 +64,13 @@ class BGZF(filesystem.CompressedFile):
       return
     self._reset_read_buffer_to_accommodate_more_data()
     self._fetch_and_decompress_data_to_buffer(num_bytes)
+    self._first_fetch = False
 
   def _enough_data_in_buffer(self, num_bytes):
     return self._read_buffer.tell() - self._read_position >= num_bytes
 
   def _reset_read_buffer_to_accommodate_more_data(self):
-    if not self._is_first_time():
+    if not self._first_fetch:
      # There aren't enough number of bytes to accommodate a read, so we prepare
      # for a possibly large read by clearing up all internal buffers but without
      # dropping any previous held data.
@@ -97,9 +103,6 @@ class BGZF(filesystem.CompressedFile):
 
   def _read_data_from_source(self):
     return self._file.read(self._read_size)
-
-  def _is_first_time(self):
-    return self._read_position == 0
 
 
 class BGZFBlockSource(textio._TextSource):
@@ -153,13 +156,10 @@ class BGZFBlock(BGZF):
 
   It reads contents from `self._block`.
     - The string before first `\n` is discarded.
-    - Decompress the next 64KB after self._block and reads the first line. It
-      assumes one row can at most spans in two Blocks.
+    - Retrieves the next `self._read_size` (16 MB) after self._block and reads
+      the first line. It assumes one row cannot be larger than 16 MB in
+      compressed form.
   """
-
-  # Each block in BGZF is no larger than `_MAX_GZIP_SIZE`.
-  _MAX_GZIP_SIZE = 64 * 1024
-
   def __init__(self,
                fileobj,
                block,
@@ -170,7 +170,7 @@ class BGZFBlock(BGZF):
     self._start_offset = self._block.start
 
   def _fetch_and_decompress_data_to_buffer(self, num_bytes):
-    if self._is_first_time():
+    if self._first_fetch:
       self._read_first_gzip_block_into_buffer()
     super(BGZFBlock, self)._fetch_and_decompress_data_to_buffer(num_bytes)
     if self._read_eof:
@@ -180,6 +180,17 @@ class BGZFBlock(BGZF):
     buf = self._read_data_from_source()
     decompressed = self._decompressor.decompress(buf)
     del buf
+    # Discards all data before first `\n`.
+    while '\n' not in decompressed:
+      if self._decompressor.unused_data != b'':
+        buf = self._decompressor.unused_data
+        self._decompressor = zlib.decompressobj(self._gzip_mask)
+        decompressed = self._decompressor.decompress(buf)
+        del buf
+      else:
+        raise ValueError('Read failed. The block {} does not contain any '
+                         'valid record.'.format(self._block))
+
     lines = decompressed.split('\n')
     self._read_buffer.write('\n'.join(lines[1:]))
 
@@ -192,10 +203,23 @@ class BGZFBlock(BGZF):
     return buf
 
   def _complete_last_line(self):
-    # Fetch the first line in the next `self._MAX_GZIP_SIZE` bytes.
+    # Fetches the first line in the next `self._read_size` bytes.
     buf = self._file.raw._downloader.get_range(
-        self._block.end, self._block.end + self._MAX_GZIP_SIZE)
+        self._block.end, self._block.end + self._read_size)
     self._decompressor = zlib.decompressobj(self._gzip_mask)
     decompressed = self._decompressor.decompress(buf)
     del buf
+    if not decompressed:
+      return
+    # Writes all data to the buffer until the first `\n` is reached.
+    while '\n' not in decompressed:
+      if self._decompressor.unused_data != b'':
+        self._read_buffer.write(decompressed)
+        buf = self._decompressor.unused_data
+        self._decompressor = zlib.decompressobj(self._gzip_mask)
+        decompressed = self._decompressor.decompress(buf)
+        del buf
+      else:
+        raise ValueError('Read failed. The record is longer than {} '
+                         'bytes.'.format(self._read_size))
     self._read_buffer.write(decompressed.split('\n')[0] + '\n')
