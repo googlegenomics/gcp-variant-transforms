@@ -18,7 +18,7 @@ from __future__ import absolute_import
 
 import unittest
 
-from apache_beam import Partition
+import apache_beam as beam
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
@@ -91,7 +91,7 @@ class PartitionVariantsTest(unittest.TestCase):
     partitions = (
         pipeline
         | Create(variants)
-        | 'PartitionVariants' >> Partition(
+        | 'PartitionVariants' >> beam.Partition(
             partition_variants.PartitionVariants(partitioner),
             partitioner.get_num_partitions()))
     for i in xrange(partitioner.get_num_partitions()):
