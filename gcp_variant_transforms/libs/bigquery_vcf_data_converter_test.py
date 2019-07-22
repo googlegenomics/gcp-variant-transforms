@@ -187,8 +187,8 @@ class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
         mode=TableFieldConstants.MODE_NULLABLE))
 
 
-class BigQueryRowGeneratorTest(unittest.TestCase):
-  """Test cases for class ``BigQueryRowGenerator``."""
+class VariantCallRowGeneratorTest(unittest.TestCase):
+  """Test cases for class `VariantCallRowGenerator`."""
 
   def setUp(self):
     self._schema_descriptor = bigquery_schema_descriptor.SchemaDescriptor(
@@ -196,7 +196,7 @@ class BigQueryRowGeneratorTest(unittest.TestCase):
     self._conflict_resolver = (
         vcf_field_conflict_resolver.FieldConflictResolver())
 
-    self._row_generator = bigquery_vcf_data_converter.BigQueryRowGenerator(
+    self._row_generator = bigquery_vcf_data_converter.VariantCallRowGenerator(
         self._schema_descriptor, self._conflict_resolver)
 
   def test_all_fields(self):
@@ -797,7 +797,7 @@ class ConverterCombinationTest(unittest.TestCase):
         _get_table_schema())
     self._conflict_resolver = (
         vcf_field_conflict_resolver.FieldConflictResolver())
-    self._row_generator = bigquery_vcf_data_converter.BigQueryRowGenerator(
+    self._row_generator = bigquery_vcf_data_converter.VariantCallRowGenerator(
         self._schema_descriptor, self._conflict_resolver)
 
   def test_bq_row_to_variant_to_bq_row(self):

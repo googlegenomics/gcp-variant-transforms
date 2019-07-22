@@ -76,7 +76,7 @@ class VariantToAvroFiles(beam.PTransform):
         schema_converter.convert_table_schema_to_json_avro_schema(
             table_schema))
     self._bigquery_row_generator = (
-        bigquery_vcf_data_converter.BigQueryRowGenerator(
+        bigquery_vcf_data_converter.VariantCallRowGenerator(
             bigquery_schema_descriptor.SchemaDescriptor(table_schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),

@@ -45,7 +45,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     self._conflict_resolver = (
         vcf_field_conflict_resolver.FieldConflictResolver())
 
-    self._row_generator = bigquery_vcf_data_converter.BigQueryRowGenerator(
+    self._row_generator = bigquery_vcf_data_converter.VariantCallRowGenerator(
         self._schema_descriptor, self._conflict_resolver)
 
   def _get_table_schema(self):

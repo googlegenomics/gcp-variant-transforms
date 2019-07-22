@@ -117,7 +117,7 @@ class VariantToBigQuery(beam.PTransform):
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
     self._bigquery_row_generator = (
-        bigquery_vcf_data_converter.BigQueryRowGenerator(
+        bigquery_vcf_data_converter.VariantCallRowGenerator(
             bigquery_schema_descriptor.SchemaDescriptor(self._schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),

@@ -24,10 +24,10 @@ from typing import Any, Dict, List  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: disable=unused-import
 
 
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
@@ -63,21 +63,8 @@ _NUM_CALL_SAMPLES = 5
 _MIN_NUM_CALLS_FOR_ROW_SIZE_ESTIMATION = 100
 
 
-class BigQueryRowGenerator(object):
+class VariantCallRowGenerator(bigquery_row_generator.BigQueryRowGenerator):
   """Class to generate BigQuery row from a variant."""
-
-  def __init__(
-      self,
-      schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
-      conflict_resolver=None,
-      # type: vcf_field_conflict_resolver.ConflictResolver
-      null_numeric_value_replacement=None  # type: int
-      ):
-    # type: (...) -> None
-    self._schema_descriptor = schema_descriptor
-    self._conflict_resolver = conflict_resolver
-    self._bigquery_field_sanitizer = bigquery_sanitizer.FieldSanitizer(
-        null_numeric_value_replacement)
 
   def get_rows(self,
                variant,
@@ -201,40 +188,6 @@ class BigQueryRowGenerator(object):
     # Set calls to empty for now (will be filled later).
     row[bigquery_util.ColumnKeyConstants.CALLS] = []
     return row
-
-  def _get_bigquery_field_entry(
-      self,
-      key,  # type: str
-      data,  # type: Union[Any, List[Any]]
-      schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
-      allow_incompatible_records,  # type: bool
-  ):
-    # type: (...) -> (str, Any)
-    if data is None:
-      return None, None
-    field_name = _BigQuerySchemaSanitizer.get_sanitized_field_name(key)
-    if not schema_descriptor.has_simple_field(field_name):
-      raise ValueError('BigQuery schema has no such field: {}.\n'
-                       'This can happen if the field is not defined in '
-                       'the VCF headers, or is not inferred automatically. '
-                       'Retry pipeline with --infer_headers.'
-                       .format(field_name))
-    sanitized_field_data = self._bigquery_field_sanitizer.get_sanitized_field(
-        data)
-    field_schema = schema_descriptor.get_field_descriptor(field_name)
-    field_data, is_compatible = self._check_and_resolve_schema_compatibility(
-        field_schema, sanitized_field_data)
-    if is_compatible or allow_incompatible_records:
-      return field_name, field_data
-    else:
-      raise ValueError('Value and schema do not match for field {}. '
-                       'Value: {} Schema: {}.'.format(
-                           field_name, sanitized_field_data, field_schema))
-
-  def _check_and_resolve_schema_compatibility(self, field_schema, field_data):
-    resolved_field_data = self._conflict_resolver.resolve_schema_conflict(
-        field_schema, field_data)
-    return resolved_field_data, resolved_field_data == field_data
 
   def _is_empty_field(self, value):
     return (value in (vcfio.MISSING_FIELD_VALUE, [vcfio.MISSING_FIELD_VALUE]) or
