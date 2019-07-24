@@ -15,14 +15,13 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
-from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
+from gcp_variant_transforms.libs import bigquery_util
 
 
 class VariantTransformsOptions(object):
@@ -192,50 +191,26 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     if not parsed_args.output_table and parsed_args.output_avro_path:
       # Writing into BigQuery is not requested; no more BigQuery checks needed.
       return
-    output_table_re_match = re.match(
-        r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
+
+    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
         parsed_args.output_table)
-    if not output_table_re_match:
-      raise ValueError(
-          'Expected a table reference (PROJECT:DATASET.TABLE) '
-          'instead of {}.'.format(parsed_args.output_table))
+
     if not client:
       credentials = GoogleCredentials.get_application_default().create_scoped(
           ['https://www.googleapis.com/auth/bigquery'])
       client = bigquery.BigqueryV2(credentials=credentials)
-    project_id = output_table_re_match.group('project')
-    dataset_id = output_table_re_match.group('dataset')
-    table_id = output_table_re_match.group('table')
-    try:
-      client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-          projectId=project_id,
-          datasetId=dataset_id))
-    except exceptions.HttpError as e:
-      if e.status_code == 404:
-        raise ValueError('Dataset %s:%s does not exist.' %
-                         (project_id, dataset_id))
-      else:
-        # For the rest of the errors, use BigQuery error message.
-        raise
+
+    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
+                                                    dataset_id)
     # Ensuring given output table doesn't already exist to avoid overwriting it.
     if not parsed_args.append:
       if parsed_args.update_schema_on_append:
         raise ValueError('--update_schema_on_append requires --append to be '
                          'true.')
-      try:
-        client.tables.Get(bigquery.BigqueryTablesGetRequest(
-            projectId=project_id,
-            datasetId=dataset_id,
-            tableId=table_id))
-        raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
-                         (project_id, dataset_id, table_id))
-      except exceptions.HttpError as e:
-        if e.status_code == 404:
-          # This is expected, output table must not already exist
-          pass
-        else:
-          # For the rest of the errors, use BigQuery error message.
-          raise
+      bigquery_util.raise_error_if_table_exists(client,
+                                                project_id,
+                                                dataset_id,
+                                                table_id)
 
 
 class AnnotationOptions(VariantTransformsOptions):
