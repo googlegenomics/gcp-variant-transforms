@@ -15,8 +15,11 @@
 from __future__ import absolute_import
 
 import unittest
+from apitools.base.py import exceptions
 
+import mock
 from apache_beam.io.gcp.internal.clients import bigquery
+
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
@@ -413,3 +416,46 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util._get_merged_field_schemas(field_schemas_1,
                                                 field_schemas_2),
         expected_merged_field_schemas)
+
+  def test_raise_error_if_table_exists(self):
+    client = mock.Mock()
+    client.tables.Get.return_value = bigquery.Table(
+        tableReference=bigquery.TableReference(
+            projectId='project', datasetId='dataset', tableId='table'))
+    self.assertRaises(ValueError,
+                      bigquery_util.raise_error_if_table_exists,
+                      client, 'project', 'dataset', 'table')
+
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    bigquery_util.raise_error_if_table_exists(client,
+                                              'project',
+                                              'dataset',
+                                              'table')
+
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '401'}, url='', content='')
+    self.assertRaises(exceptions.HttpError,
+                      bigquery_util.raise_error_if_table_exists,
+                      client, 'project', 'dataset', 'table')
+
+  def test_raise_error_if_dataset_not_exists(self):
+    client = mock.Mock()
+    client.datasets.Get.return_value = bigquery.Dataset(
+        datasetReference=bigquery.DatasetReference(
+            projectId='project', datasetId='dataset'))
+    bigquery_util.raise_error_if_dataset_not_exists(client,
+                                                    'project',
+                                                    'dataset')
+
+    client.datasets.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    self.assertRaises(ValueError,
+                      bigquery_util.raise_error_if_dataset_not_exists,
+                      client, 'project', 'dataset')
+
+    client.datasets.Get.side_effect = exceptions.HttpError(
+        response={'status': '401'}, url='', content='')
+    self.assertRaises(exceptions.HttpError,
+                      bigquery_util.raise_error_if_dataset_not_exists,
+                      client, 'project', 'dataset')

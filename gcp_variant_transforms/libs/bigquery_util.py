@@ -131,10 +131,43 @@ def parse_table_reference(input_table):
   table_re_match = re.match(
       r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', input_table)
   if not table_re_match:
-    raise ValueError('Expected a table reference (PROJECT:DATASET.TABLE) ')
+    raise ValueError('Expected a table reference (PROJECT:DATASET.TABLE), '
+                     'got {}'.format(input_table))
   return (table_re_match.group('project'),
           table_re_match.group('dataset'),
           table_re_match.group('table'))
+
+
+def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
+  # type: (bigquery.BigqueryV2, str, str) -> None
+  try:
+    client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
+        projectId=project_id, datasetId=dataset_id))
+  except exceptions.HttpError as e:
+    if e.status_code == 404:
+      raise ValueError('Dataset %s:%s does not exist.' %
+                       (project_id, dataset_id))
+    else:
+      # For the rest of the errors, use BigQuery error message.
+      raise
+
+
+def raise_error_if_table_exists(client, project_id, dataset_id, table_id):
+  # type: (bigquery.BigqueryV2, str, str, str) -> None
+  try:
+    client.tables.Get(bigquery.BigqueryTablesGetRequest(
+        projectId=project_id,
+        datasetId=dataset_id,
+        tableId=table_id))
+    raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
+                     (project_id, dataset_id, table_id))
+  except exceptions.HttpError as e:
+    if e.status_code == 404:
+      # This is expected, output table must not already exist
+      pass
+    else:
+      # For the rest of the errors, use BigQuery error message.
+      raise
 
 
 def get_bigquery_type_from_vcf_type(vcf_type):
