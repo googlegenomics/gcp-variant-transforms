@@ -62,7 +62,7 @@ class VcfHeader(object):
                alts=None,  # type: OrderedDict[str, vcf.parser._Alt]
                formats=None,  # type: OrderedDict[str, vcf.parser._Format]
                contigs=None,  # type: OrderedDict[str, vcf.parser._Contig]
-               file_name=None  # type: str
+               file_path=None  # type: str
               ):
     # type: (...) -> None
     """Initializes a VcfHeader object.
@@ -77,7 +77,7 @@ class VcfHeader(object):
       alts: A dictionary mapping alt keys to vcf alt metadata values.
       formats: A dictionary mapping format keys to vcf format metadata values.
       contigs: A dictionary mapping contig keys to vcf contig metadata values.
-      file_name: The file name of the vcf file.
+      file_path: The full file path of the vcf file.
     """
     # type: OrderedDict[str, OrderedDict]
     self.infos = self._values_asdict(infos or {})
@@ -85,7 +85,7 @@ class VcfHeader(object):
     self.alts = self._values_asdict(alts or {})
     self.formats = self._values_asdict(formats or {})
     self.contigs = self._values_asdict(contigs or {})
-    self.file_name = file_name
+    self.file_path = file_path
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -131,24 +131,24 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
 
   def read_records(
       self,
-      file_name,  # type: str
+      file_path,  # type: str
       unused_range_tracker  # type: range_trackers.UnsplittableRangeTracker
       ):
     # type: (...) -> Iterable[VcfHeader]
     try:
-      vcf_reader = vcf.Reader(fsock=self._read_headers(file_name))
+      vcf_reader = vcf.Reader(fsock=self._read_headers(file_path))
     except StopIteration:
-      raise ValueError('{} has no header.'.format(file_name))
+      raise ValueError('{} has no header.'.format(file_path))
 
     yield VcfHeader(infos=vcf_reader.infos,
                     filters=vcf_reader.filters,
                     alts=vcf_reader.alts,
                     formats=vcf_reader.formats,
                     contigs=vcf_reader.contigs,
-                    file_name=file_name)
+                    file_path=file_path)
 
-  def _read_headers(self, file_name):
-    with self.open_file(file_name) as file_to_read:
+  def _read_headers(self, file_path):
+    with self.open_file(file_path) as file_to_read:
       while True:
         record = file_to_read.readline()
         while not record or not record.strip():  # Skip empty lines.
@@ -158,11 +158,11 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
         else:
           break
 
-  def open_file(self, file_name):
+  def open_file(self, file_path):
     if self._compression_type == CompressionTypes.GZIP:
-      return bgzf.open_bgzf(file_name)
+      return bgzf.open_bgzf(file_path)
     else:
-      return FileSystems.open(file_name,
+      return FileSystems.open(file_path,
                               compression_type=self._compression_type)
 
 
