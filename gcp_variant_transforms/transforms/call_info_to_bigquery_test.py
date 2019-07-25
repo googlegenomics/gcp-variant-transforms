@@ -30,9 +30,9 @@ class ConvertCallInfoToRowTest(unittest.TestCase):
 
   def test_convert_call_info_to_row(self):
     vcf_header_1 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
-                                           file_name='file_1')
+                                           file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
-                                           file_name='file_2')
+                                           file_path='file_2')
     file_path_to_file_hash = {'file_1': 'hash_1',
                               'file_2': 'hash_2'}
     expected_rows = [

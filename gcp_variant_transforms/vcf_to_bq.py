@@ -394,7 +394,7 @@ def _create_call_info_table(pipeline,  # type: beam.Pipeline
                                                 known_args.append))
 
 
-def _write_to_bigquery_v1(pipeline,  # type: beam.Pipeline
+def _write_to_bigquery_v2(pipeline,  # type: beam.Pipeline
                           pipeline_mode,  # type: PipelineModes
                           known_args,  # type: argparse.Namespace
                           file_path_to_file_hash  # type: Dict[str, str]
@@ -403,7 +403,7 @@ def _write_to_bigquery_v1(pipeline,  # type: beam.Pipeline
                           file_path_to_file_hash)
 
 
-def _write_to_bigquery_v0(
+def _write_to_bigquery_v1(
     variants,  # type: pvalue.PCollection
     known_args,  # type: argparse.Namespace
     table_suffix,  # type: str
@@ -479,10 +479,11 @@ def run(argv=None):
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   google_cloud_options = beam_pipeline_options.view_as(
       pipeline_options.GoogleCloudOptions)
-  file_path_to_file_hash = pipeline_common.create_file_path_to_file_hash_map(
-      known_args.all_patterns, google_cloud_options.project)
-  if known_args.schema_version == 1:
-    _write_to_bigquery_v1(pipeline,
+  if (known_args.schema_version ==
+      variant_transform_options.BigQueryWriteOptions.V2):
+    file_path_to_file_hash = pipeline_common.create_file_path_to_file_hash_map(
+        known_args.all_patterns, google_cloud_options.project)
+    _write_to_bigquery_v2(pipeline,
                           pipeline_mode,
                           known_args,
                           file_path_to_file_hash)
@@ -521,8 +522,9 @@ def run(argv=None):
       table_suffix = ''
       if partitioner and partitioner.get_partition_name(i):
         table_suffix = '_' + partitioner.get_partition_name(i)
-      if known_args.schema_version == 0:
-        _write_to_bigquery_v0(variants[i],
+      if (known_args.schema_version ==
+          variant_transform_options.BigQueryWriteOptions.V1):
+        _write_to_bigquery_v1(variants[i],
                               known_args,
                               table_suffix,
                               header_fields,

@@ -32,14 +32,14 @@ class ConvertCallInfoToRow(beam.DoFn):
     # type: (vcf_header_io.VcfHeader) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
       call_id = hashing_util.generate_int64_hash_code(
-          self._file_path_to_file_hash.get(vcf_header.file_name) + sample)
+          self._file_path_to_file_hash.get(vcf_header.file_path) + sample)
       row = {
           call_info_table_schema_generator.CALL_ID: call_id,
           call_info_table_schema_generator.CALL_NAME: sample,
-          call_info_table_schema_generator.FILE_PATH: vcf_header.file_name,
+          call_info_table_schema_generator.FILE_PATH: vcf_header.file_path,
           call_info_table_schema_generator.FILE_ID:
               hashing_util.generate_int64_hash_code(
-                  self._file_path_to_file_hash.get(vcf_header.file_name))
+                  self._file_path_to_file_hash.get(vcf_header.file_path))
       }
       yield row
 
