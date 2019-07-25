@@ -22,10 +22,10 @@ from typing import Dict, List  # pylint: disable=unused-import
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import schema_converter
-from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -117,7 +117,7 @@ class VariantToBigQuery(beam.PTransform):
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
     self._bigquery_row_generator = (
-        bigquery_vcf_data_converter.VariantCallRowGenerator(
+        bigquery_row_generator.VariantCallRowGenerator(
             bigquery_schema_descriptor.SchemaDescriptor(self._schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),

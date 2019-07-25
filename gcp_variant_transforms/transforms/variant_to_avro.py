@@ -18,9 +18,9 @@ import apache_beam as beam
 import avro
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import schema_converter
-from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -76,7 +76,7 @@ class VariantToAvroFiles(beam.PTransform):
         schema_converter.convert_table_schema_to_json_avro_schema(
             table_schema))
     self._bigquery_row_generator = (
-        bigquery_vcf_data_converter.VariantCallRowGenerator(
+        bigquery_row_generator.VariantCallRowGenerator(
             bigquery_schema_descriptor.SchemaDescriptor(table_schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),
