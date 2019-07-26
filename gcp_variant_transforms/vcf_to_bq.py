@@ -479,14 +479,7 @@ def run(argv=None):
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   google_cloud_options = beam_pipeline_options.view_as(
       pipeline_options.GoogleCloudOptions)
-  if (known_args.schema_version ==
-      variant_transform_options.BigQueryWriteOptions.V2):
-    file_path_to_file_hash = pipeline_common.create_file_path_to_file_hash_map(
-        known_args.all_patterns, google_cloud_options.project)
-    _write_to_bigquery_v2(pipeline,
-                          pipeline_mode,
-                          known_args,
-                          file_path_to_file_hash)
+
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
@@ -530,6 +523,15 @@ def run(argv=None):
                               header_fields,
                               variant_merger,
                               processed_variant_factory)
+      elif (known_args.schema_version ==
+            variant_transform_options.BigQueryWriteOptions.V2):
+        file_path_to_file_hash = (
+            pipeline_common.create_file_path_to_file_hash_map(
+                known_args.all_patterns, google_cloud_options.project))
+        _write_to_bigquery_v2(pipeline,
+                              pipeline_mode,
+                              known_args,
+                              file_path_to_file_hash)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

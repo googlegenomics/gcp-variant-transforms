@@ -166,7 +166,7 @@ def create_file_path_to_file_hash_map(input_patterns, project):
   for input_file in all_files:
     if not input_file.startswith('gs://'):
       raise ValueError('Only input files in GCS are supported for BigQuery'
-                       'schema_version v1.')
+                       'schema_version v2.')
     bucket_name, blob_name = gcsio.parse_gcs_path(input_file)
     bucket = storage.Client(project).bucket(bucket_name)
     file_blob = bucket.get_blob(blob_name)
