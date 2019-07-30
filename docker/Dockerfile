@@ -32,6 +32,18 @@ ADD / /opt/gcp_variant_transforms/src/
 # Needed for installing mmh3 (one of the required packages in setup.py).
 RUN apt install -y g++
 
+# Install Pysam dependencies.
+RUN apt-get update && apt-get install -y autoconf \
+    automake \
+    make \
+    gcc \
+    perl \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libcurl4-openssl-dev \
+    libssl-dev
+
 # Install dependencies.
 RUN python -m pip install --upgrade pip && \
     python -m pip install --upgrade virtualenv && \
