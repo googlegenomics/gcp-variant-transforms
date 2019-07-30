@@ -17,7 +17,7 @@
 import setuptools
 
 REQUIRED_PACKAGES = [
-    'pysam',
+    'pysam>=0.15.3',
     'cython>=0.28.1',
     'apache-beam[gcp]',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency

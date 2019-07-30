@@ -647,7 +647,7 @@ class PySamParser(VcfParser):
     calls = []
 
     for (name, sample) in samples.iteritems():
-      phaseset = DEFAULT_PHASESET_VALUE if sample.phased else None
+      phaseset = None
       genotype = None
       info = {}
       for (key, value) in sample.iteritems():
@@ -655,15 +655,19 @@ class PySamParser(VcfParser):
           if isinstance(value, tuple):
             genotype = []
             for elem in value:
-              genotype.append(elem if elem else MISSING_GENOTYPE_VALUE)
+              genotype.append(MISSING_GENOTYPE_VALUE if elem is None else elem)
           else:
-            genotype = value if value else MISSING_GENOTYPE_VALUE
+            genotype = MISSING_GENOTYPE_VALUE if value is None else value
 
         elif key == PHASESET_FORMAT_KEY:
           phaseset = list(value) if isinstance(value, tuple) else value
         else:
           info[key] = list(value) if isinstance(value, tuple) else value
 
+      # PySam samples are "phased" for haploids, so check for for the type
+      # before settings default phaseset value.
+      if phaseset is None and sample.phased and len(genotype) > 1:
+        phaseset = DEFAULT_PHASESET_VALUE
       calls.append(VariantCall(name, genotype, phaseset, info))
 
     return calls
