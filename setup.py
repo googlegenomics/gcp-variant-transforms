@@ -17,15 +17,17 @@
 import subprocess
 from distutils.command.build import build as _build
 
+import os
 import setuptools
 
-CUSTOM_COMMANDS = [
+PYSAM_DEPENDENCY_COMMANDS = [
     ['apt-get', 'update'],
     ['apt-get', '-y', 'install', 'autoconf', 'automake', 'make', 'gcc', 'perl',
      'zlib1g-dev', 'libbz2-dev', 'liblzma-dev', 'libcurl4-openssl-dev',
-     'libssl-dev'],
-    ['pip', 'install', 'pysam>=0.15.3']
+     'libssl-dev']
 ]
+
+PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam>=0.15.3']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -72,8 +74,18 @@ class CustomCommands(setuptools.Command):
           'Command %s failed: exit code: %s' % (command_list, p.returncode))
 
   def run(self):
-    for command in CUSTOM_COMMANDS:
-      self.RunCustomCommand(command)
+    try:
+      # For superuser UID is 0, so attempt to install pysam's C dependencies.
+      if not os.getuid():
+        for command in PYSAM_DEPENDENCY_COMMANDS:
+          self.RunCustomCommand(command)
+      self.RunCustomCommand(PYSAM_INSTALLATION_COMMAND)
+        
+    except RuntimeError:
+      raise RuntimeError(
+          'PySam installation has failed. Make sure you have the ' + \
+          'following packages installed: autoconf automake make gcc perl ' + \
+          'zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev')
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.
