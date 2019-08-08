@@ -129,12 +129,6 @@ class AvroWriteOptions(VariantTransformsOptions):
                         default='',
                         help='The output path to write Avro files under.')
 
-  def validate(self, parsed_args):
-    # type: (argparse.Namespace) -> None
-    if not parsed_args.output_table and not parsed_args.output_avro_path:
-      raise ValueError('At least one of --output_table or --output_avro_path '
-                       'options should be provided.')
-
 
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
@@ -188,7 +182,12 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
-    if not parsed_args.output_table and parsed_args.output_avro_path:
+    if (not parsed_args.output_table and not parsed_args.output_avro_path and
+        not parsed_args.run_annotation_pipeline):
+      raise ValueError('At least one of --output_table or --output_avro_path '
+                       'or --run_annotation_pipeline options should be '
+                       'provided.')
+    if not parsed_args.output_table:
       # Writing into BigQuery is not requested; no more BigQuery checks needed.
       return
 
@@ -256,7 +255,8 @@ class AnnotationOptions(VariantTransformsOptions):
         '--' + AnnotationOptions._RUN_FLAG,
         type='bool', default=False, nargs='?', const=True,
         help=('If true, runs annotation tools (currently only VEP) on input '
-              'VCFs before loading to BigQuery.'))
+              'VCFs. If --output_table is also provided, the annotated VCFs '
+              'will be loaded to BigQuery.'))
     parser.add_argument(
         '--shard_variants',
         type='bool', default=True, nargs='?', const=True,

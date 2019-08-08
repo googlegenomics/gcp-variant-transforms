@@ -196,3 +196,48 @@ class PreprocessOptionsTest(unittest.TestCase):
     args = self._make_args(['--input_pattern', '*',
                             '--report_path', 'some_path'])
     self._options.validate(args)
+
+
+class OptionsTest(unittest.TestCase):
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    parser = argparse.ArgumentParser()
+    parser.register('type', 'bool', lambda v: v.lower() == 'true')
+    for option in self._options:
+      option.add_arguments(parser)
+    namespace, remaining_args = parser.parse_known_args(args)
+    assert not remaining_args
+    return namespace
+
+  def setUp(self):
+    self._options = [variant_transform_options.AnnotationOptions(),
+                     variant_transform_options.BigQueryWriteOptions(),
+                     variant_transform_options.AvroWriteOptions()]
+
+  def test_annotation_standalone(self):
+    argv = ['--run_annotation_pipeline',
+            '--annotation_output_dir', 'gs://GOOD_DIR']
+    args = self._make_args(argv)
+    for option in self._options:
+      option.validate(args)
+
+  def test_vcf_to_bq_with_annotation(self):
+    argv = ['--run_annotation_pipeline',
+            '--annotation_output_dir', 'gs://GOOD_DIR',
+            '--output_table', 'project:dataset.table2']
+    client = mock.Mock()
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    args = self._make_args(argv)
+
+    self._options[0].validate(args)
+    self._options[1].validate(args, client)
+    self._options[2].validate(args)
+
+  def test_missing_arg(self):
+    argv = []
+    args = self._make_args(argv)
+    with self.assertRaises(ValueError):
+      for option in self._options:
+        option.validate(args)

@@ -389,7 +389,8 @@ def run(argv=None):
     _get_input_dimensions(known_args, pipeline_args)
 
   annotated_vcf_pattern = _run_annotation_pipeline(known_args, pipeline_args)
-
+  if not known_args.output_table and not known_args.output_avro_path:
+    return
   all_patterns = (
       [annotated_vcf_pattern] if annotated_vcf_pattern
       else known_args.all_patterns)
