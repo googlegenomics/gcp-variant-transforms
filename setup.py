@@ -14,10 +14,20 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
+import subprocess
+from distutils.command.build import build as _build
+
 import setuptools
 
+CUSTOM_COMMANDS = [
+    ['apt-get', 'update'],
+    ['apt-get', '-y', 'install', 'autoconf', 'automake', 'make', 'gcc', 'perl',
+     'zlib1g-dev', 'libbz2-dev', 'liblzma-dev', 'libcurl4-openssl-dev',
+     'libssl-dev'],
+    ['pip', 'install', 'pysam>=0.15.3']
+]
+
 REQUIRED_PACKAGES = [
-    'pysam>=0.15.3',
     'cython>=0.28.1',
     'apache-beam[gcp]',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
@@ -38,6 +48,41 @@ REQUIRED_PACKAGES = [
 REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
 ]
+
+class CustomCommands(setuptools.Command):
+  """A setuptools Command class able to run arbitrary commands."""
+
+  def initialize_options(self):
+    pass
+
+  def finalize_options(self):
+    pass
+
+  def RunCustomCommand(self, command_list):
+    print 'Running command: %s' % command_list
+    p = subprocess.Popen(
+        command_list,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    # Can use communicate(input='y\n'.encode()) if the command run requires
+    # some confirmation.
+    stdout_data, _ = p.communicate()
+    print 'Command output: %s' % stdout_data
+    if p.returncode != 0:
+      raise RuntimeError(
+          'Command %s failed: exit code: %s' % (command_list, p.returncode))
+
+  def run(self):
+    for command in CUSTOM_COMMANDS:
+      self.RunCustomCommand(command)
+
+class build(_build):  # pylint: disable=invalid-name
+  """A build command class that will be invoked during package install.
+  The package built using the current setup.py will be staged and later
+  installed in the worker using `pip install package'. This class will be
+  instantiated during install for this specific scenario and will trigger
+  running the custom commands specified.
+  """
+  sub_commands = _build.sub_commands + [('CustomCommands', None)]
 
 setuptools.setup(
     name='gcp_variant_transforms',
@@ -66,5 +111,11 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={
         'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
+    },
+
+    cmdclass={
+        # Command class instantiated and run during pip install scenarios.
+        'build': build,
+        'CustomCommands': CustomCommands,
     },
 )

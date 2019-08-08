@@ -512,9 +512,9 @@ class PySamParser(VcfParser):
   PySam allows reading a file through either stdin stream, or through as actual
   VCF files, for which it requires legitimate file descriptor. Since we want to
   perform our own parallelization, we will fork our process, to use 2 pipelines
-  that will feed into PySam object - 1 will feed the data from main thread into
-  the child one, while second will get that data in child thread and feed it to
-  PySam library.
+  that will feed into PySam object - 1 will feed the data from main process
+  throughout into the child one, while second will get that data in child thread
+  and feed it to PySam library.
 
   The requirement of using two pipelines comes from the design of VcfParser base
   class - we could only use a single pipe, but it will divert the parsers.
@@ -558,7 +558,7 @@ class PySamParser(VcfParser):
       to_pysam.write(header.strip() + '\n')
     to_pysam.flush()
 
-    while 1:
+    while True:
       text_line = from_parent.readline()
       if not text_line:
         break
@@ -570,17 +570,17 @@ class PySamParser(VcfParser):
     sys.exit(0)
 
   def _init_with_header(self, header_lines):
-    # The first header line must be similar to '##fileformat=VCFv.*'.
+    # PySam requires a version header to be present, so add one if absent.
     if header_lines and not header_lines[0].startswith(
         FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
       header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
 
-    # First pipe is repsonsible for supplying data from child thread into the
+    # First pipe is responsible for supplying data from child thread into the
     # VariantFile, since it only takes an actual file descriptor as its input.
     p_read, c_write = os.pipe()
-    # Since vcf_parser is setup to parse 1 line at a time, second pipe is used
-    # to send 1 record at a time to the child thread, to pass it downstream back
-    # to parent thread via the first pipe/VariantFile class.
+    # Since vcf_parser processes 1 line at a time, a second pipe is used to send
+    # 1 record at a time to the child thread, to pass it downstream back to
+    # parent thread via the first pipe/VariantFile class.
     c_read, p_write = os.pipe()
 
     processid = os.fork()
