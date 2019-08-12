@@ -541,6 +541,7 @@ class PySamParser(VcfParser):
     # This member will be properly initiated in _init_with_header().
     self._vcf_reader = None
     self._to_child = None
+    self._original_info_list = None
 
   def _init_child_thread(self, p_read, c_write, c_read, p_write, header_lines):
     # Child thread's task is to populate data into the pipe that feeds
@@ -591,12 +592,13 @@ class PySamParser(VcfParser):
       into_pysam = os.fdopen(p_read)
       self._to_child = os.fdopen(p_write, 'w')
       self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
+      self._original_info_list = self._vcf_reader.header.info.keys()
     else:
       self._init_child_thread(p_read, c_write, c_read, p_write, header_lines)
 
   def _get_variant(self, data_line):
     try:
-      self._to_child.write(data_line + '\n')
+      self._to_child.write(data_line.encode('utf-8') + '\n')
       self._to_child.flush()
       return self._convert_to_variant(next(self._vcf_reader))
     except (MemoryError, IOError) as e:
@@ -636,11 +638,25 @@ class PySamParser(VcfParser):
     for k, v in record.info.iteritems():
       if k != END_INFO_KEY:
         if isinstance(v, tuple):
-          info[k] = list(v)
+          info[k] = list(map(self._convert_info_field, v))
         else:
-          info[k] = v
+          # If a field was not provided in the header, make it a list to
+          # follow the PyVCF standards.
+          info[k] = (
+              self._convert_info_field(v) if k in self._original_info_list else
+              [self._convert_info_field(v)])
 
     return info
+
+  def _convert_info_field(self, value):
+    # type: (Any) -> (Any)
+    # PySam currently doesn't recognize '.' value for String fields as missing.
+    if value == '.' or value == u'.':
+      return None
+    elif isinstance(value, unicode):
+      return value.encode('utf-8')
+    else:
+      return value
 
   def _get_variant_calls(self, samples):
     # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
