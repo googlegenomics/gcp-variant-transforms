@@ -22,9 +22,9 @@ import setuptools
 
 PYSAM_DEPENDENCY_COMMANDS = [
     ['apt-get', 'update'],
-    ['apt-get', '-y', 'install', 'autoconf', 'automake', 'make', 'gcc', 'perl',
-     'zlib1g-dev', 'libbz2-dev', 'liblzma-dev', 'libcurl4-openssl-dev',
-     'libssl-dev']
+    ['apt-get', '-y', 'install', 'autoconf', 'automake', 'gcc', 'libbz2-dev',
+     'libcurl4-openssl-dev', 'liblzma-dev', 'libssl-dev', 'make', 'perl',
+     'zlib1g-dev']
 ]
 
 PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam>=0.15.3']
@@ -62,16 +62,10 @@ class CustomCommands(setuptools.Command):
 
   def RunCustomCommand(self, command_list):
     print 'Running command: %s' % command_list
-    p = subprocess.Popen(
-        command_list,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    # Can use communicate(input='y\n'.encode()) if the command run requires
-    # some confirmation.
-    stdout_data, _ = p.communicate()
-    print 'Command output: %s' % stdout_data
-    if p.returncode != 0:
-      raise RuntimeError(
-          'Command %s failed: exit code: %s' % (command_list, p.returncode))
+    try:
+      subprocess.call(command_list)
+    except Exception as e:
+      raise RuntimeError('Command %s failed with error: %s' % (command_list, e))
 
   def run(self):
     try:
@@ -84,8 +78,8 @@ class CustomCommands(setuptools.Command):
     except RuntimeError:
       raise RuntimeError(
           'PySam installation has failed. Make sure you have the ' + \
-          'following packages installed: autoconf automake make gcc perl ' + \
-          'zlib1g-dev libbz2-dev liblzma-dev libcurl4-openssl-dev libssl-dev')
+          'following packages installed: autoconf automake gcc libbz2-dev ' + \
+          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl zlib1g-dev')
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.

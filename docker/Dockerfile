@@ -32,17 +32,19 @@ ADD / /opt/gcp_variant_transforms/src/
 # Needed for installing mmh3 (one of the required packages in setup.py).
 RUN apt install -y g++
 
-# Install Pysam dependencies.
-RUN apt-get update && apt-get install -y autoconf \
+# Install Pysam dependencies. These dependencies are only required becuase we
+# have a monolithic binary - they primarily have to be installed on the workers.
+RUN apt-get update && apt-get install -y \
+    autoconf \
     automake \
-    make \
     gcc \
-    perl \
-    zlib1g-dev \
     libbz2-dev \
-    liblzma-dev \
     libcurl4-openssl-dev \
-    libssl-dev
+    liblzma-dev \
+    libssl-dev \
+    make \
+    perl \
+    zlib1g-dev
 
 # Install dependencies.
 RUN python -m pip install --upgrade pip && \
