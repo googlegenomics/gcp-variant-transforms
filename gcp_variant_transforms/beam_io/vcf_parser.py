@@ -538,62 +538,41 @@ class PySamParser(VcfParser):
                                       allow_malformed_records,
                                       representative_header_lines,
                                       **kwargs)
-    # These members will be properly initiated in _init_with_header().
+    # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
     self._to_child = None
     self._original_info_list = None
 
-  def _init_parent_process(self, p_read, c_write, c_read, p_write):
-    # Parent Process
-    os.close(c_read)
-    os.close(c_write)
-    into_pysam = os.fdopen(p_read)
-    self._to_child = os.fdopen(p_write, 'w')
+  def _init_parent_process(self, pysam_read, variants_write):
+    into_pysam = os.fdopen(pysam_read)
+    self._to_child = os.fdopen(variants_write, 'w')
     self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
     self._original_info_list = self._vcf_reader.header.info.keys()
 
-  def _write_header_lines(self, to_pysam, header_lines):
-    # Feed the data with a break line, since we read data line by line - if
-    # we would use the conventional ``read()`` method, both pipes would lock,
-    # while waiting for an EOF signal.
+  def _write_header_lines(self, to_pysam_pipe, header_lines):
     for header in header_lines:
-      to_pysam.write(header + '\n')
-    to_pysam.flush()
+      to_pysam_pipe.write(header + '\n')
+    to_pysam_pipe.flush()
 
-  def _write_to_second_pipe(self, text_line):
-    self._to_child.write(text_line.encode('utf-8') + '\n')
-    self._to_child.flush()
-
-  def _read_from_second_pipe(self, from_parent):
-    return from_parent.readline()
-
-  def _write_to_first_pipe(self, to_pysam, text_line):
-    to_pysam.write(text_line)
-    to_pysam.flush()
-
-  def _read_from_first_pipe(self):
-    return next(self._vcf_reader)
-
-  def _init_child_process(self, p_read, c_write, c_read, p_write, header_lines):
+  def _init_child_process(self, variants_read, pysam_write, header_lines):
     # Child process' task is to populate data into the pipe that feeds
     # VariantFile class - first by populating all of the header lines, and then
     # by redirecting the data received from the second pipe.
 
-    os.close(p_read)
-    os.close(p_write)
-    from_parent = os.fdopen(c_read)
-    to_pysam = os.fdopen(c_write, 'w')
+    from_variants_pipe = os.fdopen(variants_read)
+    to_pysam_pipe = os.fdopen(pysam_write, 'w')
 
-    self._write_header_lines(to_pysam, header_lines)
+    self._write_header_lines(to_pysam_pipe, header_lines)
 
     while True:
-      text_line = self._read_from_second_pipe(from_parent)
+      text_line = from_variants_pipe.readline()
       if not text_line:
         break
-      self._write_to_first_pipe(to_pysam, text_line)
+      to_pysam_pipe.write(text_line)
+      to_pysam_pipe.flush()
 
-    from_parent.close()
-    to_pysam.close()
+    from_variants_pipe.close()
+    to_pysam_pipe.close()
     sys.exit(0)
 
   def _init_with_header(self, header_lines):
@@ -602,24 +581,24 @@ class PySamParser(VcfParser):
         FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
       header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
 
-    # First pipe is responsible for supplying data from child process into the
-    # VariantFile, since it only takes an actual file descriptor as its input.
-    p_read, c_write = os.pipe()
-    # Since vcf_parser processes 1 line at a time, a second pipe is used to send
-    # 1 record at a time to the child process, to pass it downstream back to
-    # parent process via the first pipe/VariantFile class.
-    c_read, p_write = os.pipe()
+    # Pysam pipe is responsible for supplying lines from child process into the
+    # VariantFile, since it can only take an actual file descriptor as an input.
+    pysam_read, pysam_write = os.pipe()
+    # Since child process doesn't have access to the lines that need to be
+    # parsed, variants pipe is needed to supply them from _get_variant() method
+    # into the child process, to be propagated afterwards into the pysam pipe.
+    variants_read, variants_write = os.pipe()
 
-    processid = os.fork()
-    if processid:
-      self._init_parent_process(p_read, c_write, c_read, p_write)
+    if os.fork():
+      self._init_parent_process(pysam_read, variants_write)
     else:
-      self._init_child_process(p_read, c_write, c_read, p_write, header_lines)
+      self._init_child_process(variants_read, pysam_write, header_lines)
 
   def _get_variant(self, data_line):
     try:
-      self._write_to_second_pipe(data_line)
-      return self._convert_to_variant(self._read_from_first_pipe())
+      self._to_child.write(data_line.encode('utf-8') + '\n')
+      self._to_child.flush()
+      return self._convert_to_variant(next(self._vcf_reader))
     except (MemoryError, IOError) as e:
       logging.warning('VCF record read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
