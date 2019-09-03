@@ -32,6 +32,9 @@ from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcfio
 
 
+# Number of lines from each VCF that should be read when estimating disk usage.
+SNIPPET_READ_SIZE = 50
+
 def _get_file_size(file_name):
   # type: (str) -> List[FileSizeInfo]
   matched_files = filesystems.FileSystems.match([file_name])[0].metadata_list
@@ -49,30 +52,17 @@ def _get_file_size(file_name):
   return file_metadata.size_in_bytes
 
 
-def _convert_variants_to_bytesize(variant):
-  # type: (vcfio.Variant) -> int
-  return coders.registry.get_coder(vcfio.Variant).estimate_size(variant)
-
-
 class FileSizeInfo(object):
-  def __init__(self, name, raw_file_size, encoded_file_size=None):
-    # type: (str, int, int) -> None
+  def __init__(self, raw_size, encoded_size=None, name="[no filename]"):
+    # type: (int, int, str) -> None
+    self.raw_size = raw_size
+    self.encoded_size = encoded_size # Allow direct initialization
     self.name = name
-    self.raw_size = raw_file_size
-    self.encoded_size = encoded_file_size  # Optional, useful for SumFn.
 
   def estimate_encoded_file_size(self, raw_sample_size, encoded_sample_size):
     # type: (int, int) -> None
-    """Estimates a VCF file's encoded (byte) size by analyzing sample Variants.
-
-    Given the raw_file_size and measurements of several VCF lines from the file,
-    estimate how much disk the file will take after expansion due to encoding
-    lines as `vcfio.Variant` objects. The encoded_sample_size will be set as
-    `self.encoded_size`.
-
-    This is a simple ratio problem, solving for encoded_sample_size which is
-    the only unknown:
-    encoded_sample_size / raw_sample_size = encoded_file_size / raw_file_size
+    """Estimate encoded file size, given the sizes for the raw file, sample raw
+    lines and sample encoded lines.
     """
     if raw_sample_size == 0:
       # Propagate in-band error state to avoid divide-by-zero.
@@ -86,13 +76,7 @@ class FileSizeInfo(object):
 
 
 class FileSizeInfoSumFn(beam.CombineFn):
-  """Combiner Function to sum up the size fields of FileSizeInfo objects.
-
-  Unlike VariantsSizeInfoSumFn, the input is a PTable mapping str to
-  FileSizeInfo, so the input is a tuple with the FileSizeInfos as the second
-  field. The output strips out the str key which represents the file path.
-
-  Example: [FileSizeInfo(a, b), FileSizeInfo(c, d)] -> FileSizeInfo(a+c, b+d)
+  """Combiner Function, used to sum up the size fields of FileSizeInfo objects.
   """
   def create_accumulator(self):
     # type: (None) -> Tuple[int, int]
@@ -109,7 +93,7 @@ class FileSizeInfoSumFn(beam.CombineFn):
 
   def extract_output(self, (raw, encoded)):
     # type: (Tuple[int, int]) -> FileSizeInfo
-    return FileSizeInfo("cumulative", raw, encoded)
+    return FileSizeInfo(raw, encoded)
 
 
 class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
@@ -122,8 +106,6 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
   if all sizes had been encoded as `Variant` objects.
 
   Lines that are malformed are skipped.
-
-  Parses VCF files (version 4) using PyVCF library.
   """
 
   DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
@@ -187,22 +169,20 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
         # even for non-ASCII chars. Python adds significant overhead to the
         # bytesize of the full str object.
         raw_size += len(raw_record.encode('utf-8'))
-        encoded_size += _convert_variants_to_bytesize(encoded_record)
+        encoded_size += coders.registry.get_coder(vcfio.Variant).estimate_size(
+            encoded_record)
         count += 1
 
-    file_size_info = FileSizeInfo(file_name, raw_file_size)
+    file_size_info = FileSizeInfo(raw_file_size, name=file_name)
     file_size_info.estimate_encoded_file_size(raw_size, encoded_size)
     yield file_size_info
 
 
 class EstimateVcfSize(transforms.PTransform):
-  """A PTransform for reading a limited number of lines from a set of VCF files.
+  """PTransform estimating encoded size of VCFs without reading whole files.
 
-  Output will be a PTable mapping from `file names -> Tuple[(line, Variant)]`
-  objects. The list contains the first `sample_size` number of lines that are
-  not malformed, first as a raw string and then encoded as a `Variant` class.
-
-  Parses VCF files (version 4) using PyVCF library.
+  Output is a PCollection with a single FileSizeInfo object representing the
+  aggregate encoded size estimate.
   """
 
   def __init__(
@@ -232,4 +212,6 @@ class EstimateVcfSize(transforms.PTransform):
         file_pattern, sample_size, compression_type, validate=validate)
 
   def expand(self, pvalue):
-    return pvalue.pipeline | iobase.Read(self._source)
+    return (pvalue.pipeline
+            | iobase.Read(self._source)
+            | beam.CombineGlobally(FileSizeInfoSumFn()))

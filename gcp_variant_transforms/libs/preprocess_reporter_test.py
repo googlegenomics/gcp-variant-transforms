@@ -83,9 +83,8 @@ class PreprocessReporterTest(unittest.TestCase):
     formats = OrderedDict([('NS', Format('NS', 1, 'Float', 'Number samples'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
     file_size_info = vcf_file_size_io.FileSizeInfo(
-        'unused_name',
-        raw_file_size=int(1e10),
-        encoded_file_size=int(2e10))
+        raw_size=int(1e10),
+        encoded_size=int(2e10))
 
     expected = ['Estimated disk usage by Dataflow: 20 GB\n',
                 'Total raw file sizes: 10 GB\n',

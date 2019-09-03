@@ -66,10 +66,6 @@ from gcp_variant_transforms.transforms import merge_header_definitions
 
 _COMMAND_LINE_OPTIONS = [variant_transform_options.PreprocessOptions]
 
-# Number of lines from each VCF that should be read when estimating disk usage.
-# TODO(hanjohn): Convert this field to a flag.
-_SNIPPET_READ_SIZE = 50
-
 def _get_inferred_headers(variants,  # type: pvalue.PCollection
                           merged_header  # type: pvalue.PCollection
                          ):
@@ -88,21 +84,6 @@ def _get_inferred_headers(variants,  # type: pvalue.PCollection
       | 'MergeHeadersFromVcfAndVariants' >> merge_headers.MergeHeaders(
           allow_incompatible_records=True))
   return inferred_headers, merged_header
-
-
-# TODO(hanjohn): Add an e2e test
-def _estimate_disk_resources(p, input_pattern):
-  # type: (pvalue.PCollection, str) -> (pvalue.PCollection)
-  # TODO(hanjohn): Add support for `ReadAll` pattern for inputs with very large
-  # numbers of files.
-  result = (
-      p
-      | 'InputFilePattern' >> beam.Create([input_pattern])
-      | 'ReadFileSizeAndSampleVariants' >> vcf_file_size_io.EstimateVcfSize(
-          input_pattern, _SNIPPET_READ_SIZE)
-      | 'SumFileSizeEstimates' >> beam.CombineGlobally(
-          vcf_file_size_io.FileSizeInfoSumFn()))
-  return result
 
 
 def run(argv=None):
@@ -124,8 +105,12 @@ def run(argv=None):
 
     disk_usage_estimate = None
     if known_args.estimate_disk_usage:
+      # TODO(hanjohn): Add an e2e test
+      # TODO(hanjohn): Add support for `ReadAll` pattern for inputs with very
+      # large numbers of files.
       disk_usage_estimate = beam.pvalue.AsSingleton(
-          _estimate_disk_resources(p, known_args.input_pattern))
+          p | 'SampleAndEstimateFileSize' >> vcf_file_size_io.EstimateVcfSize(
+              known_args.input_pattern, vcf_file_size_io.SNIPPET_READ_SIZE))
     if known_args.report_all_conflicts:
       variants = pipeline_common.read_variants(p,
                                                all_patterns,
