@@ -14,7 +14,7 @@
 
 # This is meant to be used by the Build Trigger set in Cloud Build for auto
 # release. It tags the verified image and pushes to the main project
-# (gcp-variant-transforms).
+# (cloud-lifesciences).
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
@@ -27,24 +27,24 @@ steps:
     args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
+      - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
     id: 'tag-image-commit-sha'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
+      - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
+      - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${TAG_NAME}'
     id: 'tag-image-release-version'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-      - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
+      - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
+      - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:latest'
     id: 'tag-image-latest'
 
 images:
-  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${COMMIT_SHA}'
-  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:${TAG_NAME}'
-  - 'gcr.io/gcp-variant-transforms/gcp-variant-transforms:latest'
+  - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
+  - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${TAG_NAME}'
+  - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:latest'

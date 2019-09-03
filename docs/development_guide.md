@@ -31,7 +31,7 @@ syncing process simple.
 
 ```bash
 git clone git@github.com:<username>/gcp-variant-transforms.git
-cd gcp_variant_transforms
+cd gcp-variant-transforms
 ```
 You will also need to add googlegenomics repository as a remote so that you can
 easily pull changes later.

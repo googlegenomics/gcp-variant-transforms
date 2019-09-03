@@ -155,9 +155,9 @@ class _EstimateVcfSizeSource(filebasedsource.FileBasedSource):
     record_iterator = vcf_parser_class(
         file_name,
         range_tracker,
-        self._pattern,
         self._compression_type,
         allow_malformed_records=True,
+        file_pattern=self._pattern,
         representative_header_lines=None,
         buffer_size=self.DEFAULT_VCF_READ_BUFFER_SIZE,
         skip_header_lines=0)

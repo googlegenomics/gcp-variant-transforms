@@ -57,7 +57,6 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_file_size_io
-from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
@@ -128,15 +127,10 @@ def run(argv=None):
       disk_usage_estimate = beam.pvalue.AsSingleton(
           _estimate_disk_resources(p, known_args.input_pattern))
     if known_args.report_all_conflicts:
-      if len(all_patterns) == 1:
-        variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-            all_patterns[0], allow_malformed_records=True)
-      else:
-        variants = (p
-                    | 'InputFilePattern' >> beam.Create(all_patterns)
-                    | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
-                        allow_malformed_records=True))
-
+      variants = pipeline_common.read_variants(p,
+                                               all_patterns,
+                                               pipeline_mode,
+                                               allow_malformed_records=True)
       malformed_records = variants | filter_variants.ExtractMalformedVariants()
       inferred_headers, merged_headers = (_get_inferred_headers(variants,
                                                                 merged_headers))

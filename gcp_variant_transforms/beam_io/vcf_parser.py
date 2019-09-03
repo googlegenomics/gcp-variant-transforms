@@ -20,10 +20,9 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 from __future__ import absolute_import
 
 import logging
-from collections import namedtuple
-
 import os
 import tempfile
+from collections import namedtuple
 
 try:
   from nucleus.io.python import vcf_reader as nucleus_vcf_reader
@@ -34,8 +33,10 @@ except ImportError:
 import vcf
 
 from apache_beam.coders import coders
+from apache_beam.io import filesystems
 from apache_beam.io import textio
 
+from gcp_variant_transforms.beam_io import bgzf
 
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
@@ -250,6 +251,7 @@ class VcfParser(object):
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
                representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -259,17 +261,40 @@ class VcfParser(object):
     self._file_name = file_name
     self._allow_malformed_records = allow_malformed_records
 
-    text_source = textio._TextSource(
-        file_pattern,
-        0,  # min_bundle_size
-        compression_type,
-        True,  # strip_trailing_newlines
-        coders.StrUtf8Coder(),  # coder
-        validate=False,
-        header_processor_fns=(
-            lambda x: not x.strip() or x.startswith('#'),
-            self._process_header_lines),
-        **kwargs)
+    if splittable_bgzf:
+      text_source = bgzf.BGZFBlockSource(
+          file_name,
+          range_tracker,
+          representative_header_lines,
+          compression_type,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
+    elif compression_type == filesystems.CompressionTypes.GZIP:
+      text_source = bgzf.BGZFSource(
+          file_pattern,
+          0,  # min_bundle_size
+          compression_type,
+          True,  # strip_trailing_newlines
+          coders.StrUtf8Coder(),  # coder
+          validate=False,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
+    else:
+      text_source = textio._TextSource(
+          file_pattern,
+          0,  # min_bundle_size
+          compression_type,
+          True,  # strip_trailing_newlines
+          coders.StrUtf8Coder(),  # coder
+          validate=False,
+          header_processor_fns=(
+              lambda x: not x.strip() or x.startswith('#'),
+              self._process_header_lines),
+          **kwargs)
 
     self._text_lines = text_source.read_records(self._file_name,
                                                 range_tracker)
@@ -330,10 +355,11 @@ class PyVcfParser(VcfParser):
   def __init__(self,
                file_name,  # type: str
                range_tracker,  # type: range_trackers.OffsetRangeTracker
-               file_pattern,  # type: str
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
                representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -343,6 +369,7 @@ class PyVcfParser(VcfParser):
                                       compression_type,
                                       allow_malformed_records,
                                       representative_header_lines,
+                                      splittable_bgzf,
                                       **kwargs)
     self._header_lines = []
     self._next_line_to_process = None
@@ -483,9 +510,9 @@ class NucleusParser(VcfParser):
   def __init__(self,
                file_name,  # type: str
                range_tracker,  # type: range_trackers.OffsetRangeTracker
-               file_pattern,  # type: str
                compression_type,  # type: str
                allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
                representative_header_lines=None,  # type:  List[str]
                **kwargs  # type: **str
               ):

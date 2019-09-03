@@ -29,11 +29,11 @@ REQUIRED_PACKAGES = [
     # Nucleus needs uptodate protocol buffer compiler (protoc).
     'protobuf>=3.6.1',
     'mmh3<2.6',
-    # Need to explicitly install v<=1.13.0. apache-beam requires
-    # google-cloud-pubsub 0.39.0, which relies on google-cloud-core<0.30dev,
-    # >=0.29.0. google-cloud-storage also has requirements on google-cloud-core,
-    # and version 1.13.0 resolves the dependency conflicts.
-    'google-cloud-storage<=1.13.0'
+    # Need to explicitly install v<=1.14.0. apache-beam requires
+    # google-cloud-pubsub 0.39.1, which relies on google-cloud-core<0.30dev,
+    # >=0.29.1. google-cloud-storage also has requirements on google-cloud-core,
+    # and version 1.14.0 resolves the dependency conflicts.
+    'google-cloud-storage<=1.14.0'
 ]
 
 REQUIRED_SETUP_PACKAGES = [
@@ -42,7 +42,7 @@ REQUIRED_SETUP_PACKAGES = [
 
 setuptools.setup(
     name='gcp_variant_transforms',
-    version='0.7.1',
+    version='0.8.1',
     description=('Tool for transforming and processing VCF files in a '
                  'scalable manner based on Apache Beam'),
     author='Google',

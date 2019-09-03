@@ -17,12 +17,18 @@
 import collections
 import unittest
 
+from apache_beam.io import filesystem
 from apache_beam.io.filesystems import FileSystems
+from apache_beam.testing import test_pipeline
+from apache_beam.testing.util import assert_that
+
 import mock
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.pipeline_common import PipelineModes
+from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
+from gcp_variant_transforms.testing import testdata_util
 
 
 class PipelineCommonWithPatternTest(unittest.TestCase):
@@ -103,6 +109,60 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
     with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+
+  def test_get_compression_type(self):
+    vcf_metadata_list = [filesystem.FileMetadata(path, size) for
+                         (path, size) in [('gs://1.vcf', 100), ('2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('vcf', vcf_metadata_list)]):
+      self.assertEqual(pipeline_common.get_compression_type(['vcf']),
+                       filesystem.CompressionTypes.AUTO)
+
+    gzip_metadata_list = [
+        filesystem.FileMetadata(path, size) for
+        (path, size) in [('gs://1.vcf.gz', 100), ('2.vcf.gz', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('gzip', gzip_metadata_list)]):
+      self.assertEqual(pipeline_common.get_compression_type('gzip'),
+                       filesystem.CompressionTypes.GZIP)
+
+    mixed_metadata_list = [
+        filesystem.FileMetadata(path, size) for
+        (path, size) in [('gs://1.vcf.gz', 100), ('2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('mixed', mixed_metadata_list)]):
+      with self.assertRaises(ValueError):
+        pipeline_common.get_compression_type('mixed')
+
+  def test_get_splittable_bgzf(self):
+    non_gs_metadata_list = [filesystem.FileMetadata(path, size) for
+                            (path, size) in [('1.vcf', 100),
+                                             ('2.vcf', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('non_gs', non_gs_metadata_list)]):
+      self.assertEqual(pipeline_common._get_splittable_bgzf(['non_gs']),
+                       [])
+
+    gs_metadata_list = [filesystem.FileMetadata(path, size) for
+                        (path, size) in [('gs://1.vcf.bgz', 100),
+                                         ('gs://2.vcf.bgz', 100)]]
+    with mock.patch.object(
+        FileSystems, 'match',
+        return_value=[filesystem.MatchResult('gs', gs_metadata_list)]):
+      with mock.patch.object(FileSystems, 'exists', return_value=True):
+        self.assertEqual(
+            pipeline_common._get_splittable_bgzf(['index file exists']),
+            ['gs://1.vcf.bgz', 'gs://2.vcf.bgz'])
+
+      with mock.patch.object(FileSystems, 'exists', return_value=False):
+        self.assertEqual(
+            pipeline_common._get_splittable_bgzf(['no index file']),
+            [])
+
 
 class PipelineCommonWithFileTest(unittest.TestCase):
   """Tests cases for the `pipeline_common` script with file input."""
@@ -185,3 +245,26 @@ class PipelineCommonWithFileTest(unittest.TestCase):
           ValueError, 'Input pattern .* from .* did not match any files.'):
         pipeline_common._get_all_patterns(
             input_pattern=None, input_file=filename)
+
+
+class CommonPipelineTest(unittest.TestCase):
+
+  def test_read_variants(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.SMALL,
+                                             False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
+  def test_read_variants_large_mode(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.LARGE,
+                                             False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()

@@ -36,13 +36,13 @@ from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 
 
-def _get_header_from_reader(vcf_reader, file_name=None):
+def _get_header_from_reader(vcf_reader, file_path=None):
   return VcfHeader(infos=vcf_reader.infos,
                    filters=vcf_reader.filters,
                    alts=vcf_reader.alts,
                    formats=vcf_reader.formats,
                    contigs=vcf_reader.contigs,
-                   file_name=file_name)
+                   file_path=file_path)
 
 
 def _get_vcf_header_from_lines(lines, file_name=None):

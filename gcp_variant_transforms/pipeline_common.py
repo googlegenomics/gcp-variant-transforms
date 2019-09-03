@@ -21,6 +21,7 @@ PTransforms and writing the output.
 from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
+import os
 import uuid
 from datetime import datetime
 
@@ -31,7 +32,11 @@ from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 from apache_beam.runners.direct import direct_runner
 
+from gcp_variant_transforms.beam_io import bgzf_io
+from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.transforms import fusion_break
 from gcp_variant_transforms.transforms import merge_headers
 
 # If the # of files matching the input file_pattern exceeds this value, then
@@ -101,6 +106,42 @@ def _get_all_patterns(input_pattern, input_file):
   return patterns
 
 
+def get_compression_type(input_patterns):
+  # type: (List[str]) -> filesystem.CompressionTypes
+  """Returns the compression type.
+
+  Raises:
+    ValueError: if the input files are not in the same format.
+  """
+  matches = filesystems.FileSystems.match(input_patterns)
+  extensions = [os.path.splitext(metadata.path)[1] for match in matches
+                for metadata in match.metadata_list]
+  if len(set(extensions)) != 1:
+    raise ValueError('All input files must be in the same format.')
+  if extensions[0].endswith('.bgz') or extensions[0].endswith('.gz'):
+    return filesystem.CompressionTypes.GZIP
+  else:
+    return filesystem.CompressionTypes.AUTO
+
+
+def _get_splittable_bgzf(all_patterns):
+  # type: (List[str]) -> List[str]
+  """Returns the splittable bgzf matching `all_patterns`."""
+  matches = filesystems.FileSystems.match(all_patterns)
+  splittable_bgzf = []
+  count = 0
+  for match in matches:
+    for metadata in match.metadata_list:
+      count += 1
+      if (metadata.path.startswith('gs://') and
+          bgzf_io.exists_tbi_file(metadata.path)):
+        splittable_bgzf.append(metadata.path)
+  if splittable_bgzf and len(splittable_bgzf) < count:
+    raise ValueError("Some index files are missing for {}.".format(
+        all_patterns))
+  return splittable_bgzf
+
+
 def _get_file_names(input_file):
   # type: (str) -> List[str]
   """Reads the input file and extracts list of patterns out of it."""
@@ -131,18 +172,73 @@ def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
     return PipelineModes.MEDIUM
   return PipelineModes.SMALL
 
+def get_estimates(pipeline, pipeline_mode, all_patterns):
+  # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
+  """Creates a PCollection by reading the VCF files and deriving estimates."""
+  if pipeline_mode == PipelineModes.LARGE:
+    estimates = (pipeline
+                 | beam.Create(all_patterns)
+                 | vcf_estimate_io.GetAllEstimates())
+  else:
+    estimates = pipeline | vcf_estimate_io.GetEstimates(all_patterns[0])
+
+  return estimates
+
 
 def read_headers(pipeline, pipeline_mode, all_patterns):
   # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
+  compression_type = get_compression_type(all_patterns)
   if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
                | beam.Create(all_patterns)
-               | vcf_header_io.ReadAllVcfHeaders())
+               | vcf_header_io.ReadAllVcfHeaders(
+                   compression_type=compression_type))
   else:
-    headers = pipeline | vcf_header_io.ReadVcfHeaders(all_patterns[0])
+    headers = pipeline | vcf_header_io.ReadVcfHeaders(
+        all_patterns[0], compression_type=compression_type)
 
   return headers
+
+
+def read_variants(
+    pipeline,  # type: beam.Pipeline
+    all_patterns,  # type: List[str]
+    pipeline_mode,  # type: PipelineModes
+    allow_malformed_records,  # type: bool
+    representative_header_lines=None,  # type: List[str]
+    vcf_parser=vcfio.VcfParserType.PYVCF  # type: vcfio.VcfParserType
+    ):
+  # type: (...) -> pvalue.PCollection
+  """Returns a PCollection of Variants by reading VCFs."""
+  compression_type = get_compression_type(all_patterns)
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    splittable_bgzf = _get_splittable_bgzf(all_patterns)
+    if splittable_bgzf:
+      return (pipeline
+              | 'ReadVariants'
+              >> vcfio.ReadFromBGZF(splittable_bgzf,
+                                    representative_header_lines,
+                                    allow_malformed_records))
+
+  if pipeline_mode == PipelineModes.LARGE:
+    variants = (pipeline
+                | 'InputFilePattern' >> beam.Create(all_patterns)
+                | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
+                    representative_header_lines=representative_header_lines,
+                    compression_type=compression_type,
+                    allow_malformed_records=allow_malformed_records))
+  else:
+    variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
+        all_patterns[0],
+        representative_header_lines=representative_header_lines,
+        compression_type=compression_type,
+        allow_malformed_records=allow_malformed_records,
+        vcf_parser_type=vcf_parser)
+
+  if compression_type == filesystem.CompressionTypes.GZIP:
+    variants |= 'FusionBreak' >> fusion_break.FusionBreak()
+  return variants
 
 
 def add_annotation_headers(pipeline, known_args, pipeline_mode,

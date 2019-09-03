@@ -45,12 +45,12 @@ class VcfHeaderDefinitions(object):
       definition = Definition(
           val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
           val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
-      self._infos[key][definition] = [vcf_header.file_name]
+      self._infos[key][definition] = [vcf_header.file_path]
     for key, val in vcf_header.formats.iteritems():
       definition = Definition(
           val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
           val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
-      self._formats[key][definition] = [vcf_header.file_name]
+      self._formats[key][definition] = [vcf_header.file_path]
 
   def __eq__(self, other):
     return self._infos == other._infos and self._formats == other._formats

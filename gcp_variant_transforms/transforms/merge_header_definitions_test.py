@@ -29,13 +29,13 @@ from gcp_variant_transforms.libs.vcf_header_definitions_merger import VcfHeaderD
 
 class MergeHeadersTest(unittest.TestCase):
 
-  def _get_vcf_header_from_reader(self, reader, file_name):
+  def _get_vcf_header_from_reader(self, reader, file_path):
     return vcf_header_io.VcfHeader(infos=reader.infos,
                                    filters=reader.filters,
                                    alts=reader.alts,
                                    formats=reader.formats,
                                    contigs=reader.contigs,
-                                   file_name=file_name)
+                                   file_path=file_path)
 
   def test_merge_header_definitions_one_header(self):
     lines = [

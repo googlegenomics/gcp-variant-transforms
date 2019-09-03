@@ -15,14 +15,13 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
-from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
+from gcp_variant_transforms.libs import bigquery_util
 
 
 class VariantTransformsOptions(object):
@@ -192,50 +191,26 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     if not parsed_args.output_table and parsed_args.output_avro_path:
       # Writing into BigQuery is not requested; no more BigQuery checks needed.
       return
-    output_table_re_match = re.match(
-        r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
+
+    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
         parsed_args.output_table)
-    if not output_table_re_match:
-      raise ValueError(
-          'Expected a table reference (PROJECT:DATASET.TABLE) '
-          'instead of {}.'.format(parsed_args.output_table))
+
     if not client:
       credentials = GoogleCredentials.get_application_default().create_scoped(
           ['https://www.googleapis.com/auth/bigquery'])
       client = bigquery.BigqueryV2(credentials=credentials)
-    project_id = output_table_re_match.group('project')
-    dataset_id = output_table_re_match.group('dataset')
-    table_id = output_table_re_match.group('table')
-    try:
-      client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-          projectId=project_id,
-          datasetId=dataset_id))
-    except exceptions.HttpError as e:
-      if e.status_code == 404:
-        raise ValueError('Dataset %s:%s does not exist.' %
-                         (project_id, dataset_id))
-      else:
-        # For the rest of the errors, use BigQuery error message.
-        raise
+
+    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
+                                                    dataset_id)
     # Ensuring given output table doesn't already exist to avoid overwriting it.
     if not parsed_args.append:
       if parsed_args.update_schema_on_append:
         raise ValueError('--update_schema_on_append requires --append to be '
                          'true.')
-      try:
-        client.tables.Get(bigquery.BigqueryTablesGetRequest(
-            projectId=project_id,
-            datasetId=dataset_id,
-            tableId=table_id))
-        raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
-                         (project_id, dataset_id, table_id))
-      except exceptions.HttpError as e:
-        if e.status_code == 404:
-          # This is expected, output table must not already exist
-          pass
-        else:
-          # For the rest of the errors, use BigQuery error message.
-          raise
+      bigquery_util.raise_error_if_table_exists(client,
+                                                project_id,
+                                                dataset_id,
+                                                table_id)
 
 
 class AnnotationOptions(VariantTransformsOptions):
@@ -299,20 +274,20 @@ class AnnotationOptions(VariantTransformsOptions):
               'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/gcp-variant-annotation/vep_91',
+        default='gcr.io/cloud-lifesciences/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
         default='',
         help=('The path for VEP cache on Google Cloud Storage. By default, '
-              'this will be set to gs://gcp-variant-annotation-vep-cache/'
+              'this will be set to gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh38_91.tar.gz, assuming neither the '
               '`--vep_species` nor the `--vep_assembly` flags have been set. '
               'For convenience, if either of those flags are provided, this '
               'path will be automatically updated to reflect the new cache, '
               'given values are a species and/or assembly we maintain. For '
               'example, `--vep_assembly GRCh37` is satisfactory for specifying '
-              'our gs://gcp-variant-annotation-vep-cache/'
+              'our gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh37_91.tar.gz cache.'))
     parser.add_argument(
         '--vep_info_field',
@@ -604,3 +579,15 @@ def _validate_inputs(parsed_args):
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '
                      'provided.')
+
+
+class ExperimentalOptions(VariantTransformsOptions):
+  """Options for experimental features."""
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        '--auto_flags_experiment',
+        default=False,
+        help=('Set flag values automatically based on heuristics extracted '
+              'from input files'))

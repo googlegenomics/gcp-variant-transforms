@@ -33,6 +33,7 @@ from apache_beam.io import iobase
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 from apache_beam.io import textio
 
+from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_parser
 
 # All other modules depend on vcfio for the following const values.
@@ -227,16 +228,59 @@ class _VcfSource(filebasedsource.FileBasedSource):
     record_iterator = vcf_parser_class(
         file_name,
         range_tracker,
-        self._pattern,
         self._compression_type,
         self._allow_malformed_records,
-        self._representative_header_lines,
+        file_pattern=self._pattern,
+        representative_header_lines=self._representative_header_lines,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
     # Convert iterator to generator to abstract behavior
     for record in record_iterator:
       yield record
+
+
+class ReadFromBGZF(beam.PTransform):
+  """Reads variants from BGZF."""
+
+  def __init__(self,
+               input_files,
+               representative_header_lines,
+               allow_malformed_records):
+    # type: (List[str], List[str], bool) -> None
+    """Initializes the transform.
+
+    Args:
+      input_files: The BGZF file paths to read from.
+      representative_header_lines: Header definitions to be used for parsing
+        VCF files.
+      allow_malformed_records: If true, malformed records from VCF files will be
+        returned as `MalformedVcfRecord` instead of failing the pipeline.
+    """
+    self._input_files = input_files
+    self._representative_header_lines = representative_header_lines
+    self._allow_malformed_records = allow_malformed_records
+
+  def _read_records(self, (file_path, block)):
+    # type: (Tuple[str, Block]) -> Iterable(Variant)
+    """Reads records from `file_path` in `block`."""
+    record_iterator = vcf_parser.PyVcfParser(
+        file_path,
+        block,
+        filesystems.CompressionTypes.GZIP,
+        self._allow_malformed_records,
+        representative_header_lines=self._representative_header_lines,
+        splittable_bgzf=True)
+
+    for record in record_iterator:
+      yield record
+
+  def expand(self, pcoll):
+    return (pcoll
+            | 'InputFiles' >> beam.Create(self._input_files)
+            | 'SplitSource' >> beam.FlatMap(bgzf_io.split_bgzf)
+            | 'Reshuffle' >> beam.Reshuffle()
+            | 'ReadBlock' >> beam.ParDo(self._read_records))
 
 
 class ReadFromVcf(transforms.PTransform):

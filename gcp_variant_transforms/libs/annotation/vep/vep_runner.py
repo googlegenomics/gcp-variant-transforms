@@ -98,7 +98,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
 class VepRunner(object):
   """A class for running vep through Pipelines API on a set of input files."""
 
-  _VEP_CACHE_BASE = ('gs://gcp-variant-annotation-vep-cache/'
+  _VEP_CACHE_BASE = ('gs://cloud-lifesciences/vep/'
                      'vep_cache_{species}_{assembly}_91.tar.gz')
 
   def __init__(
@@ -195,7 +195,7 @@ class VepRunner(object):
                 # VEP database for a wrong reference sequence is being used
                 # and this has to caught and communicated to the user.
                 'OTHER_VEP_OPTS':
-                    '--everything --check_ref --allow_non_variant',
+                    '--everything --check_ref --allow_non_variant --format vcf',
             },
             'resources': {
                 'projectId': self._project,

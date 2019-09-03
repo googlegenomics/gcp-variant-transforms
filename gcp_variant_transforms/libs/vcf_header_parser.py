@@ -48,7 +48,7 @@ def get_vcf_headers(input_file):
                                  alts=vcf_reader.alts,
                                  formats=vcf_reader.formats,
                                  contigs=vcf_reader.contigs,
-                                 file_name=input_file)
+                                 file_path=input_file)
 
 
 def get_metadata_header_lines(input_file):
