@@ -246,7 +246,8 @@ class ReadFromBGZF(beam.PTransform):
   def __init__(self,
                input_files,
                representative_header_lines,
-               allow_malformed_records):
+               allow_malformed_records,
+               vcf_parser_type=VcfParserType.PYVCF):
     # type: (List[str], List[str], bool) -> None
     """Initializes the transform.
 
@@ -260,11 +261,22 @@ class ReadFromBGZF(beam.PTransform):
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
+    self._vcf_parser_type = vcf_parser_type
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
-    record_iterator = vcf_parser.PyVcfParser(
+
+    vcf_parser_class = None
+    if self._vcf_parser_type == VcfParserType.PYVCF:
+      vcf_parser_class = vcf_parser.PyVcfParser
+    elif self._vcf_parser_type == VcfParserType.PYSAM:
+      vcf_parser_class = vcf_parser.PySamParser
+    else:
+      raise ValueError(
+          'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
+
+    record_iterator = vcf_parser_class(
         file_path,
         block,
         filesystems.CompressionTypes.GZIP,
@@ -333,11 +345,12 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None):
+    allow_malformed_records=None, vcf_parser_type=VcfParserType.PYVCF):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records)
+                    allow_malformed_records=allow_malformed_records,
+                    vcf_parser_type=vcf_parser_type)
 
 
 class ReadAllFromVcf(PTransform):
@@ -360,6 +373,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
+      vcf_parser_type=VcfParserType.PYVCF,
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -384,7 +398,8 @@ class ReadAllFromVcf(PTransform):
         _create_vcf_source,
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        vcf_parser_type=vcf_parser_type)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

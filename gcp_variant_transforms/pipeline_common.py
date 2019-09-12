@@ -227,7 +227,8 @@ def read_variants(
                 | 'ReadAllFromVcf' >> vcfio.ReadAllFromVcf(
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records))
+                    allow_malformed_records=allow_malformed_records,
+                    vcf_parser_type=vcf_parser))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
