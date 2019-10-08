@@ -24,6 +24,7 @@ from copy import copy
 import logging
 import os
 import tempfile
+import typing  # pylint: disable=unused-import
 
 from apache_beam.coders import coders
 from apache_beam.io import filesystems
@@ -233,7 +234,6 @@ class VariantCall(object):
     return ', '.join(
         [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
 
-
 class VcfParser(object):
   """Base abstract class for defining a VCF file parser.
 
@@ -319,34 +319,46 @@ class VcfParser(object):
   def after_read(self):
     return
 
+  def _next_non_empty_line(self, iterator):
+    # Get next non-empty stripped record from iterator.
+    # type: (typing.Iterable[str]) -> str
+    text_line = next(iterator).strip()
+    while not text_line:  # skip empty lines.
+      text_line = next(iterator).strip()
+    return text_line
+
   def _verify_header(self, text_source, range_tracker):
     try:
       text_lines = text_source.read_records(self._file_name,
                                             range_tracker)
-
-      text_line = next(text_lines).strip()
-      while not text_line.strip():  # skip empty lines.
-        # This natively raises StopIteration if end of file is reached.
-        text_line = next(text_lines).strip()
+      # Read until first non empty record
+      self._next_non_empty_line(text_lines)
       if not self._header_lines[-1].startswith(LAST_HEADER_LINE_PREFIX):
         raise ValueError('Header missing CHROM line.')
+      # Construct VariantHeader class from the metadata lines, to verify the
+      # validity of the file. PySam would not raise an error, will omit the
+      # metadata and hide the issue, if the header is incorrect.
       header = libcbcf.VariantHeader()
       for header_line in self._header_lines[:-1]:
         header.add_line(header_line)
 
       for k, v in header.info.iteritems():
+        # ID, Description, Type and Number are mandatory fields.
         if not k:
           raise ValueError('Corrupt ID at header line {}.'.format(v.id))
         if not v.description:
           raise ValueError(
               'Corrupt Description at header line {}.'.format(v.id))
+        # Type can only be Integer, Float, Flag, Character or String
         if not v.type or v.record['Type'] not in HEADER_INFO_TYPES:
           raise ValueError('Corrupt Type at header line {}'.format(v.id))
+        # Number can only be a number or one of 'A', 'R', 'G' and '.'.
         if not v.record['Number'] or (
             v.record['Number'] not in HEADER_INFO_NUMBERS and
             not v.record['Number'].isdigit()):
           raise ValueError('Unknown Number at header line {}.'.format(v.id))
     except StopIteration:
+      # If no record was found, add CHROM line if it's missing.
       if not self._header_lines[-1].startswith(LAST_HEADER_LINE_PREFIX):
         self._header_lines.append(LAST_HEADER_LINE_PREFIX)
 
@@ -360,12 +372,19 @@ class VcfParser(object):
       # We need to keep the last line of the header from the file because it
       # contains the sample IDs, which is unique per file.
       header_lines = self._representative_header_lines + header_lines[-1:]
+    # For PySam parser, do not initiate the class with header from this method
+    # since it's being called once Text Source is read, and for PySam, we need
+    # to read text source twice - once to verify that either CHROM... line
+    # exists or no record lines exist, and once to actually process the file.
     if isinstance(self, PySamParser):
+      # PySam requires 'fileformat=VCFvX' field to be supplied, default to 4.0.
       if header_lines and not header_lines[0].startswith(
           FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
         header_lines.insert(
             0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
       header_lines = [line.strip() for line in header_lines if line.strip()]
+      # Number='G' is to be deprecated and is unsupported by PySam - replace
+      # with 'unknown' number identifier if found.
       self._header_lines = filter(None, [line.strip().replace(
           'Number=G', 'Number=.').encode('utf-8') for line in header_lines])
     else:
@@ -373,11 +392,9 @@ class VcfParser(object):
 
   def next(self):
     try:
-      text_line = next(self._text_lines).strip()
-      while not text_line:  # skip empty lines.
-        # This natively raises StopIteration if end of file is reached.
-        text_line = next(self._text_lines).strip()
+      text_line = self._next_non_empty_line(self._text_lines)
     except StopIteration as e:
+      # clean up, once iterator is depleted.
       self.after_read()
       raise e
     record = self._get_variant(text_line)
@@ -725,6 +742,7 @@ class PySamParser(VcfParser):
     return info
 
   def _parse_to_numeric(self, value):
+    # Attempt to parse a value to int, then float or return as string.
     # type: (Any) -> Any
     if isinstance(value, str) and value.isdigit():
       return int(value)
@@ -733,12 +751,11 @@ class PySamParser(VcfParser):
         return self._parse_float(float(value))
       except ValueError:
         # non float
-        if isinstance(value, unicode):
-          return value.encode('utf-8')
         return value
 
   def _parse_float(self, value):
     # type: (Any) -> Any
+    # Resolve the floating point discrepancy.
     precise_value = float("{:0g}".format(value))
     if precise_value.is_integer():
       return int(precise_value)
@@ -749,6 +766,7 @@ class PySamParser(VcfParser):
     # PySam currently doesn't recognize '.' value for String fields as missing.
     if value == '.' or value == b'.' or not value:
       return None
+    # some times PySam returns unicode strings, encode them as strings instead.
     elif isinstance(value, unicode):
       value = value.encode('utf-8')
     return self._parse_to_numeric(value) if numeric else str(value)
