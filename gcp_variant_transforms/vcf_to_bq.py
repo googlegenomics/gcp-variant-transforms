@@ -37,7 +37,7 @@ import argparse  # pylint: disable=unused-import
 import logging
 import sys
 import tempfile
-from typing import Dict, List, Optional  # pylint: disable=unused-import
+from typing import List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
@@ -382,7 +382,6 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 def _create_call_info_table(pipeline,  # type: beam.Pipeline
                             pipeline_mode,  # type: PipelineModes
                             known_args,  # type: argparse.Namespace
-                            file_path_to_file_hash  # type: Dict[str, str]
                            ):
   # type: (...) -> None
   headers = pipeline_common.read_headers(pipeline,
@@ -390,40 +389,7 @@ def _create_call_info_table(pipeline,  # type: beam.Pipeline
                                          known_args.all_patterns)
   _ = (headers | 'CallInfoToBigQuery' >>
        call_info_to_bigquery.CallInfoToBigQuery(known_args.output_table,
-                                                file_path_to_file_hash,
                                                 known_args.append))
-
-
-def _write_to_bigquery_v2(pipeline,  # type: beam.Pipeline
-                          pipeline_mode,  # type: PipelineModes
-                          known_args,  # type: argparse.Namespace
-                          file_path_to_file_hash  # type: Dict[str, str]
-                         ):
-  _create_call_info_table(pipeline, pipeline_mode, known_args,
-                          file_path_to_file_hash)
-
-
-def _write_to_bigquery_v1(
-    variants,  # type: pvalue.PCollection
-    known_args,  # type: argparse.Namespace
-    table_suffix,  # type: str
-    header_fields,  # type: vcf_header_io.VcfHeader
-    variant_merger,  # type: variant_merge_strategy.VariantMergeStrategy
-    proc_variant_factory  # type: processed_variant.ProcessedVariantFactory
-):
-  _ = (variants | 'VariantToBigQuery' + table_suffix >>
-       variant_to_bigquery.VariantToBigQuery(
-           known_args.output_table + table_suffix,
-           header_fields,
-           variant_merger,
-           proc_variant_factory,
-           append=known_args.append,
-           update_schema_on_append=known_args.update_schema_on_append,
-           allow_incompatible_records=known_args.allow_incompatible_records,
-           omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-           num_bigquery_write_shards=known_args.num_bigquery_write_shards,
-           null_numeric_value_replacement=(
-               known_args.null_numeric_value_replacement)))
 
 
 def run(argv=None):
@@ -477,9 +443,6 @@ def run(argv=None):
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
-  google_cloud_options = beam_pipeline_options.view_as(
-      pipeline_options.GoogleCloudOptions)
-
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
@@ -515,23 +478,22 @@ def run(argv=None):
       table_suffix = ''
       if partitioner and partitioner.get_partition_name(i):
         table_suffix = '_' + partitioner.get_partition_name(i)
-      if (known_args.schema_version ==
-          variant_transform_options.BigQueryWriteOptions.V1):
-        _write_to_bigquery_v1(variants[i],
-                              known_args,
-                              table_suffix,
-                              header_fields,
-                              variant_merger,
-                              processed_variant_factory)
-      elif (known_args.schema_version ==
-            variant_transform_options.BigQueryWriteOptions.V2):
-        file_path_to_file_hash = (
-            pipeline_common.create_file_path_to_file_hash_map(
-                known_args.all_patterns, google_cloud_options.project))
-        _write_to_bigquery_v2(pipeline,
-                              pipeline_mode,
-                              known_args,
-                              file_path_to_file_hash)
+      table_name = known_args.output_table + table_suffix
+      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
+           variant_to_bigquery.VariantToBigQuery(
+               table_name,
+               header_fields,
+               variant_merger,
+               processed_variant_factory,
+               append=known_args.append,
+               update_schema_on_append=known_args.update_schema_on_append,
+               allow_incompatible_records=known_args.allow_incompatible_records,
+               omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+               num_bigquery_write_shards=known_args.num_bigquery_write_shards,
+               null_numeric_value_replacement=(
+                   known_args.null_numeric_value_replacement)))
+      if known_args.generate_call_info_table:
+        _create_call_info_table(pipeline, pipeline_mode, known_args)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

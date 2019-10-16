@@ -21,7 +21,6 @@ from gcp_variant_transforms.libs import bigquery_util
 CALL_ID = 'call_id'
 CALL_NAME = 'call_name'
 FILE_PATH = 'file_path'
-FILE_ID = 'file_id'
 TABLE_SUFFIX = '_call_info'
 
 
@@ -37,16 +36,11 @@ def generate_schema():
       name=CALL_NAME,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('Name of the call.')))
-  schema.fields.append(bigquery.TableFieldSchema(
-      name=FILE_ID,
-      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
-      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('File id of the call.')))
+      description=('Name of the call as we read it from the VCF file.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=FILE_PATH,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('File path of the call.')))
+      description=('Full file path on GCS of the call.')))
 
   return schema

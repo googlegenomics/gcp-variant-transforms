@@ -139,12 +139,6 @@ class AvroWriteOptions(VariantTransformsOptions):
 
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
-  V1 = 'v1'
-  V2 = 'v2'
-  SCHEMA_VERSION = [
-      V1,
-      V2,
-  ]
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
@@ -152,13 +146,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                         default='',
                         help='BigQuery table to store the results.')
     parser.add_argument(
-        '--schema_version',
-        default=BigQueryWriteOptions.V1,
-        choices=BigQueryWriteOptions.SCHEMA_VERSION,
-        help=('If set to 1, a new schema will be applied when running VCF to '
-              'BQ. For now, a call info table with the name output_table + {} '
-              'will be created. [EXPERIMENTAL]').format(
-                  call_info_table_schema_generator.TABLE_SUFFIX))
+        '--generate_call_info_table',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If set to True, a call info table with the name '
+              'output_table + {} will be created. This table contains a unique '
+              'call_id for each call read from the VCF file. This call_id can '
+              'be used to distinguish between call names. [EXPERIMENTAL]'
+             ).format(call_info_table_schema_generator.TABLE_SUFFIX))
 
     parser.add_argument(
         '--split_alternate_allele_info_fields',
@@ -223,17 +217,17 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       if parsed_args.update_schema_on_append:
         raise ValueError('--update_schema_on_append requires --append to be '
                          'true.')
-      if parsed_args.schema_version == BigQueryWriteOptions.V2:
+      if parsed_args.generate_call_info_table:
         bigquery_util.raise_error_if_table_exists(
             client,
             project_id,
             dataset_id,
             table_id + call_info_table_schema_generator.TABLE_SUFFIX)
-      else:
-        bigquery_util.raise_error_if_table_exists(client,
-                                                  project_id,
-                                                  dataset_id,
-                                                  table_id)
+
+      bigquery_util.raise_error_if_table_exists(client,
+                                                project_id,
+                                                dataset_id,
+                                                table_id)
 
 
 class AnnotationOptions(VariantTransformsOptions):

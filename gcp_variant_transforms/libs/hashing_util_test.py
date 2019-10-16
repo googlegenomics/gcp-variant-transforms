@@ -20,6 +20,6 @@ from gcp_variant_transforms.libs import hashing_util
 class HashingUtilTest(unittest.TestCase):
 
   def test_generate_int64_hash_code(self):
-    hash_code = hashing_util.generate_int64_hash_code('gs://bucket/blob '
-                                                      'sample 1')
-    self.assertEqual(hash_code, 5941535641672088076)
+    hash_code = hashing_util.generate_unsigned_hash_code('gs://bucket/blob '
+                                                         'sample 1')
+    self.assertEqual(hash_code, 5941535641672088077)

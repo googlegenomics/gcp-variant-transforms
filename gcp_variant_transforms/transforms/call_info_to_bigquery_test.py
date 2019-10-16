@@ -36,22 +36,18 @@ class ConvertCallInfoToRowTest(unittest.TestCase):
     file_path_to_file_hash = {'file_1': 'hash_1',
                               'file_2': 'hash_2'}
     expected_rows = [
-        {call_info_table_schema_generator.CALL_ID: 1773518740613211130,
+        {call_info_table_schema_generator.CALL_ID: 381872458580912973,
          call_info_table_schema_generator.CALL_NAME: 'Sample 1',
-         call_info_table_schema_generator.FILE_PATH: 'file_1',
-         call_info_table_schema_generator.FILE_ID: 2390198520664053477},
-        {call_info_table_schema_generator.CALL_ID: 2179255556240246529,
+         call_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {call_info_table_schema_generator.CALL_ID: 8499640793907698254,
          call_info_table_schema_generator.CALL_NAME: 'Sample 2',
-         call_info_table_schema_generator.FILE_PATH: 'file_1',
-         call_info_table_schema_generator.FILE_ID: 2390198520664053477},
-        {call_info_table_schema_generator.CALL_ID: -3371474033889505544,
+         call_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {call_info_table_schema_generator.CALL_ID: 3296990248923613411,
          call_info_table_schema_generator.CALL_NAME: 'Sample 1',
-         call_info_table_schema_generator.FILE_PATH: 'file_2',
-         call_info_table_schema_generator.FILE_ID: 4473652499813588014},
-        {call_info_table_schema_generator.CALL_ID: -6659115699645196269,
+         call_info_table_schema_generator.FILE_PATH: 'file_2'},
+        {call_info_table_schema_generator.CALL_ID: 6472296922043113988,
          call_info_table_schema_generator.CALL_NAME: 'Sample 2',
-         call_info_table_schema_generator.FILE_PATH: 'file_2',
-         call_info_table_schema_generator.FILE_ID: 4473652499813588014}
+         call_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]
     pipeline = test_pipeline.TestPipeline()
     bigquery_rows = (

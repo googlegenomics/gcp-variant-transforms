@@ -25,6 +25,5 @@ class GenerateCallInfoTableSchemaTest(unittest.TestCase):
     schema = call_info_table_schema_generator.generate_schema()
     expected_fields = [call_info_table_schema_generator.CALL_ID,
                        call_info_table_schema_generator.CALL_NAME,
-                       call_info_table_schema_generator.FILE_ID,
                        call_info_table_schema_generator.FILE_PATH]
     self.assertEqual(expected_fields, [field.name for field in schema.fields])
