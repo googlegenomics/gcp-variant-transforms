@@ -42,9 +42,13 @@ REQUIRED_PACKAGES = [
     # Nucleus needs uptodate protocol buffer compiler (protoc).
     'protobuf>=3.6.1',
     'mmh3<2.6',
+<<<<<<< HEAD
     # Refer to issue #528
     'google-cloud-storage<1.23.0',
     'pyfarmhash'
+=======
+    'google-cloud-storage'
+>>>>>>> Address eights iteration of comments.
 ]
 
 REQUIRED_SETUP_PACKAGES = [
@@ -83,6 +87,7 @@ class CustomCommands(setuptools.Command):
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.
+
   The package built using the current setup.py will be staged and later
   installed in the worker using `pip install package'. This class will be
   instantiated during install for this specific scenario and will trigger

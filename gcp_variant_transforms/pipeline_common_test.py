@@ -25,6 +25,7 @@ from apache_beam.testing.util import assert_that
 import mock
 
 from gcp_variant_transforms import pipeline_common
+from gcp_variant_transforms.beam_io.vcfio import VcfParserType
 from gcp_variant_transforms.pipeline_common import PipelineModes
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
@@ -266,5 +267,27 @@ class CommonPipelineTest(unittest.TestCase):
                                              all_patterns,
                                              PipelineModes.LARGE,
                                              False)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
+  def test_read_variants_pysam(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.SMALL,
+                                             False,
+                                             vcf_parser=VcfParserType.PYSAM)
+    assert_that(variants, asserts.count_equals_to(5))
+    pipeline.run()
+
+  def test_read_variants_large_mode_pysam(self):
+    pipeline = test_pipeline.TestPipeline()
+    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
+    variants = pipeline_common.read_variants(pipeline,
+                                             all_patterns,
+                                             PipelineModes.LARGE,
+                                             False,
+                                             vcf_parser=VcfParserType.PYSAM)
     assert_that(variants, asserts.count_equals_to(5))
     pipeline.run()

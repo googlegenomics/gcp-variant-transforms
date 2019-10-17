@@ -261,22 +261,20 @@ class ReadFromBGZF(beam.PTransform):
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
-    self._vcf_parser_type = vcf_parser_type
+    self._vcf_parser_class = None
+    if vcf_parser_type == VcfParserType.PYVCF:
+      self._vcf_parser_class = vcf_parser.PyVcfParser
+    elif vcf_parser_type == VcfParserType.PYSAM:
+      self._vcf_parser_class = vcf_parser.PySamParser
+    else:
+      raise ValueError(
+          'Unrecognized vcf_parser_type: %s.' % str(vcf_parser_type))
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
 
-    vcf_parser_class = None
-    if self._vcf_parser_type == VcfParserType.PYVCF:
-      vcf_parser_class = vcf_parser.PyVcfParser
-    elif self._vcf_parser_type == VcfParserType.PYSAM:
-      vcf_parser_class = vcf_parser.PySamParser
-    else:
-      raise ValueError(
-          'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
-
-    record_iterator = vcf_parser_class(
+    record_iterator = self._vcf_parser_class(
         file_path,
         block,
         filesystems.CompressionTypes.GZIP,
@@ -373,7 +371,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type=VcfParserType.PYVCF,
+      vcf_parser_type=VcfParserType.PYVCF, # int
       **kwargs  # type: **str
       ):
     # type: (...) -> None

@@ -21,10 +21,10 @@ from __future__ import absolute_import
 
 from collections import namedtuple
 from copy import copy
+from typing import Iterable # pylint: disable=unused-import
 import logging
 import os
 import tempfile
-import typing  # pylint: disable=unused-import
 
 from apache_beam.coders import coders
 from apache_beam.io import filesystems
@@ -234,6 +234,7 @@ class VariantCall(object):
     return ', '.join(
         [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
 
+
 class VcfParser(object):
   """Base abstract class for defining a VCF file parser.
 
@@ -320,8 +321,8 @@ class VcfParser(object):
     return
 
   def _next_non_empty_line(self, iterator):
+    # type: (Iterable[str]) -> str
     # Get next non-empty stripped record from iterator.
-    # type: (typing.Iterable[str]) -> str
     text_line = next(iterator).strip()
     while not text_line:  # skip empty lines.
       text_line = next(iterator).strip()
@@ -742,8 +743,8 @@ class PySamParser(VcfParser):
     return info
 
   def _parse_to_numeric(self, value):
-    # Attempt to parse a value to int, then float or return as string.
     # type: (Any) -> Any
+    # Attempt to parse a value to int, then float or return as string.
     if isinstance(value, str) and value.isdigit():
       return int(value)
     else:

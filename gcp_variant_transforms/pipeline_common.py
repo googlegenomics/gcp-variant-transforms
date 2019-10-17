@@ -219,7 +219,8 @@ def read_variants(
               | 'ReadVariants'
               >> vcfio.ReadFromBGZF(splittable_bgzf,
                                     representative_header_lines,
-                                    allow_malformed_records))
+                                    allow_malformed_records,
+                                    vcf_parser_type=vcf_parser))
 
   if pipeline_mode == PipelineModes.LARGE:
     variants = (pipeline
