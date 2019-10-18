@@ -273,7 +273,6 @@ class ReadFromBGZF(beam.PTransform):
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
-
     record_iterator = self._vcf_parser_class(
         file_path,
         block,
@@ -371,7 +370,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type=VcfParserType.PYVCF, # int
+      vcf_parser_type=VcfParserType.PYVCF,  # type: int
       **kwargs  # type: **str
       ):
     # type: (...) -> None

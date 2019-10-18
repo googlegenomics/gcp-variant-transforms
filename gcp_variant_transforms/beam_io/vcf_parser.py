@@ -21,7 +21,7 @@ from __future__ import absolute_import
 
 from collections import namedtuple
 from copy import copy
-from typing import Iterable # pylint: disable=unused-import
+from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
 import tempfile
@@ -329,6 +329,12 @@ class VcfParser(object):
     return text_line
 
   def _verify_header(self, text_source, range_tracker):
+    # Perform various checks on header section of the VCF file.
+    # 1) Try to read first record of the file. If one exists (StopIteration
+    #    error was not raised), verify that CHROM line exists. If error was
+    #    raised, if CHROM line is missing, add a dummy one for consistency.
+    # 2) Construct PySam header object and manually verify the validity of the
+    #    header metadata.
     try:
       text_lines = text_source.read_records(self._file_name,
                                             range_tracker)
@@ -694,6 +700,9 @@ class PySamParser(VcfParser):
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
   def _verify_record(self, record):
+    # For incorrectly supplied POS or END info fields (eg. String given
+    # instead of int), PySam returns "-MAX_INT" value instead of raising an
+    # error, which we need to catch ourselves.
     if record.start < 0:
       raise ValueError('Start position is incorrect.')
     if record.stop < 0:
