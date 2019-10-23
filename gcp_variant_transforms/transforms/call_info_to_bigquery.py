@@ -28,7 +28,7 @@ class ConvertCallInfoToRow(beam.DoFn):
     # type: (vcf_header_io.VcfHeader) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
       call_id = hashing_util.generate_unsigned_hash_code(
-          vcf_header.file_path + sample, max_hash_value=pow(2, 63))
+          [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
       row = {
           call_info_table_schema_generator.CALL_ID: call_id,
           call_info_table_schema_generator.CALL_NAME: sample,
@@ -49,7 +49,7 @@ class CallInfoToBigQuery(beam.PTransform):
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
     """
-    self._output_table = ''.join([
+    self._output_table = '_'.join([
         output_table_prefix, call_info_table_schema_generator.TABLE_SUFFIX])
     self._append = append
     self._schema = call_info_table_schema_generator.generate_schema()

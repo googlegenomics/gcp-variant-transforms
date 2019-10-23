@@ -149,9 +149,10 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--generate_call_info_table',
         type='bool', default=False, nargs='?', const=True,
         help=('If set to True, a call info table with the name '
-              'output_table + {} will be created. This table contains a unique '
-              'call_id for each call read from the VCF file. This call_id can '
-              'be used to distinguish between call names. [EXPERIMENTAL]'
+              'output_table_ + {} will be created. This table contains a '
+              'unique call_id for each call read from the VCF file. This '
+              'call_id can be used to distinguish between call names. '
+              '[EXPERIMENTAL]'
              ).format(call_info_table_schema_generator.TABLE_SUFFIX))
 
     parser.add_argument(
@@ -222,7 +223,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
             client,
             project_id,
             dataset_id,
-            table_id + call_info_table_schema_generator.TABLE_SUFFIX)
+            '_'.join([table_id, call_info_table_schema_generator.TABLE_SUFFIX]))
 
       bigquery_util.raise_error_if_table_exists(client,
                                                 project_id,

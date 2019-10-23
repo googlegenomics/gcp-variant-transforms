@@ -36,16 +36,16 @@ class ConvertCallInfoToRowTest(unittest.TestCase):
     file_path_to_file_hash = {'file_1': 'hash_1',
                               'file_2': 'hash_2'}
     expected_rows = [
-        {call_info_table_schema_generator.CALL_ID: 381872458580912973,
+        {call_info_table_schema_generator.CALL_ID: 5961690698012655974,
          call_info_table_schema_generator.CALL_NAME: 'Sample 1',
          call_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {call_info_table_schema_generator.CALL_ID: 8499640793907698254,
+        {call_info_table_schema_generator.CALL_ID: 5854056809620188906,
          call_info_table_schema_generator.CALL_NAME: 'Sample 2',
          call_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {call_info_table_schema_generator.CALL_ID: 3296990248923613411,
+        {call_info_table_schema_generator.CALL_ID: 5259968798637352651,
          call_info_table_schema_generator.CALL_NAME: 'Sample 1',
          call_info_table_schema_generator.FILE_PATH: 'file_2'},
-        {call_info_table_schema_generator.CALL_ID: 6472296922043113988,
+        {call_info_table_schema_generator.CALL_ID: 6253115674664185777,
          call_info_table_schema_generator.CALL_NAME: 'Sample 2',
          call_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]

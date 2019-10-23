@@ -21,7 +21,7 @@ from gcp_variant_transforms.libs import bigquery_util
 CALL_ID = 'call_id'
 CALL_NAME = 'call_name'
 FILE_PATH = 'file_path'
-TABLE_SUFFIX = '_call_info'
+TABLE_SUFFIX = 'call_info'
 
 
 def generate_schema():

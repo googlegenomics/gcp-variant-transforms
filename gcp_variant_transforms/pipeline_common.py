@@ -18,7 +18,7 @@ It includes parsing the command line arguments, reading the input, applying the
 PTransforms and writing the output.
 """
 
-from typing import Dict, List  # pylint: disable=unused-import
+from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
 import os
