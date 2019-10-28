@@ -12,35 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generates call_info table schema."""
+"""Generates sample_info table schema."""
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.libs import bigquery_util
 
-CALL_ID = 'call_id'
-CALL_NAME = 'call_name'
+SAMPLE_ID = 'sample_id'
+SAMPLE_NAME = 'sample_name'
 FILE_PATH = 'file_path'
-TABLE_SUFFIX = 'call_info'
+TABLE_SUFFIX = 'sample_info'
 
 
 def generate_schema():
   # type: () -> bigquery.TableSchema
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
-      name=CALL_ID,
+      name=SAMPLE_ID,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='An Integer that uniquely identifies a call.'))
+      description='An Integer that uniquely identifies a sample.'))
   schema.fields.append(bigquery.TableFieldSchema(
-      name=CALL_NAME,
+      name=SAMPLE_NAME,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('Name of the call as we read it from the VCF file.')))
+      description=('Name of the sample as we read it from the VCF file.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=FILE_PATH,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('Full file path on GCS of the call.')))
+      description=('Full file path on GCS of the sample.')))
 
   return schema

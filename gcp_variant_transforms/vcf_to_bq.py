@@ -56,7 +56,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
-from gcp_variant_transforms.transforms import call_info_to_bigquery
+from gcp_variant_transforms.transforms import sample_info_to_bigquery
 from gcp_variant_transforms.transforms import combine_call_names
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
@@ -379,17 +379,17 @@ def _run_annotation_pipeline(known_args, pipeline_args):
   return annotated_vcf_pattern
 
 
-def _create_call_info_table(pipeline,  # type: beam.Pipeline
-                            pipeline_mode,  # type: PipelineModes
-                            known_args,  # type: argparse.Namespace
-                           ):
+def _create_sample_info_table(pipeline,  # type: beam.Pipeline
+                              pipeline_mode,  # type: PipelineModes
+                              known_args,  # type: argparse.Namespace
+                             ):
   # type: (...) -> None
   headers = pipeline_common.read_headers(pipeline,
                                          pipeline_mode,
                                          known_args.all_patterns)
-  _ = (headers | 'CallInfoToBigQuery' >>
-       call_info_to_bigquery.CallInfoToBigQuery(known_args.output_table,
-                                                known_args.append))
+  _ = (headers | 'SampleInfoToBigQuery' >>
+       sample_info_to_bigquery.SampleInfoToBigQuery(known_args.output_table,
+                                                    known_args.append))
 
 
 def run(argv=None):
@@ -492,8 +492,8 @@ def run(argv=None):
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
                    known_args.null_numeric_value_replacement)))
-      if known_args.generate_call_info_table:
-        _create_call_info_table(pipeline, pipeline_mode, known_args)
+      if known_args.generate_sample_info_table:
+        _create_sample_info_table(pipeline, pipeline_mode, known_args)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for `call_info_table_schema_generator` module."""
+"""Tests for `sample_info_table_schema_generator` module."""
 
 import unittest
 
-from gcp_variant_transforms.libs import call_info_table_schema_generator
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 
 
-class GenerateCallInfoTableSchemaTest(unittest.TestCase):
+class GenerateSampleInfoTableSchemaTest(unittest.TestCase):
 
-  def test_generate_call_info_table_schema(self):
-    schema = call_info_table_schema_generator.generate_schema()
-    expected_fields = [call_info_table_schema_generator.CALL_ID,
-                       call_info_table_schema_generator.CALL_NAME,
-                       call_info_table_schema_generator.FILE_PATH]
+  def test_generate_sample_info_table_schema(self):
+    schema = sample_info_table_schema_generator.generate_schema()
+    expected_fields = [sample_info_table_schema_generator.SAMPLE_ID,
+                       sample_info_table_schema_generator.SAMPLE_NAME,
+                       sample_info_table_schema_generator.FILE_PATH]
     self.assertEqual(expected_fields, [field.name for field in schema.fields])

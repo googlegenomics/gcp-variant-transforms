@@ -22,7 +22,7 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import call_info_table_schema_generator
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 
 
 class VariantTransformsOptions(object):
@@ -146,14 +146,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                         default='',
                         help='BigQuery table to store the results.')
     parser.add_argument(
-        '--generate_call_info_table',
+        '--generate_sample_info_table',
         type='bool', default=False, nargs='?', const=True,
-        help=('If set to True, a call info table with the name '
+        help=('If set to True, a sample info table with the name '
               'output_table_ + {} will be created. This table contains a '
-              'unique call_id for each call read from the VCF file. This '
-              'call_id can be used to distinguish between call names. '
+              'unique sample_id for each sample read from the VCF file. This '
+              'sample_id can be used to distinguish between sample names. '
               '[EXPERIMENTAL]'
-             ).format(call_info_table_schema_generator.TABLE_SUFFIX))
+             ).format(sample_info_table_schema_generator.TABLE_SUFFIX))
 
     parser.add_argument(
         '--split_alternate_allele_info_fields',
@@ -218,12 +218,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       if parsed_args.update_schema_on_append:
         raise ValueError('--update_schema_on_append requires --append to be '
                          'true.')
-      if parsed_args.generate_call_info_table:
+      if parsed_args.generate_sample_info_table:
         bigquery_util.raise_error_if_table_exists(
             client,
             project_id,
             dataset_id,
-            '_'.join([table_id, call_info_table_schema_generator.TABLE_SUFFIX]))
+            '_'.join([table_id,
+                      sample_info_table_schema_generator.TABLE_SUFFIX]))
 
       bigquery_util.raise_error_if_table_exists(client,
                                                 project_id,

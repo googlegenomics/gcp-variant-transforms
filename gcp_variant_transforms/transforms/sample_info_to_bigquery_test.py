@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for `call_info_to_bigquery` module."""
+"""Tests for `sample_info_to_bigquery` module."""
 
 import unittest
 
@@ -22,13 +22,13 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.libs import call_info_table_schema_generator
-from gcp_variant_transforms.transforms import call_info_to_bigquery
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.transforms import sample_info_to_bigquery
 
 
-class ConvertCallInfoToRowTest(unittest.TestCase):
+class ConvertSampleInfoToRowTest(unittest.TestCase):
 
-  def test_convert_call_info_to_row(self):
+  def test_convert_sample_info_to_row(self):
     vcf_header_1 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
@@ -36,25 +36,25 @@ class ConvertCallInfoToRowTest(unittest.TestCase):
     file_path_to_file_hash = {'file_1': 'hash_1',
                               'file_2': 'hash_2'}
     expected_rows = [
-        {call_info_table_schema_generator.CALL_ID: 5961690698012655974,
-         call_info_table_schema_generator.CALL_NAME: 'Sample 1',
-         call_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {call_info_table_schema_generator.CALL_ID: 5854056809620188906,
-         call_info_table_schema_generator.CALL_NAME: 'Sample 2',
-         call_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {call_info_table_schema_generator.CALL_ID: 5259968798637352651,
-         call_info_table_schema_generator.CALL_NAME: 'Sample 1',
-         call_info_table_schema_generator.FILE_PATH: 'file_2'},
-        {call_info_table_schema_generator.CALL_ID: 6253115674664185777,
-         call_info_table_schema_generator.CALL_NAME: 'Sample 2',
-         call_info_table_schema_generator.FILE_PATH: 'file_2'}
+        {sample_info_table_schema_generator.SAMPLE_ID: 5961690698012655974,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 5854056809620188906,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 5259968798637352651,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+         sample_info_table_schema_generator.FILE_PATH: 'file_2'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 6253115674664185777,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+         sample_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]
     pipeline = test_pipeline.TestPipeline()
     bigquery_rows = (
         pipeline
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
-        >> transforms.ParDo(call_info_to_bigquery.ConvertCallInfoToRow(
+        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
             file_path_to_file_hash)))
 
     assert_that(bigquery_rows, equal_to(expected_rows))

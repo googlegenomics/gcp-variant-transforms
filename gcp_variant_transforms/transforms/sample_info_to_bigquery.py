@@ -17,28 +17,28 @@ from typing import Dict, Union  # pylint: disable=unused-import
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
-from gcp_variant_transforms.libs import call_info_table_schema_generator
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import hashing_util
 
 
-class ConvertCallInfoToRow(beam.DoFn):
-  """Extracts call info from `VcfHeader` and converts it to a BigQuery row."""
+class ConvertSampleInfoToRow(beam.DoFn):
+  """Extracts sample info from `VcfHeader` and converts it to a BigQuery row."""
 
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
-      call_id = hashing_util.generate_unsigned_hash_code(
+      sample_id = hashing_util.generate_unsigned_hash_code(
           [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
       row = {
-          call_info_table_schema_generator.CALL_ID: call_id,
-          call_info_table_schema_generator.CALL_NAME: sample,
-          call_info_table_schema_generator.FILE_PATH: vcf_header.file_path
+          sample_info_table_schema_generator.SAMPLE_ID: sample_id,
+          sample_info_table_schema_generator.SAMPLE_NAME: sample,
+          sample_info_table_schema_generator.FILE_PATH: vcf_header.file_path
       }
       yield row
 
 
-class CallInfoToBigQuery(beam.PTransform):
-  """Writes call info to BigQuery."""
+class SampleInfoToBigQuery(beam.PTransform):
+  """Writes sample info to BigQuery."""
 
   def __init__(self, output_table_prefix, append=False):
     # type: (str, Dict[str, str], bool) -> None
@@ -50,15 +50,15 @@ class CallInfoToBigQuery(beam.PTransform):
         overwritten. New records will be appended to those that already exist.
     """
     self._output_table = '_'.join([
-        output_table_prefix, call_info_table_schema_generator.TABLE_SUFFIX])
+        output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX])
     self._append = append
-    self._schema = call_info_table_schema_generator.generate_schema()
+    self._schema = sample_info_table_schema_generator.generate_schema()
 
   def expand(self, pcoll):
     return (pcoll
-            | 'ConvertCallInfoToBigQueryTableRow' >> beam.ParDo(
-                ConvertCallInfoToRow())
-            | 'WriteCallInfoToBigQuery' >> beam.io.WriteToBigQuery(
+            | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
+                ConvertSampleInfoToRow())
+            | 'WriteSampleInfoToBigQuery' >> beam.io.WriteToBigQuery(
                 self._output_table,
                 schema=self._schema,
                 create_disposition=(
