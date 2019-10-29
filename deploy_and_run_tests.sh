@@ -222,13 +222,13 @@ virtualenv "${temp_dir}"
 source ${temp_dir}/bin/activate;
 trap clean_up EXIT
 if [[ -n "${run_unit_tests}" ]]; then
-  pip install --upgrade .
+  python -m pip install --upgrade .
   python setup.py test
 fi
-pip install --upgrade .[int_test]
+python -m pip install --upgrade .[int_test]
 
 # Force an upgrade to avoid SSL certificate verification errors (issue #453).
-pip install --upgrade httplib2
+python -m pip install --upgrade httplib2
 
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \

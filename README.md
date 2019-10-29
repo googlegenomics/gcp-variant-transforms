@@ -107,8 +107,8 @@ source. First install git, python, pip, and virtualenv:
 
 ```bash
 sudo apt-get install -y git python-pip python-dev build-essential
-sudo pip install --upgrade pip
-sudo pip install --upgrade virtualenv
+sudo python -m pip install --upgrade pip
+sudo python -m pip install --upgrade virtualenv
 ```
 
 Run virtualenv, clone the repo, and install pip packages:
@@ -118,7 +118,7 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
-pip install --upgrade .
+python -m pip install --upgrade .
 ```
 
 You may use the

@@ -20,13 +20,13 @@ set -euo pipefail
 echo ========== Running unit tests.
 if [[ -z `which coverage` ]];then
   echo "coverage is not installed. Installing ..."
-  pip install coverage
+  python -m pip install coverage
 fi
 coverage run --source=gcp_variant_transforms setup.py test
 
 echo ========== Running pylint.
 if [[ -z `which pylint` ]];then
   echo "pylint is not installed. Installing ..."
-  pip install pylint
+  python -m pip install pylint
 fi
 pylint gcp_variant_transforms
