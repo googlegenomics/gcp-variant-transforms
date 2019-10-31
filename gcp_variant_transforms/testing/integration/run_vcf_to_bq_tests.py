@@ -24,6 +24,7 @@ You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
   --project myproject \
+  --region us-central1 \
   --staging_location gs://mybucket/staging \
   --temp_location gs://mybucket/temp \
   --logging_location gs://mybucket/temp/integration_test_logs
@@ -77,6 +78,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     self._assertion_configs = assertion_configs
     args = ['--output_table {}'.format(output_table),
             '--project {}'.format(context.project),
+            '--region {}'.format(context.region),
             '--staging_location {}'.format(context.staging_location),
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
@@ -184,6 +186,7 @@ class TestContextManager(object):
     self.temp_location = args.temp_location
     self.logging_location = args.logging_location
     self.project = args.project
+    self.region = args.region
     self.image = args.image
     self._keep_tables = args.keep_tables
     self.revalidation_dataset_id = args.revalidation_dataset_id
