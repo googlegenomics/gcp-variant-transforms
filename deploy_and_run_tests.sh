@@ -35,6 +35,7 @@ GS_DIR_OPT="--gs_dir"
 KEEP_IMAGE_OPT="--keep_image"
 IMAGE_TAG_OPT="--image_tag"
 PROJECT_OPT="--project"
+REGION_OPT="--region"
 RUN_UNIT_TEST_OPT="--run_unit_tests"
 RUN_PREPROCESSOR_TEST_OPT="--run_preprocessor_tests"
 RUN_BQ_TO_VCF_TEST_OPT="--run_bq_to_vcf_tests"
@@ -44,6 +45,7 @@ keep_image=""
 skip_build=""
 gs_dir="integration_test_runs"  # default GS dir to store logs, etc.
 project="gcp-variant-transforms-test"  # default project to use
+region="us-central1"  # default region to use
 run_unit_tests=""  # By default do not run unit-tests.
 run_preprocessor_tests=""  # By default skip preprocessor integration tests.
 run_bq_to_vcf_tests=""  # By default skip bq to vcf integration tests.
@@ -65,7 +67,7 @@ color_print() {
 #################################################
 usage() {
   echo "Usage: $0  [${GS_DIR_OPT} gs_dir] [${KEEP_IMAGE_OPT}]"
-  echo "    [${IMAGE_TAG_OPT} image_tag] [${PROJECT_OPT} project_name] "
+  echo "    [${IMAGE_TAG_OPT} image_tag] [${PROJECT_OPT} project_name] [${REGION_OPT} region]"
   echo "    [${RUN_UNIT_TEST_OPT}] [${SKIP_BUILD_OPT}] [... test script options ...]"
   echo "  ${GS_DIR_OPT} can be used to change the default GS bucket used for"
   echo "    test run artifacts like logs, staging, etc. This has to be set if"
@@ -76,6 +78,7 @@ usage() {
   echo "  ${PROJECT_OPT} sets the cloud project. This project is used to push "
   echo "    the image, create BigQuery tables, run Genomics pipelines etc."
   echo "    Default is gcp-variant-transforms-test."
+  echo "  ${REGION_OPT} sets the region to run the BEAM pipelines"
   echo "  ${RUN_UNIT_TEST_OPT} runs the unit-tests before integration tests."
   echo "  ${RUN_PREPROCESSOR_TEST_OPT} runs the preprocessor integration tests."
   echo "  ${RUN_BQ_TO_VCF_TEST_OPT} runs the BQ to VCF integration tests."
@@ -147,6 +150,16 @@ parse_args() {
       fi
       project="$1"
       color_print "Using project: ${project}" "${GREEN}"
+      shift
+    elif [[ "$1" = "${REGION_OPT}" ]]; then
+      shift
+      if [[ $# == 0 ]]; then
+        usage
+        color_print "ERROR: No name provided after ${REGION_OPT}!" "${RED}"
+        exit 1
+      fi
+      region="$1"
+      color_print "Using region: ${region}" "${GREEN}"
       shift
     elif [[ "$1" = "${RUN_UNIT_TEST_OPT}" ]]; then
       run_unit_tests="yes"  # can be any non-empty string
@@ -222,17 +235,18 @@ virtualenv "${temp_dir}"
 source ${temp_dir}/bin/activate;
 trap clean_up EXIT
 if [[ -n "${run_unit_tests}" ]]; then
-  pip install --upgrade .
+  python -m pip install --upgrade .
   python setup.py test
 fi
-pip install --upgrade .[int_test]
+python -m pip install --upgrade .[int_test]
 
 # Force an upgrade to avoid SSL certificate verification errors (issue #453).
-pip install --upgrade httplib2
+python -m pip install --upgrade httplib2
 
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --project "${project}" \
+    --region "${region}" \
     --staging_location "gs://${gs_dir}/staging" \
     --temp_location "gs://${gs_dir}/temp" \
     --logging_location "gs://${gs_dir}/temp/logs" \
@@ -241,6 +255,7 @@ pid_vcf_to_bq="$!"
 if [[ -n "${run_preprocessor_tests}" ]]; then
   python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
       --project "${project}" \
+      --region "${region}" \
       --staging_location "gs://${gs_dir}/staging" \
       --temp_location "gs://${gs_dir}/temp" \
       --logging_location "gs://${gs_dir}/temp/logs" \
@@ -252,6 +267,7 @@ pid_preprocess="$!"
 if [[ -n "${run_bq_to_vcf_tests}" ]]; then
   python gcp_variant_transforms/testing/integration/run_bq_to_vcf_tests.py \
       --project "${project}" \
+      --region "${region}" \
       --staging_location "gs://${gs_dir}/staging" \
       --temp_location "gs://${gs_dir}/temp" \
       --logging_location "gs://${gs_dir}/temp/logs" \

@@ -22,6 +22,7 @@ for the integration test.
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
   --project gcp-variant-transforms-test \
+  --region us-central1 \
   --staging_location gs://integration_test_runs/staging \
   --temp_location gs://integration_test_runs/temp \
   --logging_location gs://integration_test_runs/temp/integration_test_logs
@@ -71,6 +72,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     self._project = parser_args.project
     args = ['--report_path {}'.format(self._report_path),
             '--project {}'.format(parser_args.project),
+            '--region {}'.format(parser_args.region),
             '--staging_location {}'.format(parser_args.staging_location),
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(

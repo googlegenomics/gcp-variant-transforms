@@ -140,6 +140,7 @@ def add_args(parser):
   # type: (argparse.ArgumentParser) -> None
   """Adds common arguments."""
   parser.add_argument('--project', required=True)
+  parser.add_argument('--region', required=True)
   parser.add_argument('--staging_location', required=True)
   parser.add_argument('--temp_location', required=True)
   parser.add_argument('--logging_location', required=True)

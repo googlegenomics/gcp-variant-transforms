@@ -33,11 +33,12 @@ ADD / /opt/gcp_variant_transforms/src/
 RUN apt install -y g++
 
 # Install dependencies.
-RUN pip install --upgrade pip && pip install --upgrade virtualenv && \
+RUN python -m pip install --upgrade pip && \
+    python -m pip install --upgrade virtualenv && \
     virtualenv /opt/gcp_variant_transforms/venv && \
     . /opt/gcp_variant_transforms/venv/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    pip install --upgrade --no-binary pyvcf .
+    python -m pip install --upgrade --no-binary pyvcf .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \

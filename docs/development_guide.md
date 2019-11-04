@@ -43,8 +43,8 @@ git remote add upstream git@github.com:googlegenomics/gcp-variant-transforms.git
 
 ```bash
 sudo apt-get install python-pip python-dev build-essential
-sudo pip install --upgrade pip
-sudo pip install --upgrade virtualenv
+sudo python -m pip install --upgrade pip
+sudo python -m pip install --upgrade virtualenv
 virtualenv venv
 . venv/bin/activate
 ```
@@ -52,7 +52,7 @@ virtualenv venv
 #### Install dependences
 
 ```bash
-pip install --upgrade .
+python -m pip install --upgrade .
 ```
 Note that after running the above command we get some dependency conflicts in
 installed packages which is currently safe to ignore. For details see
@@ -155,7 +155,7 @@ script.
 Before pushing changes, make sure the pylint checks pass. To install pylint:
 ```bash
 source [PATH_TO_VENV]/bin/activate
-pip install --upgrade pylint
+python -m pip install --upgrade pylint
 ```
 Then run:
 ```bash
