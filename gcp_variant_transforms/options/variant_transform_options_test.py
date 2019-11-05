@@ -93,7 +93,8 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
   def test_valid_table_path(self):
     args = self._make_args(['--append',
-                            '--output_table', 'project:dataset.table'])
+                            '--output_table', 'project:dataset.table',
+                            '--generate_sample_info_table'])
     client = mock.Mock()
     client.datasets.Get.return_value = bigquery.Dataset(
         datasetReference=bigquery.DatasetReference(
@@ -104,7 +105,16 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     args = self._make_args(['--append', 'False',
                             '--output_table', 'project:dataset.table'])
     client = mock.Mock()
-    self.assertRaises(ValueError, self._options.validate, args, client)
+    with self.assertRaisesRegexp(ValueError, 'project:dataset.table '):
+      self._options.validate(args, client)
+
+    args = self._make_args(['--append', 'False',
+                            '--output_table', 'project:dataset.table',
+                            '--generate_sample_info_table'])
+    client = mock.Mock()
+    with self.assertRaisesRegexp(ValueError,
+                                 'project:dataset.table_sample_info'):
+      self._options.validate(args, client)
 
   def test_no_project(self):
     args = self._make_args(['--output_table', 'dataset.table'])
