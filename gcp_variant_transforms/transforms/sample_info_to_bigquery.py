@@ -49,8 +49,8 @@ class SampleInfoToBigQuery(beam.PTransform):
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
     """
-    self._output_table = '_'.join([
-        output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX])
+    self._output_table = sample_info_table_schema_generator.compose_table_name(
+        output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX)
     self._append = append
     self._schema = sample_info_table_schema_generator.generate_schema()
 

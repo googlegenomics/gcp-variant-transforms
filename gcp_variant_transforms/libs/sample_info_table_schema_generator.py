@@ -24,6 +24,11 @@ FILE_PATH = 'file_path'
 TABLE_SUFFIX = 'sample_info'
 
 
+def compose_table_name(base_name, suffix):
+  # type: (str, List[str]) -> str
+  return '_'.join([base_name, suffix])
+
+
 def generate_schema():
   # type: () -> bigquery.TableSchema
   schema = bigquery.TableSchema()
