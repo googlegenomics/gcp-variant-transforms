@@ -26,6 +26,8 @@ VCF files. It contains three parts and each of them reports one type of error.
 TODO(allieychen): Eventually, it also contains the resource estimation.
 
 Output example (assuming opening in spreedsheet):
+Estimated disk usage by Dataflow: 4846.0 GB
+Total raw file sizes: 1231.0 GB
 Header Conflicts
 ID    Category    Conflicts            File Paths    Proposed Resolution
 NS    INFO        num=1 type=Float     file1         num=1 type=Float
@@ -43,13 +45,16 @@ Malformed Records
 File Path   Variant Record              Error Message
 file 1      rs6 G A 29 PASS NS=3;       invalid literal for int() with base 10.
 """
+import logging
+import math
 
 from typing import Dict, List, Optional, Union  # pylint: disable=unused-import
 
 from apache_beam.io import filesystems
 
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
-from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
+from gcp_variant_transforms.beam_io import vcf_file_size_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_header_definitions_merger  # pylint: disable=unused-import
 
 # An alias for the header key constants to make referencing easier.
@@ -78,6 +83,7 @@ class _HeaderLine(object):
 def generate_report(
     header_definitions,  # type: _VcfHeaderDefinitions
     file_path,  # type: str
+    disk_usage_estimate,  # type: vcf_file_size_io.FileSizeInfo
     resolved_headers=None,  # type: vcf_header_io.VcfHeader
     inferred_headers=None,  # type: vcf_header_io.VcfHeader
     malformed_records=None  # type: List[vcfio.MalformedVcfRecord]
@@ -89,6 +95,9 @@ def generate_report(
     header_definitions: The container which contains all header definitions and
       the corresponding file names.
     file_path: The location where the report is saved.
+    disk_usage_estimate: `FileSizeInfo` with metadata about the input files'
+      sizes in both raw and Beam-encoded formats. Can be set to `None` if no
+      estimate was made.
     resolved_headers: The `VcfHeader` that provides the resolutions for the
       fields that have conflicting definitions.
     inferred_headers: The `VcfHeader` that contains the inferred header
@@ -98,6 +107,7 @@ def generate_report(
   """
   resolved_headers = resolved_headers or vcf_header_io.VcfHeader()
   with filesystems.FileSystems.create(file_path) as file_to_write:
+    _append_disk_usage_estimate_to_report(file_to_write, disk_usage_estimate)
     _append_conflicting_headers_to_report(file_to_write, header_definitions,
                                           resolved_headers)
     _append_inferred_headers_to_report(file_to_write, inferred_headers)
@@ -274,6 +284,19 @@ def _format_definition(num_value, type_value):
           [vcf_header_io.VcfParserHeaderKeyConstants.TYPE, str(type_value)])
   ]
   return ' '.join(formatted_definition)
+
+
+def _append_disk_usage_estimate_to_report(file_to_write, disk_usage_estimate):
+  # type: (file, vcf_file_size_io.FileSizeInfo) -> None
+  if disk_usage_estimate is None:
+    return
+  logging.info("Final estimate of encoded size: %d GB",
+               disk_usage_estimate.encoded_size / 1e9)
+  file_to_write.write(
+      'Estimated disk usage by Dataflow: {} GB\n'
+      'Total raw file sizes: {} GB\n'.format(
+          int(math.ceil(disk_usage_estimate.encoded_size / 1e9)),
+          int(math.ceil(disk_usage_estimate.raw_size / 1e9))))
 
 
 def _append_to_report(file_to_write, error_type, header, contents):

@@ -56,6 +56,7 @@ from apache_beam import pvalue
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
+from gcp_variant_transforms.beam_io import vcf_file_size_io
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
@@ -65,14 +66,13 @@ from gcp_variant_transforms.transforms import merge_header_definitions
 
 _COMMAND_LINE_OPTIONS = [variant_transform_options.PreprocessOptions]
 
-
 def _get_inferred_headers(variants,  # type: pvalue.PCollection
                           merged_header  # type: pvalue.PCollection
                          ):
   # type: (...) -> (pvalue.PCollection, pvalue.PCollection)
   inferred_headers = (variants
                       | 'FilterVariants' >> filter_variants.FilterVariants()
-                      | ' InferHeaderFields' >>
+                      | 'InferHeaderFields' >>
                       infer_headers.InferHeaderFields(
                           pvalue.AsSingleton(merged_header),
                           allow_incompatible_records=True,
@@ -102,6 +102,15 @@ def run(argv=None):
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
+
+    disk_usage_estimate = None
+    if known_args.estimate_disk_usage:
+      # TODO(hanjohn): Add an e2e test
+      # TODO(hanjohn): Add support for `ReadAll` pattern for inputs with very
+      # large numbers of files.
+      disk_usage_estimate = beam.pvalue.AsSingleton(
+          p | 'SampleAndEstimateFileSize' >> vcf_file_size_io.EstimateVcfSize(
+              known_args.input_pattern, vcf_file_size_io.SNIPPET_READ_SIZE))
     if known_args.report_all_conflicts:
       variants = pipeline_common.read_variants(p,
                                                all_patterns,
@@ -114,6 +123,7 @@ def run(argv=None):
            | 'GenerateConflictsReport' >>
            beam.ParDo(preprocess_reporter.generate_report,
                       known_args.report_path,
+                      disk_usage_estimate,
                       beam.pvalue.AsSingleton(merged_headers),
                       beam.pvalue.AsSingleton(inferred_headers),
                       beam.pvalue.AsIter(malformed_records)))
@@ -122,6 +132,7 @@ def run(argv=None):
            | 'GenerateConflictsReport' >>
            beam.ParDo(preprocess_reporter.generate_report,
                       known_args.report_path,
+                      disk_usage_estimate,
                       beam.pvalue.AsSingleton(merged_headers)))
 
     if known_args.resolved_headers_path:

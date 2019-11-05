@@ -18,10 +18,11 @@ from collections import OrderedDict
 from typing import List  # pylint: disable=unused-import
 import unittest
 
-from apache_beam.io.filesystems import FileSystems
+from apache_beam.io import filesystems
 from vcf.parser import _Format as Format
 from vcf.parser import _Info as Info
 
+from gcp_variant_transforms.beam_io import vcf_file_size_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.libs import preprocess_reporter
@@ -39,18 +40,21 @@ class PreprocessReporterTest(unittest.TestCase):
       header_definitions,  # type: VcfHeaderDefinitions
       resolved_headers=None,  # type: VcfHeader
       inferred_headers=None,  # type: VcfHeader
-      malformed_records=None  # type: List[vcfio.MalformedVcfRecord]
+      malformed_records=None,  # type: List[vcfio.MalformedVcfRecord]
+      disk_usage_estimate=None,  # type: vcf_file_size_io.FileSizeInfo
       ):
     # type: (...) -> None
     with temp_dir.TempDir() as tempdir:
-      file_path = FileSystems.join(tempdir.get_path(),
-                                   PreprocessReporterTest._REPORT_NAME)
+      file_path = filesystems.FileSystems.join(
+          tempdir.get_path(),
+          PreprocessReporterTest._REPORT_NAME)
       preprocess_reporter.generate_report(header_definitions,
                                           file_path,
+                                          disk_usage_estimate,
                                           resolved_headers,
                                           inferred_headers,
                                           malformed_records)
-      with FileSystems.open(file_path) as f:
+      with filesystems.FileSystems.open(file_path) as f:
         reader = f.readlines()
         self.assertEqual(reader, expected_content)
 
@@ -68,6 +72,29 @@ class PreprocessReporterTest(unittest.TestCase):
     self._generate_report_and_assert_contents_equal(expected,
                                                     header_definitions,
                                                     resolved_headers)
+
+  def test_report_with_disk_estimate(self):
+    header_definitions = VcfHeaderDefinitions()
+    header_definitions._infos = {'NS': {Definition(1, 'Float'): ['file1']}}
+    header_definitions._formats = {'NS': {Definition(1, 'Float'): ['file2']}}
+
+    infos = OrderedDict([
+        ('NS', Info('NS', 1, 'Integer', 'Number samples', None, None))])
+    formats = OrderedDict([('NS', Format('NS', 1, 'Float', 'Number samples'))])
+    resolved_headers = VcfHeader(infos=infos, formats=formats)
+    file_size_info = vcf_file_size_io.FileSizeInfo(
+        raw_size=int(1e10),
+        encoded_size=int(2e10))
+
+    expected = ['Estimated disk usage by Dataflow: 20 GB\n',
+                'Total raw file sizes: 10 GB\n',
+                'No Header Conflicts Found.\n',
+                '\n']
+    self._generate_report_and_assert_contents_equal(
+        expected,
+        header_definitions,
+        resolved_headers,
+        disk_usage_estimate=file_size_info)
 
   def test_report_conflicts(self):
     header_definitions = VcfHeaderDefinitions()

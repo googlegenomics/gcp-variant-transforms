@@ -497,6 +497,13 @@ class PreprocessOptions(VariantTransformsOptions):
         help=('The full path of the resolved headers. The file will not be'
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
+    parser.add_argument(
+        '--estimate_disk_usage',
+        type='bool', default=False, nargs='?', const=True,
+        help=('By default, disk resource usage will not be estimated.'
+              'If true, the preprocessor will estimate the maximum disk usage '
+              'consumed at any step in the pipeline, which could lead to '
+              'out-of-disk errors at a shuffle step e.g. MergeVariants.'))
 
   def validate(self, parsed_args):
     _validate_inputs(parsed_args)
