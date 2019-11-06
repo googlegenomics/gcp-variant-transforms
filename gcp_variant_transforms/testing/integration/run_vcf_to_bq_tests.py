@@ -66,7 +66,6 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
                test_name,  # type: str
                table_name,  # type: str
                assertion_configs,  # type: List[Dict]
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -77,8 +76,6 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     output_table = '{}:{}'.format(context.project, self._table_name)
     self._assertion_configs = assertion_configs
     args = ['--output_table {}'.format(output_table),
-            '--project {}'.format(context.project),
-            '--region {}'.format(context.region),
             '--staging_location {}'.format(context.staging_location),
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
@@ -89,8 +86,9 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
       args.append('--{} {}'.format(k, value))
     self.run_test_command = run_tests_common.form_command(
         context.project,
+        context.region,
         filesystems.FileSystems.join(context.logging_location, output_table),
-        context.image, _TOOL_NAME, zones, args)
+        context.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""

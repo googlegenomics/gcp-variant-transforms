@@ -83,15 +83,15 @@ COMMAND="vcf_to_bq \
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --zones us-west1-b \
+  --region us-west1 \
   "${COMMAND}"
 ```
-The flags `--project` and `--zones` are optional, given that these properties
-are set in your local configuration. You may set the default project and zones
+The flags `--project` and `--region` are optional, given that these properties
+are set in your local configuration. You may set the default project and region
 using the following commands:
 ```bash
 gcloud config set project GOOGLE_CLOUD_PROJECT
-gcloud config set compute/zone ZONE
+gcloud config set compute/region REGION
 ```
 
 The underlying pipeline uses
@@ -165,11 +165,12 @@ The BigQuery to VCF pipeline is used to export variants in BigQuery to one VCF f
 Please refer to [BigQuery to VCF pipeline](docs/bigquery_to_vcf.md) for more
 details.
 
-## Running jobs in a particular region/zone
+## Running jobs in a particular region
 
-You may need to constrain Cloud Dataflow job processing to a specific geographic
-region in support of your project’s security and compliance needs. See
-[Setting zone/region doc](docs/setting_zone_region.md).
+You must constrain Cloud Dataflow job processing to a specific geographic
+region. Setting `--region` flag is [required](https://beam.apache.org/blog/2019/08/22/beam-2.15.0.html)
+by Beam 2.16.0 in addition to supporting your project’s security and compliance needs. See
+[Setting region doc](docs/setting_region.md).
 
 
 ## Additional topics

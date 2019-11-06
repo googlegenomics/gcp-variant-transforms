@@ -5,7 +5,6 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/invalid-4.2-AF-mismatch.vcf",
     "allow_malformed_records": true,
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],

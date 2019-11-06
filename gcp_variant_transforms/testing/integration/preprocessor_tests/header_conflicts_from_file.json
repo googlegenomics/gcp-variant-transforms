@@ -5,7 +5,6 @@
     "report_all_conflicts": "True",
     "report_blob_name": "temp/report_header_conflicts_from_file.tsv",
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "expected_contents": [
       "Header Conflicts",
       "ID\tCategory\tConflicts\tFile Paths\tProposed Resolution",

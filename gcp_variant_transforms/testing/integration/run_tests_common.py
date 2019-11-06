@@ -29,7 +29,6 @@ from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/cloud-lifesciences/gcp-variant-transforms'
-_DEFAULT_ZONES = ['us-east1-b']
 
 # `TestCaseState` saves current running test and the remaining tests in the same
 # test script (.json).
@@ -126,13 +125,13 @@ class TestRunner(object):
     return 0
 
 
-def form_command(project, temp_location, image, tool_name, zones, args):
-  # type: (str, str, str, str, Optional[List[str]], List[str]) -> List[str]
+def form_command(project, region, temp_location, image, tool_name, args):
+  # type: (str, str, str, str, str, List[str]) -> List[str]
   return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
           '--project', project,
+          '--region', region,
           '--docker_image', image,
           '--temp_location', temp_location,
-          '--zones', str(' '.join(zones or _DEFAULT_ZONES)),
           ' '.join([tool_name] + args)]
 
 

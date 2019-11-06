@@ -58,7 +58,6 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
                expected_contents,  # type: List[str]
                report_blob_name,  # type: str
                header_blob_name=None,  # type: str
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -71,8 +70,6 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._report_blob_name])
     self._project = parser_args.project
     args = ['--report_path {}'.format(self._report_path),
-            '--project {}'.format(parser_args.project),
-            '--region {}'.format(parser_args.region),
             '--staging_location {}'.format(parser_args.staging_location),
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(
@@ -90,9 +87,10 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
 
     self.run_test_command = run_tests_common.form_command(
         parser_args.project,
+        parser_args.region,
         filesystems.FileSystems.join(parser_args.logging_location,
                                      self._report_blob_name),
-        parser_args.image, _TOOL_NAME, zones, args)
+        parser_args.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.

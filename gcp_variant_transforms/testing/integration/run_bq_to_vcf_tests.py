@@ -55,7 +55,6 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
                input_table,  # type: str
                output_file_name,  # type: str
                expected_output_file,  # type: str
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -68,8 +67,6 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
                                                      output_file_name)
     args = ['--input_table {}'.format(input_table),
             '--output_file {}'.format(self._output_file),
-            '--project {}'.format(parsed_args.project),
-            '--region {}'.format(parsed_args.region),
             '--staging_location {}'.format(parsed_args.staging_location),
             '--temp_location {}'.format(parsed_args.temp_location),
             '--job_name {}'.format(
@@ -79,9 +76,10 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
 
     self.run_test_command = run_tests_common.form_command(
         parsed_args.project,
+        parsed_args.region,
         filesystems.FileSystems.join(parsed_args.logging_location,
                                      '_'.join([test_name, timestamp])),
-        parsed_args.image, _TOOL_NAME, zones, args)
+        parsed_args.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.

@@ -204,10 +204,7 @@ def _get_input_dimensions(known_args, pipeline_args):
 
   estimate_sizes_job_name = pipeline_common.generate_unique_name(
       _ESTIMATE_SIZES_JOB_NAME)
-  if google_cloud_options.job_name:
-    google_cloud_options.job_name += '-' + estimate_sizes_job_name
-  else:
-    google_cloud_options.job_name = estimate_sizes_job_name
+  _update_google_cloud_job_name(google_cloud_options, estimate_sizes_job_name)
   temp_directory = google_cloud_options.temp_location or tempfile.mkdtemp()
   temp_estimated_input_size_file_name = '-'.join(
       [google_cloud_options.job_name,
