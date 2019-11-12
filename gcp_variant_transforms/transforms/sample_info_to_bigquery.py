@@ -24,11 +24,15 @@ from gcp_variant_transforms.libs import hashing_util
 class ConvertSampleInfoToRow(beam.DoFn):
   """Extracts sample info from `VcfHeader` and converts it to a BigQuery row."""
 
-  def process(self, vcf_header):
-    # type: (vcf_header_io.VcfHeader) -> Dict[str, Union[int, str]]
+  def process(self, vcf_header, include_file_in_sample_id):
+    # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
-      sample_id = hashing_util.generate_unsigned_hash_code(
-          [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
+      if include_file_in_sample_id:
+        sample_id = hashing_util.generate_unsigned_hash_code(
+            [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
+      else:
+        sample_id = hashing_util.generate_unsigned_hash_code(
+            [sample], max_hash_value=pow(2, 63))
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
@@ -40,8 +44,9 @@ class ConvertSampleInfoToRow(beam.DoFn):
 class SampleInfoToBigQuery(beam.PTransform):
   """Writes sample info to BigQuery."""
 
-  def __init__(self, output_table_prefix, append=False):
-    # type: (str, Dict[str, str], bool) -> None
+  def __init__(
+      self, output_table_prefix, append=False, include_file_in_sample_id=True):
+    # type: (str, Dict[str, str], bool, bool) -> None
     """Initializes the transform.
 
     Args:
@@ -52,12 +57,13 @@ class SampleInfoToBigQuery(beam.PTransform):
     self._output_table = sample_info_table_schema_generator.compose_table_name(
         output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX)
     self._append = append
+    self._include_file_in_sample_id = include_file_in_sample_id
     self._schema = sample_info_table_schema_generator.generate_schema()
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
-                ConvertSampleInfoToRow())
+                ConvertSampleInfoToRow(self._include_file_in_sample_id))
             | 'WriteSampleInfoToBigQuery' >> beam.io.WriteToBigQuery(
                 self._output_table,
                 schema=self._schema,
