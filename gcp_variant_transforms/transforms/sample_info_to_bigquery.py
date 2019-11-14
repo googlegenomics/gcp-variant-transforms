@@ -24,15 +24,16 @@ from gcp_variant_transforms.libs import hashing_util
 class ConvertSampleInfoToRow(beam.DoFn):
   """Extracts sample info from `VcfHeader` and converts it to a BigQuery row."""
 
-  def process(self, vcf_header, include_file_in_sample_id):
+  def process(self, vcf_header, samples_span_multiple_files):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
-      if include_file_in_sample_id:
-        sample_id = hashing_util.generate_unsigned_hash_code(
-            [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
-      else:
+      if samples_span_multiple_files:
         sample_id = hashing_util.generate_unsigned_hash_code(
             [sample], max_hash_value=pow(2, 63))
+      else:
+        sample_id = hashing_util.generate_unsigned_hash_code(
+            [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
+
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
@@ -44,8 +45,8 @@ class ConvertSampleInfoToRow(beam.DoFn):
 class SampleInfoToBigQuery(beam.PTransform):
   """Writes sample info to BigQuery."""
 
-  def __init__(
-      self, output_table_prefix, append=False, include_file_in_sample_id=True):
+  def __init__(self, output_table_prefix, append=False,
+               samples_span_multiple_files=False):
     # type: (str, Dict[str, str], bool, bool) -> None
     """Initializes the transform.
 
@@ -53,17 +54,19 @@ class SampleInfoToBigQuery(beam.PTransform):
       output_table_prefix: The prefix of the output BigQuery table.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
+      samples_span_multiple_files: If true, sample_id = hash#([sample_name]),
+        otherwise sample_id = hash#([file_path, sample_name]).
     """
     self._output_table = sample_info_table_schema_generator.compose_table_name(
         output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX)
     self._append = append
-    self._include_file_in_sample_id = include_file_in_sample_id
+    self.samples_span_multiple_files = samples_span_multiple_files
     self._schema = sample_info_table_schema_generator.generate_schema()
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
-                ConvertSampleInfoToRow(self._include_file_in_sample_id))
+                ConvertSampleInfoToRow(self._samples_span_multiple_files))
             | 'WriteSampleInfoToBigQuery' >> beam.io.WriteToBigQuery(
                 self._output_table,
                 schema=self._schema,

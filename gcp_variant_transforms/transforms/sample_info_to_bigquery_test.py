@@ -53,7 +53,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
         >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
-            ), True))
+            ), False))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
@@ -83,7 +83,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
         >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
-            ), False))
+            ), True))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
