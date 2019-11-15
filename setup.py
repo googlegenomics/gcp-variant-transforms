@@ -29,7 +29,8 @@ REQUIRED_PACKAGES = [
     # Nucleus needs uptodate protocol buffer compiler (protoc).
     'protobuf>=3.6.1',
     'mmh3<2.6',
-    'google-cloud-storage',
+    # Refer to issue #528
+    'google-cloud-storage<1.23.0',
     'pyfarmhash'
 ]
 
