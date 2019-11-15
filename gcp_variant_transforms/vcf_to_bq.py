@@ -388,8 +388,10 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
                                          pipeline_mode,
                                          known_args.all_patterns)
   _ = (headers | 'SampleInfoToBigQuery' >>
-       sample_info_to_bigquery.SampleInfoToBigQuery(known_args.output_table,
-                                                    known_args.append))
+       sample_info_to_bigquery.SampleInfoToBigQuery(
+           known_args.output_table,
+           known_args.append,
+           known_args.samples_span_multiple_files))
 
 
 def run(argv=None):

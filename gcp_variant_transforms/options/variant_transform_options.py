@@ -156,6 +156,13 @@ class BigQueryWriteOptions(VariantTransformsOptions):
              ).format(sample_info_table_schema_generator.TABLE_SUFFIX))
 
     parser.add_argument(
+        '--samples_span_multiple_files',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If True sample_id will be the hash of [sample_name] thus it '
+              'will be independent of file_path, otherwise hash of '
+              '[file_path, sample_name] will be used as sample_id. '))
+
+    parser.add_argument(
         '--split_alternate_allele_info_fields',
         type='bool', default=True, nargs='?', const=True,
         help=('If true, all INFO fields with Number=A (i.e. one value for each '

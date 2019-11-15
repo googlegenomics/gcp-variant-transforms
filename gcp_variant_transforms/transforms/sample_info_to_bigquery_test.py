@@ -33,8 +33,6 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
                                            file_path='file_2')
-    file_path_to_file_hash = {'file_1': 'hash_1',
-                              'file_2': 'hash_2'}
     expected_rows = [
         {sample_info_table_schema_generator.SAMPLE_ID: 5961690698012655974,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
@@ -55,7 +53,37 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
         >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
-            file_path_to_file_hash)))
+            ), False))
+
+    assert_that(bigquery_rows, equal_to(expected_rows))
+    pipeline.run()
+
+  def test_convert_sample_info_to_row_without_file_in_hash(self):
+    vcf_header_1 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+                                           file_path='file_1')
+    vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+                                           file_path='file_2')
+    expected_rows = [
+        {sample_info_table_schema_generator.SAMPLE_ID: 6721344017406412066,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 7224630242958043176,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 6721344017406412066,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+         sample_info_table_schema_generator.FILE_PATH: 'file_2'},
+        {sample_info_table_schema_generator.SAMPLE_ID: 7224630242958043176,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+         sample_info_table_schema_generator.FILE_PATH: 'file_2'}
+    ]
+    pipeline = test_pipeline.TestPipeline()
+    bigquery_rows = (
+        pipeline
+        | transforms.Create([vcf_header_1, vcf_header_2])
+        | 'ConvertToRow'
+        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
+            ), True))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
