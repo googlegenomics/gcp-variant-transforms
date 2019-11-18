@@ -53,6 +53,9 @@ Run the script below and replace the following parameters:
 
 * `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
   dataset.
+* `GOOGLE_CLOUD_REGION`: This is the region in which your pipeline will run, 
+  for example: `us-west1`. For more info about regions please refer to
+  [Setting Regions](docs/setting_region.md) documentation.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
@@ -69,6 +72,7 @@ Run the script below and replace the following parameters:
 #!/bin/bash
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
+GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
 INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
 TEMP_LOCATION=gs://BUCKET/temp
@@ -83,12 +87,12 @@ COMMAND="vcf_to_bq \
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region us-west1 \
+  --region "${GOOGLE_CLOUD_REGION}" \
   "${COMMAND}"
 ```
-The flags `--project` and `--region` are optional, given that these properties
-are set in your local configuration. You may set the default project and region
-using the following commands:
+The flags `--project` and `--region` are needed unless their default values
+are set in your local `gcloud` configuration. You may set the default project
+and region using the following commands:
 ```bash
 gcloud config set project GOOGLE_CLOUD_PROJECT
 gcloud config set compute/region REGION
@@ -143,12 +147,12 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gs://BUCKET/*.vcf \
   --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region "${GOOGLE_CLOUD_REGION}" \
   --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery \
   --setup_file ./setup.py \
   --runner DataflowRunner
 ```
-
 
 ## Running VCF files preprocessor
 
@@ -168,9 +172,8 @@ details.
 ## Running jobs in a particular region
 
 You must constrain Cloud Dataflow job processing to a specific geographic
-region. Setting `--region` flag is [required](https://beam.apache.org/blog/2019/08/22/beam-2.15.0.html)
-by Beam 2.16.0 in addition to supporting your project’s security and compliance needs. See
-[Setting region doc](docs/setting_region.md).
+region by setting `--region` flag. For more information please refer to
+[setting region](docs/setting_region.md).
 
 
 ## Additional topics

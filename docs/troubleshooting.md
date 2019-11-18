@@ -19,6 +19,12 @@ group or file a GitHub issue if you believe that there is a bug in the pipeline.
   quota issues by navigating to the [Compute Engine quotas page](https://console.cloud.google.com/iam-admin/quotas?service=compute.googleapis.com)
   while the pipeline is running, which shows saturated quotas at the top of the
   page in red color.
+* Ensure your source GCS bucket is located in the same region as where you are
+  running your Dataflow pipeline. According to [data
+  locality](https://cloud.google.com/dataflow/docs/concepts/regional-endpoints#data_locality)
+  guidelines the GCS bucket containing your VCF files as well as the temporary
+  directory of your pipeline should be located in the same region as your
+  Dataflow pipeline.
 * `gzip` and `bzip2` file formats cannot be sharded, which considerably slows
   down the pipeline. Consider decompressing the files prior to running the
   pipeline. You may use [dsub](https://github.com/googlegenomics/dsub) to write
