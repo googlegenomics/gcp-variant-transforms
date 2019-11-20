@@ -15,7 +15,7 @@ are located in the same region:
 * Your Dataflow pipeline set by `--region` flag.
 
 ## Running jobs in a particular region
-Dataflow API [requires](https://beam.apache.org/blog/2019/08/22/beam-2.15.0.html)
+The Dataflow API [requires](https://beam.apache.org/blog/2019/08/22/beam-2.15.0.html)
 setting a [GCP
 region](https://cloud.google.com/compute/docs/regions-zones/#available) via
 `--region` flag to run. In addition to this requirment you might also
@@ -24,7 +24,6 @@ security and compliance requirements. For example, in order
 to restrict your processing job to Europe, update the region as follows:
 
 ```bash
-# Dataflow API.
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -45,7 +44,7 @@ In this case you do not need to set the `--region` flag any more. For more
 information please refer to this [cloud SDK page](https://cloud.google.com/sdk/gcloud/reference/config/set).
 
 If you are running Variant Transforms from GitHub, you just need to specify
-region for Dataflow API as below.
+region for the Dataflow API as below.
 
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq ... \

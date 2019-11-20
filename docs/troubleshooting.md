@@ -18,7 +18,7 @@ group or file a GitHub issue if you believe that there is a bug in the pipeline.
   for running the pipeline by specifying `--region <region>`. You can check for
   quota issues by navigating to the [Compute Engine quotas page](https://console.cloud.google.com/iam-admin/quotas?service=compute.googleapis.com)
   while the pipeline is running, which shows saturated quotas at the top of the
-  page in red color.
+  page (highlighted in red).
 * Ensure your source GCS bucket is located in the same region as where you are
   running your Dataflow pipeline. According to [data
   locality](https://cloud.google.com/dataflow/docs/concepts/regional-endpoints#data_locality)

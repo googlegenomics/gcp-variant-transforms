@@ -53,9 +53,9 @@ Run the script below and replace the following parameters:
 
 * `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
   dataset.
-* `GOOGLE_CLOUD_REGION`: This is the region in which your pipeline will run, 
-  for example: `us-west1`. For more info about regions please refer to
-  [Setting Regions](docs/setting_region.md) documentation.
+* `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
+  to process your data, for example: `us-west1`. For more info about regions
+  please refer to [Setting Regions](docs/setting_region.md).
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
@@ -90,7 +90,7 @@ docker run -v ~/.config:/root/.config \
   --region "${GOOGLE_CLOUD_REGION}" \
   "${COMMAND}"
 ```
-The flags `--project` and `--region` are needed unless their default values
+Both `--project` and `--region` flags are needed unless their default values
 are set in your local `gcloud` configuration. You may set the default project
 and region using the following commands:
 ```bash
@@ -168,12 +168,6 @@ validator to check the validity of the VCF files, or as a helper tool for
 The BigQuery to VCF pipeline is used to export variants in BigQuery to one VCF file.
 Please refer to [BigQuery to VCF pipeline](docs/bigquery_to_vcf.md) for more
 details.
-
-## Running jobs in a particular region
-
-You must constrain Cloud Dataflow job processing to a specific geographic
-region by setting `--region` flag. For more information please refer to
-[setting region](docs/setting_region.md).
 
 
 ## Additional topics
