@@ -27,8 +27,6 @@ import logging
 
 from typing import Any, Dict, List, Set  # pylint: disable=unused-import
 
-import vcf
-
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
@@ -304,8 +302,7 @@ class ProcessedVariantFactory(object):
         description='Alternate base.'))
     if self._split_alternate_allele_info_fields:
       for key, field in self._header_fields.infos.iteritems():
-        if (field[_HeaderKeyConstants.NUM] ==
-            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]):
+        if self._is_num_a(field[_HeaderKeyConstants.NUM]):
           alternate_bases_record.fields.append(bigquery.TableFieldSchema(
               name=_BigQuerySchemaSanitizer.get_sanitized_field_name(key),
               type=bigquery_util.get_bigquery_type_from_vcf_type(
@@ -386,8 +383,17 @@ class ProcessedVariantFactory(object):
     return (
         self._split_alternate_allele_info_fields and
         info_field_name in self._header_fields.infos and
-        self._header_fields.infos[info_field_name][_HeaderKeyConstants.NUM] == (
-            vcf.parser.field_counts[_FIELD_COUNT_ALTERNATE_ALLELE]))
+        self._is_num_a(
+            self._header_fields.infos[info_field_name]
+            [_HeaderKeyConstants.NUM]))
+
+  def _is_num_a(self, field_value):
+    # Checks for both PyVCF and PySAM values for Number='A'.
+    return (
+        field_value in vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION and
+        vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION[field_value] ==
+        _FIELD_COUNT_ALTERNATE_ALLELE)
+
 
 
 class _AnnotationProcessor(object):

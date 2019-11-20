@@ -4,7 +4,6 @@
     "table_name": "valid_4_0_bz2_pysam",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf.bz2",
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "vcf_parser": "PYSAM",
     "assertion_configs": [
       {

@@ -185,18 +185,26 @@ def get_estimates(pipeline, pipeline_mode, all_patterns):
   return estimates
 
 
-def read_headers(pipeline, pipeline_mode, all_patterns):
-  # type: (beam.Pipeline, int, List[str]) -> pvalue.PCollection
+def read_headers(
+    pipeline,  #type: beam.Pipeline
+    pipeline_mode,  #type: int
+    all_patterns,  #type: List[str]
+    vcf_parser=vcfio.VcfParserType.PYVCF  #type: vcfio.VcfParserType
+    ):
+  # type: (...) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
   compression_type = get_compression_type(all_patterns)
   if pipeline_mode == PipelineModes.LARGE:
     headers = (pipeline
                | beam.Create(all_patterns)
                | vcf_header_io.ReadAllVcfHeaders(
-                   compression_type=compression_type))
+                   compression_type=compression_type,
+                   vcf_parser=vcf_parser))
   else:
     headers = pipeline | vcf_header_io.ReadVcfHeaders(
-        all_patterns[0], compression_type=compression_type)
+        all_patterns[0],
+        compression_type=compression_type,
+        vcf_parser=vcf_parser)
 
   return headers
 
