@@ -83,7 +83,7 @@ COMMAND="vcf_to_bq_preprocess \
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --zones us-west1-b \
+  --region us-west1 \
   "${COMMAND}"
 ```
 

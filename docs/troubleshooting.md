@@ -14,13 +14,17 @@ group or file a GitHub issue if you believe that there is a bug in the pipeline.
   [predefined machine types](https://cloud.google.com/compute/pricing#predefined_machine_types)
   for the full list.
 * Ensure you have enough [quota](https://cloud.google.com/compute/quotas) in the
-  zone/region running the pipeline. By default, the pipeline runs in the
-  `us-central1` region. You may change this by specifying `--region <region>`
-  or `--zone <zone>` when running the pipeline. You can check for quota issues
-  by navigating to the
-  [Compute Engine quotas page](https://console.cloud.google.com/iam-admin/quotas?service=compute.googleapis.com)
+  region running the pipeline. You need to [set a region](./setting_region.md) 
+  for running the pipeline by specifying `--region <region>`. You can check for
+  quota issues by navigating to the [Compute Engine quotas page](https://console.cloud.google.com/iam-admin/quotas?service=compute.googleapis.com)
   while the pipeline is running, which shows saturated quotas at the top of the
-  page.
+  page (highlighted in red).
+* Ensure your source GCS bucket is located in the same region as where you are
+  running your Dataflow pipeline. According to [data
+  locality](https://cloud.google.com/dataflow/docs/concepts/regional-endpoints#data_locality)
+  guidelines the GCS bucket containing your VCF files as well as the temporary
+  directory of your pipeline should be located in the same region as your
+  Dataflow pipeline.
 * `gzip` and `bzip2` file formats cannot be sharded, which considerably slows
   down the pipeline. Consider decompressing the files prior to running the
   pipeline. You may use [dsub](https://github.com/googlegenomics/dsub) to write

@@ -6,7 +6,6 @@
     "annotation_fields": "CSQ",
     "infer_annotation_types": "True",
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],

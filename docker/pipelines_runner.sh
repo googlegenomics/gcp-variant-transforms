@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,zones: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,region: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -37,8 +37,8 @@ function parse_args {
         vt_docker_image="$2"
         ;;
 
-      --zones)
-        zones="$2"
+      --region)
+        region="$2"
         ;;
 
       *)
@@ -58,7 +58,7 @@ function main {
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}}"
-  zones="${zones:-$(gcloud config get-value compute/zone)}"
+  region="${region:-$(gcloud config get-value compute/region)}"
   temp_location="${temp_location:-''}"
 
   if [[ -z "${google_cloud_project}" ]]; then
@@ -67,9 +67,9 @@ function main {
     exit 1
   fi
 
-  if [[ -z "${zones}" ]]; then
-    echo "Please set the zones using flags --zones."
-    echo "Or set default zone in your local client configuration using gcloud config set compute/zone ZONE."
+  if [[ -z "${region}" ]]; then
+    echo "Please set the region using flags --region."
+    echo "Or set default region in your local client configuration using gcloud config set compute/region REGION."
     exit 1
   fi
 
@@ -79,11 +79,11 @@ function main {
   fi
 
   pipelines --project "${google_cloud_project}" run \
-    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project}" \
+    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project} --region ${region}" \
     --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
     --wait \
     --scopes "https://www.googleapis.com/auth/cloud-platform" \
-    --zones "${zones}" \
+    --regions "${region}" \
     --image "${vt_docker_image}" \
     --pvm-attempts 0 \
     --attempts 1 \
