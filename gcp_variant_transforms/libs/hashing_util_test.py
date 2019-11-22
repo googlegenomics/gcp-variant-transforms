@@ -20,11 +20,39 @@ from gcp_variant_transforms.libs import hashing_util
 class HashingUtilTest(unittest.TestCase):
 
   def test_generate_unsigned_hash_code(self):
-    hash_code = hashing_util.generate_unsigned_hash_code(['gs://bucket/blob',
-                                                          'sample 1'])
-    self.assertEqual(hash_code, 797596659968939265)
+    hash_code = (
+        hashing_util.generate_unsigned_hash_code(['str1', 'str2', 'str3']))
+    self.assertEqual(hash_code, 7972645828447426528)
 
-    hash_code = hashing_util.generate_unsigned_hash_code(['gs://bucket/blob',
-                                                          'sample 1'],
-                                                         1000)
-    self.assertEqual(hash_code, 72)
+    hash_code = (
+        hashing_util.generate_unsigned_hash_code(['str1', 'str2', 'str3'],
+                                                 1000))
+    self.assertEqual(hash_code, 335)
+
+    hash_code = (
+        hashing_util.generate_unsigned_hash_code(['str1', 'str2'], 1000))
+    self.assertEqual(hash_code, 678)
+
+    hash_code = (
+        hashing_util.generate_unsigned_hash_code(['str2', 'str1'], 1000))
+    self.assertEqual(hash_code, 110)
+
+  def test_generate_sample_id_with_file_path(self):
+    hash_code = hashing_util.generate_sample_id('Sample 1', 'file_1')
+    self.assertEqual(hash_code, 5961690698012655974)
+
+    hash_code = hashing_util.generate_sample_id('Sample 2', 'file_1')
+    self.assertEqual(hash_code, 5854056809620188906)
+
+    hash_code = hashing_util.generate_sample_id('Sample 1', 'file_2')
+    self.assertEqual(hash_code, 5259968798637352651)
+
+    hash_code = hashing_util.generate_sample_id('Sample 2', 'file_2')
+    self.assertEqual(hash_code, 6253115674664185777)
+
+  def test_generate_sample_id_without_file_path(self):
+    hash_code = hashing_util.generate_sample_id('Sample 1')
+    self.assertEqual(hash_code, 3787456804322732813)
+
+    hash_code = hashing_util.generate_sample_id('Sample 2')
+    self.assertEqual(hash_code, 6583536632710741776)

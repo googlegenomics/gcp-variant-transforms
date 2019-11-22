@@ -67,16 +67,16 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
     vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
     expected_rows = [
-        {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
+        {sample_info_table_schema_generator.SAMPLE_ID: 3557060386057929459,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
+        {sample_info_table_schema_generator.SAMPLE_ID: 105007314023450378,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
+        {sample_info_table_schema_generator.SAMPLE_ID: 3557060386057929459,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
+        {sample_info_table_schema_generator.SAMPLE_ID: 105007314023450378,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]
