@@ -24,8 +24,6 @@ from typing import Dict, Union  # pylint: disable=unused-import
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.protorpclite import messages  # pylint: disable=unused-import
 
-from vcf import parser
-
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_util
@@ -35,8 +33,6 @@ from gcp_variant_transforms.libs import vcf_reserved_fields
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 
-_Format = parser._Format
-_Info = parser._Info
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 
@@ -100,7 +96,6 @@ def generate_schema_from_header_fields(
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Reference bases.'))
-
   schema.fields.append(proc_variant_factory.create_alt_bases_field_schema())
 
   schema.fields.append(bigquery.TableFieldSchema(
@@ -363,19 +358,19 @@ def _add_format_fields(schema, formats, allow_incompatible_schema=False):
           not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
       _validate_reserved_field(field, reserved_definition)
-      formats.update({field.name: _Format(
-          id=field.name,
-          num=reserved_definition.num,
-          type=reserved_definition.type,
-          desc=_remove_special_characters(field.description or
-                                          reserved_definition.desc))})
+      formats.update({field.name: vcf_header_io.CreateFormatField(
+          field.name,
+          reserved_definition.num,
+          reserved_definition.type,
+          _remove_special_characters(field.description or
+                                     reserved_definition.desc))})
     else:
-      formats.update({field.name: _Format(
-          id=field.name,
-          num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
-                                                             field.type),
-          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          desc=_remove_special_characters(field.description))})
+      formats.update({field.name: vcf_header_io.CreateFormatField(
+          field.name,
+          bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                         field.type),
+          bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          _remove_special_characters(field.description))})
 
 
 def _add_info_fields(field, infos, allow_incompatible_schema=False):
@@ -388,23 +383,19 @@ def _add_info_fields(field, infos, allow_incompatible_schema=False):
         not allow_incompatible_schema):
     reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
     _validate_reserved_field(field, reserved_definition)
-    infos.update({field.name: _Info(
-        id=field.name,
-        num=reserved_definition.num,
-        type=reserved_definition.type,
-        desc=_remove_special_characters(field.description or
-                                        reserved_definition.desc),
-        source=None,
-        version=None)})
+    infos.update({field.name: vcf_header_io.CreateInfoField(
+        field.name,
+        reserved_definition.num,
+        reserved_definition.type,
+        _remove_special_characters(field.description or
+                                   reserved_definition.desc))})
   else:
-    infos.update({field.name: _Info(
-        id=field.name,
-        num=bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
-                                                           field.type),
-        type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-        desc=_remove_special_characters(field.description),
-        source=None,
-        version=None)})
+    infos.update({field.name: vcf_header_io.CreateInfoField(
+        field.name,
+        bigquery_util.get_vcf_num_from_bigquery_schema(field.mode,
+                                                       field.type),
+        bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+        _remove_special_characters(field.description))})
 
 
 def _add_info_fields_from_alternate_bases(schema,
@@ -424,33 +415,27 @@ def _add_info_fields_from_alternate_bases(schema,
     if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
       continue
     elif field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
-      infos.update({field.name: _Info(
-          id=field.name,
-          num=parser.field_counts[vcfio.MISSING_FIELD_VALUE],
-          type=bigquery_util._VcfHeaderTypeConstants.STRING,
-          desc=_remove_special_characters(_get_annotation_description(field)),
-          source=None,
-          version=None)})
+      infos.update({field.name: vcf_header_io.CreateInfoField(
+          field.name,
+          vcfio.MISSING_FIELD_VALUE,
+          bigquery_util._VcfHeaderTypeConstants.STRING,
+          _remove_special_characters(_get_annotation_description(field)))})
     elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
           not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
       _validate_reserved_field_type(field, reserved_definition)
-      infos.update({field.name: _Info(
-          id=field.name,
-          num=reserved_definition.num,
-          type=reserved_definition.type,
-          desc=_remove_special_characters(field.description or
-                                          reserved_definition.desc),
-          source=None,
-          version=None)})
+      infos.update({field.name: vcf_header_io.CreateInfoField(
+          field.name,
+          reserved_definition.num,
+          reserved_definition.type,
+          _remove_special_characters(field.description or
+                                     reserved_definition.desc))})
     else:
-      infos.update({field.name: _Info(
-          id=field.name,
-          num=parser.field_counts[vcfio.FIELD_COUNT_ALTERNATE_ALLELE],
-          type=bigquery_util.get_vcf_type_from_bigquery_type(field.type),
-          desc=_remove_special_characters(field.description),
-          source=None,
-          version=None)})
+      infos.update({field.name: vcf_header_io.CreateInfoField(
+          field.name,
+          vcfio.FIELD_COUNT_ALTERNATE_ALLELE,
+          bigquery_util.get_vcf_type_from_bigquery_type(field.type),
+          _remove_special_characters(field.description))})
 
 
 def _validate_reserved_field(field_schema, reserved_definition):

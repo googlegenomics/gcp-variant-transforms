@@ -106,7 +106,8 @@ def run(argv=None):
       variants = pipeline_common.read_variants(p,
                                                all_patterns,
                                                pipeline_mode,
-                                               allow_malformed_records=True)
+                                               allow_malformed_records=True,
+                                               infer_headers=True)
       malformed_records = variants | filter_variants.ExtractMalformedVariants()
       inferred_headers, merged_headers = (_get_inferred_headers(variants,
                                                                 merged_headers))

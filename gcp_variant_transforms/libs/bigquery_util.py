@@ -22,7 +22,6 @@ from typing import List, Tuple, Union  # pylint: disable=unused-import
 from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
-from vcf import parser
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
@@ -206,7 +205,7 @@ def get_vcf_num_from_bigquery_schema(bigquery_mode, bigquery_type):
   # type: (str, str) -> int
   """Returns VCF num based on BigQuery mode and type."""
   if bigquery_mode == TableFieldConstants.MODE_REPEATED:
-    return parser.field_counts[vcfio.MISSING_FIELD_VALUE]
+    return vcfio.MISSING_FIELD_VALUE
   else:
     return 0 if bigquery_type == TableFieldConstants.TYPE_BOOLEAN else 1
 

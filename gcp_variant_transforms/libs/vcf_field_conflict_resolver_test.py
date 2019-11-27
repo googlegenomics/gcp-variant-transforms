@@ -18,8 +18,6 @@ import unittest
 
 from collections import namedtuple
 
-import vcf
-
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeaderFieldTypeConstants
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfParserHeaderKeyConstants
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
@@ -41,11 +39,6 @@ class ConflictResolverTest(unittest.TestCase):
         split_alternate_allele_info_fields=True)
     self._resolver_always = vcf_field_conflict_resolver.FieldConflictResolver(
         resolve_always=True)
-
-  def _field_count(self, symbol):
-    # type: (str) -> int
-    # symbol = {'A', 'G', 'R'}.
-    return vcf.parser.field_counts[symbol]
 
   def _run_resolve_schema_conflict_tests(self, test_data_configs):
     for config in test_data_configs:
@@ -186,15 +179,14 @@ class ConflictResolverTest(unittest.TestCase):
     self.assertEqual(
         self._resolver.resolve_attribute_conflict(
             VcfParserHeaderKeyConstants.NUM, 2, 3),
-        None)
+        '.')
     self.assertEqual(
         self._resolver.resolve_attribute_conflict(
-            VcfParserHeaderKeyConstants.NUM, 2, None),
-        None)
+            VcfParserHeaderKeyConstants.NUM, 2, '.'),
+        '.')
     # Unresolvable cases.
     for i in [0, 1]:
-      for j in [self._field_count('R'), self._field_count('G'),
-                self._field_count('A'), 2, None]:
+      for j in ['R', 'G', 'A', 2, '.']:
         with self.assertRaises(ValueError):
           self._resolver.resolve_attribute_conflict(
               VcfParserHeaderKeyConstants.NUM, i, j)
@@ -205,14 +197,14 @@ class ConflictResolverTest(unittest.TestCase):
     self.assertEqual(
         self._resolver_allele.resolve_attribute_conflict(
             VcfParserHeaderKeyConstants.NUM, 2, 3),
-        None)
+        '.')
     self.assertEqual(
         self._resolver_allele.resolve_attribute_conflict(
-            VcfParserHeaderKeyConstants.NUM, 2, None),
-        None)
+            VcfParserHeaderKeyConstants.NUM, 2, '.'),
+        '.')
     # Unresolvable cases.
-    for i in [self._field_count('A')]:
-      for j in [self._field_count('R'), self._field_count('G'), 0, 1, 2, None]:
+    for i in ['A']:
+      for j in ['R', 'G', 0, 1, 2, '.']:
         with self.assertRaises(ValueError):
           self._resolver_allele.resolve_attribute_conflict(
               VcfParserHeaderKeyConstants.NUM, i, j)
@@ -240,14 +232,13 @@ class ConflictResolverTest(unittest.TestCase):
   def test_resolving_all_field_definition_conflict_in_number(self):
     self.assertEqual(
         self._resolver_always.resolve_attribute_conflict(
-            VcfParserHeaderKeyConstants.NUM, 2, 3), None)
+            VcfParserHeaderKeyConstants.NUM, 2, 3), '.')
     self.assertEqual(
         self._resolver_always.resolve_attribute_conflict(
-            VcfParserHeaderKeyConstants.NUM, 2, None), None)
+            VcfParserHeaderKeyConstants.NUM, 2, '.'), '.')
 
     for i in [0, 1]:
-      for j in [self._field_count('R'), self._field_count('G'),
-                self._field_count('A'), 2, None]:
+      for j in ['R', 'G', 'A', 2, '.']:
         self.assertEqual(
             self._resolver_always.resolve_attribute_conflict(
-                VcfParserHeaderKeyConstants.NUM, i, j), None)
+                VcfParserHeaderKeyConstants.NUM, i, j), '.')

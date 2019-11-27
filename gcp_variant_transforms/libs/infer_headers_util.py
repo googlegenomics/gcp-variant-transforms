@@ -115,11 +115,10 @@ def infer_format_fields(
                   format_key, variant))
         logging.warning('Undefined FORMAT field "%s" in variant "%s"',
                         format_key, str(variant))
-        formats[format_key] = vcf_header_io.VcfHeaderFormatField(
+        formats[format_key] = vcf_header_io.CreateFormatField(
             format_key,
             _get_field_count(format_value),
-            _get_field_type(format_value),
-            '')  # NO_DESCRIPTION
+            _get_field_type(format_value))
     # No point in proceeding. All other calls have the same FORMAT.
     break
   for call in variant.calls:
@@ -142,11 +141,11 @@ def _get_field_count(field_value):
   # type: (Union[List, bool, int, str]) -> Optional[int]
   """
   Args:
-    field_value: value for the field returned by PyVCF. E.g. [0.33, 0.66] is a
-      field value for Allele frequency (AF) field.
+    field_value: value for the field. E.g. [0.33, 0.66] is a field value for
+    Allele frequency (AF) field.
   """
   if isinstance(field_value, list):
-    return None # Default decoding for '.' values.
+    return '.'
   elif isinstance(field_value, bool):
     return 0
   else:
@@ -155,9 +154,8 @@ def _get_field_count(field_value):
 def _get_field_type(field_value):
   """
   Args:
-    field_value (list, bool, integer, or string): value for the field
-      returned by PyVCF. E.g. [0.33, 0.66] is a field value for Allele
-      frequency (AF) field.
+    field_value (list, bool, integer, or string): value for the field. E.g.
+    [0.33, 0.66] is a field value for Allele frequency (AF) field.
   """
   if isinstance(field_value, list):
     return (_get_field_type(field_value[0]) if field_value else
@@ -181,16 +179,15 @@ def _can_cast_to(value, cast_type):
   try:
     _ = cast_type(value)
     return True
-  except ValueError:
+  except (ValueError, TypeError):
     return False
 
 def _get_corrected_type(defined_type, value):
   # type: (str, Any) -> str
   """Returns the corrected type according to `defined_type` and `value`.
 
-  It handles one special case PyVCF cannot handle, i.e., the defined type is
-  `Integer`, but the provided value is float. In this case, correct the type
-  to be `Float`.
+  It handles one special case , i.e., the defined type is `Integer`, but the
+  provided value is float. In this case, correct the type to be `Float`.
 
   Note that if `value` is a float instance but with an integer value
   (e.g. 2.0), the type will stay the same as `defined_type`.
@@ -215,7 +212,7 @@ def _infer_mismatched_info_field(field_key,  # type: str
 
   Two mismatches are handled:
   - Defined num is `A`, but the provided values do not have the same
-    cardinality as the alternate bases. Correct the num to be `None`.
+    cardinality as the alternate bases. Correct the num to be `.`.
   - Defined type is `Integer`, but the provided value is float. Correct the
     type to be `Float`.
 
@@ -229,18 +226,16 @@ def _infer_mismatched_info_field(field_key,  # type: str
     Corrected info definition if there are mismatches.
   """
   corrected_num = defined_header.get(_HeaderKeyConstants.NUM)
-  if (corrected_num in vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION and
-      vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION[corrected_num] ==
-      _FIELD_COUNT_ALTERNATE_ALLELE and
+  if (corrected_num == _FIELD_COUNT_ALTERNATE_ALLELE and
       len(field_value) != num_alternate_bases):
-    corrected_num = None # Default decoding for '.' values.
+    corrected_num = '.'
 
   corrected_type = _get_corrected_type(
       defined_header.get(_HeaderKeyConstants.TYPE), field_value)
 
   if (corrected_type != defined_header.get(_HeaderKeyConstants.TYPE) or
       corrected_num != defined_header.get(_HeaderKeyConstants.NUM)):
-    return vcf_header_io.VcfHeaderInfoField(
+    return vcf_header_io.CreateInfoField(
         field_key,
         corrected_num,
         corrected_type,
@@ -268,7 +263,7 @@ def _infer_mismatched_format_field(field_key, field_value, defined_header):
   corrected_type = _get_corrected_type(
       defined_header.get(_HeaderKeyConstants.TYPE), field_value)
   if corrected_type != defined_header.get(_HeaderKeyConstants.TYPE):
-    return vcf_header_io.VcfHeaderFormatField(
+    return vcf_header_io.CreateFormatField(
         field_key,
         defined_header.get(_HeaderKeyConstants.NUM),
         corrected_type,
@@ -303,13 +298,10 @@ def _infer_non_annotation_info_fields(
                 info_field_key, variant))
       logging.warning('Undefined INFO field "%s" in variant "%s"',
                       info_field_key, str(variant))
-      infos[info_field_key] = vcf_header_io.VcfHeaderInfoField(
+      infos[info_field_key] = vcf_header_io.CreateInfoField(
           info_field_key,
           _get_field_count(info_field_value),
-          _get_field_type(info_field_value),
-          '',  # NO_DESCRIPTION
-          '',  # UNKNOWN_SOURCE
-          '')  # UNKNOWN_VERSION
+          _get_field_type(info_field_value))
     else:
       defined_header = defined_headers.infos.get(info_field_key)
       corrected_info = _infer_mismatched_info_field(
@@ -371,7 +363,7 @@ def _infer_annotation_type_info_fields(
     _check_annotation_lists_lengths(annotation_names, annotation_values)
     annotation_values = zip(*annotation_values)
     for name, values in zip(annotation_names, annotation_values):
-      variant_merged_type = None
+      variant_merged_type = '.'
       for v in values:
         if not v:
           continue
@@ -383,11 +375,8 @@ def _infer_annotation_type_info_fields(
           break
       key_id = get_inferred_annotation_type_header_key(
           field, name)
-      infos[key_id] = vcf_header_io.VcfHeaderInfoField(\
+      infos[key_id] = vcf_header_io.CreateInfoField(
           key_id,
           1,  # field count
           variant_merged_type,
-          ('Inferred type field for annotation {}.'.format(
-              name)),
-          '',  # UNKNOWN_SOURCE
-          '')  # UNKNOWN_VERSION
+          ('Inferred type field for annotation {}.'.format(name)))

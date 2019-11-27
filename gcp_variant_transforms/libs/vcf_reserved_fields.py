@@ -22,38 +22,36 @@ from __future__ import absolute_import
 import collections
 from typing import Optional  # pylint: disable=unused-import
 
-from vcf import parser
-
 _ReservedDefinition = collections.namedtuple('ReservedDefinition',
                                              ['id', 'num', 'type', 'desc'])
 
 
 def _get_field_count(value):
   # type: (str) -> Optional[int]
-  return parser.field_counts[value]
+  return value
 
 
 INFO_FIELDS = {
     'AA': _ReservedDefinition('AA', 1, 'String', 'Ancestral allele'),
-    'AC': _ReservedDefinition('AC', _get_field_count('A'), 'Integer',
+    'AC': _ReservedDefinition('AC', 'A', 'Integer',
                               'Allele count in genotypes, for each ALT allele, '
                               'in the same order as listed'),
-    'AD': _ReservedDefinition('AD', _get_field_count('R'), 'Integer',
+    'AD': _ReservedDefinition('AD', 'R', 'Integer',
                               'Total read depth for each allele'),
-    'ADF': _ReservedDefinition('ADF', _get_field_count('R'), 'Integer',
+    'ADF': _ReservedDefinition('ADF', 'R', 'Integer',
                                'Read depth for each allele on the forward '
                                'strand'),
-    'ADR': _ReservedDefinition('ADR', _get_field_count('R'), 'Integer',
+    'ADR': _ReservedDefinition('ADR', 'R', 'Integer',
                                'Read depth for each allele on the reverse '
                                'strand'),
-    'AF': _ReservedDefinition('AF', _get_field_count('A'), 'Float',
+    'AF': _ReservedDefinition('AF', 'A', 'Float',
                               'Allele frequency for each ALT allele in the '
                               'same order as listed (estimated from primary '
                               'data, not called genotypes'),
     'AN': _ReservedDefinition('AN', 1, 'Integer',
                               'Total number of alleles in called genotypes'),
     'BQ': _ReservedDefinition('BQ', 1, 'Float', 'RMS base quality'),
-    'CIGAR': _ReservedDefinition('CIGAR', _get_field_count('A'), 'String',
+    'CIGAR': _ReservedDefinition('CIGAR', 'A', 'String',
                                  'Cigar string describing how to align an '
                                  'alternate allele to the reference allele'),
     'DB': _ReservedDefinition('DB', 0, 'Flag', 'dbSNP membership'),

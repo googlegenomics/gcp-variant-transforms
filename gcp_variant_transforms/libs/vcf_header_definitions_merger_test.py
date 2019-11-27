@@ -15,7 +15,7 @@
 """Test cases for definitions_merger module."""
 
 import unittest
-import vcf
+from pysam import libcbcf
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs.vcf_header_definitions_merger import DefinitionsMerger
@@ -25,17 +25,19 @@ from gcp_variant_transforms.libs.vcf_header_definitions_merger import VcfHeaderD
 
 class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
 
-  def _get_vcf_header_from_reader(self, reader, file_path):
-    return vcf_header_io.VcfHeader(infos=reader.infos,
-                                   filters=reader.filters,
-                                   alts=reader.alts,
-                                   formats=reader.formats,
-                                   contigs=reader.contigs,
+  def _get_header_from_lines(self, lines, file_path=None):
+    header = libcbcf.VariantHeader()
+    for line in lines[:-1]:
+      header.add_line(line)
+    return vcf_header_io.VcfHeader(infos=header.info,
+                                   filters=header.filters,
+                                   alts=header.alts,
+                                   formats=header.formats,
+                                   contigs=header.contigs,
                                    file_path=file_path)
 
   def _create_definitions_from_lines(self, lines, file_name):
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    header = self._get_vcf_header_from_reader(vcf_reader, file_name)
+    header = self._get_header_from_lines(lines, file_name)
     return VcfHeaderDefinitions(header)
 
   def test_create_empty_header_defitions(self):
@@ -52,8 +54,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
 
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    header = self._get_vcf_header_from_reader(vcf_reader, 'file1')
+    header = self._get_header_from_lines(lines, 'file1')
 
     expected_info = {}
     expected_format = {'NS': {Definition(1, 'Integer'): ['file1']}}
@@ -68,8 +69,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
 
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    header = self._get_vcf_header_from_reader(vcf_reader, 'file1')
+    header = self._get_header_from_lines(lines, 'file1')
 
     expected_info = {'NS': {Definition(1, 'Float'): ['file1']}}
     expected_format = {}
@@ -87,8 +87,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
 
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    header = self._get_vcf_header_from_reader(vcf_reader, 'file1')
+    header = self._get_header_from_lines(lines, 'file1')
 
     expected_info = {
         'NS': {Definition(1, 'Integer'): ['file1']},
@@ -115,12 +114,12 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     merger = DefinitionsMerger()
     lines_1 = [
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-        '##FORMAT=<ID=DP,Number=3,Type=Char,Description="Number samples">\n',
+        '##FORMAT=<ID=DP,Number=3,Type=Character,Description="Num samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
     lines_2 = [
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples2">\n',
-        '##FORMAT=<ID=DP,Number=3,Type=Char,Description="Number samples2">\n',
+        '##FORMAT=<ID=DP,Number=3,Type=Character,Description="Num samples2">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
     main_definitions = self._create_definitions_from_lines(lines_1, 'file1')
@@ -128,7 +127,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
         lines_2, 'file2')
 
     expected_infos = {'NS': {Definition(1, 'Float'): ['file1', 'file2']}}
-    expected_formats = {'DP': {Definition(3, 'Char'): ['file1', 'file2']}}
+    expected_formats = {'DP': {Definition(3, 'Character'): ['file1', 'file2']}}
     merger.merge(main_definitions, secondary_definitions)
 
     self.assertDictEqual(expected_infos, main_definitions.infos)
@@ -138,7 +137,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     merger = DefinitionsMerger()
     lines_1 = [
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-        '##FORMAT=<ID=DP,Number=3,Type=Char,Description="Number samples">\n',
+        '##FORMAT=<ID=DP,Number=3,Type=Character,Description="Num samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
     lines_2 = [
@@ -158,7 +157,7 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     }
     expected_formats = {
         'DP': {
-            Definition(3, 'Char'): ['file1'],
+            Definition(3, 'Character'): ['file1'],
             Definition(3, 'String'): ['file2']
         }
     }
@@ -171,12 +170,12 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     merger = DefinitionsMerger()
     lines_1 = [
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-        '##FORMAT=<ID=DP,Number=3,Type=Char,Description="Number samples">\n',
+        '##FORMAT=<ID=DP,Number=3,Type=Character,Description="Num samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
     lines_2 = [
         '##INFO=<ID=NS,Number=2,Type=Float,Description="Number samples2">\n',
-        '##FORMAT=<ID=DP,Number=4,Type=Char,Description="Number samples2">\n',
+        '##FORMAT=<ID=DP,Number=4,Type=Character,Description="Num samples2">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
     main_definitions = self._create_definitions_from_lines(lines_1, 'file1')
@@ -191,8 +190,8 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     }
     expected_formats = {
         'DP': {
-            Definition(3, 'Char'): ['file1'],
-            Definition(4, 'Char'): ['file2']
+            Definition(3, 'Character'): ['file1'],
+            Definition(4, 'Character'): ['file2']
         }
     }
     merger.merge(main_definitions, secondary_definitions)
@@ -204,12 +203,12 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
     merger = DefinitionsMerger()
     lines_1 = [
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
-        '##FORMAT=<ID=DP,Number=3,Type=Char,Description="Number samples">\n',
+        '##FORMAT=<ID=DP,Number=3,Type=Character,Description="Num samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
     lines_2 = [
         '##INFO=<ID=NK,Number=1,Type=Float,Description="Number samples2">\n',
-        '##FORMAT=<ID=DL,Number=3,Type=Char,Description="Number samples2">\n',
+        '##FORMAT=<ID=DL,Number=3,Type=Character,Description="Num samples2">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
     main_definitions = self._create_definitions_from_lines(lines_1, 'file1')
@@ -221,8 +220,8 @@ class VcfHeaderDefinitionsMergerTest(unittest.TestCase):
         'NK': {Definition(1, 'Float'): ['file2']}
     }
     expected_formats = {
-        'DP': {Definition(3, 'Char'): ['file1']},
-        'DL': {Definition(3, 'Char'): ['file2']}
+        'DP': {Definition(3, 'Character'): ['file1']},
+        'DL': {Definition(3, 'Character'): ['file2']}
     }
     merger.merge(main_definitions, secondary_definitions)
 

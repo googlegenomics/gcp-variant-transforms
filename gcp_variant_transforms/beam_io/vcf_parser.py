@@ -24,19 +24,12 @@ from copy import copy
 from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
-import tempfile
 
 from apache_beam.coders import coders
 from apache_beam.io import filesystems
 from apache_beam.io import textio
 from apache_beam.io import range_trackers
-try:
-  from nucleus.io.python import vcf_reader as nucleus_vcf_reader
-  from nucleus.protos import variants_pb2
-except ImportError:
-  logging.warning('Nucleus is not installed. Cannot use the Nucleus parser.')
 from pysam import libcbcf
-import vcf
 
 from gcp_variant_transforms.beam_io import bgzf
 
@@ -257,6 +250,7 @@ class VcfParser(object):
                allow_malformed_records,  # type: bool
                representative_header_lines=None,  # type:  List[str]
                splittable_bgzf=False,  # type: bool
+               infer_headers=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -265,6 +259,7 @@ class VcfParser(object):
     self._representative_header_lines = representative_header_lines
     self._file_name = file_name
     self._allow_malformed_records = allow_malformed_records
+    self._infer_headers = infer_headers
 
     if splittable_bgzf:
       text_source = bgzf.BGZFBlockSource(
@@ -301,18 +296,17 @@ class VcfParser(object):
               self._process_header_lines),
           **kwargs)
 
-    if isinstance(self, PySamParser):
-      # In an absence of "#CHROM POS..." header line, PySam process would lock.
-      # However, we need to support cases when no records in files were provided
-      # even if the above header line is missing. To circumvent the error, read
-      # the file until the first line is found, and verify validity.
-      self._header_lines = None
-      if isinstance(range_tracker, range_trackers.UnsplittableRangeTracker):
-        secondary_tracker = range_trackers.UnsplittableRangeTracker(
-            copy(range_tracker._range_tracker))
-      else:
-        secondary_tracker = copy(range_tracker)
-      self._verify_header(copy(text_source), secondary_tracker)
+    # In an absence of "#CHROM POS..." header line, PySam process would lock.
+    # However, we need to support cases when no records in files were provided
+    # even if the above header line is missing. To circumvent the error, read
+    # the file until the first line is found, and verify validity.
+    self._header_lines = None
+    if isinstance(range_tracker, range_trackers.UnsplittableRangeTracker):
+      secondary_tracker = range_trackers.UnsplittableRangeTracker(
+          copy(range_tracker._range_tracker))
+    else:
+      secondary_tracker = copy(range_tracker)
+    self._verify_header(copy(text_source), secondary_tracker)
 
     self._text_lines = text_source.read_records(self._file_name,
                                                 range_tracker)
@@ -353,7 +347,7 @@ class VcfParser(object):
         # ID, Description, Type and Number are mandatory fields.
         if not k:
           raise ValueError('Corrupt ID at header line {}.'.format(v.id))
-        if not v.description:
+        if v.description is None:
           raise ValueError(
               'Corrupt Description at header line {}.'.format(v.id))
         # Type can only be Integer, Float, Flag, Character or String
@@ -383,19 +377,24 @@ class VcfParser(object):
     # since it's being called once Text Source is read, and for PySam, we need
     # to read text source twice - once to verify that either CHROM... line
     # exists or no record lines exist, and once to actually process the file.
-    if isinstance(self, PySamParser):
-      # PySam requires 'fileformat=VCFvX' field to be supplied, default to 4.0.
-      if header_lines and not header_lines[0].startswith(
-          FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
-        header_lines.insert(
-            0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
-      header_lines = [line.strip() for line in header_lines if line.strip()]
+    # PySam requires 'fileformat=VCFvX' field to be supplied, default to 4.0.
+    if header_lines and not header_lines[0].startswith(
+        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+      header_lines.insert(
+          0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+    header_lines = [line.strip() for line in header_lines if line.strip()]
+    self._header_lines = []
+    for line in header_lines:
       # Number='G' is to be deprecated and is unsupported by PySam - replace
       # with 'unknown' number identifier if found.
-      self._header_lines = filter(None, [line.strip().replace(
-          'Number=G', 'Number=.').encode('utf-8') for line in header_lines])
-    else:
-      self._init_with_header(header_lines)
+      parsed_line = line.strip().replace('Number=G', 'Number=.')
+      # Tests provide lines in unicode.
+      if isinstance(parsed_line, str):
+        parsed_line = parsed_line.decode('utf-8')
+      if parsed_line:
+        # For str cases, decode then re-encode lines in utf-8, to not use ascii
+        # encoding.
+        self._header_lines.append(parsed_line.encode('utf-8'))
 
   def next(self):
     try:
@@ -404,7 +403,10 @@ class VcfParser(object):
       # clean up, once iterator is depleted.
       self.after_read()
       raise e
-    record = self._get_variant(text_line)
+    try:
+      record = self._get_variant(text_line)
+    except Exception as e:
+      raise ValueError('asd')
     if isinstance(record, Variant):
       return record
     elif isinstance(record, MalformedVcfRecord):
@@ -437,163 +439,6 @@ class VcfParser(object):
     raise NotImplementedError
 
 
-class PyVcfParser(VcfParser):
-  """An Iterator for processing a single VCF file using PyVcf."""
-
-  def __init__(self,
-               file_name,  # type: str
-               range_tracker,  # type: range_trackers.OffsetRangeTracker
-               compression_type,  # type: str
-               allow_malformed_records,  # type: bool
-               file_pattern=None,  # type: str
-               representative_header_lines=None,  # type:  List[str]
-               splittable_bgzf=False,  # type: bool
-               **kwargs  # type: **str
-              ):
-    # type: (...) -> None
-    super(PyVcfParser, self).__init__(file_name,
-                                      range_tracker,
-                                      file_pattern,
-                                      compression_type,
-                                      allow_malformed_records,
-                                      representative_header_lines,
-                                      splittable_bgzf,
-                                      **kwargs)
-    self._header_lines = []
-    self._next_line_to_process = None
-    self._current_line = None
-    # This member will be properly initiated in _init_with_header().
-    self._vcf_reader = None
-
-  def _init_with_header(self, header_lines):
-    self._header_lines = header_lines
-    try:
-      self._vcf_reader = vcf.Reader(fsock=self._line_generator())
-    except SyntaxError as e:
-      raise ValueError(
-          'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
-
-  def _get_variant(self, data_line):
-    # _line_generator will consume this line.
-    self._next_line_to_process = data_line
-    try:
-      record = next(self._vcf_reader)
-      return self._convert_to_variant(record, self._vcf_reader.formats)
-    except (LookupError, ValueError) as e:
-      logging.warning('VCF record read failed in %s for line %s: %s',
-                      self._file_name, data_line, str(e))
-      return MalformedVcfRecord(self._file_name, data_line, str(e))
-
-  def _line_generator(self):
-    for header in self._header_lines:
-      yield header
-    # Continue to process the next line indefinitely. The next line is set
-    # inside _get_variant() and this method is indirectly called in get_variant.
-    while self._next_line_to_process:
-      self._current_line = self._next_line_to_process
-      self._next_line_to_process = None
-      # PyVCF has explicit str() calls when parsing INFO fields, which fails
-      # with UTF-8 decoded strings. Encode the line back to UTF-8.
-      yield self._current_line.encode('utf-8')
-      # Making sure _get_variant() assigned a new value before consuming it.
-      assert self._next_line_to_process is not None, (
-          'Internal error: A data line is requested to be processed more than '
-          'once. Please file a bug if you see this!')
-
-  def _convert_to_variant(
-      self,
-      record,  # type: vcf.model._Record
-      formats  # type: Dict[str, vcf.parser._Format]
-      ):
-    # type: (...) -> Variant
-    """Converts the PyVCF record to a :class:`Variant` object.
-
-    Args:
-      record: An object containing info about a variant.
-      formats: The PyVCF dict storing FORMAT extracted from the VCF header.
-        The key is the FORMAT key and the value is
-        :class:`~vcf.parser._Format`.
-
-    Returns:
-      A :class:`Variant` object from the given record.
-
-    Raises:
-      ValueError: if ``record`` is semantically invalid.
-    """
-    return Variant(
-        reference_name=record.CHROM,
-        start=record.start,
-        end=self._get_variant_end(record),
-        reference_bases=(
-            record.REF if record.REF != MISSING_FIELD_VALUE else None),
-        alternate_bases=self._get_variant_alternate_bases(record),
-        names=record.ID.split(';') if record.ID else [],
-        quality=record.QUAL,
-        filters=[PASS_FILTER] if record.FILTER == [] else record.FILTER,
-        info=self._get_variant_info(record),
-        calls=self._get_variant_calls(record, formats))
-
-  def _get_variant_end(self, record):
-    if END_INFO_KEY not in record.INFO:
-      return record.end
-    end_info_value = record.INFO[END_INFO_KEY]
-    if isinstance(end_info_value, (int, long)):
-      return end_info_value
-    if (isinstance(end_info_value, list) and len(end_info_value) == 1 and
-        isinstance(end_info_value[0], (int, long))):
-      return end_info_value[0]
-    else:
-      raise ValueError('Invalid END INFO field in record: {}'.format(
-          self._current_line))
-
-  def _get_variant_alternate_bases(self, record):
-    # ALT fields are classes in PyVCF (e.g. Substitution), so need convert
-    # them to their string representations.
-    return [str(r) for r in record.ALT if r] if record.ALT else []
-
-  def _get_variant_info(self, record):
-    info = {}
-    for k, v in record.INFO.iteritems():
-      if k != END_INFO_KEY:
-        info[k] = v
-
-    return info
-
-  def _get_variant_calls(self, record, formats):
-    calls = []
-    for sample in record.samples:
-      call = VariantCall()
-      call.name = sample.sample
-      for allele in sample.gt_alleles or [MISSING_GENOTYPE_VALUE]:
-        if allele is None:
-          allele = MISSING_GENOTYPE_VALUE
-        call.genotype.append(int(allele))
-      phaseset_from_format = (
-          getattr(sample.data, PHASESET_FORMAT_KEY)
-          if PHASESET_FORMAT_KEY in sample.data._fields
-          else None)
-      # Note: Call is considered phased if it contains the 'PS' key regardless
-      # of whether it uses '|'.
-      if phaseset_from_format or sample.phased:
-        call.phaseset = (str(phaseset_from_format) if phaseset_from_format
-                         else DEFAULT_PHASESET_VALUE)
-      for field in sample.data._fields:
-        # Genotype and phaseset (if present) are already included.
-        if field in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
-          continue
-        data = getattr(sample.data, field)
-        # Convert single values to a list for cases where the number of fields
-        # is unknown. This is to ensure consistent types across all records.
-        # Note: this is already done for INFO fields in PyVCF.
-        if (field in formats and
-            formats[field].num not in (0, 1) and
-            isinstance(data, (int, float, long, basestring, bool))):
-          data = [data]
-        call.info[field] = data
-      calls.append(call)
-    return calls
-
-
 class PySamParser(VcfParser):
   """An Iterator for processing a single VCF file using PySam.
 
@@ -616,6 +461,7 @@ class PySamParser(VcfParser):
                file_pattern=None,  # type: str
                representative_header_lines=None,  # type:  List[str]
                splittable_bgzf=False,  # type: bool
+               infer_headers=False,  # type: bool
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -625,6 +471,8 @@ class PySamParser(VcfParser):
                                       compression_type,
                                       allow_malformed_records,
                                       representative_header_lines,
+                                      splittable_bgzf,
+                                      infer_headers,
                                       **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
@@ -646,14 +494,19 @@ class PySamParser(VcfParser):
     self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
     self._original_info_list = self._vcf_reader.header.info.keys()
 
-  def _init_child_process(self, variants_read, pysam_write, header_lines):
+  def _init_child_process(
+      self, variants_read, pysam_write, header_lines, infer_headers):
     # Child process' task is to populate data into the pipe that feeds
     # VariantFile class - first by populating all of the header lines, and then
     # by redirecting the data received from the second pipe.
 
     # Write Header Lines into PySam.
     to_pysam_pipe = os.fdopen(pysam_write, 'w')
-    to_pysam_pipe.write('\n'.join(header_lines) + '\n')
+    if infer_headers:
+      to_pysam_pipe.write(header_lines[0] + '\n') # fileformat line
+      to_pysam_pipe.write(header_lines[-1] + '\n') # `#CHROM...` line
+    else:
+      to_pysam_pipe.write('\n'.join(header_lines) + '\n')
     to_pysam_pipe.flush()
 
     # Forward variants from _get_variant to PySam.
@@ -687,14 +540,16 @@ class PySamParser(VcfParser):
       self._process_pid = pid
       self._init_parent_process(pysam_read, variants_write)
     else:
-      self._init_child_process(variants_read, pysam_write, header_lines)
+      self._init_child_process(
+        variants_read, pysam_write, header_lines, self._infer_headers)
 
   def _get_variant(self, data_line):
     try:
       self._to_child.write(data_line.encode('utf-8') + '\n')
       self._to_child.flush()
-      return self._convert_to_variant(next(self._vcf_reader))
-    except (MemoryError, IOError, ValueError) as e:
+      minext = next(self._vcf_reader)
+      return self._convert_to_variant(minext)
+    except (MemoryError, IOError, ValueError, StopIteration) as e:
       logging.warning('VCF record read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
@@ -739,12 +594,13 @@ class PySamParser(VcfParser):
     # type: (libcbcf.VariantRecord) -> Dict[str, Any]
     info = {}
     for k, v in list(record.info.items()):
-      if k != END_INFO_KEY:
+      if not v and k not in self._original_info_list:
+        info[k] = True
+      elif k != END_INFO_KEY:
         if isinstance(v, tuple):
           info[k] = list(map(self._convert_field, v))
         else:
-          # If a field was not provided in the header, make it a list to
-          # follow the PyVCF standards.
+          # If a field was not provided in the header, make it a list.
           info[k] = (
               self._convert_field(v) if k in self._original_info_list else
               [self._convert_field(v)])
@@ -813,189 +669,4 @@ class PySamParser(VcfParser):
         phaseset = DEFAULT_PHASESET_VALUE
       calls.append(VariantCall(name, genotype, phaseset, info))
 
-    return calls
-
-
-class NucleusParser(VcfParser):
-  """An Iterator for processing a single VCF file using Nucleus."""
-
-  def __init__(self,
-               file_name,  # type: str
-               range_tracker,  # type: range_trackers.OffsetRangeTracker
-               compression_type,  # type: str
-               allow_malformed_records,  # type: bool
-               file_pattern=None,  # type: str
-               representative_header_lines=None,  # type:  List[str]
-               **kwargs  # type: **str
-              ):
-    # type: (...) -> None
-    super(NucleusParser, self).__init__(file_name,
-                                        range_tracker,
-                                        file_pattern,
-                                        compression_type,
-                                        allow_malformed_records,
-                                        representative_header_lines,
-                                        **kwargs)
-    try:
-      nucleus_vcf_reader
-    except NameError:
-      raise RuntimeError(
-          'Nucleus is not installed. Cannot use the Nucleus parser.')
-
-    # This member will be properly initiated in _init_with_header().
-    self._vcf_reader = None
-    # These members will be properly initiated in _extract_header_fields().
-    self._header_infos = {}
-    self._header_formats = {}
-
-  def _store_to_temp_local_file(self, header_lines):
-    temp_file, temp_file_name = tempfile.mkstemp(text=True)
-    for line in header_lines:
-      if not line.endswith('\n'):
-        line += '\n'
-      os.write(temp_file, line)
-    os.close(temp_file)
-    return temp_file_name
-
-  def _init_with_header(self, header_lines):
-    # The first header line must be similar to '##fileformat=VCFv.*'.
-    if header_lines and not header_lines[0].startswith(
-        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
-      header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
-
-    try:
-      self._vcf_reader = nucleus_vcf_reader.VcfReader.from_file(
-          self._store_to_temp_local_file(header_lines),
-          variants_pb2.VcfReaderOptions())
-    except ValueError as e:
-      raise ValueError(
-          'Invalid VCF header in %s: %s' % (self._file_name, str(e)))
-    self._extract_header_fields()
-
-  def _extract_header_fields(self):
-    header = self._vcf_reader.header
-    for info in header.infos:
-      self._header_infos[info.id] = info
-
-    for format_info in header.formats:
-      self._header_formats[format_info.id] = format_info
-
-  def _is_info_repeated(self, info_id):
-    info = self._header_infos.get(info_id, None)
-    if not info or not info.number:
-      return False
-    else:
-      return self._is_repeated(info.number)
-
-  def _is_format_repeated(self, format_id):
-    format_info = self._header_formats.get(format_id, None)
-    if not format_info or not format_info.number:
-      return False
-    else:
-      return self._is_repeated(format_info.number)
-
-  def _is_repeated(self, number):
-    if number in ('0', '1'):
-      return False
-    else:
-      return True
-
-  def _get_variant(self, data_line):
-    try:
-      variant_proto = self._vcf_reader.from_string(data_line)
-      return self._convert_to_variant(variant_proto)
-    except ValueError as e:
-      logging.warning('VCF variant_proto read failed in %s for line %s: %s',
-                      self._file_name, data_line, str(e))
-      return MalformedVcfRecord(self._file_name, data_line, str(e))
-
-  def _convert_to_variant(self, variant_proto):
-    # type: (variants_pb2.Variant) -> Variant
-    return Variant(
-        reference_name=variant_proto.reference_name,
-        start=variant_proto.start,
-        end=variant_proto.end,
-        reference_bases=(variant_proto.reference_bases
-                         if variant_proto.reference_bases != MISSING_FIELD_VALUE
-                         else None),
-        alternate_bases=list(variant_proto.alternate_bases),
-        names=variant_proto.names[0].split(';') if variant_proto.names else [],
-        # TODO(samanvp): ensure the default value (when missing) is set to -1.
-        quality=variant_proto.quality,
-        filters=map(str, variant_proto.filter),
-        info=self._get_variant_info(variant_proto),
-        calls=self._get_variant_calls(variant_proto))
-
-  def _get_variant_info(self, variant_proto):
-    info = {}
-    for k in variant_proto.info:
-      data = self._convert_list_value(variant_proto.info[k],
-                                      self._is_info_repeated(k))
-      # Avoid including missing flags as `false` or other fields valued as `[]`.
-      if not data:
-        continue
-      info[k] = data
-    return info
-
-  def _convert_list_value(self, list_values, is_repeated):
-    """Converts an object of ListValue to python native types.
-
-    if is_repeated is set the output will be a list otherwise a single value.
-    """
-    output_list = []
-    for value in list_values.values:
-      if value.HasField('null_value'):
-        output_list.append(value.null_value)
-      elif value.HasField('number_value'):
-        output_list.append(value.number_value)
-      elif value.HasField('int_value'):
-        output_list.append(value.int_value)
-      elif value.HasField('string_value'):
-        output_list.append(value.string_value)
-      elif value.HasField('bool_value'):
-        output_list.append(value.bool_value)
-      elif value.HasField('struct_value'):
-        output_list.append(value.struct_value)
-      elif value.HasField('list_value'):
-        output_list.append(self._convert_list_value(value.list_value, True))
-      else:
-        raise ValueError('ListValue object has an unexpected value: %s' % value)
-
-    if is_repeated:
-      return output_list
-    else:
-      if len(output_list) > 1 and not self._allow_malformed_records:
-        raise ValueError('a not repeated field has more than 1 value')
-      if not output_list:
-        return None
-      else:
-        # TODO(samanvp): Verify whether we reach here with len(output_list) > 1.
-        return output_list[0]
-
-  def _get_variant_calls(self, variant_proto):
-    calls = []
-    for call_proto in variant_proto.calls:
-      call = VariantCall()
-      call.name = call_proto.call_set_name
-      if not call_proto.genotype:
-        call.genotype.append(MISSING_GENOTYPE_VALUE)
-      else:
-        call.genotype = list(call_proto.genotype)
-
-      phaseset_from_format = (
-          self._convert_list_value(call_proto.info[PHASESET_FORMAT_KEY], False)
-          if PHASESET_FORMAT_KEY in call_proto.info else None)
-      # Note: Call is considered phased if it contains the 'PS' key regardless
-      # of whether it uses '|'.
-      if phaseset_from_format or call_proto.is_phased:
-        call.phaseset = (str(phaseset_from_format) if phaseset_from_format
-                         else DEFAULT_PHASESET_VALUE)
-      for k in call_proto.info:
-        # Genotype and phaseset (if present) are already included.
-        if k in (GENOTYPE_FORMAT_KEY, PHASESET_FORMAT_KEY):
-          continue
-        data = self._convert_list_value(call_proto.info[k],
-                                        self._is_format_repeated(k))
-        call.info[k] = data
-      calls.append(call)
     return calls

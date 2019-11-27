@@ -117,8 +117,8 @@ class FieldConflictResolver(object):
     numeric_types = (type_constants.INTEGER, type_constants.FLOAT)
     if first == second:
       return first
-    elif first is None or second is None:
-      return first if second is None else second
+    elif first == '.' or second == '.':
+      return first if second == '.' else second
     elif first in numeric_types and second in numeric_types:
       return type_constants.FLOAT
     elif self._resolve_always:
@@ -133,9 +133,9 @@ class FieldConflictResolver(object):
     elif (self._is_bigquery_field_repeated(first) and
           self._is_bigquery_field_repeated(second)):
       # None implies arbitrary number of values.
-      return None
+      return '.'
     elif self._resolve_always:
-      return None
+      return '.'
     else:
       raise ValueError('Incompatible numbers cannot be resolved: '
                        '{}, {}'.format(first, second))
@@ -149,8 +149,7 @@ class FieldConflictResolver(object):
     """
     if vcf_num in (0, 1):
       return False
-    elif (vcf_num in vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION and
-          vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION[vcf_num] == 'A' and
+    elif (vcf_num == 'A' and
           self._split_alternate_allele_info_fields):
       # info field with `Number=A` does not become a repeated field if flag
       # `split_alternate_allele_info_fields` is on.

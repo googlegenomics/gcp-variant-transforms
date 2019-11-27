@@ -19,7 +19,6 @@ import argparse  # pylint: disable=unused-import
 from apache_beam.io.gcp.internal.clients import bigquery
 from oauth2client.client import GoogleCredentials
 
-from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
@@ -102,20 +101,6 @@ class VcfReadOptions(VariantTransformsOptions):
               'of the the header fields do not match the field values. Note: '
               'setting this flag or `--infer_annotation_types` incurs a '
               'performance penalty of an extra pass over all variants.'))
-    parser.add_argument(
-        '--vcf_parser',
-        default=vcfio.VcfParserType.PYVCF.name,
-        choices=[parser.name for parser in vcfio.VcfParserType],
-        help=('Choose the underlying parser for reading VCF files. Currently '
-              'we only support ``{}`` (default), ``{}`` and ``{}``. Note: '
-              'Nucleus parser is still in experimental stage so using it for '
-              'production jobs is not recommended. Additionally, if you are '
-              'running using PySam in a ``DirectRunner``, you may need to '
-              'install additional compression libraries on your machines, like '
-              '``zlib1g-dev``, ``libbz2-dev`` and ``liblzma-dev``'.format(
-                  vcfio.VcfParserType.PYVCF.name,
-                  vcfio.VcfParserType.NUCLEUS.name,
-                  vcfio.VcfParserType.PYSAM.name)))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None

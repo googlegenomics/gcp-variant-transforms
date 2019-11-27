@@ -52,7 +52,7 @@ RUN python -m pip install --upgrade pip && \
     virtualenv /opt/gcp_variant_transforms/venv && \
     . /opt/gcp_variant_transforms/venv/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    python -m pip install --upgrade --no-binary pyvcf .
+    python -m pip install --upgrade .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \

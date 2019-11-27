@@ -92,8 +92,7 @@ class FieldSanitizer(object):
     [0, `null_numeric_value_replacement`, 1].
     Null value replacements are:
       - `False` for bool.
-      - `.` for string (null string values should not exist in Variants parsed
-        using PyVCF though).
+      - `.` for string.
       - `null_numeric_value_replacement` for float/int/long.
 
     For strings, it returns its unicode representation. The BigQuery API does
@@ -127,8 +126,7 @@ class FieldSanitizer(object):
     [0, `null_numeric_value_replacement`, 1].
     Null value replacements are:
       - `False` for bool.
-      - `.` for string (null string values should not exist in Variants parsed
-        using PyVCF though).
+      - `.` for string.
       - `null_numeric_value_replacement` for float/int/long.
     Lists that contain strings are also sanitized according to the
     `_get_sanitized_string` method.

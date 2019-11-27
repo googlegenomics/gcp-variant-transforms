@@ -38,7 +38,6 @@ from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
-from gcp_variant_transforms.beam_io.vcfio import VcfParserType
 from gcp_variant_transforms.testing import testdata_util
 from gcp_variant_transforms.testing.temp_dir import TempDir
 
@@ -53,19 +52,6 @@ _SAMPLE_HEADER_LINES = [
     '\n',
 ]
 
-# Note: Nucleus cannot tolarate missing fields in the header and needs contig.
-_NUCLEUS_HEADER_LINES = [
-    '##fileformat=VCFv4.2\n',
-    '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
-    '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
-    '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-    '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">\n',
-    '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phaseset">\n',
-    '##contig=<ID=19,length=1>\n',
-    '##contig=<ID=20,length=1>\n',
-    '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
-]
-
 _SAMPLE_TEXT_LINES = [
     '20\t14370\t.\tG\tA\t29\tPASS\tAF=0.5\tGT:GQ\t0|0:48\t1|0:48\n',
     '20\t17330\t.\tT\tA\t3\tq10\tAF=0.017\tGT:GQ\t0|0:49\t0|1:3\n',
@@ -77,10 +63,7 @@ _SAMPLE_TEXT_LINES = [
     '19\t12\t.\tC\t<SYMBOLIC>\t49\tq10\tAF=0.5\tGT:GQ\t0|1:45\t.:.\n'
 ]
 
-
-# Note: all 3 following sample variants have two versions, one for PyVcf and one
-# simplified for Nucleus. We need to do this so Nucleus can process them.
-def _get_sample_variant_1(is_for_nucleus=False):
+def _get_sample_variant_1():
   """Get first sample variant.
 
   Features:
@@ -89,37 +72,22 @@ def _get_sample_variant_1(is_for_nucleus=False):
     multiple names
     utf-8 encoded
   """
-  if not is_for_nucleus:
-    vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-                'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
-    variant = vcfio.Variant(
-        reference_name='20', start=1233, end=1234, reference_bases='C',
-        alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-        filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
-  else:
-    # 0.1 -> 0.25 float precision loss due to binary floating point conversion.
-    # rs123;rs2 -> rs123 it seems nuclues does not parse IDs correctly.
-    # quality=50 -> 50.0 nucleus converts quality values to float.
-    # TODO(samanvp): convert all quality values to float.
-    vcf_line = ('20	1234	rs123	C	A,T	50	'
-                'PASS	AF=0.5,0.25;NS=1	GT:GQ	0/0:48	1/0:20\n')
-    variant = vcfio.Variant(
-        reference_name='20', start=1233, end=1234, reference_bases='C',
-        alternate_bases=['A', 'T'], names=['rs123'], quality=50.0,
-        filters=['PASS'], info={'AF': [0.5, 0.25], 'NS': 1})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+  vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
+              'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
+  variant = vcfio.Variant(
+      reference_name='20', start=1233, end=1234, reference_bases='C',
+      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+      filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+
 
   return variant, vcf_line
 
 
-def _get_sample_variant_2(vcf_parser_type=VcfParserType.PYVCF):
+def _get_sample_variant_2():
   """Get second sample variant.
 
   Features:
@@ -129,53 +97,23 @@ def _get_sample_variant_2(vcf_parser_type=VcfParserType.PYVCF):
     multiple filters
     missing format field
   """
-  if vcf_parser_type == VcfParserType.PYSAM:
-    vcf_line = (
-        '19	123	rs1234	GTC	.	40	q10;s50	NS=2	'
-        'GT:GQ	1|0:48	0/1:.\n')
-    variant = vcfio.Variant(
-        reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=[], names=['rs1234'], quality=40,
-        filters=['q10', 's50'], info={'NS': 2})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[-1, 0],
-                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
-                          info={'GQ': 48}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2', genotype=[0, -1], info={'GQ': None}))
-  elif vcf_parser_type == VcfParserType.NUCLEUS:
-    # 'q10;s50' -> 'PASS' due to missing header fields.
-    vcf_line = (
-        '19	123	rs1234	GTC	.	40	PASS	NS=2	'
-        'GT:GQ	1|0:48	0/1:.\n')
-    variant = vcfio.Variant(
-        reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=[], names=['rs1234'], quality=40,
-        filters=['PASS'], info={'NS': 2})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[1, 0],
-                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
-                          info={'GQ': 48}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={}))
-  else:
-    vcf_line = (
-        '19	123	rs1234	GTC	.	40	q10;s50	NS=2	'
-        'GT:GQ	1|0:48	0/1:.\n')
-    variant = vcfio.Variant(
-        reference_name='19', start=122, end=125, reference_bases='GTC',
-        alternate_bases=[], names=['rs1234'], quality=40,
-        filters=['q10', 's50'], info={'NS': 2})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[1, 0],
-                          phaseset=vcfio.DEFAULT_PHASESET_VALUE,
-                          info={'GQ': 48}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2', genotype=[0, 1], info={'GQ': None}))
+  vcf_line = (
+      '19	123	rs1234	GTC	.	40	q10;s50	NS=2	'
+      'GT:GQ	.|0:48	0/.:.\n')
+  variant = vcfio.Variant(
+      reference_name='19', start=122, end=125, reference_bases='GTC',
+      alternate_bases=[], names=['rs1234'], quality=40,
+      filters=['q10', 's50'], info={'NS': 2})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[-1, 0],
+                        phaseset=vcfio.DEFAULT_PHASESET_VALUE,
+                        info={'GQ': 48}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2', genotype=[0, -1], info={'GQ': None}))
   return variant, vcf_line
 
 
-def _get_sample_variant_3(is_for_nucleus=False):
+def _get_sample_variant_3():
   """Get third sample variant.
 
   Features:
@@ -183,38 +121,20 @@ def _get_sample_variant_3(is_for_nucleus=False):
     no calls for sample 2
     alternate phaseset
   """
-  if not is_for_nucleus:
-    vcf_line = (
-        '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	'
-        'GT:PS:GQ	0|1:1:45	.:.:.\n')
-    variant = vcfio.Variant(
-        reference_name='19', start=11, end=12, reference_bases='C',
-        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-        info={'AF': [0.5]})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[0, 1],
-                          phaseset='1', info={'GQ': 45}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2',
-                          genotype=[vcfio.MISSING_GENOTYPE_VALUE],
-                          info={'GQ': None}))
-  else:
-    # '.:.:.' -> './.:.:.' due to Nucleus handeling of VariantCall.genotype.
-    vcf_line = (
-        '19	12	.	C	<SYMBOLIC>	49	PASS	'
-        'AF=0.5	GT:PS:GQ	0|1:1:45	./.:.:.\n')
-    variant = vcfio.Variant(
-        reference_name='19', start=11, end=12, reference_bases='C',
-        alternate_bases=['<SYMBOLIC>'], quality=49, filters=['PASS'],
-        info={'AF': [0.5]})
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample1', genotype=[0, 1],
-                          phaseset='1', info={'GQ': 45}))
-    variant.calls.append(
-        vcfio.VariantCall(name='Sample2',
-                          genotype=[vcfio.MISSING_GENOTYPE_VALUE,
-                                    vcfio.MISSING_GENOTYPE_VALUE],
-                          info={}))
+  vcf_line = (
+      '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	'
+      'GT:PS:GQ	0|1:1:45	.:.:.\n')
+  variant = vcfio.Variant(
+      reference_name='19', start=11, end=12, reference_bases='C',
+      alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
+      info={'AF': [0.5]})
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+                        phaseset='1', info={'GQ': 45}))
+  variant.calls.append(
+      vcfio.VariantCall(name='Sample2',
+                        genotype=[vcfio.MISSING_GENOTYPE_VALUE],
+                        info={'GQ': None}))
   return variant, vcf_line
 
 
@@ -234,12 +154,6 @@ def _get_sample_non_variant():
 class VcfSourceTest(unittest.TestCase):
 
   VCF_FILE_DIR_MISSING = not os.path.exists(testdata_util.get_full_dir())
-  try:
-    vcfio.vcf_parser.nucleus_vcf_reader
-  except AttributeError:
-    NUCLEUS_IMPORT_MISSING = True
-  else:
-    NUCLEUS_IMPORT_MISSING = False
 
   def _create_temp_vcf_file(
       self, lines, tempdir, compression_type=CompressionTypes.UNCOMPRESSED):
@@ -257,27 +171,24 @@ class VcfSourceTest(unittest.TestCase):
         suffix=suffix, lines=lines, compression_type=compression_type)
 
   def _read_records(self, file_or_pattern, representative_header_lines=None,
-                    vcf_parser_type=VcfParserType.PYVCF, **kwargs):
+                    **kwargs):
     return source_test_utils.read_from_source(
         VcfSource(file_or_pattern,
                   representative_header_lines=representative_header_lines,
-                  vcf_parser_type=vcf_parser_type,
                   **kwargs))
 
   def _create_temp_file_and_read_records(
-      self, lines, representative_header_lines=None,
-      vcf_parser_type=VcfParserType.PYVCF):
+      self, lines, representative_header_lines=None):
     with TempDir() as tempdir:
       file_name = tempdir.create_temp_file(suffix='.vcf', lines=lines)
-      return self._read_records(file_name, representative_header_lines,
-                                vcf_parser_type)
+      return self._read_records(file_name, representative_header_lines)
 
   def _assert_variants_equal(self, actual, expected):
     self.assertEqual(
         sorted(expected),
         sorted(actual))
 
-  def _get_invalid_file_contents(self, is_pysam=False):
+  def _get_invalid_file_contents(self):
     """Gets sample invalid files contents.
 
     Returns:
@@ -286,56 +197,51 @@ class VcfSourceTest(unittest.TestCase):
        because of header errors.
     """
     malformed_vcf_records = [
-        # GT is not an integer.
-        [
-            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
-            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT	A|0'
-        ],
         # POS should be an integer.
         [
             '##FILTER=<ID=PASS,Description="All filters passed">\n',
             '##FILTER=<ID=q10,Description="Quality is less than 10.">\n',
-            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
-            '19	abc	rs12345	T	C	9	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n',
+            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+            '19\tabc\trs12345\tT\tC\t9\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48\n',
         ]
     ]
-    if not is_pysam:
-      malformed_vcf_records.extend(
-          [
-              # Malfromed record.
-              # Causes segmentation fault with PYSAM due to memory allocation
-              # issue with the id field.
-              [
-                  '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
-                  '1    1  '
-              ],
-              # Depending on whether pyvcf uses cython this case fails, this is
-              # a known problem: https://github.com/apache/beam/pull/4221
-              # Missing "GT:GQ" format, but GQ is provided.
-              # HTSLib throws "exit(1)" when encountering this error.
-              [
-                  '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t'
-                  'Sample\n',
-                  '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT\t1|0:48'
-              ],
-          ])
     malformed_header_lines = [
         # Malformed FILTER.
         [
             '##FILTER=<ID=PASS,Description="All filters passed">\n',
             '##FILTER=<ID=LowQual,Descri\n',
-            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
-            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48',
+            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48',
         ],
         # Invalid Number value for INFO.
         [
             '##INFO=<ID=G,Number=U,Type=String,Description="InvalidNumber">\n',
-            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample\n',
-            '19	123	rs12345	T	C	50	q10	AF=0.2;NS=2	GT:GQ	1|0:48\n',
+            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48\n',
         ]
     ]
 
-    return (malformed_vcf_records, malformed_header_lines)
+    return (malformed_vcf_records, malformed_header_lines) #, malformed_header_lines
+
+  def _assert_pipeline_read_files_record_count_equal(
+      self, input_pattern, expected_count, use_read_all=False):
+    """Helper method for verifying total records read.
+
+    Args:
+      input_pattern (str): Input file pattern to read.
+      expected_count (int): Expected number of reacords that was read.
+      use_read_all (bool): Whether to use the scalable ReadAllFromVcf transform
+        instead of ReadFromVcf.
+    """
+    pipeline = TestPipeline()
+    if use_read_all:
+      pcoll = (pipeline
+               | 'Create' >> beam.Create([input_pattern])
+               | 'Read' >> ReadAllFromVcf())
+    else:
+      pcoll = pipeline | 'Read' >> ReadFromVcf(input_pattern)
+    assert_that(pcoll, asserts.count_equals_to(expected_count))
+    pipeline.run()
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_single_file_large(self):
@@ -362,7 +268,8 @@ class VcfSourceTest(unittest.TestCase):
 
   def test_single_file_no_records(self):
     for content in [[''], [' '], ['', ' ', '\n'], ['\n', '\r\n', '\n']]:
-      self.assertEqual([], self._create_temp_file_and_read_records(content))
+      self.assertEqual([], self._create_temp_file_and_read_records(
+          content))
       self.assertEqual([], self._create_temp_file_and_read_records(
           content, _SAMPLE_HEADER_LINES))
 
@@ -380,24 +287,6 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
-  @unittest.skipIf(NUCLEUS_IMPORT_MISSING, 'Nucleus is not imported')
-  def test_single_file_verify_details_nucleus(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
-    read_data = self._create_temp_file_and_read_records(
-        _NUCLEUS_HEADER_LINES + [vcf_line_1],
-        vcf_parser_type=VcfParserType.NUCLEUS)
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(variant_1, read_data[0])
-
-    variant_2, vcf_line_2 = _get_sample_variant_2(
-        vcf_parser_type=VcfParserType.NUCLEUS)
-    variant_3, vcf_line_3 = _get_sample_variant_3(is_for_nucleus=True)
-    read_data = self._create_temp_file_and_read_records(
-        _NUCLEUS_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3],
-        vcf_parser_type=VcfParserType.NUCLEUS)
-    self.assertEqual(3, len(read_data))
-    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
-
   def test_file_pattern_verify_details(self):
     variant_1, vcf_line_1 = _get_sample_variant_1()
     variant_2, vcf_line_2 = _get_sample_variant_2()
@@ -408,22 +297,6 @@ class VcfSourceTest(unittest.TestCase):
                                   [vcf_line_2, vcf_line_3]),
                                  tempdir)
       read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'))
-      self.assertEqual(3, len(read_data))
-      self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
-
-  @unittest.skipIf(NUCLEUS_IMPORT_MISSING, 'Nucleus is not imported')
-  def test_file_pattern_verify_details_nucleus(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1(is_for_nucleus=True)
-    variant_2, vcf_line_2 = _get_sample_variant_2(
-        vcf_parser_type=VcfParserType.NUCLEUS)
-    variant_3, vcf_line_3 = _get_sample_variant_3(is_for_nucleus=True)
-    with TempDir() as tempdir:
-      self._create_temp_vcf_file(_NUCLEUS_HEADER_LINES + [vcf_line_1], tempdir)
-      self._create_temp_vcf_file((_NUCLEUS_HEADER_LINES +
-                                  [vcf_line_2, vcf_line_3]),
-                                 tempdir)
-      read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'),
-                                     vcf_parser_type=VcfParserType.NUCLEUS)
       self.assertEqual(3, len(read_data))
       self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
@@ -526,7 +399,7 @@ class VcfSourceTest(unittest.TestCase):
     # when a representative headers with String definition for field `HU` is
     # given.
     file_content = [
-        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##INFO=<ID=HU,Number=.,Type=String,Descr\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
         '19	2	.	A	T	.	.	HU=a,b	GT	0/0	0/1\n',]
@@ -555,15 +428,15 @@ class VcfSourceTest(unittest.TestCase):
     # when a representative headers with String definition for field `HU` is
     # given.
     file_content_1 = [
-        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##INFO=<ID=HU,Number=.,Type=Float,Descri\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1\r\n',
-        '9     2       .       A       T       .       .       HU=a,b  GT 0/0']
+        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample1\r\n',
+        '9\t2\t.\tA\tT\t.\t.\tHU=a,b\tGT\t0/0']
     file_content_2 = [
-        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
+        '##INFO=<ID=HU,Number=.,Type=Float,Descri\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample2\r\n',
-        '19	2	.	A	T	.	.	HU=a,b	GT	0/1\n',]
+        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample2\r\n',
+        '19\t2\t.\tA\tT\t.\t.\tHU=a,b\tGT\t0/1\n',]
     representative_header_lines = [
         '##INFO=<ID=HU,Number=.,Type=String,Description="Info">\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',]
@@ -591,14 +464,16 @@ class VcfSourceTest(unittest.TestCase):
   def test_end_info_key(self):
     end_info_header_line = (
         '##INFO=<ID=END,Number=1,Type=Integer,Description="End of record.">\n')
-    record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n',
-                    '19	123	.	A	.	.	.	.	GT	0/1	1/1\n']
+    record_lines = ['19	123	.	A	T	.	.	END=1111	GT	1/0	0/1\n',
+                    '19	123	.	A	T	.	.	.	GT	0/1	1/1\n']
     variant_1 = Variant(
-        reference_name='19', start=122, end=1111, reference_bases='A')
+        reference_name='19', start=122, end=1111, reference_bases='A',
+        alternate_bases=['T'])
     variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
     variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
     variant_2 = Variant(
-        reference_name='19', start=122, end=123, reference_bases='A')
+        reference_name='19', start=122, end=123, reference_bases='A',
+        alternate_bases=['T'])
     variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
     variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
     read_data = self._create_temp_file_and_read_records(
@@ -609,9 +484,10 @@ class VcfSourceTest(unittest.TestCase):
   def test_end_info_key_unknown_number(self):
     end_info_header_line = (
         '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
-    record_lines = ['19	123	.	A	.	.	.	END=1111	GT	1/0	0/1\n']
+    record_lines = ['19	123	.	A	T	.	.	END=1111	GT	1/0	0/1\n']
     variant_1 = Variant(
-        reference_name='19', start=122, end=1111, reference_bases='A')
+        reference_name='19', start=122, end=1111, reference_bases='A',
+        alternate_bases=['T'])
     variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
     variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
     read_data = self._create_temp_file_and_read_records(
@@ -622,16 +498,32 @@ class VcfSourceTest(unittest.TestCase):
   def test_end_info_key_unknown_number_invalid(self):
     end_info_header_line = (
         '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
-    # END should only have one field.
+    # PySam should only take first END field.
+    variant = Variant(
+        reference_name='19', start=122, end=150, reference_bases='A',
+        alternate_bases=['T'])
+    variant.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
+    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    read_data = self._create_temp_file_and_read_records(
+        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
+        ['19	123	.	A	T	.	.	END=150,160	GT	1/0	0/1\n'])
+
+    self.assertEqual(1, len(read_data))
+    self._assert_variants_equal([variant], read_data)
+
+    # END should be rounded down.
+    read_data = self._create_temp_file_and_read_records(
+        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
+        ['19	123	.	A	T	.	.	END=150.9	GT	1/0	0/1\n'])
+
+    self.assertEqual(1, len(read_data))
+    self._assert_variants_equal([variant], read_data)
+
+    # END should not be a string.
     with self.assertRaises(ValueError):
       self._create_temp_file_and_read_records(
           [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
-          ['19	124	.	A	.	.	.	END=150,160	GT	1/0	0/1\n'])
-    # END should be an integer.
-    with self.assertRaises(ValueError):
-      self._create_temp_file_and_read_records(
-          [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
-          ['19	124	.	A	.	.	.	END=150.1	GT	1/0	0/1\n'])
+          ['19	123	.	A	T	.	.	END=text	GT	1/0	0/1\n'])
 
   def test_custom_phaseset(self):
     phaseset_header_line = (
@@ -686,28 +578,6 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(1, len(read_data))
     self.assertEqual(expected_variant, read_data[0])
 
-  def _assert_pipeline_read_files_record_count_equal(
-      self, input_pattern, expected_count, use_read_all=False,
-      vcf_parser_type=VcfParserType.PYVCF):
-    """Helper method for verifying total records read.
-
-    Args:
-      input_pattern (str): Input file pattern to read.
-      expected_count (int): Expected number of reacords that was read.
-      use_read_all (bool): Whether to use the scalable ReadAllFromVcf transform
-        instead of ReadFromVcf.
-    """
-    pipeline = TestPipeline()
-    if use_read_all:
-      pcoll = (pipeline
-               | 'Create' >> beam.Create([input_pattern])
-               | 'Read' >> ReadAllFromVcf(vcf_parser_type=vcf_parser_type))
-    else:
-      pcoll = pipeline | 'Read' >> ReadFromVcf(input_pattern,
-                                               vcf_parser_type=vcf_parser_type)
-    assert_that(pcoll, asserts.count_equals_to(expected_count))
-    pipeline.run()
-
   def test_pipeline_read_single_file(self):
     with TempDir() as tempdir:
       file_name = self._create_temp_vcf_file(
@@ -730,8 +600,7 @@ class VcfSourceTest(unittest.TestCase):
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_all_single_file_large(self):
     self._assert_pipeline_read_files_record_count_equal(
-        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882,
-        use_read_all=True)
+        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882)
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_file_pattern_large(self):
@@ -741,8 +610,7 @@ class VcfSourceTest(unittest.TestCase):
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_all_file_pattern_large(self):
     self._assert_pipeline_read_files_record_count_equal(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900,
-        use_read_all=True)
+        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900)
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_pipeline_read_all_gzip_large(self):
@@ -823,496 +691,6 @@ class VcfSourceTest(unittest.TestCase):
           (splits[0].source, splits[0].start_position, splits[0].stop_position))
 
   def test_dynamic_work_rebalancing(self):
-    with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      source = VcfSource(file_name)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
-      assert len(splits) == 1
-      source_test_utils.assert_split_at_fraction_exhaustive(
-          splits[0].source, splits[0].start_position, splits[0].stop_position)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_read_single_file_large_pysam(self):
-    test_data_conifgs = [
-        {'file': 'valid-4.0.vcf', 'num_records': 5},
-        {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
-        {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
-        {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
-        {'file': 'valid-4.2.vcf', 'num_records': 13},
-    ]
-    for config in test_data_conifgs:
-      read_data = self._read_records(
-          testdata_util.get_full_file_path(config['file']),
-          vcf_parser_type=VcfParserType.PYSAM)
-      self.assertEqual(config['num_records'], len(read_data))
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_read_file_pattern_large_pysam(self):
-    read_data = self._read_records(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'),
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(9900, len(read_data))
-    read_data_gz = self._read_records(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf.gz'),
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(9900, len(read_data_gz))
-
-  def test_single_file_no_records_pysam(self):
-    for content in [[''], [' '], ['', ' ', '\n'], ['\n', '\r\n', '\n']]:
-      self.assertEqual([], self._create_temp_file_and_read_records(
-          content, vcf_parser_type=VcfParserType.PYSAM))
-      self.assertEqual([], self._create_temp_file_and_read_records(
-          content, _SAMPLE_HEADER_LINES, vcf_parser_type=VcfParserType.PYSAM))
-
-  def test_single_file_verify_details_pysam(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1()
-    read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES + [vcf_line_1],
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(variant_1, read_data[0])
-
-    variant_2, vcf_line_2 = _get_sample_variant_2(
-        vcf_parser_type=VcfParserType.PYSAM)
-    variant_3, vcf_line_3 = _get_sample_variant_3()
-    read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3],
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(3, len(read_data))
-    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
-
-  def test_file_pattern_verify_details_pysam(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1()
-    variant_2, vcf_line_2 = _get_sample_variant_2(
-        vcf_parser_type=VcfParserType.PYSAM)
-    variant_3, vcf_line_3 = _get_sample_variant_3()
-    with TempDir() as tempdir:
-      self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [vcf_line_1], tempdir)
-      self._create_temp_vcf_file((_SAMPLE_HEADER_LINES +
-                                  [vcf_line_2, vcf_line_3]),
-                                 tempdir)
-      read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'),
-                                     vcf_parser_type=VcfParserType.PYSAM)
-      self.assertEqual(3, len(read_data))
-      self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_read_after_splitting_pysam(self):
-    file_name = testdata_util.get_full_file_path('valid-4.1-large.vcf')
-    source = VcfSource(file_name, vcf_parser_type=VcfParserType.PYSAM)
-    splits = [p for p in source.split(desired_bundle_size=500)]
-    self.assertGreater(len(splits), 1)
-    sources_info = ([
-        (split.source, split.start_position, split.stop_position) for
-        split in splits])
-    self.assertGreater(len(sources_info), 1)
-    split_records = []
-    for source_info in sources_info:
-      split_records.extend(source_test_utils.read_from_source(*source_info))
-    self.assertEqual(9882, len(split_records))
-
-  def test_invalid_file_pysam(self):
-    invalid_file_contents = self._get_invalid_file_contents(is_pysam=True)
-
-    for content in chain(*invalid_file_contents):
-      with TempDir() as tempdir, self.assertRaises(ValueError):
-        self._read_records(self._create_temp_vcf_file(content, tempdir))
-        self.fail('Invalid VCF file must throw an exception')
-    # Try with multiple files (any one of them will throw an exception).
-    with TempDir() as tempdir, self.assertRaises(ValueError):
-      for content in chain(*invalid_file_contents):
-        self._create_temp_vcf_file(content, tempdir)
-        self._read_records(os.path.join(tempdir.get_path(), '*.vcf'),
-                           vcf_parser_type=VcfParserType.PYSAM)
-
-  def test_allow_malformed_records_pysam(self):
-    invalid_records, invalid_headers = self._get_invalid_file_contents(
-        is_pysam=True)
-
-    # Invalid records should not raise errors
-    for content in invalid_records:
-      with TempDir() as tempdir:
-        self._read_records(self._create_temp_vcf_file(content, tempdir),
-                           allow_malformed_records=True,
-                           vcf_parser_type=VcfParserType.PYSAM)
-    # Invalid headers should still raise errors
-    for content in invalid_headers:
-      with TempDir() as tempdir, self.assertRaises(ValueError):
-        self._read_records(self._create_temp_vcf_file(content, tempdir),
-                           allow_malformed_records=True,
-                           vcf_parser_type=VcfParserType.PYSAM)
-
-  def test_no_samples_pysam(self):
-    header_line = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO\n'
-    record_line = '19	123	.	G	A	.	PASS	AF=0.2'
-    expected_variant = Variant(
-        reference_name='19', start=122, end=123, reference_bases='G',
-        alternate_bases=['A'], filters=['PASS'], info={'AF': [0.2]})
-    read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES[:-1] + [header_line, record_line],
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(expected_variant, read_data[0])
-
-  def test_no_info_pysam(self):
-    record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
-    expected_variant = Variant(reference_name='chr19', start=122, end=123)
-    expected_variant.calls.append(
-        VariantCall(name='Sample1', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
-    expected_variant.calls.append(
-        VariantCall(name='Sample2', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
-    read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES + [record_line],
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(expected_variant, read_data[0])
-
-  def test_info_numbers_and_types_pysam(self):
-    info_headers = [
-        '##INFO=<ID=HA,Number=A,Type=String,Description="StringInfo_A">\n',
-        '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
-        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
-        '##INFO=<ID=HF,Number=0,Type=Flag,Description="FlagInfo">\n',
-        '##INFO=<ID=HU,Number=.,Type=Float,Description="FloatInfo_variable">\n']
-    record_lines = [
-        '19	2	.	A	T,C	.	.	HA=a1,a2;HG=1,2,3;HR=a,b,c;HF;HU=0.1	GT	1/0	0/1\n',
-        '19	124	.	A	T	.	.	HG=3,4,5;HR=d,e;HU=1.1,1.2	GT	0/0	0/1']
-    variant_1 = Variant(
-        reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T', 'C'],
-        info={'HA': ['a1', 'a2'], 'HG': [1, 2, 3], 'HR': ['a', 'b', 'c'],
-              'HF': True, 'HU': [0.1]})
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
-        reference_name='19', start=123, end=124, reference_bases='A',
-        alternate_bases=['T'],
-        info={'HG': [3, 4, 5], 'HR': ['d', 'e'], 'HU': [1.1, 1.2]})
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    read_data = self._create_temp_file_and_read_records(
-        info_headers + _SAMPLE_HEADER_LINES[1:] + record_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(2, len(read_data))
-    self._assert_variants_equal([variant_1, variant_2], read_data)
-
-  def test_use_of_representative_header_pysam(self):
-    # Info field `HU` is defined as Float in file header while data is String.
-    # This results in parser failure. We test if parser completes successfully
-    # when a representative headers with String definition for field `HU` is
-    # given.
-    file_content = [
-        '##INFO=<ID=HU,Number=.,Type=String,Descr\n',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
-        '19	2	.	A	T	.	.	HU=a,b	GT	0/0	0/1\n',]
-    representative_header_lines = [
-        '##INFO=<ID=HU,Number=.,Type=String,Description="Info">\n',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',]
-    variant = Variant(
-        reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-
-    # `file_headers` is used.
-    with self.assertRaises(ValueError):
-      read_data = self._create_temp_file_and_read_records(
-          file_content,
-          vcf_parser_type=VcfParserType.PYSAM)
-
-    # `representative_header` is used.
-    read_data = self._create_temp_file_and_read_records(
-        file_content, representative_header_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self._assert_variants_equal([variant], read_data)
-
-  def test_use_of_representative_header_two_files_pysam(self):
-    # Info field `HU` is defined as Float in file header while data is String.
-    # This results in parser failure. We test if parser completes successfully
-    # when a representative headers with String definition for field `HU` is
-    # given.
-    file_content_1 = [
-        '##INFO=<ID=HU,Number=.,Type=Float,Descri\n',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample1\r\n',
-        '9\t2\t.\tA\tT\t.\t.\tHU=a,b\tGT\t0/0']
-    file_content_2 = [
-        '##INFO=<ID=HU,Number=.,Type=Float,Descri\n',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
-        '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample2\r\n',
-        '19\t2\t.\tA\tT\t.\t.\tHU=a,b\tGT\t0/1\n',]
-    representative_header_lines = [
-        '##INFO=<ID=HU,Number=.,Type=String,Description="Info">\n',
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',]
-
-    variant_1 = Variant(
-        reference_name='9', start=1, end=2, reference_bases='A',
-        alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-
-    variant_2 = Variant(
-        reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-
-    read_data_1 = self._create_temp_file_and_read_records(
-        file_content_1, representative_header_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data_1))
-    self._assert_variants_equal([variant_1], read_data_1)
-
-    read_data_2 = self._create_temp_file_and_read_records(
-        file_content_2, representative_header_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data_2))
-    self._assert_variants_equal([variant_2], read_data_2)
-
-  def test_end_info_key_pysam(self):
-    end_info_header_line = (
-        '##INFO=<ID=END,Number=1,Type=Integer,Description="End of record.">\n')
-    record_lines = ['19	123	.	A	T	.	.	END=1111	GT	1/0	0/1\n',
-                    '19	123	.	A	T	.	.	.	GT	0/1	1/1\n']
-    variant_1 = Variant(
-        reference_name='19', start=122, end=1111, reference_bases='A',
-        alternate_bases=['T'])
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
-        reference_name='19', start=122, end=123, reference_bases='A',
-        alternate_bases=['T'])
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
-    read_data = self._create_temp_file_and_read_records(
-        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(2, len(read_data))
-    self._assert_variants_equal([variant_1, variant_2], read_data)
-
-  def test_end_info_key_unknown_number_pysam(self):
-    end_info_header_line = (
-        '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
-    record_lines = ['19	123	.	A	T	.	.	END=1111	GT	1/0	0/1\n']
-    variant_1 = Variant(
-        reference_name='19', start=122, end=1111, reference_bases='A',
-        alternate_bases=['T'])
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    read_data = self._create_temp_file_and_read_records(
-        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self._assert_variants_equal([variant_1], read_data)
-
-  def test_end_info_key_unknown_number_invalid_pysam(self):
-    end_info_header_line = (
-        '##INFO=<ID=END,Number=.,Type=Integer,Description="End of record.">\n')
-    # PySam should only take first END field.
-    variant = Variant(
-        reference_name='19', start=122, end=150, reference_bases='A',
-        alternate_bases=['T'])
-    variant.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    read_data = self._create_temp_file_and_read_records(
-        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
-        ['19	123	.	A	T	.	.	END=150,160	GT	1/0	0/1\n'],
-        vcf_parser_type=VcfParserType.PYSAM)
-
-    self.assertEqual(1, len(read_data))
-    self._assert_variants_equal([variant], read_data)
-
-    # END should be rounded down.
-    read_data = self._create_temp_file_and_read_records(
-        [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
-        ['19	123	.	A	T	.	.	END=150.9	GT	1/0	0/1\n'],
-        vcf_parser_type=VcfParserType.PYSAM)
-
-    self.assertEqual(1, len(read_data))
-    self._assert_variants_equal([variant], read_data)
-
-    # END should not be a string.
-    with self.assertRaises(ValueError):
-      self._create_temp_file_and_read_records(
-          [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
-          ['19	123	.	A	T	.	.	END=text	GT	1/0	0/1\n'],
-          vcf_parser_type=VcfParserType.PYSAM)
-
-  def test_custom_phaseset_pysam(self):
-    phaseset_header_line = (
-        '##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phaseset">\n')
-    record_lines = ['19	123	.	A	T	.	.	.	GT:PS	1|0:1111	0/1:.\n',
-                    '19	121	.	A	T	.	.	.	GT:PS	1|0:2222	0/1:2222\n']
-    variant_1 = Variant(
-        reference_name='19', start=122, end=123, reference_bases='A',
-        alternate_bases=['T'])
-    variant_1.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='1111'))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
-    variant_2 = Variant(
-        reference_name='19', start=120, end=121, reference_bases='A',
-        alternate_bases=['T'])
-    variant_2.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='2222'))
-    variant_2.calls.append(
-        VariantCall(name='Sample2', genotype=[0, 1], phaseset='2222'))
-    read_data = self._create_temp_file_and_read_records(
-        [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(2, len(read_data))
-    self._assert_variants_equal([variant_1, variant_2], read_data)
-
-  def test_format_numbers_pysam(self):
-    format_headers = [
-        '##FORMAT=<ID=FU,Number=.,Type=String,Description="Format_variable">\n',
-        '##FORMAT=<ID=F1,Number=1,Type=Integer,Description="Format_1">\n',
-        '##FORMAT=<ID=F2,Number=2,Type=Character,Description="Format_2">\n',
-        '##FORMAT=<ID=AO,Number=A,Type=Integer,Description="Format_3">\n',
-        '##FORMAT=<ID=AD,Number=G,Type=Integer,Description="Format_4">\n',]
-
-    record_lines = [
-        ('19	2	.	A	T,C	.	.	.	'
-         'GT:FU:F1:F2:AO:AD	1/0:a1:3:a,b:1:3,4	'
-         '0/1:a2,a3:4:b,c:1,2:3')]
-    expected_variant = Variant(
-        reference_name='19', start=1, end=2, reference_bases='A',
-        alternate_bases=['T', 'C'])
-    expected_variant.calls.append(VariantCall(
-        name='Sample1',
-        genotype=[1, 0],
-        info={'FU': ['a1'], 'F1': 3, 'F2': ['a', 'b'], 'AO': [1],
-              'AD': [3, 4]}))
-    expected_variant.calls.append(VariantCall(
-        name='Sample2',
-        genotype=[0, 1],
-        info={'FU': ['a2', 'a3'], 'F1': 4, 'F2': ['b', 'c'], 'AO': [1, 2],
-              'AD':[3]}))
-    read_data = self._create_temp_file_and_read_records(
-        format_headers + _SAMPLE_HEADER_LINES[1:] + record_lines,
-        vcf_parser_type=VcfParserType.PYSAM)
-    self.assertEqual(1, len(read_data))
-    self.assertEqual(expected_variant, read_data[0])
-
-  def test_pipeline_read_single_file_pysam(self):
-    with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      self._assert_pipeline_read_files_record_count_equal(
-          file_name, len(_SAMPLE_TEXT_LINES),
-          vcf_parser_type=VcfParserType.PYSAM)
-
-  def test_pipeline_read_all_single_file_pysam(self):
-    with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      self._assert_pipeline_read_files_record_count_equal(
-          file_name, len(_SAMPLE_TEXT_LINES), use_read_all=True,
-          vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_single_file_large_pysam(self):
-    self._assert_pipeline_read_files_record_count_equal(
-        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882,
-        vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_all_single_file_large_pysam(self):
-    self._assert_pipeline_read_files_record_count_equal(
-        testdata_util.get_full_file_path('valid-4.1-large.vcf'), 9882,
-        use_read_all=True, vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_file_pattern_large_pysam(self):
-    self._assert_pipeline_read_files_record_count_equal(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900,
-        vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_all_file_pattern_large_pysam(self):
-    self._assert_pipeline_read_files_record_count_equal(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf'), 9900,
-        use_read_all=True, vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_all_gzip_large_pysam(self):
-    self._assert_pipeline_read_files_record_count_equal(
-        os.path.join(testdata_util.get_full_dir(), 'valid-*.vcf.gz'), 9900,
-        use_read_all=True, vcf_parser_type=VcfParserType.PYSAM)
-
-  @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
-  def test_pipeline_read_all_multiple_files_large_pysam(self):
-    pipeline = TestPipeline()
-    pcoll = (pipeline
-             | 'Create' >> beam.Create(
-                 [testdata_util.get_full_file_path('valid-4.0.vcf'),
-                  testdata_util.get_full_file_path('valid-4.1-large.vcf'),
-                  testdata_util.get_full_file_path('valid-4.2.vcf')])
-             | 'Read' >> ReadAllFromVcf(vcf_parser_type=VcfParserType.PYSAM))
-    assert_that(pcoll, asserts.count_equals_to(9900))
-    pipeline.run()
-
-  def test_pipeline_read_all_gzip_pysam(self):
-    with TempDir() as tempdir:
-      file_name_1 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
-          compression_type=CompressionTypes.GZIP)
-      file_name_2 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
-          compression_type=CompressionTypes.GZIP)
-      pipeline = TestPipeline()
-      pcoll = (pipeline
-               | 'Create' >> beam.Create([file_name_1, file_name_2])
-               | 'Read' >> ReadAllFromVcf(vcf_parser_type=VcfParserType.PYSAM))
-      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
-      pipeline.run()
-
-  def test_pipeline_read_all_bzip2_pysam(self):
-    with TempDir() as tempdir:
-      file_name_1 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
-          compression_type=CompressionTypes.BZIP2)
-      file_name_2 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir,
-          compression_type=CompressionTypes.BZIP2)
-      pipeline = TestPipeline()
-      pcoll = (pipeline
-               | 'Create' >> beam.Create([file_name_1, file_name_2])
-               | 'Read' >> ReadAllFromVcf(vcf_parser_type=VcfParserType.PYSAM))
-      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
-      pipeline.run()
-
-  def test_pipeline_read_all_multiple_files_pysam(self):
-    with TempDir() as tempdir:
-      file_name_1 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      file_name_2 = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      pipeline = TestPipeline()
-      pcoll = (pipeline
-               | 'Create' >> beam.Create([file_name_1, file_name_2])
-               | 'Read' >> ReadAllFromVcf(vcf_parser_type=VcfParserType.PYSAM))
-      assert_that(pcoll, asserts.count_equals_to(2 * len(_SAMPLE_TEXT_LINES)))
-      pipeline.run()
-
-  def test_read_reentrant_without_splitting_pysam(self):
-    with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      source = VcfSource(file_name, vcf_parser_type=VcfParserType.PYSAM)
-      source_test_utils.assert_reentrant_reads_succeed((source, None, None))
-
-  def test_read_reentrant_after_splitting_pysam(self):
-    with TempDir() as tempdir:
-      file_name = self._create_temp_vcf_file(
-          _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      source = VcfSource(file_name, vcf_parser_type=VcfParserType.PYSAM)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
-      assert len(splits) == 1
-      source_test_utils.assert_reentrant_reads_succeed(
-          (splits[0].source, splits[0].start_position, splits[0].stop_position))
-
-  def test_dynamic_work_rebalancing_pysam(self):
     with TempDir() as tempdir:
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)

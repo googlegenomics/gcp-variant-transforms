@@ -17,69 +17,42 @@
 from __future__ import absolute_import
 
 from pysam import libcbcf
-import vcf
 
 from apache_beam.io.filesystems import FileSystems
 from gcp_variant_transforms.beam_io import vcf_header_io
-from gcp_variant_transforms.beam_io import vcfio
 
-def get_vcf_headers(input_file, vcf_parser=vcfio.VcfParserType.PYVCF):
-  if vcf_parser == vcfio.VcfParserType.PYSAM:
-    return _get_vcf_headers_pysam(input_file)
-  else:
-    return _get_vcf_headers_pyvcf(input_file)
+def get_vcf_headers(input_file):
 
-def _get_vcf_headers_pysam(input_file):
-  header = libcbcf.VariantHeader()
-  lines = _line_generator()
-  sample_line = vcf_header_io.LAST_HEADER_LINE_PREFIX
-  for line in lines:
-    if line.startswith('#'):
-      if line.startswith(vcf_header_io.LAST_HEADER_LINE_PREFIX):
-        sample_line = line
-      else:
-        header.add_line(line)
-    else:
-      break
-
-  yield vcf_header_io.VcfHeader(infos=header.info,
-                                filters=header.filters,
-                                alts=header.alts,
-                                formats=header.formats,
-                                contigs=header.contigs,
-                                samples=sample_line,
-                                file_path=input_file,
-                                vcf_parser=vcfio.VcfParserType.PYSAM)
-
-def _get_vcf_headers_pyvcf(input_file):
-  # type: (str) -> vcf_header_io.VcfHeader
-  """Returns VCF headers from ``input_file``.
-
-  Args:
-    input_file (str): A string specifying the path to the representative VCF
-      file, i.e., the VCF file that contains a header representative of all VCF
-      files matching the input_pattern of the job. It can be local or
-      remote (e.g. on GCS).
-  Returns:
-    VCF header info.
-  Raises:
-    ValueError: If ``input_file`` is not a valid VCF file (e.g. bad format,
-    empty, non-existent).
-  """
   if not FileSystems.exists(input_file):
     raise ValueError('VCF header does not exist')
-  try:
-    vcf_reader = vcf.Reader(fsock=_line_generator(input_file))
-  except (SyntaxError, StopIteration) as e:
-    raise ValueError('Invalid VCF header in %s: %s' % (input_file, str(e)))
-  return vcf_header_io.VcfHeader(infos=vcf_reader.infos,
-                                 filters=vcf_reader.filters,
-                                 alts=vcf_reader.alts,
-                                 formats=vcf_reader.formats,
-                                 contigs=vcf_reader.contigs,
-                                 samples=vcf_reader.samples,
-                                 file_path=input_file,
-                                 vcf_parser=vcfio.VcfParserType.PYVCF)
+  header = libcbcf.VariantHeader()
+  lines = _line_generator(input_file)
+  sample_line = None
+  header.add_line('##fileformat=VCFv4.0\n')
+  file_empty = True
+  for line in lines:
+    if line.startswith('##'):
+      header.add_line(line.strip())
+      file_empty = False
+    elif line.startswith('#'):
+      sample_line = line.strip()
+      file_empty = False
+    elif line:
+      if not sample_line:
+        raise ValueError('Header line is missing')
+    else:
+      if file_empty:
+        raise ValueError('File is empty')
+      if not sample_line:
+        sample_line = vcf_header_io.LAST_HEADER_LINE_PREFIX
+
+  return vcf_header_io.VcfHeader(infos=header.info,
+                                 filters=header.filters,
+                                 alts=header.alts,
+                                 formats=header.formats,
+                                 contigs=header.contigs,
+                                 samples=sample_line,
+                                 file_path=input_file)
 
 
 def get_metadata_header_lines(input_file):
@@ -104,11 +77,13 @@ def get_metadata_header_lines(input_file):
 def _line_generator(file_name):
   """Generator to return lines delimited by newline chars from ``file_name``."""
   with FileSystems.open(file_name) as f:
+    record = None
     while True:
-      line = f.readline()
-      while line and not line.strip():  # Skip empty lines.
-        line = f.readline()
-      if line and line.startswith('#'):
-        yield line
+      record = f.readline()
+      while record and not record.strip():  # Skip empty lines.
+        record = f.readline()
+      if record and record.startswith('#'):
+        yield record
       else:
         break
+    yield record

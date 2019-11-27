@@ -45,7 +45,6 @@ from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
-from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_header_parser
@@ -93,7 +92,8 @@ _GCS_RECURSIVE_WILDCARD = '**'
 def _read_variants(all_patterns,  # type: List[str]
                    pipeline,  # type: beam.Pipeline
                    known_args,  # type: argparse.Namespace
-                   pipeline_mode  # type: int
+                   pipeline_mode,  # type: int
+                   infer_headers=False  # type: bool
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -107,7 +107,7 @@ def _read_variants(all_patterns,  # type: List[str]
       pipeline_mode,
       known_args.allow_malformed_records,
       representative_header_lines,
-      vcfio.VcfParserType[known_args.vcf_parser])
+      infer_headers=infer_headers)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -145,7 +145,8 @@ def _add_inferred_headers(all_patterns,  # type: List[str]
       _read_variants(all_patterns,
                      pipeline,
                      known_args,
-                     pipeline_mode)
+                     pipeline_mode,
+                     known_args.infer_headers)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
@@ -322,8 +323,7 @@ def _merge_headers(known_args, pipeline_args,
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
-        known_args.all_patterns,
-        vcfio.VcfParserType[known_args.vcf_parser])
+        known_args.all_patterns)
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -389,8 +389,7 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
   headers = pipeline_common.read_headers(
       pipeline,
       pipeline_mode,
-      known_args.all_patterns,
-      vcfio.VcfParserType[known_args.vcf_parser])
+      known_args.all_patterns)
   _ = (headers | 'SampleInfoToBigQuery' >>
        sample_info_to_bigquery.SampleInfoToBigQuery(
            known_args.output_table,

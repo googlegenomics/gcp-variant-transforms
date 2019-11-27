@@ -24,12 +24,11 @@ from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
-from vcf.parser import _Format as Format
-from vcf.parser import _Info as Info
-from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateFormatField as createFormat
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.transforms import infer_headers
 
@@ -46,16 +45,16 @@ class InferHeaderFieldsTest(unittest.TestCase):
         additional annotation fields in the format (key, `Info`).
     """
     infos = OrderedDict([
-        ('IS', Info('I1', 1, 'String', 'desc', 'src', 'v')),
-        ('ISI', Info('ISI', 1, 'Int', 'desc', 'src', 'v')),
-        ('ISF', Info('ISF', 1, 'Float', 'desc', 'src', 'v')),
-        ('IF', Info('IF', 1, 'Float', 'desc', 'src', 'v')),
-        ('IB', Info('I1', 1, 'Flag', 'desc', 'src', 'v')),
-        ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+        ('IS', createInfo('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('ISI', createInfo('ISI', 1, 'Integer', 'desc', 'src', 'v')),
+        ('ISF', createInfo('ISF', 1, 'Float', 'desc', 'src', 'v')),
+        ('IF', createInfo('IF', 1, 'Float', 'desc', 'src', 'v')),
+        ('IB', createInfo('I1', 1, 'Flag', 'desc', 'src', 'v')),
+        ('IA', createInfo('IA', 'A', 'Integer', 'desc', 'src', 'v'))])
     if with_annotation:
-      infos['CSQ'] = Info(
+      infos['CSQ'] = createInfo(
           'CSQ',
-          field_counts['.'],
+          '.',
           'String',
           'Annotations from VEP. Format: Allele|Gene|Position|Score',
           'src',
@@ -64,11 +63,11 @@ class InferHeaderFieldsTest(unittest.TestCase):
         for key, value in with_annotation:
           infos[key] = value
     formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+        ('FS', createFormat('FS', 1, 'String', 'desc')),
+        ('FI', createFormat('FI', 2, 'Integer', 'desc')),
+        ('FU', createFormat('FU', '.', 'Float', 'desc')),
+        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
     return vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
   def _get_sample_variant_1(self):
@@ -172,14 +171,14 @@ class InferHeaderFieldsTest(unittest.TestCase):
           infer_headers.InferHeaderFields(defined_headers=None,
                                           infer_headers=True))
 
-      expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-                        'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-                        'ISF': Info('ISF', 1, 'Float', '', '', ''),
-                        'IF': Info('IF', 1, 'Float', '', '', ''),
-                        'IB': Info('IB', 0, 'Flag', '', '', ''),
-                        'IA': Info('IA', None, 'Integer', '', '', '')}
-      expected_formats = {'FI': Format('FI', 1, 'Integer', ''),
-                          'FU': Format('FU', None, 'Float', '')}
+      expected_infos = {'IS': createInfo('IS', 1, 'String', ''),
+                        'ISI': createInfo('ISI', 1, 'Integer', ''),
+                        'ISF': createInfo('ISF', 1, 'Float', ''),
+                        'IF': createInfo('IF', 1, 'Float', ''),
+                        'IB': createInfo('IB', 0, 'Flag', ''),
+                        'IA': createInfo('IA', '.', 'Integer', '')}
+      expected_formats = {'FI': createFormat('FI', 1, 'Integer', ''),
+                          'FU': createFormat('FU', '.', 'Float', '')}
 
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
@@ -215,16 +214,16 @@ class InferHeaderFieldsTest(unittest.TestCase):
           infer_headers.InferHeaderFields(defined_headers=None,
                                           infer_headers=True))
 
-      expected_infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-                        'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-                        'ISF': Info('ISF', 1, 'Float', '', '', ''),
-                        'IF': Info('IF', 1, 'Float', '', '', ''),
-                        'IB': Info('IB', 0, 'Flag', '', '', ''),
-                        'IA': Info('IA', None, 'Integer', '', '', ''),
-                        'IS_2': Info('IS_2', 1, 'String', '', '', '')}
-      expected_formats = {'FI': Format('FI', 1, 'Integer', ''),
-                          'FU': Format('FU', None, 'Float', ''),
-                          'FI_2': Format('FI_2', 1, 'Integer', '')}
+      expected_infos = {'IS': createInfo('IS', 1, 'String', ''),
+                        'ISI': createInfo('ISI', 1, 'Integer', ''),
+                        'ISF': createInfo('ISF', 1, 'Float', ''),
+                        'IF': createInfo('IF', 1, 'Float', ''),
+                        'IB': createInfo('IB', 0, 'Flag', ''),
+                        'IA': createInfo('IA', '.', 'Integer', ''),
+                        'IS_2': createInfo('IS_2', 1, 'String', '')}
+      expected_formats = {'FI': createFormat('FI', 1, 'Integer', ''),
+                          'FU': createFormat('FU', '.', 'Float', ''),
+                          'FI_2': createFormat('FI_2', 1, 'Integer', '')}
 
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
@@ -248,8 +247,8 @@ class InferHeaderFieldsTest(unittest.TestCase):
               pvalue.AsSingleton(vcf_headers_side_input),
               infer_headers=True))
 
-      expected_infos = {'IS_2': Info('IS_2', 1, 'String', '', '', '')}
-      expected_formats = {'FI_2': Format('FI_2', 1, 'Integer', '')}
+      expected_infos = {'IS_2': createInfo('IS_2', 1, 'String', '')}
+      expected_formats = {'FI_2': createFormat('FI_2', 1, 'Integer', '')}
       expected = vcf_header_io.VcfHeader(
           infos=expected_infos, formats=expected_formats)
       assert_that(inferred_headers,
@@ -258,16 +257,16 @@ class InferHeaderFieldsTest(unittest.TestCase):
 
 
   def test_pipeline(self):
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Integer', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', 'A', 'Integer', '')}
     formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+        ('FS', createFormat('FS', 1, 'String', 'desc')),
+        ('FI', createFormat('FI', 2, 'Integer', 'desc')),
+        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
 
     with TestPipeline() as p:
       variant_1 = self._get_sample_variant_info_ia_cardinality_mismatch()
@@ -282,10 +281,10 @@ class InferHeaderFieldsTest(unittest.TestCase):
               allow_incompatible_records=True,
               infer_headers=True))
 
-      expected_infos = {'IA': Info('IA', None, 'Float', '', '', ''),
-                        'IF': Info('IF', 1, 'Float', '', '', '')}
-      expected_formats = {'FI': Format('FI', 2, 'Float', 'desc'),
-                          'FU': Format('FU', None, 'Float', '')}
+      expected_infos = {'IA': createInfo('IA', '.', 'Float', ''),
+                        'IF': createInfo('IF', 1, 'Float', '')}
+      expected_formats = {'FI': createFormat('FI', 2, 'Float', 'desc'),
+                          'FU': createFormat('FU', '.', 'Float', '')}
       expected = vcf_header_io.VcfHeader(infos=expected_infos,
                                          formats=expected_formats)
       assert_that(inferred_headers,
@@ -334,7 +333,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
                            'TT|||']
     infer_header_fields = infer_headers._InferHeaderFields(False, anno_fields)
     inferred_headers = next(infer_header_fields.process(variant, header))
-    expected_types = {'CSQ_Gene_TYPE': None,
+    expected_types = {'CSQ_Gene_TYPE': '.',
                       'CSQ_Position_TYPE': 'Integer',
                       'CSQ_Score_TYPE': 'Float'}
     for key, item in inferred_headers.infos.iteritems():
@@ -348,9 +347,9 @@ class InferHeaderFieldsTest(unittest.TestCase):
 
   def test_infer_annotation_types_with_multiple_annotation_fields(self):
     anno_fields = ['CSQ', 'CSQ_VT']
-    csq_vt = [('CSQ_VT', Info(
+    csq_vt = [('CSQ_VT', createInfo(
         'CSQ_VT',
-        -1,
+        'A',
         'String',
         'Annotations from VEP. Format: Allele|Gene|Position|Score',
         'source',
@@ -389,12 +388,11 @@ class InferHeaderFieldsTest(unittest.TestCase):
     desc = 'Inferred type field for annotation {}.'
     expected = vcf_header_io.VcfHeader(infos={
         'CSQ_Gene_TYPE':
-        Info('CSQ_Gene_TYPE', 1, 'Float', desc.format('Gene'), '', ''),
+        createInfo('CSQ_Gene_TYPE', 1, 'Float', desc.format('Gene')),
         'CSQ_Position_TYPE':
-        Info('CSQ_Position_TYPE', 1, 'String',
-             desc.format('Position'), '', ''),
+        createInfo('CSQ_Position_TYPE', 1, 'String', desc.format('Position')),
         'CSQ_Score_TYPE':
-        Info('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'), '', '')})
+        createInfo('CSQ_Score_TYPE', 1, 'Float', desc.format('Score'))})
 
     with TestPipeline() as p:
       inferred_headers = (

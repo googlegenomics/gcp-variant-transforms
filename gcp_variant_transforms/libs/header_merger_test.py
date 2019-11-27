@@ -16,7 +16,7 @@
 
 from collections import OrderedDict
 import unittest
-import vcf
+from pysam import libcbcf
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
@@ -40,25 +40,25 @@ FILE_2_LINES = [
 class HeaderMergerTest(unittest.TestCase):
   """Test cases for HeaderMerger module."""
 
-  def _get_header_from_reader(self, reader):
-    """Extracts values from a pyVCF reader into a VcfHeader object."""
-    return vcf_header_io.VcfHeader(
-        infos=reader.infos,
-        filters=reader.filters,
-        alts=reader.alts,
-        formats=reader.formats,
-        contigs=reader.contigs)
-
   def _get_header_merger(self, split_alternate_allele_info_fields=True):
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
         split_alternate_allele_info_fields)
     merger = HeaderMerger(resolver)
     return merger
 
+  def _get_header_from_lines(self, lines):
+    header = libcbcf.VariantHeader()
+    for line in lines[:-1]:
+      header.add_line(line)
+    return vcf_header_io.VcfHeader(infos=header.info,
+                                   filters=header.filters,
+                                   alts=header.alts,
+                                   formats=header.formats,
+                                   contigs=header.contigs)
+
   def test_merge_header_with_empty_one(self):
-    vcf_reader = vcf.Reader(fsock=iter(FILE_1_LINES))
     merger = self._get_header_merger()
-    header_1 = self._get_header_from_reader(vcf_reader)
+    header_1 = self._get_header_from_lines(FILE_1_LINES)
     header_2 = vcf_header_io.VcfHeader()
 
     merger.merge(header_1, header_2)
@@ -70,10 +70,8 @@ class HeaderMergerTest(unittest.TestCase):
     self.assertItemsEqual(header_2.formats.keys(), ['GT', 'GQ'])
 
   def test_merge_two_headers(self):
-    vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))
-    vcf_reader_2 = vcf.Reader(fsock=iter(FILE_2_LINES))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(FILE_1_LINES)
+    secondary_header = self._get_header_from_lines(FILE_2_LINES)
 
     merger = self._get_header_merger()
     merger.merge(main_header, secondary_header)
@@ -93,10 +91,8 @@ class HeaderMergerTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(lines_1)
+    secondary_header = self._get_header_from_lines(lines_2)
 
     merger = self._get_header_merger()
 
@@ -123,10 +119,8 @@ class HeaderMergerTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(lines_1)
+    secondary_header = self._get_header_from_lines(lines_2)
 
     merger = self._get_header_merger()
 
@@ -153,10 +147,8 @@ class HeaderMergerTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=3,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(lines_1)
+    secondary_header = self._get_header_from_lines(lines_2)
 
     merger = self._get_header_merger()
 
@@ -187,10 +179,8 @@ class HeaderMergerTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(lines_1)
+    secondary_header = self._get_header_from_lines(lines_2)
 
     merger = self._get_header_merger()
 
@@ -208,10 +198,8 @@ class HeaderMergerTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    main_header = self._get_header_from_reader(vcf_reader_1)
-    secondary_header = self._get_header_from_reader(vcf_reader_2)
+    main_header = self._get_header_from_lines(lines_1)
+    secondary_header = self._get_header_from_lines(lines_2)
 
     merger = self._get_header_merger()
 

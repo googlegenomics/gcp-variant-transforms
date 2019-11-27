@@ -37,10 +37,6 @@ REQUIRED_PACKAGES = [
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
     'google-api-python-client>=1.6',
     'intervaltree>=2.1.0,<2.2.0',
-    'pyvcf<0.7.0',
-    'google-nucleus==0.2.0',
-    # Nucleus needs uptodate protocol buffer compiler (protoc).
-    'protobuf>=3.6.1',
     'mmh3<2.6',
     # Refer to issue #528
     'google-cloud-storage<1.23.0',

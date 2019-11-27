@@ -25,26 +25,29 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.transforms import sample_info_to_bigquery
 
+SAMPLE_LINE = (
+    '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tSAMPLES\tSample1\tSample2')
+
 
 class ConvertSampleInfoToRowTest(unittest.TestCase):
 
   def test_convert_sample_info_to_row(self):
-    vcf_header_1 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+    vcf_header_1 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_1')
-    vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+    vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
     expected_rows = [
-        {sample_info_table_schema_generator.SAMPLE_ID: 5961690698012655974,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 1603149767211015963,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 5854056809620188906,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 7039455832764509387,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 5259968798637352651,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 4840534050208649594,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 6253115674664185777,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 7113221774487715893,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]
     pipeline = test_pipeline.TestPipeline()
@@ -59,22 +62,22 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
     pipeline.run()
 
   def test_convert_sample_info_to_row_without_file_in_hash(self):
-    vcf_header_1 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+    vcf_header_1 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_1')
-    vcf_header_2 = vcf_header_io.VcfHeader(samples=['Sample 1', 'Sample 2'],
+    vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
     expected_rows = [
-        {sample_info_table_schema_generator.SAMPLE_ID: 6721344017406412066,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 7224630242958043176,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_1'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 6721344017406412066,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'},
-        {sample_info_table_schema_generator.SAMPLE_ID: 7224630242958043176,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample 2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
+         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
          sample_info_table_schema_generator.FILE_PATH: 'file_2'}
     ]
     pipeline = test_pipeline.TestPipeline()

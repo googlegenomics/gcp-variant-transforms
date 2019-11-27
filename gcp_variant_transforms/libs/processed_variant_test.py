@@ -18,11 +18,9 @@ from collections import OrderedDict
 
 import unittest
 
-from vcf import parser
-from vcf.parser import _Info as Info
-
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs.annotation import annotation_parser
@@ -172,14 +170,14 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     variant = self._get_sample_variant()
     variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
     infos = OrderedDict([
-        ('A1', Info('A1', 1, None, '', None, None)),
-        ('A2', Info('A2', parser.field_counts['A'], None, '', None, None)),
-        ('CSQ', Info('CSQ',
-                     parser.field_counts['.'],
-                     None,
-                     'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
-                     None,
-                     None))])
+        ('A1', createInfo('A1', 1, '.', 'desc', None, None)),
+        ('A2', createInfo('A2', 'A', '.', 'desc', None, None)),
+        ('CSQ', createInfo('CSQ',
+                           '.',
+                           '.',
+                           'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
+                           None,
+                           None))])
     if additional_infos is not None:
       for key, value in additional_infos:
         infos[key] = value
@@ -480,9 +478,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
             CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 1)
 
   def test_create_processed_variant_annotation_alt_allele_num(self):
-    csq_info = parser._Info(
-        id=None, num='.', type=None,
-        desc='some desc Allele|Consequence|IMPACT|ALLELE_NUM',
+    csq_info = createInfo(
+        None, '.', '.', 'some desc Allele|Consequence|IMPACT|ALLELE_NUM',
         source=None, version=None)
     header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
     variant = vcfio.Variant(
@@ -561,11 +558,12 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     ids = ['CSQ_Allele_TYPE', 'CSQ_Consequence_TYPE',
            'CSQ_IMPACT_TYPE', 'CSQ_SYMBOL_TYPE']
     types = ['String', 'Integer', 'Integer', 'Float']
-    infos = [(i, Info(i, 1, t, '', None, None)) for i, t in zip(ids, types)]
+    infos = [(i, createInfo(i, 1, t, 'desc', None, None))
+             for i, t in zip(ids, types)]
     _, header_fields = self._get_sample_variant_and_header_with_csq(
         additional_infos=infos)
     for hfi in header_fields.infos.values():
-      if hfi['type'] is None:
+      if hfi['type'] == '.':
         hfi['type'] = 'String'
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,

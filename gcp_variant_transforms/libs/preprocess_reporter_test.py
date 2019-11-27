@@ -19,10 +19,10 @@ from typing import List  # pylint: disable=unused-import
 import unittest
 
 from apache_beam.io.filesystems import FileSystems
-from vcf.parser import _Format as Format
-from vcf.parser import _Info as Info
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateFormatField as createFormat
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.testing import temp_dir
@@ -60,8 +60,9 @@ class PreprocessReporterTest(unittest.TestCase):
     header_definitions._formats = {'NS': {Definition(1, 'Float'): ['file2']}}
 
     infos = OrderedDict([
-        ('NS', Info('NS', 1, 'Integer', 'Number samples', None, None))])
-    formats = OrderedDict([('NS', Format('NS', 1, 'Float', 'Number samples'))])
+        ('NS', createInfo('NS', 1, 'Integer', 'Number samples', None, None))])
+    formats = OrderedDict(
+        [('NS', createFormat('NS', 1, 'Float', 'Number samples'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
 
     expected = ['No Header Conflicts Found.\n', '\n']
@@ -75,7 +76,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                         Definition(1, 'Float'): ['file2']}}
 
     infos = OrderedDict([
-        ('NS', Info('NS', 1, 'Float', 'Number samples', None, None))])
+        ('NS', createInfo('NS', 1, 'Float', 'Number samples', None, None))])
     resolved_headers = VcfHeader(infos=infos)
 
     expected = [
@@ -99,7 +100,7 @@ class PreprocessReporterTest(unittest.TestCase):
     }
 
     infos = OrderedDict([
-        ('NS', Info('NS', 1, 'Float', 'Number samples', None, None))])
+        ('NS', createInfo('NS', 1, 'Float', 'Number samples', None, None))])
     resolved_headers = VcfHeader(infos=infos)
 
     expected = [
@@ -125,9 +126,9 @@ class PreprocessReporterTest(unittest.TestCase):
                                           Definition(2, 'Integer'): ['file4']}}
 
     infos = OrderedDict([
-        ('NS', Info('NS', 1, 'Float', 'Number samples', None, None))])
+        ('NS', createInfo('NS', 1, 'Float', 'Number samples', None, None))])
     formats = OrderedDict([
-        ('DP', Format('DP', 2, 'Float', 'Total Depth'))])
+        ('DP', createFormat('DP', 2, 'Float', 'Total Depth'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
 
     expected = [
@@ -168,7 +169,8 @@ class PreprocessReporterTest(unittest.TestCase):
 
   def test_report_inferred_headers_only(self):
     header_definitions = VcfHeaderDefinitions()
-    formats = OrderedDict([('DP', Format('DP', 2, 'Float', 'Total Depth'))])
+    formats = OrderedDict(
+        [('DP', createFormat('DP', 2, 'Float', 'Total Depth'))])
 
     inferred_headers = VcfHeader(formats=formats)
     expected = [
@@ -189,9 +191,9 @@ class PreprocessReporterTest(unittest.TestCase):
                                         Definition(1, 'Integer'): ['file2']}}
 
     infos = OrderedDict([
-        ('NS', Info('NS', 1, 'Float', 'Number samples', None, None))])
+        ('NS', createInfo('NS', 1, 'Float', 'Number samples', None, None))])
     formats = OrderedDict([
-        ('DP', Format('DP', 2, 'Float', 'Total Depth'))])
+        ('DP', createFormat('DP', 2, 'Float', 'Total Depth'))])
     resolved_headers = VcfHeader(infos=infos, formats=formats)
     inferred_headers = VcfHeader(formats=formats)
     expected = [

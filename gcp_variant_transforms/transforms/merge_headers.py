@@ -53,7 +53,7 @@ class _MergeHeadersFn(beam.CombineFn):
   def extract_output(self, merged_headers):
     # type: (vcf_header_io.VcfHeader) -> vcf_header_io.VcfHeader
     for info in merged_headers.infos.values():
-      if info[_HeaderKeyConstants.TYPE] is None:
+      if info[_HeaderKeyConstants.TYPE] == '.':
         info[_HeaderKeyConstants.TYPE] = _VcfHeaderTypeConstants.STRING
     return merged_headers
 
