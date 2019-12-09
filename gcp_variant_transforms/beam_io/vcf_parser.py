@@ -19,22 +19,24 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 
 from __future__ import absolute_import
 
+from collections import namedtuple
+from copy import copy
+from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
 import tempfile
-from collections import namedtuple
 
+from apache_beam.coders import coders
+from apache_beam.io import filesystems
+from apache_beam.io import textio
+from apache_beam.io import range_trackers
 try:
   from nucleus.io.python import vcf_reader as nucleus_vcf_reader
   from nucleus.protos import variants_pb2
 except ImportError:
   logging.warning('Nucleus is not installed. Cannot use the Nucleus parser.')
-
+from pysam import libcbcf
 import vcf
-
-from apache_beam.coders import coders
-from apache_beam.io import filesystems
-from apache_beam.io import textio
 
 from gcp_variant_transforms.beam_io import bgzf
 
@@ -54,6 +56,9 @@ DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
                               # no 'PS' is present.
 MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
+LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
+HEADER_INFO_TYPES = ['Integer', 'Float', 'Flag', 'Character', 'String', '.']
+HEADER_INFO_NUMBERS = ['A', 'R', 'G', '.']
 
 class Variant(object):
   """A class to store info about a genomic variant.
@@ -296,8 +301,73 @@ class VcfParser(object):
               self._process_header_lines),
           **kwargs)
 
+    if isinstance(self, PySamParser):
+      # In an absence of "#CHROM POS..." header line, PySam process would lock.
+      # However, we need to support cases when no records in files were provided
+      # even if the above header line is missing. To circumvent the error, read
+      # the file until the first line is found, and verify validity.
+      self._header_lines = None
+      if isinstance(range_tracker, range_trackers.UnsplittableRangeTracker):
+        secondary_tracker = range_trackers.UnsplittableRangeTracker(
+            copy(range_tracker._range_tracker))
+      else:
+        secondary_tracker = copy(range_tracker)
+      self._verify_header(copy(text_source), secondary_tracker)
+
     self._text_lines = text_source.read_records(self._file_name,
                                                 range_tracker)
+
+  def after_read(self):
+    return
+
+  def _next_non_empty_line(self, iterator):
+    # type: (Iterable[str]) -> str
+    # Get next non-empty stripped record from iterator.
+    text_line = next(iterator).strip()
+    while not text_line:  # skip empty lines.
+      text_line = next(iterator).strip()
+    return text_line
+
+  def _verify_header(self, text_source, range_tracker):
+    # Perform various checks on header section of the VCF file.
+    # 1) Try to read first record of the file. If one exists (StopIteration
+    #    error was not raised), verify that CHROM line exists. If error was
+    #    raised, if CHROM line is missing, add a dummy one for consistency.
+    # 2) Construct PySam header object and manually verify the validity of the
+    #    header metadata.
+    try:
+      text_lines = text_source.read_records(self._file_name,
+                                            range_tracker)
+      # Read until first non empty record
+      self._next_non_empty_line(text_lines)
+      if not self._header_lines[-1].startswith(LAST_HEADER_LINE_PREFIX):
+        raise ValueError('Header missing CHROM line.')
+      # Construct VariantHeader class from the metadata lines, to verify the
+      # validity of the file. PySam would not raise an error, will omit the
+      # metadata and hide the issue, if the header is incorrect.
+      header = libcbcf.VariantHeader()
+      for header_line in self._header_lines[:-1]:
+        header.add_line(header_line)
+
+      for k, v in header.info.iteritems():
+        # ID, Description, Type and Number are mandatory fields.
+        if not k:
+          raise ValueError('Corrupt ID at header line {}.'.format(v.id))
+        if not v.description:
+          raise ValueError(
+              'Corrupt Description at header line {}.'.format(v.id))
+        # Type can only be Integer, Float, Flag, Character or String
+        if not v.type or v.record['Type'] not in HEADER_INFO_TYPES:
+          raise ValueError('Corrupt Type at header line {}'.format(v.id))
+        # Number can only be a number or one of 'A', 'R', 'G' and '.'.
+        if not v.record['Number'] or (
+            v.record['Number'] not in HEADER_INFO_NUMBERS and
+            not v.record['Number'].isdigit()):
+          raise ValueError('Unknown Number at header line {}.'.format(v.id))
+    except StopIteration:
+      # If no record was found, add CHROM line if it's missing.
+      if not self._header_lines[-1].startswith(LAST_HEADER_LINE_PREFIX):
+        self._header_lines.append(LAST_HEADER_LINE_PREFIX)
 
   def _process_header_lines(self, header_lines):
     """Processes header lines from text source and initializes the parser.
@@ -309,13 +379,31 @@ class VcfParser(object):
       # We need to keep the last line of the header from the file because it
       # contains the sample IDs, which is unique per file.
       header_lines = self._representative_header_lines + header_lines[-1:]
-    self._init_with_header(header_lines)
+    # For PySam parser, do not initiate the class with header from this method
+    # since it's being called once Text Source is read, and for PySam, we need
+    # to read text source twice - once to verify that either CHROM... line
+    # exists or no record lines exist, and once to actually process the file.
+    if isinstance(self, PySamParser):
+      # PySam requires 'fileformat=VCFvX' field to be supplied, default to 4.0.
+      if header_lines and not header_lines[0].startswith(
+          FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+        header_lines.insert(
+            0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+      header_lines = [line.strip() for line in header_lines if line.strip()]
+      # Number='G' is to be deprecated and is unsupported by PySam - replace
+      # with 'unknown' number identifier if found.
+      self._header_lines = filter(None, [line.strip().replace(
+          'Number=G', 'Number=.').encode('utf-8') for line in header_lines])
+    else:
+      self._init_with_header(header_lines)
 
   def next(self):
-    text_line = next(self._text_lines).strip()
-    while not text_line:  # skip empty lines.
-      # This natively raises StopIteration if end of file is reached.
-      text_line = next(self._text_lines).strip()
+    try:
+      text_line = self._next_non_empty_line(self._text_lines)
+    except StopIteration as e:
+      # clean up, once iterator is depleted.
+      self.after_read()
+      raise e
     record = self._get_variant(text_line)
     if isinstance(record, Variant):
       return record
@@ -425,8 +513,10 @@ class PyVcfParser(VcfParser):
       formats: The PyVCF dict storing FORMAT extracted from the VCF header.
         The key is the FORMAT key and the value is
         :class:`~vcf.parser._Format`.
+
     Returns:
       A :class:`Variant` object from the given record.
+
     Raises:
       ValueError: if ``record`` is semantically invalid.
     """
@@ -501,6 +591,228 @@ class PyVcfParser(VcfParser):
           data = [data]
         call.info[field] = data
       calls.append(call)
+    return calls
+
+
+class PySamParser(VcfParser):
+  """An Iterator for processing a single VCF file using PySam.
+
+  PySam allows reading a file through either stdin stream, or through as actual
+  VCF files, for which it requires legitimate file descriptor. Since we want to
+  perform our own parallelization, we will fork our process, to use 2 pipelines
+  that will feed into PySam object - 1 will feed the data from main process
+  throughout into the child one, while second will get that data in child
+  process and feed it to PySam library.
+
+  The requirement of using two pipelines comes from the design of VcfParser base
+  class - we could only use a single pipe, but it will divert the parsers.
+  """
+
+  def __init__(self,
+               file_name,  # type: str
+               range_tracker,  # type: range_trackers.OffsetRangeTracker
+               compression_type,  # type: str
+               allow_malformed_records,  # type: bool
+               file_pattern=None,  # type: str
+               representative_header_lines=None,  # type:  List[str]
+               splittable_bgzf=False,  # type: bool
+               **kwargs  # type: **str
+              ):
+    # type: (...) -> None
+    super(PySamParser, self).__init__(file_name,
+                                      range_tracker,
+                                      file_pattern,
+                                      compression_type,
+                                      allow_malformed_records,
+                                      representative_header_lines,
+                                      **kwargs)
+    # These members will be properly initiated in _init_parent_process().
+    self._vcf_reader = None
+    self._to_child = None
+    self._original_info_list = None
+    self._process_pid = None
+    self._init_with_header(self._header_lines)
+
+  def after_read(self):
+    self._to_child.write('\n')
+    self._to_child.flush()
+    self._to_child.close()
+    os.waitpid(self._process_pid, 0)
+    return
+
+  def _init_parent_process(self, pysam_read, variants_write):
+    into_pysam = os.fdopen(pysam_read)
+    self._to_child = os.fdopen(variants_write, 'w')
+    self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
+    self._original_info_list = self._vcf_reader.header.info.keys()
+
+  def _init_child_process(self, variants_read, pysam_write, header_lines):
+    # Child process' task is to populate data into the pipe that feeds
+    # VariantFile class - first by populating all of the header lines, and then
+    # by redirecting the data received from the second pipe.
+
+    # Write Header Lines into PySam.
+    to_pysam_pipe = os.fdopen(pysam_write, 'w')
+    to_pysam_pipe.write('\n'.join(header_lines) + '\n')
+    to_pysam_pipe.flush()
+
+    # Forward variants from _get_variant to PySam.
+    from_variants_pipe = os.fdopen(variants_read)
+    while True:
+      text_line = from_variants_pipe.readline()
+      if not text_line or text_line == '\n':
+        break
+      to_pysam_pipe.write(text_line)
+      to_pysam_pipe.flush()
+
+    from_variants_pipe.close()
+    to_pysam_pipe.close()
+    os._exit(0)
+
+  def _init_with_header(self, header_lines):
+    # PySam requires a version header to be present, so add one if absent.
+    if header_lines and not header_lines[0].startswith(
+        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+      header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+
+    # Pysam pipe is responsible for supplying lines from child process into the
+    # VariantFile, since it can only take an actual file descriptor as an input.
+    pysam_read, pysam_write = os.pipe()
+    # Since child process doesn't have access to the lines that need to be
+    # parsed, variants pipe is needed to supply them from _get_variant() method
+    # into the child process, to be propagated afterwards into the pysam pipe.
+    variants_read, variants_write = os.pipe()
+    pid = os.fork()
+    if pid:
+      self._process_pid = pid
+      self._init_parent_process(pysam_read, variants_write)
+    else:
+      self._init_child_process(variants_read, pysam_write, header_lines)
+
+  def _get_variant(self, data_line):
+    try:
+      self._to_child.write(data_line.encode('utf-8') + '\n')
+      self._to_child.flush()
+      return self._convert_to_variant(next(self._vcf_reader))
+    except (MemoryError, IOError, ValueError) as e:
+      logging.warning('VCF record read failed in %s for line %s: %s',
+                      self._file_name, data_line, str(e))
+      return MalformedVcfRecord(self._file_name, data_line, str(e))
+
+  def _verify_record(self, record):
+    # For incorrectly supplied POS or END info fields (eg. String given
+    # instead of int), PySam returns "-MAX_INT" value instead of raising an
+    # error, which we need to catch ourselves.
+    if record.start < 0:
+      raise ValueError('Start position is incorrect.')
+    if record.stop < 0:
+      raise ValueError('End position is incorrect.')
+
+  def _convert_to_variant(self, record):
+    # type: (libcbcf.VariantRecord) -> Variant
+    """Converts the PySAM record to a :class:`Variant` object.
+
+    Args:
+      record: An object containing info about a variant.
+
+    Returns:
+      A :class:`Variant` object from the given record.
+
+    Raises:
+      ValueError: if `record` is semantically invalid.
+    """
+    self._verify_record(record)
+    return Variant(
+        reference_name=record.chrom.encode('utf-8'),
+        start=record.start,
+        end=record.stop,
+        reference_bases=self._convert_field(record.ref),
+        alternate_bases=list(record.alts) if record.alts else [],
+        names=record.id.split(';') if record.id else [],
+        quality=self._parse_to_numeric(record.qual) if record.qual else None,
+        filters=(None if not list(record.filter.keys()) else
+                 list(record.filter.keys())),
+        info=self._get_variant_info(record),
+        calls=self._get_variant_calls(record.samples))
+
+  def _get_variant_info(self, record):
+    # type: (libcbcf.VariantRecord) -> Dict[str, Any]
+    info = {}
+    for k, v in list(record.info.items()):
+      if k != END_INFO_KEY:
+        if isinstance(v, tuple):
+          info[k] = list(map(self._convert_field, v))
+        else:
+          # If a field was not provided in the header, make it a list to
+          # follow the PyVCF standards.
+          info[k] = (
+              self._convert_field(v) if k in self._original_info_list else
+              [self._convert_field(v)])
+
+    return info
+
+  def _parse_to_numeric(self, value):
+    # type: (Any) -> Any
+    # Attempt to parse a value to int, then float or return as string.
+    if isinstance(value, str) and value.isdigit():
+      return int(value)
+    else:
+      try:
+        return self._parse_float(float(value))
+      except ValueError:
+        # non float
+        return value
+
+  def _parse_float(self, value):
+    # type: (Any) -> Any
+    # Resolve the floating point discrepancy.
+    precise_value = float("{:0g}".format(value))
+    if precise_value.is_integer():
+      return int(precise_value)
+    return precise_value
+
+  def _convert_field(self, value, numeric=True):
+    # type: (Any) -> Any
+    # PySam currently doesn't recognize '.' value for String fields as missing.
+    if value == '.' or value == b'.' or not value:
+      return None
+    # some times PySam returns unicode strings, encode them as strings instead.
+    elif isinstance(value, unicode):
+      value = value.encode('utf-8')
+    return self._parse_to_numeric(value) if numeric else str(value)
+
+  def _get_variant_calls(self, samples):
+    # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
+    calls = []
+
+    for (name, sample) in list(samples.items()):
+      phaseset = None
+      genotype = None
+      info = {}
+      for (key, value) in list(sample.items()):
+        if key == GENOTYPE_FORMAT_KEY:
+          if isinstance(value, tuple):
+            genotype = []
+            for elem in value:
+              genotype.append(MISSING_GENOTYPE_VALUE if elem is None else elem)
+          else:
+            genotype = MISSING_GENOTYPE_VALUE if value is None else value
+
+        elif key == PHASESET_FORMAT_KEY:
+          phaseset = (
+              list(map(self._convert_field, value, [False] * (len(value)))) if
+              isinstance(value, tuple) else
+              self._convert_field(value, numeric=False))
+        else:
+          info[key] = (list(map(self._convert_field, value)) if
+                       isinstance(value, tuple) else self._convert_field(value))
+
+      # PySam samples are "phased" for haploids, so check for for the type
+      # before settings default phaseset value.
+      if phaseset is None and sample.phased and len(genotype) > 1:
+        phaseset = DEFAULT_PHASESET_VALUE
+      calls.append(VariantCall(name, genotype, phaseset, info))
+
     return calls
 
 

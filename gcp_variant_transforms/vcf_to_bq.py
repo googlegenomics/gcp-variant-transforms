@@ -321,7 +321,9 @@ def _merge_headers(known_args, pipeline_args,
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
-        p, pipeline_mode, known_args.all_patterns)
+        p, pipeline_mode,
+        known_args.all_patterns,
+        vcfio.VcfParserType[known_args.vcf_parser])
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -384,9 +386,11 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
                               known_args,  # type: argparse.Namespace
                              ):
   # type: (...) -> None
-  headers = pipeline_common.read_headers(pipeline,
-                                         pipeline_mode,
-                                         known_args.all_patterns)
+  headers = pipeline_common.read_headers(
+      pipeline,
+      pipeline_mode,
+      known_args.all_patterns,
+      vcfio.VcfParserType[known_args.vcf_parser])
   _ = (headers | 'SampleInfoToBigQuery' >>
        sample_info_to_bigquery.SampleInfoToBigQuery(
            known_args.output_table,

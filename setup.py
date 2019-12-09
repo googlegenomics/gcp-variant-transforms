@@ -14,7 +14,20 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
+import subprocess
+from distutils.command.build import build as _build
+
+import os
 import setuptools
+
+PYSAM_DEPENDENCY_COMMANDS = [
+    ['apt-get', 'update'],
+    ['apt-get', '-y', 'install', 'autoconf', 'automake', 'gcc', 'libbz2-dev',
+     'libcurl4-openssl-dev', 'liblzma-dev', 'libssl-dev', 'make', 'perl',
+     'zlib1g-dev']
+]
+
+PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam>=0.15.3']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -37,6 +50,46 @@ REQUIRED_PACKAGES = [
 REQUIRED_SETUP_PACKAGES = [
     'nose>=1.0',
 ]
+
+class CustomCommands(setuptools.Command):
+  """A setuptools Command class able to run arbitrary commands."""
+
+  def initialize_options(self):
+    pass
+
+  def finalize_options(self):
+    pass
+
+  def RunCustomCommand(self, command_list):
+    print 'Running command: %s' % command_list
+    try:
+      subprocess.call(command_list)
+    except Exception as e:
+      raise RuntimeError('Command %s failed with error: %s' % (command_list, e))
+
+  def run(self):
+    try:
+      # For superuser UID is 0, so attempt to install pysam's C dependencies.
+      if not os.getuid():
+        for command in PYSAM_DEPENDENCY_COMMANDS:
+          self.RunCustomCommand(command)
+      self.RunCustomCommand(PYSAM_INSTALLATION_COMMAND)
+
+    except RuntimeError:
+      raise RuntimeError(
+          'PySam installation has failed. Make sure you have the ' + \
+          'following packages installed: autoconf automake gcc libbz2-dev ' + \
+          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl zlib1g-dev')
+
+class build(_build):  # pylint: disable=invalid-name
+  """A build command class that will be invoked during package install.
+
+  The package built using the current setup.py will be staged and later
+  installed in the worker using `pip install package'. This class will be
+  instantiated during install for this specific scenario and will trigger
+  running the custom commands specified.
+  """
+  sub_commands = _build.sub_commands + [('CustomCommands', None)]
 
 setuptools.setup(
     name='gcp_variant_transforms',
@@ -65,5 +118,11 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={
         'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
+    },
+
+    cmdclass={
+        # Command class instantiated and run during pip install scenarios.
+        'build': build,
+        'CustomCommands': CustomCommands,
     },
 )

@@ -19,10 +19,6 @@ from __future__ import absolute_import
 import logging
 from typing import Any, Dict, List, Optional, Union  # pylint: disable=unused-import
 
-from vcf.parser import _Format as Format
-from vcf.parser import _Info as Info
-from vcf.parser import field_counts
-
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
@@ -88,8 +84,11 @@ def infer_info_fields(
         variant, infos, defined_headers, annotation_fields_to_infer)
   return infos
 
-def infer_format_fields(variant, defined_headers):
-  # type: (vcfio.Variant, vcf_header_io.VcfHeader) -> Dict[str, Format]
+def infer_format_fields(
+    variant,  # type: vcfio.Variant
+    defined_headers  # type: vcf_header_io.VcfHeader
+    ):
+  # type: (...) -> Dict[str, vcf_header_io.VcfHeaderFormatField]
   """Returns inferred format fields.
 
   Two types of format fields are inferred:
@@ -116,10 +115,11 @@ def infer_format_fields(variant, defined_headers):
                   format_key, variant))
         logging.warning('Undefined FORMAT field "%s" in variant "%s"',
                         format_key, str(variant))
-        formats[format_key] = Format(format_key,
-                                     _get_field_count(format_value),
-                                     _get_field_type(format_value),
-                                     '')  # NO_DESCRIPTION
+        formats[format_key] = vcf_header_io.VcfHeaderFormatField(
+            format_key,
+            _get_field_count(format_value),
+            _get_field_type(format_value),
+            '')  # NO_DESCRIPTION
     # No point in proceeding. All other calls have the same FORMAT.
     break
   for call in variant.calls:
@@ -146,7 +146,7 @@ def _get_field_count(field_value):
       field value for Allele frequency (AF) field.
   """
   if isinstance(field_value, list):
-    return field_counts['.']
+    return None # Default decoding for '.' values.
   elif isinstance(field_value, bool):
     return 0
   else:
@@ -210,7 +210,7 @@ def _infer_mismatched_info_field(field_key,  # type: str
                                  defined_header,  # type: Dict
                                  num_alternate_bases  # type: int
                                 ):
-  # type: (...) -> Optional[Info]
+  # type: (...) -> Optional[vcf_header_io.VcfHeaderInfoField]
   """Returns corrected info if there are mismatches.
 
   Two mismatches are handled:
@@ -229,25 +229,28 @@ def _infer_mismatched_info_field(field_key,  # type: str
     Corrected info definition if there are mismatches.
   """
   corrected_num = defined_header.get(_HeaderKeyConstants.NUM)
-  if (corrected_num == field_counts[_FIELD_COUNT_ALTERNATE_ALLELE] and
+  if (corrected_num in vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION and
+      vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION[corrected_num] ==
+      _FIELD_COUNT_ALTERNATE_ALLELE and
       len(field_value) != num_alternate_bases):
-    corrected_num = field_counts['.']
+    corrected_num = None # Default decoding for '.' values.
 
   corrected_type = _get_corrected_type(
       defined_header.get(_HeaderKeyConstants.TYPE), field_value)
 
   if (corrected_type != defined_header.get(_HeaderKeyConstants.TYPE) or
       corrected_num != defined_header.get(_HeaderKeyConstants.NUM)):
-    return Info(field_key,
-                corrected_num,
-                corrected_type,
-                defined_header.get(_HeaderKeyConstants.DESC),
-                defined_header.get(_HeaderKeyConstants.SOURCE),
-                defined_header.get(_HeaderKeyConstants.VERSION))
+    return vcf_header_io.VcfHeaderInfoField(
+        field_key,
+        corrected_num,
+        corrected_type,
+        defined_header.get(_HeaderKeyConstants.DESC),
+        defined_header.get(_HeaderKeyConstants.SOURCE),
+        defined_header.get(_HeaderKeyConstants.VERSION))
   return None
 
 def _infer_mismatched_format_field(field_key, field_value, defined_header):
-  # type: (str, Any, Dict) -> Optional[Format]
+  # type: (str, Any, Dict) -> Optional[vcf_header_io.VcfHeaderFormatField]
   """Returns corrected format if there are mismatches.
 
   One type of mismatches is handled:
@@ -265,14 +268,19 @@ def _infer_mismatched_format_field(field_key, field_value, defined_header):
   corrected_type = _get_corrected_type(
       defined_header.get(_HeaderKeyConstants.TYPE), field_value)
   if corrected_type != defined_header.get(_HeaderKeyConstants.TYPE):
-    return Format(field_key,
-                  defined_header.get(_HeaderKeyConstants.NUM),
-                  corrected_type,
-                  defined_header.get(_HeaderKeyConstants.DESC))
+    return vcf_header_io.VcfHeaderFormatField(
+        field_key,
+        defined_header.get(_HeaderKeyConstants.NUM),
+        corrected_type,
+        defined_header.get(_HeaderKeyConstants.DESC))
   return None
 
-def _infer_non_annotation_info_fields(variant, infos, defined_headers):
-  # type: (vcfio.Variant, Dict[str, Info], vcf_header_io.VcfHeader) -> None
+def _infer_non_annotation_info_fields(
+    variant,  # type: vcfio.Variant
+    infos,  # type: Dict[str, vcf_header_io.VcfHeaderInfoField]
+    defined_headers  # type: vcf_header_io.VcfHeader
+    ):
+  # type: (...) -> None
   """Updates `infos` with inferred info fields.
 
   Two types of info fields are inferred:
@@ -295,12 +303,13 @@ def _infer_non_annotation_info_fields(variant, infos, defined_headers):
                 info_field_key, variant))
       logging.warning('Undefined INFO field "%s" in variant "%s"',
                       info_field_key, str(variant))
-      infos[info_field_key] = Info(info_field_key,
-                                   _get_field_count(info_field_value),
-                                   _get_field_type(info_field_value),
-                                   '',  # NO_DESCRIPTION
-                                   '',  # UNKNOWN_SOURCE
-                                   '')  # UNKNOWN_VERSION
+      infos[info_field_key] = vcf_header_io.VcfHeaderInfoField(
+          info_field_key,
+          _get_field_count(info_field_value),
+          _get_field_type(info_field_value),
+          '',  # NO_DESCRIPTION
+          '',  # UNKNOWN_SOURCE
+          '')  # UNKNOWN_VERSION
     else:
       defined_header = defined_headers.infos.get(info_field_key)
       corrected_info = _infer_mismatched_info_field(
@@ -315,12 +324,13 @@ def _infer_non_annotation_info_fields(variant, infos, defined_headers):
             str(info_field_value), str(variant))
         infos[info_field_key] = corrected_info
 
-def _infer_annotation_type_info_fields(variant,
-                                       infos,
-                                       defined_headers,
-                                       annotation_fields_to_infer
-                                      ):
-  # type: (vcfio.Variant, Dict[str, Info], vcf_header_io.VcfHeader) -> None
+def _infer_annotation_type_info_fields(
+    variant,  # type: vcfio.Variant
+    infos,  # type: Dict[str, vcf_header_io.VcfHeaderInfoField]
+    defined_headers,  # type: vcf_header_io.VcfHeader
+    annotation_fields_to_infer  # type: List[str]
+    ):
+  # type: (...) -> None
   """Updates `infos` with inferred annotation type info fields.
 
   All annotation headers in each annotation field are converted to Info header
@@ -373,10 +383,11 @@ def _infer_annotation_type_info_fields(variant,
           break
       key_id = get_inferred_annotation_type_header_key(
           field, name)
-      infos[key_id] = Info(key_id,
-                           1,  # field count
-                           variant_merged_type,
-                           ('Inferred type field for annotation {}.'.format(
-                               name)),
-                           '',  # UNKNOWN_SOURCE
-                           '')  # UNKNOWN_VERSION
+      infos[key_id] = vcf_header_io.VcfHeaderInfoField(\
+          key_id,
+          1,  # field count
+          variant_merged_type,
+          ('Inferred type field for annotation {}.'.format(
+              name)),
+          '',  # UNKNOWN_SOURCE
+          '')  # UNKNOWN_VERSION

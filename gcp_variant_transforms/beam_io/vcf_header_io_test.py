@@ -31,6 +31,7 @@ from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeader
 from gcp_variant_transforms.beam_io.vcf_header_io import WriteVcfHeaderFn
 from gcp_variant_transforms.beam_io.vcf_header_io import WriteVcfHeaders
+from gcp_variant_transforms.beam_io.vcfio import VcfParserType
 from gcp_variant_transforms.testing import asserts
 from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
@@ -59,10 +60,11 @@ class VcfHeaderSourceTest(unittest.TestCase):
   def setUp(self):
     self.lines = testdata_util.get_sample_vcf_header_lines()
 
-  def _create_file_and_read_headers(self):
+  def _create_file_and_read_headers(self, vcf_parser=VcfParserType.PYVCF):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(suffix='.vcf', lines=self.lines)
-      headers = source_test_utils.read_from_source(VcfHeaderSource(filename))
+      headers = source_test_utils.read_from_source(
+          VcfHeaderSource(filename, vcf_parser=vcf_parser))
       return headers[0]
 
   def test_vcf_header_eq(self):
@@ -80,6 +82,7 @@ class VcfHeaderSourceTest(unittest.TestCase):
     self.lines = [
         '##contig=<ID=M,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
         '##contig=<ID=P,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
+        '\n',
         '##ALT=<ID=CGA_CNVWIN,Description="Copy number analysis window">\n',
         '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
         '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
@@ -88,6 +91,25 @@ class VcfHeaderSourceTest(unittest.TestCase):
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	GS000016676-ASM\n',
     ]
     header = self._create_file_and_read_headers()
+    self.assertItemsEqual(header.contigs.keys(), ['M', 'P'])
+    self.assertItemsEqual(header.alts.keys(), ['CGA_CNVWIN', 'INS:ME:MER'])
+    self.assertItemsEqual(header.filters.keys(), ['MPCBT'])
+    self.assertItemsEqual(header.infos.keys(), ['CGA_MIRB'])
+    self.assertItemsEqual(header.formats.keys(), ['FT'])
+
+  def test_all_fields_pysam(self):
+    self.lines = [
+        '##contig=<ID=M,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
+        '##contig=<ID=P,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
+        '\n',
+        '##ALT=<ID=CGA_CNVWIN,Description="Copy number analysis window">\n',
+        '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
+        '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
+        '##INFO=<ID=CGA_MIRB,Number=.,Type=String,Description="miRBaseId">\n',
+        '##FORMAT=<ID=FT,Number=1,Type=String,Description="Genotype filter">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	GS000016676-ASM\n',
+    ]
+    header = self._create_file_and_read_headers(vcf_parser=VcfParserType.PYSAM)
     self.assertItemsEqual(header.contigs.keys(), ['M', 'P'])
     self.assertItemsEqual(header.alts.keys(), ['CGA_CNVWIN', 'INS:ME:MER'])
     self.assertItemsEqual(header.filters.keys(), ['MPCBT'])
@@ -295,6 +317,46 @@ class WriteVcfHeadersTest(unittest.TestCase):
         '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
         '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
         '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
+        '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
+    ]
+    with temp_dir.TempDir() as tempdir:
+      tempfile = tempdir.create_temp_file(suffix='.vcf')
+      header_fn = WriteVcfHeaderFn(tempfile)
+      header_fn.process(header, vcf_version_line)
+      with open(tempfile, 'rb') as f:
+        actual = f.readlines()
+        self.assertItemsEqual(actual, expected_results)
+
+  def test_write_headers_with_vcf_version_line_pysam(self):
+    lines = [
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+        '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
+        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
+        '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',
+        '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="GQ">\n',
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n',
+    ]
+    header = None
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(suffix='.vcf', lines=lines)
+      headers = source_test_utils.read_from_source(
+          VcfHeaderSource(filename, vcf_parser=VcfParserType.PYSAM))
+      header = headers[0]
+    vcf_version_line = '##fileformat=VCFv4.3\n'
+    expected_results = [
+        vcf_version_line,
+        '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
+        '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
+        # Pysam does not recognize Character type, and converts to String.
+        '##INFO=<ID=HR,Number=R,Type=String,Description="ChrInfo_R">\n',
         '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
         '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',

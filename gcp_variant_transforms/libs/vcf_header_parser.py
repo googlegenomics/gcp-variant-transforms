@@ -16,13 +16,42 @@
 
 from __future__ import absolute_import
 
+from pysam import libcbcf
 import vcf
 
 from apache_beam.io.filesystems import FileSystems
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcfio
 
+def get_vcf_headers(input_file, vcf_parser=vcfio.VcfParserType.PYVCF):
+  if vcf_parser == vcfio.VcfParserType.PYSAM:
+    return _get_vcf_headers_pysam(input_file)
+  else:
+    return _get_vcf_headers_pyvcf(input_file)
 
-def get_vcf_headers(input_file):
+def _get_vcf_headers_pysam(input_file):
+  header = libcbcf.VariantHeader()
+  lines = _line_generator()
+  sample_line = vcf_header_io.LAST_HEADER_LINE_PREFIX
+  for line in lines:
+    if line.startswith('#'):
+      if line.startswith(vcf_header_io.LAST_HEADER_LINE_PREFIX):
+        sample_line = line
+      else:
+        header.add_line(line)
+    else:
+      break
+
+  yield vcf_header_io.VcfHeader(infos=header.info,
+                                filters=header.filters,
+                                alts=header.alts,
+                                formats=header.formats,
+                                contigs=header.contigs,
+                                samples=sample_line,
+                                file_path=input_file,
+                                vcf_parser=vcfio.VcfParserType.PYSAM)
+
+def _get_vcf_headers_pyvcf(input_file):
   # type: (str) -> vcf_header_io.VcfHeader
   """Returns VCF headers from ``input_file``.
 
@@ -48,7 +77,9 @@ def get_vcf_headers(input_file):
                                  alts=vcf_reader.alts,
                                  formats=vcf_reader.formats,
                                  contigs=vcf_reader.contigs,
-                                 file_path=input_file)
+                                 samples=vcf_reader.samples,
+                                 file_path=input_file,
+                                 vcf_parser=vcfio.VcfParserType.PYVCF)
 
 
 def get_metadata_header_lines(input_file):
@@ -75,7 +106,9 @@ def _line_generator(file_name):
   with FileSystems.open(file_name) as f:
     while True:
       line = f.readline()
-      if line:
+      while line and not line.strip():  # Skip empty lines.
+        line = f.readline()
+      if line and line.startswith('#'):
         yield line
       else:
         break
