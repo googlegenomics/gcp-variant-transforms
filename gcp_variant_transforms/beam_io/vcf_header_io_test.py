@@ -96,6 +96,23 @@ class VcfHeaderSourceTest(unittest.TestCase):
     header = self._create_file_and_read_headers()
     self.assertEqual(header, _get_vcf_header_from_lines(headers))
 
+  def test_malformed_headers(self):
+    # TODO(tneymanov): Add more tests.
+    malformed_header_lines = [
+        # Malformed FILTER.
+        [
+            '##FILTER=<ID=PASS,Description="All filters passed">\n',
+            '##FILTER=<ID=LowQual,Descri\n',
+            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48'
+        ]
+    ]
+
+    for content in malformed_header_lines:
+      self.lines = content
+      with self.assertRaises(ValueError):
+        self._create_file_and_read_headers()
+
   def test_all_fields(self):
     self.lines = [
         '##contig=<ID=M,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',

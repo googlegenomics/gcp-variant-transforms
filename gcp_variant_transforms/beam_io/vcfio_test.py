@@ -23,7 +23,6 @@ import logging
 import os
 import tempfile
 import unittest
-from itertools import chain
 
 import apache_beam as beam
 from apache_beam.io.filesystem import CompressionTypes
@@ -205,23 +204,8 @@ class VcfSourceTest(unittest.TestCase):
             '19\tabc\trs12345\tT\tC\t9\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48\n',
         ]
     ]
-    malformed_header_lines = [
-        # Malformed FILTER.
-        [
-            '##FILTER=<ID=PASS,Description="All filters passed">\n',
-            '##FILTER=<ID=LowQual,Descri\n',
-            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
-            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48',
-        ],
-        # Invalid Number value for INFO.
-        [
-            '##INFO=<ID=G,Number=U,Type=String,Description="InvalidNumber">\n',
-            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
-            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48\n',
-        ]
-    ]
 
-    return (malformed_vcf_records, malformed_header_lines) #, malformed_header_lines
+    return malformed_vcf_records #, malformed_header_lines
 
   def _assert_pipeline_read_files_record_count_equal(
       self, input_pattern, expected_count, use_read_all=False):
@@ -268,8 +252,6 @@ class VcfSourceTest(unittest.TestCase):
 
   def test_single_file_no_records(self):
     for content in [[''], [' '], ['', ' ', '\n'], ['\n', '\r\n', '\n']]:
-      self.assertEqual([], self._create_temp_file_and_read_records(
-          content))
       self.assertEqual([], self._create_temp_file_and_read_records(
           content, _SAMPLE_HEADER_LINES))
 
@@ -318,27 +300,23 @@ class VcfSourceTest(unittest.TestCase):
   def test_invalid_file(self):
     invalid_file_contents = self._get_invalid_file_contents()
 
-    for content in chain(*invalid_file_contents):
+    for content in invalid_file_contents:
       with TempDir() as tempdir, self.assertRaises(ValueError):
         self._read_records(self._create_temp_vcf_file(content, tempdir))
         self.fail('Invalid VCF file must throw an exception')
     # Try with multiple files (any one of them will throw an exception).
+
     with TempDir() as tempdir, self.assertRaises(ValueError):
-      for content in chain(*invalid_file_contents):
+      for content in invalid_file_contents:
         self._create_temp_vcf_file(content, tempdir)
         self._read_records(os.path.join(tempdir.get_path(), '*.vcf'))
 
   def test_allow_malformed_records(self):
-    invalid_records, invalid_headers = self._get_invalid_file_contents()
+    invalid_records = self._get_invalid_file_contents()
 
     # Invalid records should not raise errors
     for content in invalid_records:
       with TempDir() as tempdir:
-        self._read_records(self._create_temp_vcf_file(content, tempdir),
-                           allow_malformed_records=True)
-    # Invalid headers should still raise errors
-    for content in invalid_headers:
-      with TempDir() as tempdir, self.assertRaises(ValueError):
         self._read_records(self._create_temp_vcf_file(content, tempdir),
                            allow_malformed_records=True)
 
@@ -399,7 +377,7 @@ class VcfSourceTest(unittest.TestCase):
     # when a representative headers with String definition for field `HU` is
     # given.
     file_content = [
-        '##INFO=<ID=HU,Number=.,Type=String,Descr\n',
+        '##INFO=<ID=HU,Number=.,Type=Float,Description="Info">\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\r\n',
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	Sample1	Sample2\r\n',
         '19	2	.	A	T	.	.	HU=a,b	GT	0/0	0/1\n',]
@@ -413,8 +391,9 @@ class VcfSourceTest(unittest.TestCase):
     variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
 
     # `file_headers` is used.
-    with self.assertRaises(ValueError):
-      read_data = self._create_temp_file_and_read_records(file_content)
+    read_data = self._create_temp_file_and_read_records(file_content)
+    # Pysam expects Float value for HU, and returns Nones when list is given.
+    self.assertEqual([None, None], read_data[0].info['HU'])
 
     # `representative_header` is used.
     read_data = self._create_temp_file_and_read_records(

@@ -16,7 +16,6 @@
 
 from collections import OrderedDict
 import unittest
-import vcf
 from pysam import libcbcf
 
 from apache_beam.testing.test_pipeline import TestPipeline

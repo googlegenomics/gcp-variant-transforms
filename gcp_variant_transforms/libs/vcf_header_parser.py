@@ -26,7 +26,7 @@ def get_vcf_headers(input_file):
   if not FileSystems.exists(input_file):
     raise ValueError('VCF header does not exist')
   header = libcbcf.VariantHeader()
-  lines = _line_generator(input_file)
+  lines = _header_line_generator(input_file)
   sample_line = None
   header.add_line('##fileformat=VCFv4.0\n')
   file_empty = True
@@ -71,10 +71,11 @@ def get_metadata_header_lines(input_file):
   """
   if not FileSystems.exists(input_file):
     raise ValueError('{} does not exist'.format(input_file))
-  return [line for line in _line_generator(input_file) if line.startswith('##')]
+  return[line for line in _header_line_generator(input_file) if
+         line.startswith('##')]
 
 
-def _line_generator(file_name):
+def _header_line_generator(file_name):
   """Generator to return lines delimited by newline chars from ``file_name``."""
   with FileSystems.open(file_name) as f:
     record = None

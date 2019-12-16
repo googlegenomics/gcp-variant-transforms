@@ -321,7 +321,7 @@ class ReadVcfHeaders(PTransform):
     return pvalue.pipeline | Read(self._source)
 
 
-def _create_vcf_header_source(
+def CreateVcfHeaderSource(
     file_pattern=None,
     compression_type=None):
   return VcfHeaderSource(file_pattern=file_pattern,
@@ -361,7 +361,7 @@ class ReadAllVcfHeaders(PTransform):
     """
     super(ReadAllVcfHeaders, self).__init__(**kwargs)
     source_from_file = partial(
-        _create_vcf_header_source,
+        CreateVcfHeaderSource,
         compression_type=compression_type)
     self._read_all_files = filebasedsource.ReadAllFiles(
         False,  # splittable (we are just reading the headers)

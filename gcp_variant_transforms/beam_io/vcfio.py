@@ -190,7 +190,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
                allow_malformed_records=False,  # type: bool
-               infer_headers=False,  # type: bool
+               pre_infer_headers=False,  # type: bool
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -200,7 +200,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
-    self._infer_headers = infer_headers
+    self._pre_infer_headers = pre_infer_headers
 
   def read_records(self,
                    file_name,  # type: str
@@ -214,7 +214,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         self._allow_malformed_records,
         file_pattern=self._pattern,
         representative_header_lines=self._representative_header_lines,
-        infer_headers=self._infer_headers,
+        pre_infer_headers=self._pre_infer_headers,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -230,7 +230,7 @@ class ReadFromBGZF(beam.PTransform):
                input_files,
                representative_header_lines,
                allow_malformed_records,
-               infer_headers):
+               pre_infer_headers):
     # type: (List[str], List[str], bool) -> None
     """Initializes the transform.
 
@@ -244,7 +244,7 @@ class ReadFromBGZF(beam.PTransform):
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
-    self._infer_headers = infer_headers
+    self._pre_infer_headers = pre_infer_headers
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
@@ -256,7 +256,7 @@ class ReadFromBGZF(beam.PTransform):
         self._allow_malformed_records,
         representative_header_lines=self._representative_header_lines,
         splittable_bgzf=True,
-        infer_headers=self._infer_headers)
+        pre_infer_headers=self._pre_infer_headers)
 
     for record in record_iterator:
       yield record
@@ -286,7 +286,7 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
-      infer_headers=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -312,7 +312,7 @@ class ReadFromVcf(PTransform):
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        infer_headers=infer_headers)
+        pre_infer_headers=pre_infer_headers)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -320,12 +320,12 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None, infer_headers=False):
+    allow_malformed_records=None, pre_infer_headers=False):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
-                    infer_headers=infer_headers)
+                    pre_infer_headers=pre_infer_headers)
 
 
 class ReadAllFromVcf(PTransform):
@@ -348,7 +348,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
-      infer_headers=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -374,7 +374,7 @@ class ReadAllFromVcf(PTransform):
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
-        infer_headers=infer_headers)
+        pre_infer_headers=pre_infer_headers)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,
