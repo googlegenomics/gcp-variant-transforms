@@ -297,7 +297,7 @@ class VcfParser(object):
     self._text_lines = text_source.read_records(self._file_name,
                                                 range_tracker)
 
-  def after_read(self):
+  def send_kill_signal_to_child(self):
     return
 
   def _next_non_empty_line(self, iterator):
@@ -345,7 +345,7 @@ class VcfParser(object):
       text_line = self._next_non_empty_line(self._text_lines)
     except StopIteration as e:
       # clean up, once iterator is depleted.
-      self.after_read()
+      self.send_kill_signal_to_child()
       raise e
     record = self._get_variant(text_line)
     if isinstance(record, Variant):
@@ -421,7 +421,7 @@ class PySamParser(VcfParser):
     self._original_info_list = None
     self._process_pid = None
 
-  def after_read(self):
+  def send_kill_signal_to_child(self):
     self._to_child.write('\n')
     self._to_child.flush()
     self._to_child.close()
@@ -488,7 +488,7 @@ class PySamParser(VcfParser):
       self._to_child.write(data_line.encode('utf-8') + '\n')
       self._to_child.flush()
       return self._convert_to_variant(next(self._vcf_reader))
-    except (MemoryError, IOError, ValueError, StopIteration) as e:
+    except (ValueError, StopIteration, TypeError) as e:
       logging.warning('VCF record read failed in %s for line %s: %s',
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
@@ -520,7 +520,7 @@ class PySamParser(VcfParser):
         reference_name=record.chrom.encode('utf-8'),
         start=record.start,
         end=record.stop,
-        reference_bases=self._convert_field(record.ref),
+        reference_bases=self._convert_field(record.ref, True),
         alternate_bases=list(record.alts) if record.alts else [],
         names=record.id.split(';') if record.id else [],
         quality=self._parse_to_numeric(record.qual) if record.qual else None,
@@ -533,26 +533,30 @@ class PySamParser(VcfParser):
     # type: (libcbcf.VariantRecord) -> Dict[str, Any]
     info = {}
     for k, v in list(record.info.items()):
-      if not v and k not in self._original_info_list:
+      if isinstance(v, bool):
+        info[k] = v
+      elif v is None and k not in self._original_info_list:
         info[k] = True
       elif k != END_INFO_KEY:
         if isinstance(v, tuple):
-          info[k] = self._convert_list(map(self._convert_field, v))
+          info[k] = self._homogenize_list_dtype(
+              map(self._convert_field, v, [True] * (len(v))))
         else:
           # If a field was not provided in the header, make it a list.
           info[k] = (
-              self._convert_field(v) if k in self._original_info_list else
-              [self._convert_field(v)])
+              self._convert_field(v, True) if k in self._original_info_list else
+              [self._convert_field(v, True)])
 
     return info
 
   def _parse_to_numeric(self, value):
     # type: (Any) -> Any
     # Attempt to parse a value to int, then float or return as string.
-    if isinstance(value, str) and value.isdigit():
-      return int(value)
-    else:
+    try:
+      return int(str(value))
+    except ValueError:
       try:
+        # Resolve the floating point discrepancy.
         return self._parse_float(float(value))
       except ValueError:
         # non float
@@ -560,21 +564,21 @@ class PySamParser(VcfParser):
 
   def _parse_float(self, value):
     # type: (Any) -> Any
-    # Resolve the floating point discrepancy.
+
     precise_value = float("{:0g}".format(value))
     if precise_value.is_integer():
       return int(precise_value)
     return precise_value
 
-  def _convert_field(self, value, numeric=True):
+  def _convert_field(self, value, is_numeric):
     # type: (Any) -> Any
     # PySam currently doesn't recognize '.' value for String fields as missing.
-    if value == '.' or value == b'.' or not value:
+    if value == '.' or value == b'.' or value is None:
       return None
     # some times PySam returns unicode strings, encode them as strings instead.
     elif isinstance(value, unicode):
       value = value.encode('utf-8')
-    return self._parse_to_numeric(value) if numeric else str(value)
+    return self._parse_to_numeric(value) if is_numeric else str(value)
 
   def _get_variant_calls(self, samples):
     # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
@@ -597,10 +601,12 @@ class PySamParser(VcfParser):
           phaseset = (
               list(map(self._convert_field, value, [False] * (len(value)))) if
               isinstance(value, tuple) else
-              self._convert_field(value, numeric=False))
+              self._convert_field(value, False))
         else:
-          info[key] = (self._convert_list(map(self._convert_field, value)) if
-                       isinstance(value, tuple) else self._convert_field(value))
+          info[key] = (self._homogenize_list_dtype(
+              map(self._convert_field, value, [True] * (len(value)))) if
+                       isinstance(value, tuple) else
+                       self._convert_field(value, True))
 
       # PySam samples are "phased" for haploids, so check for for the type
       # before settings default phaseset value.
@@ -610,22 +616,15 @@ class PySamParser(VcfParser):
 
     return calls
 
-  def _convert_list(self, data):
-    cast_type = self._get_cast_type(data)
-    parsed_data = []
-    for elem in data:
-      parsed_data.append(None if elem is None else cast_type(elem))
-    return parsed_data
+  def _homogenize_list_dtype(self, data):
+    # Due to BQ requirements, make sure that elements in repeated fields are of
+    # the same type.
+    none_type = type(None)
+    if all(isinstance(elem, (int, none_type)) for elem in data):
+      cast_type = int
+    elif all(isinstance(elem, (int, float, none_type)) for elem in data):
+      cast_type = float
+    else:
+      cast_type = str
 
-  def _get_cast_type(self, data):
-    is_int = True
-    for elem in data:
-      if elem is None:
-        continue
-      if isinstance(elem, str):
-        return str
-      if isinstance(elem, float):
-        is_int = False
-    if is_int:
-      return int
-    return float
+    return [None if elem is None else cast_type(elem) for elem in data]
