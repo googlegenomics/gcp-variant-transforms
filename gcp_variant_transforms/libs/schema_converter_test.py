@@ -466,7 +466,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         ('IFR', createInfo('IFR', '.', 'Float', 'desc', None, None)),
         ('IS', createInfo('IS', 1, 'String', 'desc', None, None))])
     formats = OrderedDict([
-        ('FB', createFormat('FB', 0, 'Flag', 'desc')),
+        ('FB', createFormat('FB', 1, 'String', 'desc')),
         ('GQ', createFormat('GQ', 1, 'Integer', 'desc'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
@@ -485,7 +485,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         ('IFR', createInfo('IFR', '.', 'Float', 'desc', None, None)),
         ('IS', createInfo('IS', 1, 'String', 'desc', None, None))])
     formats = OrderedDict([
-        ('FB', createFormat('FB', 0, 'Flag', 'desc')),
+        ('FB', createFormat('FB', 1, 'String', 'desc')),
         ('GQ', createFormat('GQ', 1, 'Integer',
                             'desc'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)

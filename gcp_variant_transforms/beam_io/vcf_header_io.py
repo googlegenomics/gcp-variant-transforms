@@ -34,8 +34,9 @@ from gcp_variant_transforms.beam_io import bgzf
 from gcp_variant_transforms.beam_io import vcfio
 
 LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
-HEADER_TYPES = ['Integer', 'Float', 'Flag', 'Character', 'String', '.']
+COMMON_TYPES = ['Integer', 'Float', 'Character', 'String', '.']
 HEADER_NUMBERS = ['A', 'R', 'G', '.']
+FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 
 class VcfHeaderFieldTypeConstants(object):
@@ -63,25 +64,28 @@ def CreateInfoField(info_id,
                     description='',
                     source=None,
                     version=None):
+  """Creates mock PySam INFO object."""
+  # type: (str, Any, str, str, str, str) -> VariantHeaderMetadata
   return VariantHeaderMetadataMock(
       info_id,
-      number,
-      info_type,
-      description,
       {
           'Type': info_type,
           'Number': str(number),
+          'Description': description,
           'Source': None if source is None else str(source),
           'Version': None if version is None else str(version)
       })
 
 def CreateFormatField(info_id, number, info_type, description=''):
-  return VariantHeaderMetadataMock(info_id, number, info_type, description,
-                                   {'Type': info_type, 'Number': number})
+  """Creates mock PySam FORMAT object."""
+  # type: (str, Any, str, str) -> VariantHeaderMetadata
+  return VariantHeaderMetadataMock(info_id, {'Number': str(number),
+                                             'Type': info_type,
+                                             'Description': description})
 
 # Mock of PySam VariantHeaderMetadata field
 VariantHeaderMetadataMock = collections.namedtuple(
-    'VariantHeaderMetadata', ['id', 'number', 'type', 'description', 'record'])
+    'VariantHeaderMetadata', ['id', 'record'])
 
 class VcfHeader(object):
   """Container for header data."""
@@ -111,12 +115,12 @@ class VcfHeader(object):
       samples: A list of sample names.
       file_path: The full file path of the vcf file.
     """
-    self.infos = self._get_infos_pysam(infos or {})
-    self.filters = self._get_filters_pysam(filters or {})
-    self.alts = self._get_alts_pysam(alts or {})
-    self.formats = self._get_formats_pysam(formats or {})
-    self.contigs = self._get_contigs_pysam(contigs or {})
-    self.samples = self._get_samples_pysam(samples or '')
+    self.infos = self._get_infos(infos or {})
+    self.filters = self._get_filters(filters or {})
+    self.alts = self._get_alts(alts or {})
+    self.formats = self._get_formats(formats or {})
+    self.contigs = self._get_contigs(contigs or {})
+    self.samples = self._get_samples(samples or '')
     self.file_path = file_path
 
   def __eq__(self, other):
@@ -132,101 +136,113 @@ class VcfHeader(object):
                                                  self.alts,
                                                  self.formats,
                                                  self.contigs]])
-  def _get_infos_pysam(self, infos):
-    self.verify_infos(infos)
+  def _get_infos(self, infos):
+    self._verify_header(infos, is_format=False)
     results = collections.OrderedDict()
-    for item in infos.items():
+    for info_id, field in infos.items():
       result = collections.OrderedDict()
-      result['id'] = item[0]
-      result['num'] = item[1].number
-      result['type'] = item[1].record['Type']
-      result['desc'] = item[1].description
+      result['id'] = info_id
+      result['num'] = (
+          field.record['Number'] if field.record['Number'] in HEADER_NUMBERS
+          else int(field.record['Number']))
+      result['type'] = field.record['Type']
+      result['desc'] = field.record['Description'].strip("\"")
       # Pysam doesn't return these fields in info
-      result['source'] = (item[1].record['Source'].strip("\"")
-                          if 'Source' in item[1].record and
-                          item[1].record['Source'] is not None else None)
-      result['version'] = (item[1].record['Version'].strip("\"")
-                           if 'Version' in item[1].record and
-                           item[1].record['Version'] is not None else None)
-      results[item[0]] = result
+      result['source'] = (field.record['Source'].strip("\"")
+                          if 'Source' in field.record and
+                          field.record['Source'] is not None else None)
+      result['version'] = (field.record['Version'].strip("\"")
+                           if 'Version' in field.record and
+                           field.record['Version'] is not None else None)
+      results[info_id] = result
     return results
 
-  def _get_filters_pysam(self, filters):
+  def _get_filters(self, filters):
     results = collections.OrderedDict()
-    for item in filters.items():
+    for filter_id, field in filters.items():
       result = collections.OrderedDict()
-      result['id'] = item[0]
-      result['desc'] = item[1].description
-      results[item[0]] = result
+      result['id'] = filter_id
+      result['desc'] = field.record['Description'].strip("\"")
+      results[filter_id] = result
     # PySAM adds default PASS value to its filters
     if 'PASS' in results:
       del results['PASS']
     return results
 
-  def _get_alts_pysam(self, alts):
+  def _get_alts(self, alts):
     results = collections.OrderedDict()
-    for item in alts.items():
+    for alt_id, field in alts.items():
       result = collections.OrderedDict()
-      result['id'] = item[0]
-      result['desc'] = item[1]['Description'].strip("\"")
-      results[item[0]] = result
+      result['id'] = alt_id
+      result['desc'] = field['Description'].strip("\"")
+      results[alt_id] = result
     return results
 
-  def _get_formats_pysam(self, formats):
+  def _get_formats(self, formats):
+    self._verify_header(formats, is_format=True)
     results = collections.OrderedDict()
-    for item in formats.items():
+    for format_id, field in formats.items():
       result = collections.OrderedDict()
-      result['id'] = item[0]
-      result['num'] = item[1].number
-      result['type'] = item[1].record['Type']
-      result['desc'] = item[1].description
-      results[item[0]] = result
+      result['id'] = format_id
+      result['num'] = (
+          field.record['Number'] if field.record['Number'] in HEADER_NUMBERS
+          else int(field.record['Number']))
+      result['type'] = field.record['Type']
+      result['desc'] = field.record['Description'].strip("\"")
+      results[format_id] = result
     return results
 
-  def _get_contigs_pysam(self, contigs):
+  def _get_contigs(self, contigs):
     results = collections.OrderedDict()
-    for item in contigs.items():
+    for contig_id, field in contigs.items():
       result = collections.OrderedDict()
-      result['id'] = item[0]
-      result['length'] = item[1].length
-      results[item[0]] = result
+      result['id'] = contig_id
+      result['length'] = field.length
+      results[contig_id] = result
     return results
 
-  def _get_samples_pysam(self, sample_line):
+  def _get_samples(self, sample_line):
     sample_tags = sample_line.split('\t')
-    if len(sample_tags) > 9:
-      return sample_tags[9:]
+    # CHROM... line has 8 const fields. If samples are present, they are listed
+    # after 9th field - FORMAT.
+    default_items_num = len(LAST_HEADER_LINE_PREFIX.split('\t')) + 1
+    if len(sample_tags) > default_items_num:
+      return sample_tags[default_items_num:]
     else:
       return []
 
-  def verify_infos(self, fields):
+  def _verify_header(self, fields, is_format):
+    """Verifies the integrity of INFO and FORMAT fields"""
+    # type(Dict[str, VariantHeaderMetadata], bool) -> None
     for k, v in fields.iteritems():
       # ID, Description, Type and Number are mandatory fields.
       if not k:
         raise ValueError('Corrupt ID at header line {}.'.format(v.id))
-      if v.description is None:
+      if 'Description' not in v.record:
         raise ValueError(
             'Corrupt Description at header line {}.'.format(v.id))
-      # Type can only be Integer, Float, Flag, Character or String
-      if not v.type or v.record['Type'] not in HEADER_TYPES:
+      # Format type can only be Integer, Float, Character and String.
+      # Info type can also be Flag.
+      if 'Type' not in v.record or (v.record['Type'] not in COMMON_TYPES and
+                                    (is_format or v.record['Type'] != 'Flag')):
         raise ValueError('Corrupt Type at header line {}'.format(v.id))
       # Number can only be a number or one of 'A', 'R', 'G' and '.'.
-      if not v.record['Number'] or (
-          v.record['Number'] not in HEADER_NUMBERS and
-          not v.record['Number'].isdigit()):
-        raise ValueError('Unknown Number at header line {}.'.format(v.id))
+      if 'Number' not in v.record:
+        raise ValueError('No number for header line {}.'.format(v.id))
+      elif v.record['Number'] not in HEADER_NUMBERS:
+        try:
+          int(v.record['Number'])
+        except ValueError:
+          raise ValueError('Unknown Number at header line {}.'.format(v.id))
 
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
-  """A source for reading VCF file headers.
-
-  Parses VCF files.
-  """
+  """A source for reading VCF file headers."""
 
   def __init__(self,
                file_pattern,
                compression_type=CompressionTypes.AUTO,
-               validate=True,):
+               validate=True):
     # type: (str, str, bool) -> None
     super(VcfHeaderSource, self).__init__(file_pattern,
                                           compression_type=compression_type,
@@ -243,16 +259,23 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
     header = libcbcf.VariantHeader()
     lines = self._read_headers(file_path)
     sample_line = None
-    header.add_line('##fileformat=VCFv4.0')
+    read_file_format_line = False
     for line in lines:
+      if not read_file_format_line:
+        read_file_format_line = True
+        if line and not line.startswith(
+            FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+          header.add_line(FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
       if line.startswith('##'):
         header.add_line(line.strip())
       elif line.startswith('#'):
         sample_line = line
       elif line:
+        # If non-empty non-header line exists, #CHROM line has to be supplied.
         if not sample_line:
           raise ValueError('Header line is missing')
       else:
+        # If no records were found, use dummy #CHROM line for sample extraction.
         if not sample_line:
           sample_line = LAST_HEADER_LINE_PREFIX
 
@@ -275,6 +298,8 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
           yield record.strip()
         else:
           break
+      # Return one record line to verify that file has records. If no record
+      # lines were found, the last line would be empty.
       yield record.strip()
 
   def open_file(self, file_path):
@@ -286,10 +311,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
 
 
 class ReadVcfHeaders(PTransform):
-  """A PTransform for reading the header lines of VCF files.
-
-  Parses VCF files.
-  """
+  """A PTransform for reading the header lines of VCF files."""
 
   def __init__(
       self,
@@ -516,9 +538,9 @@ class WriteVcfHeaderFn(beam.DoFn):
     Raises:
       ValueError: if the number is not valid.
     """
-    if number is None:
-      return None
-    if number >= 0:
+    if number in HEADER_NUMBERS:
+      return number
+    if isinstance(number, int) and number >= 0:
       return str(number)
     else:
       raise ValueError('Invalid value for number: {}'.format(number))

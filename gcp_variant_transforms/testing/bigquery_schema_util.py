@@ -132,7 +132,7 @@ def get_sample_table_schema(with_annotation_fields=False):
                    'was specified.')))
   calls_record.fields.append(bigquery.TableFieldSchema(
       name='FB',
-      type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN,
+      type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='desc'))
   calls_record.fields.append(bigquery.TableFieldSchema(
