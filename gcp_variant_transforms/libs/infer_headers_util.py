@@ -20,11 +20,12 @@ import logging
 from typing import Any, Dict, List, Optional, Union  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.annotation import annotation_parser
 
-_FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+_FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 
 # Alias for the header key/type constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants

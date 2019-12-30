@@ -26,6 +26,7 @@ from apitools.base.protorpclite import messages  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_sanitizer
@@ -433,7 +434,7 @@ def _add_info_fields_from_alternate_bases(schema,
     else:
       infos.update({field.name: vcf_header_io.CreateInfoField(
           field.name,
-          vcfio.FIELD_COUNT_ALTERNATE_ALLELE,
+          vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
           bigquery_util.get_vcf_type_from_bigquery_type(field.type),
           _remove_special_characters(field.description))})
 

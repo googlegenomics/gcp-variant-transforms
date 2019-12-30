@@ -15,6 +15,7 @@
 """Class for resolving conflicts in VCF field definitions."""
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 
@@ -149,7 +150,7 @@ class FieldConflictResolver(object):
     """
     if vcf_num in (0, 1):
       return False
-    elif (vcf_num == 'A' and
+    elif (vcf_num == vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE and
           self._split_alternate_allele_info_fields):
       # info field with `Number=A` does not become a repeated field if flag
       # `split_alternate_allele_info_fields` is on.

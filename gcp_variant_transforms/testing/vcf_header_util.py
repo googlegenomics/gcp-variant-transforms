@@ -28,5 +28,6 @@ def make_header(header_num_dict):
   """
   infos = {}
   for k, v in header_num_dict.iteritems():
-    infos[k] = vcf_header_io.CreateInfoField(k, v, '.', '')
+    num_field_value = v if v in vcf_header_io.HEADER_SPECIAL_NUMBERS else int(v)
+    infos[k] = vcf_header_io.CreateInfoField(k, num_field_value, '.', '')
   return vcf_header_io.VcfHeader(infos=infos)

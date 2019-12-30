@@ -31,6 +31,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_sanitizer
@@ -38,7 +39,7 @@ from gcp_variant_transforms.libs import infer_headers_util
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
 
-_FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+_FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants

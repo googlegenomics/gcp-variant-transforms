@@ -36,8 +36,11 @@ from gcp_variant_transforms.beam_io import bgzf
 # failed in.
 MalformedVcfRecord = namedtuple('MalformedVcfRecord',
                                 ['file_name', 'line', 'error'])
-FIELD_COUNT_ALTERNATE_ALLELE = 'A'  # Indicates one value for each alternate
-                                    # allele.
+# Indicates one value for each alternate allele.
+FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+FIELD_COUNT_ALL_ALLELE = 'R'
+FIELD_COUNT_GENOTYPE = 'G'
+
 MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
 PASS_FILTER = 'PASS'  # Indicates that all filters have been passed.
 END_INFO_KEY = 'END'  # The info key that explicitly specifies end of a record.
@@ -47,9 +50,6 @@ DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
                               # no 'PS' is present.
 MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
-LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
-HEADER_INFO_TYPES = ['Integer', 'Float', 'Flag', 'Character', 'String', '.']
-HEADER_INFO_NUMBERS = ['A', 'R', 'G', '.']
 
 class Variant(object):
   """A class to store info about a genomic variant.

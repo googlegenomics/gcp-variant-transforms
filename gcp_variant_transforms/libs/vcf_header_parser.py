@@ -30,7 +30,14 @@ def get_vcf_headers(input_file):
   sample_line = None
   header.add_line('##fileformat=VCFv4.0\n')
   file_empty = True
+  read_file_format_line = False
   for line in lines:
+    if not read_file_format_line:
+      read_file_format_line = True
+      if line and not line.startswith(
+          vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+        header.add_line(vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(
+            VERSION='4.0'))
     if line.startswith('##'):
       header.add_line(line.strip())
       file_empty = False
@@ -38,11 +45,13 @@ def get_vcf_headers(input_file):
       sample_line = line.strip()
       file_empty = False
     elif line:
+      # If non-empty non-header line exists, #CHROM line has to be supplied.
       if not sample_line:
         raise ValueError('Header line is missing')
     else:
       if file_empty:
         raise ValueError('File is empty')
+      # If no records were found, use dummy #CHROM line for sample extraction.
       if not sample_line:
         sample_line = vcf_header_io.LAST_HEADER_LINE_PREFIX
 

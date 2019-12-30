@@ -32,10 +32,15 @@ from apache_beam.transforms import PTransform
 
 from gcp_variant_transforms.beam_io import bgzf
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_parser
 
 LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
-COMMON_TYPES = ['Integer', 'Float', 'Character', 'String', '.']
-HEADER_NUMBERS = ['A', 'R', 'G', '.']
+FORMAT_TYPES = ['Integer', 'Float', 'Character', 'String', '.']
+INFO_TYPES = FORMAT_TYPES + ['Flag']
+HEADER_SPECIAL_NUMBERS = [vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
+                          vcf_parser.FIELD_COUNT_ALL_ALLELE,
+                          vcf_parser.FIELD_COUNT_GENOTYPE,
+                          vcf_parser.MISSING_FIELD_VALUE]
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 
@@ -136,15 +141,18 @@ class VcfHeader(object):
                                                  self.alts,
                                                  self.formats,
                                                  self.contigs]])
-  def _get_infos(self, infos):
+  def _get_infos(self,
+                 infos):  # type: Dict[str, VariantHeaderMetadata]
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     self._verify_header(infos, is_format=False)
     results = collections.OrderedDict()
     for info_id, field in infos.items():
       result = collections.OrderedDict()
       result['id'] = info_id
       result['num'] = (
-          field.record['Number'] if field.record['Number'] in HEADER_NUMBERS
-          else int(field.record['Number']))
+          field.record['Number'] if
+          field.record['Number'] in HEADER_SPECIAL_NUMBERS else
+          int(field.record['Number']))
       result['type'] = field.record['Type']
       result['desc'] = field.record['Description'].strip("\"")
       # Pysam doesn't return these fields in info
@@ -157,7 +165,9 @@ class VcfHeader(object):
       results[info_id] = result
     return results
 
-  def _get_filters(self, filters):
+  def _get_filters(self,
+                   filters):  # type: Dict[str, VariantHeaderMetadata]
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for filter_id, field in filters.items():
       result = collections.OrderedDict()
@@ -169,7 +179,9 @@ class VcfHeader(object):
       del results['PASS']
     return results
 
-  def _get_alts(self, alts):
+  def _get_alts(self,
+                alts):  # type: Dict[str, VariantHeaderMetadata]
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for alt_id, field in alts.items():
       result = collections.OrderedDict()
@@ -178,21 +190,26 @@ class VcfHeader(object):
       results[alt_id] = result
     return results
 
-  def _get_formats(self, formats):
+  def _get_formats(self,
+                   formats):  # type: Dict[str, VariantHeaderMetadata]
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     self._verify_header(formats, is_format=True)
     results = collections.OrderedDict()
     for format_id, field in formats.items():
       result = collections.OrderedDict()
       result['id'] = format_id
       result['num'] = (
-          field.record['Number'] if field.record['Number'] in HEADER_NUMBERS
-          else int(field.record['Number']))
+          field.record['Number'] if
+          field.record['Number'] in HEADER_SPECIAL_NUMBERS else
+          int(field.record['Number']))
       result['type'] = field.record['Type']
       result['desc'] = field.record['Description'].strip("\"")
       results[format_id] = result
     return results
 
-  def _get_contigs(self, contigs):
+  def _get_contigs(self,
+                   contigs):  # type: Dict[str, VariantHeaderMetadata]
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for contig_id, field in contigs.items():
       result = collections.OrderedDict()
@@ -202,6 +219,7 @@ class VcfHeader(object):
     return results
 
   def _get_samples(self, sample_line):
+    # type: (str) -> List[str]
     sample_tags = sample_line.split('\t')
     # CHROM... line has 8 const fields. If samples are present, they are listed
     # after 9th field - FORMAT.
@@ -213,27 +231,28 @@ class VcfHeader(object):
 
   def _verify_header(self, fields, is_format):
     """Verifies the integrity of INFO and FORMAT fields"""
-    # type(Dict[str, VariantHeaderMetadata], bool) -> None
-    for k, v in fields.iteritems():
+    # type: (Dict[str, VariantHeaderMetadata], bool) -> None
+    for header_id, field in fields.iteritems():
       # ID, Description, Type and Number are mandatory fields.
-      if not k:
-        raise ValueError('Corrupt ID at header line {}.'.format(v.id))
-      if 'Description' not in v.record:
+      if not header_id:
+        raise ValueError('Corrupt ID at header line {}.'.format(field.id))
+      if 'Description' not in field.record:
         raise ValueError(
-            'Corrupt Description at header line {}.'.format(v.id))
+            'Corrupt Description at header line {}.'.format(field.id))
       # Format type can only be Integer, Float, Character and String.
       # Info type can also be Flag.
-      if 'Type' not in v.record or (v.record['Type'] not in COMMON_TYPES and
-                                    (is_format or v.record['Type'] != 'Flag')):
-        raise ValueError('Corrupt Type at header line {}'.format(v.id))
+      accepted_types = FORMAT_TYPES if is_format else INFO_TYPES
+      if ('Type' not in field.record or
+          (field.record['Type'] not in accepted_types)):
+        raise ValueError('Corrupt Type at header line {}'.format(field.id))
       # Number can only be a number or one of 'A', 'R', 'G' and '.'.
-      if 'Number' not in v.record:
-        raise ValueError('No number for header line {}.'.format(v.id))
-      elif v.record['Number'] not in HEADER_NUMBERS:
+      if 'Number' not in field.record:
+        raise ValueError('No number for header line {}.'.format(field.id))
+      elif field.record['Number'] not in HEADER_SPECIAL_NUMBERS:
         try:
-          int(v.record['Number'])
+          int(field.record['Number'])
         except ValueError:
-          raise ValueError('Unknown Number at header line {}.'.format(v.id))
+          raise ValueError('Unknown Number at header line {}.'.format(field.id))
 
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
@@ -257,7 +276,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
       ):
     # type: (...) -> Iterable[VcfHeader]
     header = libcbcf.VariantHeader()
-    lines = self._read_headers(file_path)
+    lines = self._read_headers_plus_one_record(file_path)
     sample_line = None
     read_file_format_line = False
     for line in lines:
@@ -287,7 +306,7 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                     samples=sample_line,
                     file_path=file_path)
 
-  def _read_headers(self, file_path):
+  def _read_headers_plus_one_record(self, file_path):
     with self.open_file(file_path) as file_to_read:
       record = None
       while True:
@@ -538,7 +557,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     Raises:
       ValueError: if the number is not valid.
     """
-    if number in HEADER_NUMBERS:
+    if number in HEADER_SPECIAL_NUMBERS:
       return number
     if isinstance(number, int) and number >= 0:
       return str(number)
