@@ -22,6 +22,12 @@ from __future__ import absolute_import
 import collections
 from typing import Optional  # pylint: disable=unused-import
 
+from gcp_variant_transforms.beam_io import vcf_parser
+
+FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
+FIELD_COUNT_ALL_ALLELE = vcf_parser.FIELD_COUNT_ALL_ALLELE
+FIELD_COUNT_GENOTYPE = vcf_parser.FIELD_COUNT_GENOTYPE
+
 _ReservedDefinition = collections.namedtuple('ReservedDefinition',
                                              ['id', 'num', 'type', 'desc'])
 
@@ -33,25 +39,26 @@ def _get_field_count(value):
 
 INFO_FIELDS = {
     'AA': _ReservedDefinition('AA', 1, 'String', 'Ancestral allele'),
-    'AC': _ReservedDefinition('AC', 'A', 'Integer',
+    'AC': _ReservedDefinition('AC', FIELD_COUNT_ALTERNATE_ALLELE, 'Integer',
                               'Allele count in genotypes, for each ALT allele, '
                               'in the same order as listed'),
-    'AD': _ReservedDefinition('AD', 'R', 'Integer',
+    'AD': _ReservedDefinition('AD', FIELD_COUNT_ALL_ALLELE, 'Integer',
                               'Total read depth for each allele'),
-    'ADF': _ReservedDefinition('ADF', 'R', 'Integer',
+    'ADF': _ReservedDefinition('ADF', FIELD_COUNT_ALL_ALLELE, 'Integer',
                                'Read depth for each allele on the forward '
                                'strand'),
-    'ADR': _ReservedDefinition('ADR', 'R', 'Integer',
+    'ADR': _ReservedDefinition('ADR', FIELD_COUNT_ALL_ALLELE, 'Integer',
                                'Read depth for each allele on the reverse '
                                'strand'),
-    'AF': _ReservedDefinition('AF', 'A', 'Float',
+    'AF': _ReservedDefinition('AF', FIELD_COUNT_ALTERNATE_ALLELE, 'Float',
                               'Allele frequency for each ALT allele in the '
                               'same order as listed (estimated from primary '
                               'data, not called genotypes'),
     'AN': _ReservedDefinition('AN', 1, 'Integer',
                               'Total number of alleles in called genotypes'),
     'BQ': _ReservedDefinition('BQ', 1, 'Float', 'RMS base quality'),
-    'CIGAR': _ReservedDefinition('CIGAR', 'A', 'String',
+    'CIGAR': _ReservedDefinition('CIGAR', FIELD_COUNT_ALTERNATE_ALLELE,
+                                 'String',
                                  'Cigar string describing how to align an '
                                  'alternate allele to the reference allele'),
     'DB': _ReservedDefinition('DB', 0, 'Flag', 'dbSNP membership'),
@@ -75,30 +82,30 @@ INFO_FIELDS = {
 }
 
 FORMAT_FIELDS = {
-    'AD': _ReservedDefinition('AD', _get_field_count('R'), 'Integer',
+    'AD': _ReservedDefinition('AD', FIELD_COUNT_ALL_ALLELE, 'Integer',
                               'Read depth for each allele'),
-    'ADF': _ReservedDefinition('ADF', _get_field_count('R'), 'Integer',
+    'ADF': _ReservedDefinition('ADF', FIELD_COUNT_ALL_ALLELE, 'Integer',
                                'Read depth for each allele on the forward '
                                'strand'),
-    'ADR': _ReservedDefinition('ADR', _get_field_count('R'), 'Integer',
+    'ADR': _ReservedDefinition('ADR', FIELD_COUNT_ALL_ALLELE, 'Integer',
                                'Read depth for each allele on the reverse '
                                'strand'),
     'DP': _ReservedDefinition('DP', 1, 'Integer', 'Read depth'),
-    'EC': _ReservedDefinition('EC', _get_field_count('A'), 'Integer',
+    'EC': _ReservedDefinition('EC', FIELD_COUNT_ALTERNATE_ALLELE, 'Integer',
                               'Expected alternate allele counts'),
     'FT': _ReservedDefinition('FT', 1, 'String',
                               'Filter indicating if this genotype was '
                               '''called'''),
-    'GL': _ReservedDefinition('GL', _get_field_count('G'), 'Float',
+    'GL': _ReservedDefinition('GL', FIELD_COUNT_GENOTYPE, 'Float',
                               'Genotype likelihoods'),
-    'GP': _ReservedDefinition('GP', _get_field_count('G'), 'Float',
+    'GP': _ReservedDefinition('GP', FIELD_COUNT_GENOTYPE, 'Float',
                               'Genotype posterior probabilities'),
     'GQ': _ReservedDefinition('GQ', 1, 'Integer',
                               'Conditional genotype quality'),
     'GT': _ReservedDefinition('GT', 1, 'String', 'Genotype'),
     'HQ': _ReservedDefinition('HQ', 2, 'Integer', 'Haplotype quality'),
     'MQ': _ReservedDefinition('MQ', 1, 'Integer', 'RMS mapping quality'),
-    'PL': _ReservedDefinition('PL', _get_field_count('G'), 'Integer',
+    'PL': _ReservedDefinition('PL', FIELD_COUNT_GENOTYPE, 'Integer',
                               'Phred-scaled genotype likelihoods rounded to '
                               'the closest integer'),
     'PQ': _ReservedDefinition('PQ', 1, 'Integer', 'Phasing quality'),

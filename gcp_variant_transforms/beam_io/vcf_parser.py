@@ -38,7 +38,9 @@ MalformedVcfRecord = namedtuple('MalformedVcfRecord',
                                 ['file_name', 'line', 'error'])
 # Indicates one value for each alternate allele.
 FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+# If the field has one value for each possible allele (including the reference).
 FIELD_COUNT_ALL_ALLELE = 'R'
+# If the field has one value for each possible genotype.
 FIELD_COUNT_GENOTYPE = 'G'
 
 MISSING_FIELD_VALUE = '.'  # Indicates field is missing in VCF record.
@@ -50,6 +52,8 @@ DEFAULT_PHASESET_VALUE = '*'  # Default phaseset value if call is phased, but
                               # no 'PS' is present.
 MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
+INFO_HEADER_TAG = '##INFO'
+LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
 
 class Variant(object):
   """A class to store info about a genomic variant.
@@ -325,11 +329,20 @@ class VcfParser(object):
       header_lines.insert(
           0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
 
+    # If last line is not present, add it to make sure PySam doesn't hang. This
+    # can only happen if the file has no records and was used as the hub for
+    # headers for other files - otherwise, the this would had been caught in
+    # vcf_header_io.py header checks.
+    if header_lines and not header_lines[-1].startswith(
+        LAST_HEADER_LINE_PREFIX):
+      header_lines.append(LAST_HEADER_LINE_PREFIX)
+
     parsed_header_lines = []
     for line in header_lines:
       # Number='G' is to be deprecated and is unsupported by PySam - replace
       # with 'unknown' number identifier if found.
-      parsed_line = line.strip().replace('Number=G', 'Number=.')
+      parsed_line = (line.strip().replace('Number=G', 'Number=.') if
+                     line.startswith(INFO_HEADER_TAG) else line)
       # Tests provide lines in unicode.
       if isinstance(parsed_line, str):
         parsed_line = parsed_line.decode('utf-8')
@@ -350,14 +363,12 @@ class VcfParser(object):
     record = self._get_variant(text_line)
     if isinstance(record, Variant):
       return record
-    elif isinstance(record, MalformedVcfRecord):
+    else:
       if self._allow_malformed_records:
         return record
       else:
         raise ValueError('VCF record read failed in %s for line %s: %s' %
                          (self._file_name, text_line, str(record.error)))
-    else:
-      raise ValueError('Unrecognized record type: %s.' % str(type(record)))
 
   def __iter__(self):
     return self
@@ -428,20 +439,20 @@ class PySamParser(VcfParser):
     os.waitpid(self._process_pid, 0)
     return
 
-  def _init_parent_process(self, pysam_read, variants_write):
-    into_pysam = os.fdopen(pysam_read)
+  def _init_parent_process(self, vcf_read, variants_write):
+    into_pysam = os.fdopen(vcf_read)
     self._to_child = os.fdopen(variants_write, 'w')
     self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
     self._original_info_list = self._vcf_reader.header.info.keys()
 
   def _init_child_process(
-      self, variants_read, pysam_write, header_lines, pre_infer_headers):
+      self, variants_read, vcf_write, header_lines, pre_infer_headers):
     # Child process' task is to populate data into the pipe that feeds
     # VariantFile class - first by populating all of the header lines, and then
     # by redirecting the data received from the second pipe.
 
     # Write Header Lines into PySam.
-    to_pysam_pipe = os.fdopen(pysam_write, 'w')
+    to_pysam_pipe = os.fdopen(vcf_write, 'w')
     if pre_infer_headers:
       to_pysam_pipe.write(header_lines[0] + '\n') # fileformat line
       to_pysam_pipe.write(header_lines[-1] + '\n') # `#CHROM...` line
@@ -463,14 +474,9 @@ class PySamParser(VcfParser):
     os._exit(0)
 
   def _init_with_header(self, header_lines):
-    # PySam requires a version header to be present, so add one if absent.
-    if header_lines and not header_lines[0].startswith(
-        FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
-      header_lines.insert(0, FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
-
     # Pysam pipe is responsible for supplying lines from child process into the
     # VariantFile, since it can only take an actual file descriptor as an input.
-    pysam_read, pysam_write = os.pipe()
+    vcf_read, vcf_write = os.pipe()
     # Since child process doesn't have access to the lines that need to be
     # parsed, variants pipe is needed to supply them from _get_variant() method
     # into the child process, to be propagated afterwards into the pysam pipe.
@@ -478,10 +484,10 @@ class PySamParser(VcfParser):
     pid = os.fork()
     if pid:
       self._process_pid = pid
-      self._init_parent_process(pysam_read, variants_write)
+      self._init_parent_process(vcf_read, variants_write)
     else:
       self._init_child_process(
-          variants_read, pysam_write, header_lines, self._pre_infer_headers)
+          variants_read, vcf_write, header_lines, self._pre_infer_headers)
 
   def _get_variant(self, data_line):
     try:
@@ -493,7 +499,7 @@ class PySamParser(VcfParser):
                       self._file_name, data_line, str(e))
       return MalformedVcfRecord(self._file_name, data_line, str(e))
 
-  def _verify_record(self, record):
+  def _verify_start_end(self, record):
     # For incorrectly supplied POS or END info fields (eg. String given
     # instead of int), PySam returns "-MAX_INT" value instead of raising an
     # error, which we need to catch ourselves.
@@ -515,7 +521,7 @@ class PySamParser(VcfParser):
     Raises:
       ValueError: if `record` is semantically invalid.
     """
-    self._verify_record(record)
+    self._verify_start_end(record)
     return Variant(
         reference_name=record.chrom.encode('utf-8'),
         start=record.start,
@@ -532,20 +538,29 @@ class PySamParser(VcfParser):
   def _get_variant_info(self, record):
     # type: (libcbcf.VariantRecord) -> Dict[str, Any]
     info = {}
-    for k, v in list(record.info.items()):
-      if isinstance(v, bool):
-        info[k] = v
-      elif v is None and k not in self._original_info_list:
-        info[k] = True
-      elif k != END_INFO_KEY:
-        if isinstance(v, tuple):
-          info[k] = self._homogenize_list_dtype(
-              map(self._convert_field, v, [True] * (len(v))))
+    for info_id, field in list(record.info.items()):
+      # End position is extracted from record.
+      if info_id == END_INFO_KEY:
+        continue
+
+      # Check if field is a flag:
+      # - If it's defined in the header, it always has value True.
+      # - If it's not defined in the header, it would be None.
+      #
+      # Note that if type was mismatched (eg. string provided for an int field),
+      # the field would also be None, so header presence needs to be verified.
+      if isinstance(field, bool) or (field is None and
+                                     info_id not in self._original_info_list):
+        info[info_id] = True
+      else:
+        if isinstance(field, tuple):
+          info[info_id] = self._homogenize_list_dtype(
+              map(self._convert_field, field, [True] * (len(field))))
         else:
           # If a field was not provided in the header, make it a list.
-          info[k] = (
-              self._convert_field(v, True) if k in self._original_info_list else
-              [self._convert_field(v, True)])
+          info[info_id] = (self._convert_field(field, True) if
+                           info_id in self._original_info_list else
+                           [self._convert_field(field, True)])
 
     return info
 

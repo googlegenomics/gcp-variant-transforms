@@ -34,7 +34,7 @@ from gcp_variant_transforms.beam_io import bgzf
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_parser
 
-LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
+LAST_HEADER_LINE_PREFIX = vcf_parser.LAST_HEADER_LINE_PREFIX
 FORMAT_TYPES = ['Integer', 'Float', 'Character', 'String', '.']
 INFO_TYPES = FORMAT_TYPES + ['Flag']
 HEADER_SPECIAL_NUMBERS = [vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
@@ -239,8 +239,6 @@ class VcfHeader(object):
       if 'Description' not in field.record:
         raise ValueError(
             'Corrupt Description at header line {}.'.format(field.id))
-      # Format type can only be Integer, Float, Character and String.
-      # Info type can also be Flag.
       accepted_types = FORMAT_TYPES if is_format else INFO_TYPES
       if ('Type' not in field.record or
           (field.record['Type'] not in accepted_types)):
