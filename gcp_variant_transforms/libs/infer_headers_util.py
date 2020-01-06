@@ -30,6 +30,7 @@ _FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 # Alias for the header key/type constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
 _HeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+_PysamHeaderKeyConstants = vcf_header_io.PysamHeaderKeyConstants
 
 # Filled with annotation field and name data, then used as a header ID.
 _BASE_ANNOTATION_TYPE_KEY = '{}_{}_TYPE'
@@ -107,36 +108,40 @@ def infer_format_fields(
     the field values.
   """
   formats = {}
+  if defined_headers and defined_headers.formats:
+    for format_key, format_value in defined_headers.formats.items():
+      formats[format_key] = vcf_header_io.CreateFormatField(
+          format_key,
+          format_value[_HeaderKeyConstants.NUM],
+          format_value[_HeaderKeyConstants.TYPE],
+          format_value[_HeaderKeyConstants.DESC],
+      )
+  updated_formats = {}
   for call in variant.calls:
     for format_key, format_value in call.info.iteritems():
-      if not defined_headers or format_key not in defined_headers.formats:
-        if format_key in formats:
-          raise ValueError(
-              'Duplicate FORMAT field "{}" in variant "{}"'.format(
-                  format_key, variant))
+      if format_key not in formats:
         logging.warning('Undefined FORMAT field "%s" in variant "%s"',
                         format_key, str(variant))
         formats[format_key] = vcf_header_io.CreateFormatField(
             format_key,
             _get_field_count(format_value),
             _get_field_type(format_value))
-    # No point in proceeding. All other calls have the same FORMAT.
-    break
-  for call in variant.calls:
-    for format_key, format_value in call.info.iteritems():
-      if defined_headers and format_key in defined_headers.formats:
-        defined_header = defined_headers.formats.get(format_key)
+        updated_formats[format_key] = formats[format_key]
+      else:
+        defined_header = formats[format_key]
         corrected_format = _infer_mismatched_format_field(
             format_key, format_value, defined_header)
         if corrected_format:
           logging.warning(
-              'Incorrect FORMAT field "%s". Defined as "type=%s,num=%s", '
+              'Adjusting FORMAT field "%s". Defined as "type=%s,num=%s", '
               'got "%s" in variant "%s"',
-              format_key, defined_header.get(_HeaderKeyConstants.TYPE),
-              str(defined_header.get(_HeaderKeyConstants.NUM)),
+              format_key, defined_header.record[_PysamHeaderKeyConstants.TYPE],
+              str(defined_header.record[_PysamHeaderKeyConstants.NUM]),
               str(format_value), str(variant))
           formats[format_key] = corrected_format
-  return formats
+          updated_formats[format_key] = formats[format_key]
+
+  return updated_formats
 
 def _get_field_count(field_value):
   # type: (Union[List, bool, int, str]) -> Optional[int]
@@ -161,7 +166,6 @@ def _get_field_type(field_value):
   if isinstance(field_value, list):
     return (_get_field_type(field_value[0]) if field_value else
             vcf_header_io.VcfHeaderFieldTypeConstants.STRING)
-
   if isinstance(field_value, bool):
     return vcf_header_io.VcfHeaderFieldTypeConstants.FLAG
   elif isinstance(field_value, int):
@@ -178,7 +182,7 @@ def _get_field_type(field_value):
 def _can_cast_to(value, cast_type):
   """Returns true if `value` can be casted to type `type`"""
   try:
-    _ = cast_type(value)
+    _ = cast_type(str(value))
     return True
   except (ValueError, TypeError):
     return False
@@ -187,21 +191,68 @@ def _get_corrected_type(defined_type, value):
   # type: (str, Any) -> str
   """Returns the corrected type according to `defined_type` and `value`.
 
-  It handles one special case , i.e., the defined type is `Integer`, but the
-  provided value is float. In this case, correct the type to be `Float`.
+  For lists we recurisively find types for the underlying elements and pick a
+  "smallest common denominator" type.
 
-  Note that if `value` is a float instance but with an integer value
-  (e.g. 2.0), the type will stay the same as `defined_type`.
+  If the expected type is integer, we make sure that the value is either int,
+  float that could be converted to int or string that could be converted int.
+
+  Similarly, if the expected type is float we verify that the value is either
+  float or a str representation of float number (note that if value is int,
+  preffered type will remain float).
+
+  For the expected type of Flag we verify that the value is bool.
+
+  If the field is absent, it can be of any type, so we keep the expected type.
+
+  Finally, if encountered a non-numeric str, or two types cannot be used stored
+  together (ie. flag and int), we return String type.
   """
+  if isinstance(value, list):
+    corrected_type = defined_type
+    for item in value:
+      corrected_type = _get_corrected_type(corrected_type, item)
+    return corrected_type
+
+  if value is None:
+    return defined_type
+  if defined_type == _HeaderTypeConstants.FLAG and isinstance(value, bool):
+    return defined_type
   if defined_type == _HeaderTypeConstants.INTEGER:
-    if isinstance(value, float) and not value.is_integer():
+    if isinstance(value, int):
+      return defined_type
+    if isinstance(value, float):
+      if value.is_integer():
+        return _HeaderTypeConstants.INTEGER
       return _HeaderTypeConstants.FLOAT
-    if isinstance(value, list):
-      for item in value:
-        corrected_type = _get_corrected_type(defined_type, item)
-        if corrected_type != defined_type:
-          return corrected_type
-  return defined_type
+    if isinstance(value, str):
+      if _can_str_be_int(value):
+        return defined_type
+      if _can_str_be_float(value):
+        return _HeaderTypeConstants.FLOAT
+  if defined_type == _HeaderTypeConstants.FLOAT and (
+      isinstance(value, (int, float)) or
+      (isinstance(value, str) and _can_str_be_float(value))):
+    return _HeaderTypeConstants.FLOAT
+  return _HeaderTypeConstants.STRING
+
+def _can_str_be_int(value):
+  if value is None:
+    return True
+  try:
+    _ = int(value)
+    return True
+  except ValueError:
+    return False
+
+def _can_str_be_float(value):
+  if value is None:
+    return True
+  try:
+    _ = float(value)
+    return True
+  except ValueError:
+    return False
 
 def _infer_mismatched_info_field(field_key,  # type: str
                                  field_value,  # type: Any
@@ -262,13 +313,13 @@ def _infer_mismatched_format_field(field_key, field_value, defined_header):
     Corrected format definition if there are mismatches.
   """
   corrected_type = _get_corrected_type(
-      defined_header.get(_HeaderKeyConstants.TYPE), field_value)
-  if corrected_type != defined_header.get(_HeaderKeyConstants.TYPE):
+      defined_header.record[_PysamHeaderKeyConstants.TYPE], field_value)
+  if corrected_type != defined_header.record[_PysamHeaderKeyConstants.TYPE]:
     return vcf_header_io.CreateFormatField(
         field_key,
-        defined_header.get(_HeaderKeyConstants.NUM),
+        defined_header.record[_PysamHeaderKeyConstants.NUM],
         corrected_type,
-        defined_header.get(_HeaderKeyConstants.DESC))
+        defined_header.record[_PysamHeaderKeyConstants.DESC])
   return None
 
 def _infer_non_annotation_info_fields(

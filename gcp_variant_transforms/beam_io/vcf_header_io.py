@@ -63,30 +63,42 @@ class VcfParserHeaderKeyConstants(object):
   VERSION = 'version'
   LENGTH = 'length'
 
+
+class PysamHeaderKeyConstants(object):
+  """Constants for header fields from the parser."""
+  NUM = 'Number'
+  TYPE = 'Type'
+  DESC = 'Description'
+  SOURCE = 'Source'
+  VERSION = 'Version'
+
 def CreateInfoField(info_id,
                     number,
                     info_type,
                     description='',
                     source=None,
                     version=None):
-  """Creates mock PySam INFO object."""
   # type: (str, Any, str, str, str, str) -> VariantHeaderMetadata
+  """Creates mock PySam INFO object."""
   return VariantHeaderMetadataMock(
       info_id,
       {
-          'Type': info_type,
-          'Number': str(number),
-          'Description': description,
-          'Source': None if source is None else str(source),
-          'Version': None if version is None else str(version)
+          PysamHeaderKeyConstants.TYPE: info_type,
+          PysamHeaderKeyConstants.NUM: str(number),
+          PysamHeaderKeyConstants.DESC: description,
+          PysamHeaderKeyConstants.SOURCE: None if source is None
+                                          else str(source),
+          PysamHeaderKeyConstants.VERSION: None if version is None
+                                           else str(version)
       })
 
 def CreateFormatField(info_id, number, info_type, description=''):
-  """Creates mock PySam FORMAT object."""
   # type: (str, Any, str, str) -> VariantHeaderMetadata
-  return VariantHeaderMetadataMock(info_id, {'Number': str(number),
-                                             'Type': info_type,
-                                             'Description': description})
+  """Creates mock PySam FORMAT object."""
+  return VariantHeaderMetadataMock(info_id,
+                                   {PysamHeaderKeyConstants.NUM: str(number),
+                                    PysamHeaderKeyConstants.TYPE: info_type,
+                                    PysamHeaderKeyConstants.DESC: description})
 
 # Mock of PySam VariantHeaderMetadata field
 VariantHeaderMetadataMock = collections.namedtuple(
@@ -142,37 +154,44 @@ class VcfHeader(object):
                                                  self.formats,
                                                  self.contigs]])
   def _get_infos(self,
-                 infos):  # type: Dict[str, VariantHeaderMetadata]
+                 infos  # type: Dict[str, VariantHeaderMetadata]
+                ):
     # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     self._verify_header(infos, is_format=False)
     results = collections.OrderedDict()
     for info_id, field in infos.items():
       result = collections.OrderedDict()
-      result['id'] = info_id
-      result['num'] = (
-          field.record['Number'] if
-          field.record['Number'] in HEADER_SPECIAL_NUMBERS else
-          int(field.record['Number']))
-      result['type'] = field.record['Type']
-      result['desc'] = field.record['Description'].strip("\"")
+      result[VcfParserHeaderKeyConstants.ID] = info_id
+      result[VcfParserHeaderKeyConstants.NUM] = (
+          field.record[PysamHeaderKeyConstants.NUM] if
+          field.record[PysamHeaderKeyConstants.NUM] in HEADER_SPECIAL_NUMBERS
+          else int(field.record[PysamHeaderKeyConstants.NUM]))
+      result[VcfParserHeaderKeyConstants.TYPE] = (
+          field.record[PysamHeaderKeyConstants.TYPE])
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
       # Pysam doesn't return these fields in info
-      result['source'] = (field.record['Source'].strip("\"")
-                          if 'Source' in field.record and
-                          field.record['Source'] is not None else None)
-      result['version'] = (field.record['Version'].strip("\"")
-                           if 'Version' in field.record and
-                           field.record['Version'] is not None else None)
+      result[VcfParserHeaderKeyConstants.SOURCE] = (
+          field.record[PysamHeaderKeyConstants.SOURCE].strip("\"")
+          if PysamHeaderKeyConstants.SOURCE in field.record and
+          field.record[PysamHeaderKeyConstants.SOURCE] is not None else None)
+      result[VcfParserHeaderKeyConstants.VERSION] = (
+          field.record[PysamHeaderKeyConstants.VERSION].strip("\"")
+          if PysamHeaderKeyConstants.VERSION in field.record and
+          field.record[PysamHeaderKeyConstants.VERSION] is not None else None)
       results[info_id] = result
     return results
 
   def _get_filters(self,
-                   filters):  # type: Dict[str, VariantHeaderMetadata]
+                   filters  # type: Dict[str, VariantHeaderMetadata]
+                  ):
     # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for filter_id, field in filters.items():
       result = collections.OrderedDict()
-      result['id'] = filter_id
-      result['desc'] = field.record['Description'].strip("\"")
+      result[VcfParserHeaderKeyConstants.ID] = filter_id
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
       results[filter_id] = result
     # PySAM adds default PASS value to its filters
     if 'PASS' in results:
@@ -180,41 +199,47 @@ class VcfHeader(object):
     return results
 
   def _get_alts(self,
-                alts):  # type: Dict[str, VariantHeaderMetadata]
+                alts  # type: Dict[str, VariantHeaderMetadata]
+               ):
     # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for alt_id, field in alts.items():
       result = collections.OrderedDict()
-      result['id'] = alt_id
-      result['desc'] = field['Description'].strip("\"")
+      result[VcfParserHeaderKeyConstants.ID] = alt_id
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field[PysamHeaderKeyConstants.DESC].strip("\""))
       results[alt_id] = result
     return results
 
   def _get_formats(self,
-                   formats):  # type: Dict[str, VariantHeaderMetadata]
+                   formats  # type: Dict[str, VariantHeaderMetadata]
+                  ):
     # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     self._verify_header(formats, is_format=True)
     results = collections.OrderedDict()
     for format_id, field in formats.items():
       result = collections.OrderedDict()
-      result['id'] = format_id
-      result['num'] = (
-          field.record['Number'] if
-          field.record['Number'] in HEADER_SPECIAL_NUMBERS else
-          int(field.record['Number']))
-      result['type'] = field.record['Type']
-      result['desc'] = field.record['Description'].strip("\"")
+      result[VcfParserHeaderKeyConstants.ID] = format_id
+      result[VcfParserHeaderKeyConstants.NUM] = (
+          field.record[PysamHeaderKeyConstants.NUM] if
+          field.record[PysamHeaderKeyConstants.NUM] in HEADER_SPECIAL_NUMBERS
+          else int(field.record[PysamHeaderKeyConstants.NUM]))
+      result[VcfParserHeaderKeyConstants.TYPE] = (
+          field.record[PysamHeaderKeyConstants.TYPE])
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
       results[format_id] = result
     return results
 
   def _get_contigs(self,
-                   contigs):  # type: Dict[str, VariantHeaderMetadata]
+                   contigs  # type: Dict[str, VariantHeaderMetadata]
+                  ):
     # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
     results = collections.OrderedDict()
     for contig_id, field in contigs.items():
       result = collections.OrderedDict()
-      result['id'] = contig_id
-      result['length'] = field.length
+      result[VcfParserHeaderKeyConstants.ID] = contig_id
+      result[VcfParserHeaderKeyConstants.LENGTH] = field.length
       results[contig_id] = result
     return results
 
@@ -230,8 +255,8 @@ class VcfHeader(object):
       return []
 
   def _verify_header(self, fields, is_format):
-    """Verifies the integrity of INFO and FORMAT fields"""
     # type: (Dict[str, VariantHeaderMetadata], bool) -> None
+    """Verifies the integrity of INFO and FORMAT fields"""
     for header_id, field in fields.iteritems():
       # ID, Description, Type and Number are mandatory fields.
       if not header_id:
@@ -240,15 +265,16 @@ class VcfHeader(object):
         raise ValueError(
             'Corrupt Description at header line {}.'.format(field.id))
       accepted_types = FORMAT_TYPES if is_format else INFO_TYPES
-      if ('Type' not in field.record or
-          (field.record['Type'] not in accepted_types)):
+      if (PysamHeaderKeyConstants.TYPE not in field.record or
+          (field.record[PysamHeaderKeyConstants.TYPE] not in accepted_types)):
         raise ValueError('Corrupt Type at header line {}'.format(field.id))
       # Number can only be a number or one of 'A', 'R', 'G' and '.'.
-      if 'Number' not in field.record:
+      if PysamHeaderKeyConstants.NUM not in field.record:
         raise ValueError('No number for header line {}.'.format(field.id))
-      elif field.record['Number'] not in HEADER_SPECIAL_NUMBERS:
+      elif (field.record[PysamHeaderKeyConstants.NUM] not in
+            HEADER_SPECIAL_NUMBERS):
         try:
-          int(field.record['Number'])
+          int(field.record[PysamHeaderKeyConstants.NUM])
         except ValueError:
           raise ValueError('Unknown Number at header line {}.'.format(field.id))
 

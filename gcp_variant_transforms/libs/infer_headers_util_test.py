@@ -198,15 +198,9 @@ class InferHeaderUtilTest(unittest.TestCase):
 
   def test_infer_mismatched_format_field(self):
     variant = self._get_sample_variant_format_fi_float_value()
-    formats = OrderedDict([
-        ('FS', createFormat('FS', 1, 'String', 'desc')),
-        ('FI', createFormat('FI', 2, 'Integer', 'desc')),
-        ('FU', createFormat('FU', '.', 'Float', 'desc')),
-        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
     corrected_format = infer_headers_util._infer_mismatched_format_field(
         'FI', variant.calls[0].info.get('FI'),
-        vcf_header_io.VcfHeader(formats=formats).formats.get('FI'))
+        createFormat('FI', 2, 'Integer', 'desc'))
     expected_formats = createFormat('FI', 2, 'Float', 'desc')
     self.assertEqual(expected_formats, corrected_format)
 
@@ -218,6 +212,7 @@ class InferHeaderUtilTest(unittest.TestCase):
         ('FU', createFormat('FU', '.', 'Float', 'desc')),
         ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
         ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
+
     header = infer_headers_util.infer_format_fields(
         variant, vcf_header_io.VcfHeader(formats=formats))
     self.assertEqual({}, header)

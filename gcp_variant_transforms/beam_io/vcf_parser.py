@@ -342,7 +342,7 @@ class VcfParser(object):
       # Number='G' is to be deprecated and is unsupported by PySam - replace
       # with 'unknown' number identifier if found.
       parsed_line = (line.strip().replace('Number=G', 'Number=.') if
-                     line.startswith(INFO_HEADER_TAG) else line)
+                     line.startswith(INFO_HEADER_TAG) else line.strip())
       # Tests provide lines in unicode.
       if isinstance(parsed_line, str):
         parsed_line = parsed_line.decode('utf-8')
@@ -439,55 +439,57 @@ class PySamParser(VcfParser):
     os.waitpid(self._process_pid, 0)
     return
 
-  def _init_parent_process(self, vcf_read, variants_write):
-    into_pysam = os.fdopen(vcf_read)
-    self._to_child = os.fdopen(variants_write, 'w')
-    self._vcf_reader = libcbcf.VariantFile(into_pysam, 'r')
+  def _init_parent_process(self, return_pipe_read, send_pipe_write):
+    from_child = os.fdopen(return_pipe_read)
+    self._to_child = os.fdopen(send_pipe_write, 'w')
+    self._vcf_reader = libcbcf.VariantFile(from_child, 'r')
     self._original_info_list = self._vcf_reader.header.info.keys()
 
   def _init_child_process(
-      self, variants_read, vcf_write, header_lines, pre_infer_headers):
+      self, send_pipe_read, return_pipe_write, header_lines, pre_infer_headers):
     # Child process' task is to populate data into the pipe that feeds
     # VariantFile class - first by populating all of the header lines, and then
     # by redirecting the data received from the second pipe.
 
     # Write Header Lines into PySam.
-    to_pysam_pipe = os.fdopen(vcf_write, 'w')
+    to_parent = os.fdopen(return_pipe_write, 'w')
     if pre_infer_headers:
-      to_pysam_pipe.write(header_lines[0] + '\n') # fileformat line
-      to_pysam_pipe.write(header_lines[-1] + '\n') # `#CHROM...` line
+      to_parent.write(header_lines[0] + '\n') # fileformat line
+      to_parent.write(header_lines[-1] + '\n') # `#CHROM...` line
     else:
-      to_pysam_pipe.write('\n'.join(header_lines) + '\n')
-    to_pysam_pipe.flush()
-
+      to_parent.write('\n'.join(header_lines) + '\n')
+    to_parent.flush()
     # Forward variants from _get_variant to PySam.
-    from_variants_pipe = os.fdopen(variants_read)
+    from_parent = os.fdopen(send_pipe_read)
     while True:
-      text_line = from_variants_pipe.readline()
+      text_line = from_parent.readline()
       if not text_line or text_line == '\n':
         break
-      to_pysam_pipe.write(text_line)
-      to_pysam_pipe.flush()
+      to_parent.write(text_line)
+      to_parent.flush()
 
-    from_variants_pipe.close()
-    to_pysam_pipe.close()
+    from_parent.close()
+    to_parent.close()
     os._exit(0)
 
   def _init_with_header(self, header_lines):
-    # Pysam pipe is responsible for supplying lines from child process into the
-    # VariantFile, since it can only take an actual file descriptor as an input.
-    vcf_read, vcf_write = os.pipe()
+    # Following pipe is responsible for supplying lines from child process to
+    # the parent process, which will be fed into PySam object through an actual
+    # file descriptor.
+    return_pipe_read, return_pipe_write = os.pipe()
     # Since child process doesn't have access to the lines that need to be
-    # parsed, variants pipe is needed to supply them from _get_variant() method
-    # into the child process, to be propagated afterwards into the pysam pipe.
-    variants_read, variants_write = os.pipe()
+    # parsed, following pipe is needed to supply them from _get_variant() method
+    # into the child process, to be propagated back into the return pipe.
+    send_pipe_read, send_pipe_write = os.pipe()
     pid = os.fork()
     if pid:
       self._process_pid = pid
-      self._init_parent_process(vcf_read, variants_write)
+      self._init_parent_process(return_pipe_read, send_pipe_write)
     else:
-      self._init_child_process(
-          variants_read, vcf_write, header_lines, self._pre_infer_headers)
+      self._init_child_process(send_pipe_read,
+                               return_pipe_write,
+                               header_lines,
+                               self._pre_infer_headers)
 
   def _get_variant(self, data_line):
     try:
@@ -526,14 +528,22 @@ class PySamParser(VcfParser):
         reference_name=record.chrom.encode('utf-8'),
         start=record.start,
         end=record.stop,
-        reference_bases=self._convert_field(record.ref, True),
+        reference_bases=self._convert_field(record.ref),
         alternate_bases=list(record.alts) if record.alts else [],
         names=record.id.split(';') if record.id else [],
-        quality=self._parse_to_numeric(record.qual) if record.qual else None,
+        quality=self._convert_qual(record.qual),
         filters=(None if not list(record.filter.keys()) else
                  list(record.filter.keys())),
         info=self._get_variant_info(record),
         calls=self._get_variant_calls(record.samples))
+
+  def _convert_qual(self, qual):
+    if not qual:
+      return None
+    if qual.is_integer():
+      return int(qual)
+    else:
+      return self._parse_float(qual)
 
   def _get_variant_info(self, record):
     # type: (libcbcf.VariantRecord) -> Dict[str, Any]
@@ -554,46 +564,33 @@ class PySamParser(VcfParser):
         info[info_id] = True
       else:
         if isinstance(field, tuple):
-          info[info_id] = self._homogenize_list_dtype(
-              map(self._convert_field, field, [True] * (len(field))))
+          info[info_id] = list(map(self._convert_field, field))
         else:
           # If a field was not provided in the header, make it a list.
-          info[info_id] = (self._convert_field(field, True) if
-                           info_id in self._original_info_list else
-                           [self._convert_field(field, True)])
-
+          info[info_id] = (self._convert_field(field) if
+                           info_id in self._original_info_list
+                           else [self._convert_field(field)])
     return info
-
-  def _parse_to_numeric(self, value):
-    # type: (Any) -> Any
-    # Attempt to parse a value to int, then float or return as string.
-    try:
-      return int(str(value))
-    except ValueError:
-      try:
-        # Resolve the floating point discrepancy.
-        return self._parse_float(float(value))
-      except ValueError:
-        # non float
-        return value
 
   def _parse_float(self, value):
     # type: (Any) -> Any
+    return float("{:0g}".format(value))
 
-    precise_value = float("{:0g}".format(value))
-    if precise_value.is_integer():
-      return int(precise_value)
-    return precise_value
-
-  def _convert_field(self, value, is_numeric):
+  def _convert_field(self, value, is_phaseset=False):
     # type: (Any) -> Any
     # PySam currently doesn't recognize '.' value for String fields as missing.
     if value == '.' or value == b'.' or value is None:
       return None
-    # some times PySam returns unicode strings, encode them as strings instead.
+    if is_phaseset:
+      return str(value)
+    if isinstance(value, int):
+      return value
+    if isinstance(value, float):
+      return self._parse_float(value)
+    # Sometimes PySam returns unicode strings, encode them as strings instead.
     elif isinstance(value, unicode):
       value = value.encode('utf-8')
-    return self._parse_to_numeric(value) if is_numeric else str(value)
+    return str(value)
 
   def _get_variant_calls(self, samples):
     # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
@@ -614,14 +611,13 @@ class PySamParser(VcfParser):
 
         elif key == PHASESET_FORMAT_KEY:
           phaseset = (
-              list(map(self._convert_field, value, [False] * (len(value)))) if
+              list(map(self._convert_field, value, [True] * len(value))) if
               isinstance(value, tuple) else
-              self._convert_field(value, False))
+              self._convert_field(value, True))
         else:
-          info[key] = (self._homogenize_list_dtype(
-              map(self._convert_field, value, [True] * (len(value)))) if
-                       isinstance(value, tuple) else
-                       self._convert_field(value, True))
+          info[key] = (list(map(self._convert_field, value))
+                       if isinstance(value, tuple) else
+                       self._convert_field(value))
 
       # PySam samples are "phased" for haploids, so check for for the type
       # before settings default phaseset value.
@@ -630,16 +626,3 @@ class PySamParser(VcfParser):
       calls.append(VariantCall(name, genotype, phaseset, info))
 
     return calls
-
-  def _homogenize_list_dtype(self, data):
-    # Due to BQ requirements, make sure that elements in repeated fields are of
-    # the same type.
-    none_type = type(None)
-    if all(isinstance(elem, (int, none_type)) for elem in data):
-      cast_type = int
-    elif all(isinstance(elem, (int, float, none_type)) for elem in data):
-      cast_type = float
-    else:
-      cast_type = str
-
-    return [None if elem is None else cast_type(elem) for elem in data]
