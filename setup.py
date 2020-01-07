@@ -44,7 +44,8 @@ REQUIRED_PACKAGES = [
     'mmh3<2.6',
     # Refer to issue #528
     'google-cloud-storage<1.23.0',
-    'pyfarmhash'
+    'pyfarmhash',
+    'pyyaml'
 ]
 
 REQUIRED_SETUP_PACKAGES = [
