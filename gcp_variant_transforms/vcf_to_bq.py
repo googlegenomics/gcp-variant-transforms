@@ -390,7 +390,7 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 def _create_sample_info_table(pipeline,  # type: beam.Pipeline
                               pipeline_mode,  # type: PipelineModes
                               known_args,  # type: argparse.Namespace,
-                              pipeline_args,  # type: List[str]
+                              temp_directory, # str
                              ):
   # type: (...) -> None
   headers = pipeline_common.read_headers(
@@ -410,6 +410,8 @@ def run(argv=None):
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
+  if known_args.output_table and '--temp_location' not in pipeline_args:
+    raise ValueError('--temp_location is required for BigQuery imports.')
   if known_args.auto_flags_experiment:
     _get_input_dimensions(known_args, pipeline_args)
 
@@ -483,9 +485,10 @@ def run(argv=None):
       file_to_write.write(schema_json)
 
     for i in range(num_shards):
-      table_suffix = sharding.get_output_table_suffix(i)
-      table_name = sample_info_table_schema_generator.compose_table_name(
-          known_args.output_table, table_suffix)
+      table_suffix = ''
+      if sharding and sharding.get_shard_name(i):
+        table_suffix = '_' + sharding.get_shard_name(i)
+      table_name = known_args.output_table + table_suffix
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
@@ -498,7 +501,7 @@ def run(argv=None):
                    known_args.null_numeric_value_replacement)))
       if known_args.generate_sample_info_table:
         _create_sample_info_table(
-            pipeline, pipeline_mode, known_args, pipeline_args)
+            pipeline, pipeline_mode, known_args)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and
