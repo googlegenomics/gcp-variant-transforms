@@ -73,7 +73,9 @@ def parse_args(argv, command_line_options):
   known_args, pipeline_args = parser.parse_known_args(argv)
   for transform_options in options:
     transform_options.validate(known_args)
-  _raise_error_on_invalid_flags(pipeline_args)
+  _raise_error_on_invalid_flags(
+      pipeline_args,
+      known_args.output_table if hasattr(known_args, 'output_table') else None)
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
@@ -304,8 +306,8 @@ def write_headers(merged_header, file_path):
        vcf_header_io.WriteVcfHeaders(file_path))
 
 
-def _raise_error_on_invalid_flags(pipeline_args):
-  # type: (List[str]) -> None
+def _raise_error_on_invalid_flags(pipeline_args, output_table):
+  # type: (List[str], Any) -> None
   """Raises an error if there are unrecognized flags."""
   parser = argparse.ArgumentParser()
   for cls in pipeline_options.PipelineOptions.__subclasses__():
@@ -318,6 +320,14 @@ def _raise_error_on_invalid_flags(pipeline_args):
       not known_pipeline_args.setup_file):
     raise ValueError('The --setup_file flag is required for DataflowRunner. '
                      'Please provide a path to the setup.py file.')
+  if output_table:
+    if (not hasattr(known_pipeline_args, 'temp_location') or
+        not known_pipeline_args.temp_location):
+      raise ValueError('--temp_location is required for BigQuery imports.')
+    if not known_pipeline_args.temp_location.startswith('gs://'):
+      raise ValueError(
+          '--temp_location must be valid GCS location for BigQuery imports')
+
 
 
 def is_pipeline_direct_runner(pipeline):

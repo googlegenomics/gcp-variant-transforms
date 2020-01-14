@@ -94,21 +94,31 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
                      'gcp-variant-transforms-test',
                      '--staging_location',
                      'gs://integration_test_runs/staging']
-    pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+    pipeline_common._raise_error_on_invalid_flags(pipeline_args, None)
 
     # Add Dataflow runner (requires --setup_file).
     pipeline_args.extend(['--runner', 'DataflowRunner'])
     with self.assertRaisesRegexp(ValueError, 'setup_file'):
-      pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args, None)
 
     # Add setup.py (required for Variant Transforms run). This is now valid.
     pipeline_args.extend(['--setup_file', 'setup.py'])
-    pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+    pipeline_common._raise_error_on_invalid_flags(pipeline_args, None)
+
+    with self.assertRaisesRegexp(ValueError, '--temp_location is required*'):
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args, 'output')
+
+    pipeline_args.extend(['--temp_location', 'wrong_gcs'])
+    with self.assertRaisesRegexp(ValueError, '--temp_location must be valid*'):
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args, 'output')
+
+    pipeline_args = pipeline_args[:-1] + ['gs://valid_bucket/temp']
+    pipeline_common._raise_error_on_invalid_flags(pipeline_args, 'output')
 
     # Add an unknown flag.
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
     with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
-      pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args, 'output')
 
   def test_get_compression_type(self):
     vcf_metadata_list = [filesystem.FileMetadata(path, size) for

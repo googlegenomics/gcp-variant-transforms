@@ -185,7 +185,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--num_bigquery_write_shards',
         type=int, default=1,
-        help=('This flag is deprecated and may be removed in future releases.'))
+        help=('This flag is deprecated and will be removed in future '
+              'releases.'))
     parser.add_argument(
         '--null_numeric_value_replacement',
         type=int,

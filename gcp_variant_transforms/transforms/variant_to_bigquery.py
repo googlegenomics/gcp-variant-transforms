@@ -119,5 +119,4 @@ class VariantToBigQuery(beam.PTransform):
                     beam.io.BigQueryDisposition.WRITE_APPEND
                     if self._append
                     else beam.io.BigQueryDisposition.WRITE_TRUNCATE),
-                method=beam.io.WriteToBigQuery.Method.FILE_LOADS,
-                custom_gcs_temp_location=self._temp_location))
+                method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
