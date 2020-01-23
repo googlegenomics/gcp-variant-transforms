@@ -28,12 +28,10 @@ class ConvertSampleInfoToRow(beam.DoFn):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
     for sample in vcf_header.samples:
       if samples_span_multiple_files:
-        sample_id = hashing_util.generate_unsigned_hash_code(
-            [sample], max_hash_value=pow(2, 63))
+        sample_id = hashing_util.generate_sample_id(sample)
       else:
-        sample_id = hashing_util.generate_unsigned_hash_code(
-            [vcf_header.file_path, sample], max_hash_value=pow(2, 63))
-
+        sample_id = hashing_util.generate_sample_id(sample,
+                                                    vcf_header.file_path)
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
