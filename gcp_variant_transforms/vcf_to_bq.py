@@ -389,7 +389,7 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 
 def _create_sample_info_table(pipeline,  # type: beam.Pipeline
                               pipeline_mode,  # type: PipelineModes
-                              known_args,  # type: argparse.Namespace,
+                              known_args  # type: argparse.Namespace
                              ):
   # type: (...) -> None
   headers = pipeline_common.read_headers(

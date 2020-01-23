@@ -63,8 +63,7 @@ class VariantToBigQuery(beam.PTransform):
       update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      null_numeric_value_replacement=None  # type: int,
-
+      null_numeric_value_replacement=None  # type: int
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -115,8 +114,5 @@ class VariantToBigQuery(beam.PTransform):
                 schema=self._schema,
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_APPEND
-                    if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE),
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
                 method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
