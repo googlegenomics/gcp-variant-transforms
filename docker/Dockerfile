@@ -19,7 +19,7 @@ FROM golang:1.11
 
 RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
 
-FROM google/cloud-sdk:slim
+FROM google/cloud-sdk:276.0.0-slim
 
 COPY --from=0 /go/bin/pipelines /usr/bin
 
@@ -52,7 +52,7 @@ RUN python -m pip install --upgrade pip && \
     virtualenv /opt/gcp_variant_transforms/venv && \
     . /opt/gcp_variant_transforms/venv/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    python -m pip install --upgrade --no-binary pyvcf .
+    python -m pip install --upgrade .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \

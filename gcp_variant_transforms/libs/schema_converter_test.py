@@ -23,10 +23,10 @@ import unittest
 import avro
 from apache_beam.io.gcp.internal.clients import bigquery
 
-from vcf import parser
-from vcf.parser import field_counts
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateFormatField as createFormat
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import processed_variant
@@ -34,9 +34,6 @@ from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 from gcp_variant_transforms.testing import bigquery_schema_util
-
-Format = parser._Format
-Info = parser._Info
 
 
 class _DummyVariantMergeStrategy(variant_merge_strategy.VariantMergeStrategy):
@@ -97,15 +94,15 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 
   def test_info_header_fields(self):
     infos = OrderedDict([
-        ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
-        ('I2', Info('I2', 2, 'Integer', 'desc', 'src', 'v')),
-        ('IA', Info('IA', field_counts['A'], 'Float', 'desc', 'src', 'v')),
-        ('IU', Info('IU', field_counts['.'], 'Character', 'desc', 'src', 'v')),
-        ('IG', Info('IG', field_counts['G'], 'String', 'desc', 'src', 'v')),
-        ('I0', Info('I0', 0, 'Flag', 'desc', 'src', 'v')),
-        ('IA2', Info('IA2', field_counts['A'], 'Float', 'desc', 'src', 'v')),
+        ('I1', createInfo('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('I2', createInfo('I2', 2, 'Integer', 'desc', 'src', 'v')),
+        ('IA', createInfo('IA', 'A', 'Float', 'desc', 'src', 'v')),
+        ('IU', createInfo('IU', '.', 'Character', 'desc', 'src', 'v')),
+        ('IG', createInfo('IG', 'G', 'String', 'desc', 'src', 'v')),
+        ('I0', createInfo('I0', 0, 'Flag', 'desc', 'src', 'v')),
+        ('IA2', createInfo('IA2', 'A', 'Float', 'desc', 'src', 'v')),
         ('END',  # END should not be included in the generated schema.
-         Info('END', 1, 'Integer', 'Special END key', 'src', 'v'))])
+         createInfo('END', 1, 'Integer', 'Special END key', 'src', 'v'))])
     header_fields = vcf_header_io.VcfHeader(infos=infos)
 
     self._validate_schema(
@@ -150,16 +147,16 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 
   def test_info_and_format_header_fields(self):
     infos = OrderedDict([
-        ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
-        ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+        ('I1', createInfo('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('IA', createInfo('IA', 'A', 'Integer', 'desc', 'src', 'v'))])
     # GT and PS should not be set as they're already included in special
     # 'genotype' and 'phaseset' fields.
     formats = OrderedDict([
-        ('F1', Format('F1', 1, 'String', 'desc')),
-        ('F2', Format('F2', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+        ('F1', createFormat('F1', 1, 'String', 'desc')),
+        ('F2', createFormat('F2', 2, 'Integer', 'desc')),
+        ('FU', createFormat('FU', '.', 'Float', 'desc')),
+        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
     header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._validate_schema(
         self._generate_expected_fields(
@@ -172,15 +169,15 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 
   def test_bigquery_field_name_sanitize(self):
     infos = OrderedDict([
-        ('_', Info('_', 1, 'String', 'desc', 'src', 'v')),
-        ('_A', Info('_A', 1, 'String', 'desc', 'src', 'v')),
-        ('0a', Info('0a', 1, 'String', 'desc', 'src', 'v')),
-        ('A-B*C', Info('A-B*C', 1, 'String', 'desc', 'src', 'v')),
-        ('I-A', Info('I-A', field_counts['A'], 'Float', 'desc', 'src', 'v')),
-        ('OK_info_09', Format('OK_info_09', 1, 'String', 'desc'))])
+        ('_', createInfo('_', 1, 'String', 'desc', 'src', 'v')),
+        ('_A', createInfo('_A', 1, 'String', 'desc', 'src', 'v')),
+        ('0a', createInfo('0a', 1, 'String', 'desc', 'src', 'v')),
+        ('A-B*C', createInfo('A-B*C', 1, 'String', 'desc', 'src', 'v')),
+        ('I-A', createInfo('I-A', 'A', 'Float', 'desc', 'src', 'v')),
+        ('OK_info_09', createInfo('OK_info_09', 1, 'String', 'desc'))])
     formats = OrderedDict([
-        ('a^b', Format('a^b', 1, 'String', 'desc')),
-        ('OK_format_09', Format('OK_format_09', 1, 'String', 'desc'))])
+        ('a^b', createFormat('a^b', 1, 'String', 'desc')),
+        ('OK_format_09', createFormat('OK_format_09', 1, 'String', 'desc'))])
     header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._validate_schema(
         self._generate_expected_fields(
@@ -194,9 +191,9 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
 
   def test_variant_merger_modify_schema(self):
     infos = OrderedDict([
-        ('I1', Info('I1', 1, 'String', 'desc', 'src', 'v')),
-        ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
-    formats = OrderedDict([('F1', Format('F1', 1, 'String', 'desc'))])
+        ('I1', createInfo('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('IA', createInfo('IA', 'A', 'Integer', 'desc', 'src', 'v'))])
+    formats = OrderedDict([('F1', createFormat('F1', 1, 'String', 'desc'))])
     header_fields = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self._validate_schema(
         self._generate_expected_fields(
@@ -246,8 +243,8 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema_converter._add_info_fields(
         alternate_bases_record_with_desc, infos_with_desc)
     expected_infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'bigquery desc',
-                    None, None))])
+        ('AF', createInfo('AF', 'A', 'Float', 'bigquery desc',
+                          None, None))])
     self.assertEqual(infos_with_desc, expected_infos)
 
     alternate_bases_record_no_desc = bigquery.TableFieldSchema(
@@ -264,10 +261,11 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema_converter._add_info_fields(
         alternate_bases_record_no_desc, infos_no_desc)
     expected_infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float',
-                    'Allele frequency for each ALT allele in the same order '
-                    'as listed (estimated from primary data, not called '
-                    'genotypes', None, None))])
+        ('AF', createInfo(
+            'AF', 'A', 'Float',
+            'Allele frequency for each ALT allele in the same order '
+            'as listed (estimated from primary data, not called genotypes',
+            None, None))])
     self.assertEqual(infos_no_desc, expected_infos)
 
   def test_add_info_fields_from_alternate_bases_schema_compatibility(self):
@@ -291,7 +289,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         infos_allow_incompatible_schema,
         allow_incompatible_schema=True)
     expected_infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Integer', 'desc', None, None))])
+        ('AF', createInfo('AF', 'A', 'Integer', 'desc', None, None))])
     self.assertEqual(infos_allow_incompatible_schema, expected_infos)
 
   def test_add_info_fields_from_alternate_bases_non_reserved_field(self):
@@ -309,8 +307,8 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema_converter._add_info_fields(
         alternate_bases_record, infos)
     expected_infos = OrderedDict([
-        ('non_reserved', Info('non_reserved', field_counts['A'], 'Float',
-                              'bigquery desc', None, None))])
+        ('non_reserved', createInfo('non_reserved', 'A', 'Float',
+                                    'bigquery desc', None, None))])
     self.assertEqual(infos, expected_infos)
 
   def test_add_info_fields_reserved_field(self):
@@ -322,7 +320,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     infos = OrderedDict()
     schema_converter._add_info_fields(field_with_desc, infos)
     expected_infos = OrderedDict([
-        ('AA', Info('AA', 1, 'String', 'bigquery desc', None, None))])
+        ('AA', createInfo('AA', 1, 'String', 'bigquery desc', None, None))])
     self.assertEqual(infos, expected_infos)
 
     field_without_desc = bigquery.TableFieldSchema(
@@ -333,7 +331,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     infos = OrderedDict()
     schema_converter._add_info_fields(field_without_desc, infos)
     expected_infos = OrderedDict([
-        ('AA', Info('AA', 1, 'String', 'Ancestral allele', None, None))])
+        ('AA', createInfo('AA', 1, 'String', 'Ancestral allele', None, None))])
     self.assertEqual(infos, expected_infos)
 
   def test_add_info_fields_reserved_field_schema_compatibility(self):
@@ -361,7 +359,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         info_allow_incompatible_schema,
         allow_incompatible_schema=True)
     expected_infos = OrderedDict([
-        ('AA', Info('AA', field_counts['.'], 'String', 'desc', None, None))])
+        ('AA', createInfo('AA', '.', 'String', 'desc', None, None))])
     self.assertEqual(info_allow_incompatible_schema, expected_infos)
 
   def test_add_info_fields_non_reserved_field(self):
@@ -373,8 +371,8 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     infos = OrderedDict()
     schema_converter._add_info_fields(non_reserved_field, infos)
     expected_infos = OrderedDict([
-        ('non_reserved_info', Info('non_reserved_info', 1, 'String', '',
-                                   None, None))])
+        ('non_reserved_info', createInfo('non_reserved_info', 1, 'String', '',
+                                         None, None))])
     self.assertEqual(infos, expected_infos)
 
   def test_add_format_fields_reserved_field(self):
@@ -392,7 +390,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema_converter._add_format_fields(calls_record_with_desc,
                                         formats)
     expected_formats = OrderedDict([
-        ('GQ', Format('GQ', 1, 'Integer', 'bigquery desc'))])
+        ('GQ', createFormat('GQ', 1, 'Integer', 'bigquery desc'))])
     self.assertEqual(formats, expected_formats)
 
     calls_record_without_desc = bigquery.TableFieldSchema(
@@ -409,7 +407,8 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     schema_converter._add_format_fields(calls_record_without_desc,
                                         formats)
     expected_formats = OrderedDict([
-        ('GQ', Format('GQ', 1, 'Integer', 'Conditional genotype quality'))])
+        ('GQ', createFormat(
+            'GQ', 1, 'Integer', 'Conditional genotype quality'))])
     self.assertEqual(formats, expected_formats)
 
   def test_add_format_fields_reserved_field_schema_compatibility(self):
@@ -435,7 +434,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         formats_allow_incompatible_schema,
         allow_incompatible_schema=True)
     expected_formats = OrderedDict([
-        ('GQ', Format('GQ', 1, 'String', 'desc'))])
+        ('GQ', createFormat('GQ', 1, 'String', 'desc'))])
     self.assertEqual(formats_allow_incompatible_schema, expected_formats)
 
   def test_add_format_fields_non_reserved_field(self):
@@ -452,8 +451,8 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     formats = OrderedDict()
     schema_converter._add_format_fields(calls_record, formats)
     expected_formats = OrderedDict([
-        ('non_reserved_format', Format('non_reserved_format', 1, 'Integer',
-                                       'bigquery desc'))])
+        ('non_reserved_format',
+         createFormat('non_reserved_format', 1, 'Integer', 'bigquery desc'))])
     self.assertEqual(formats, expected_formats)
 
   def test_generate_header_fields_from_schema(self):
@@ -462,14 +461,13 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         sample_schema)
 
     infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'desc', None, None)),
-        ('AA', Info('AA', 1, 'String', 'desc', None, None)),
-        ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
-        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
+        ('AF', createInfo('AF', 'A', 'Float', 'desc', None, None)),
+        ('AA', createInfo('AA', 1, 'String', 'desc', None, None)),
+        ('IFR', createInfo('IFR', '.', 'Float', 'desc', None, None)),
+        ('IS', createInfo('IS', 1, 'String', 'desc', None, None))])
     formats = OrderedDict([
-        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
-        ('GQ', parser._Format('GQ', 1, 'Integer',
-                              'desc'))])
+        ('FB', createFormat('FB', 1, 'String', 'desc')),
+        ('GQ', createFormat('GQ', 1, 'Integer', 'desc'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
 
@@ -480,16 +478,16 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         sample_schema)
 
     infos = OrderedDict([
-        ('AF', Info('AF', field_counts['A'], 'Float', 'desc', None, None)),
-        ('CSQ', Info('CSQ', field_counts['.'], 'String',
-                     'desc Format: Consequence|IMPACT', None, None)),
-        ('AA', Info('AA', 1, 'String', 'desc', None, None)),
-        ('IFR', Info('IFR', field_counts['.'], 'Float', 'desc', None, None)),
-        ('IS', Info('IS', 1, 'String', 'desc', None, None))])
+        ('AF', createInfo('AF', 'A', 'Float', 'desc', None, None)),
+        ('CSQ', createInfo('CSQ', '.', 'String',
+                           'desc Format: Consequence|IMPACT', None, None)),
+        ('AA', createInfo('AA', 1, 'String', 'desc', None, None)),
+        ('IFR', createInfo('IFR', '.', 'Float', 'desc', None, None)),
+        ('IS', createInfo('IS', 1, 'String', 'desc', None, None))])
     formats = OrderedDict([
-        ('FB', parser._Format('FB', 0, 'Flag', 'desc')),
-        ('GQ', parser._Format('GQ', 1, 'Integer',
-                              'desc'))])
+        ('FB', createFormat('FB', 1, 'String', 'desc')),
+        ('GQ', createFormat('GQ', 1, 'Integer',
+                            'desc'))])
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
 
@@ -516,7 +514,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     header = schema_converter.generate_header_fields_from_schema(
         schema_non_reserved_fields)
     infos = OrderedDict([
-        ('field', Info('field', 1, 'String', 'desc', None, None))])
+        ('field', createInfo('field', 1, 'String', 'desc', None, None))])
     formats = OrderedDict()
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
@@ -529,7 +527,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
     header = schema_converter.generate_header_fields_from_schema(
         schema_reserved_fields)
     infos = OrderedDict([
-        ('AA', Info('AA', 1, 'String', 'desc', None, None))])
+        ('AA', createInfo('AA', 1, 'String', 'desc', None, None))])
     formats = OrderedDict()
     expected_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
     self.assertEqual(header, expected_header)
@@ -549,7 +547,7 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         schema_conflict,
         allow_incompatible_schema=True)
     infos = OrderedDict([
-        ('AA', Info('AA', 1, 'Integer', 'desc', None, None))])
+        ('AA', createInfo('AA', 1, 'Integer', 'desc', None, None))])
     expected_header = vcf_header_io.VcfHeader(infos=infos,
                                               formats=OrderedDict())
     self.assertEqual(header, expected_header)
@@ -565,9 +563,9 @@ class GenerateHeaderFieldsFromSchemaTest(unittest.TestCase):
         schema)
 
     infos = OrderedDict([
-        ('invalid_description', Info('invalid_description', 1, 'String',
-                                     'Desc This is added intentionally.',
-                                     None, None))])
+        ('invalid_description', createInfo(
+            'invalid_description', 1, 'String',
+            'Desc This is added intentionally.', None, None))])
     expected_header = vcf_header_io.VcfHeader(infos=infos,
                                               formats=OrderedDict())
     self.assertEqual(header, expected_header)
@@ -578,12 +576,12 @@ class VcfHeaderAndSchemaConverterCombinationTest(unittest.TestCase):
 
   def test_vcf_header_to_schema_to_vcf_header(self):
     infos = OrderedDict([
-        ('I1', Info('I1', field_counts['.'], 'String', 'desc', None, None)),
-        ('IA', Info('IA', field_counts['.'], 'Integer', 'desc', None, None))])
+        ('I1', createInfo('I1', '.', 'String', 'desc', None, None)),
+        ('IA', createInfo('IA', '.', 'Integer', 'desc', None, None))])
     formats = OrderedDict([
-        ('F1', Format('F1', field_counts['.'], 'String', 'desc')),
-        ('F2', Format('F2', field_counts['.'], 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc'))])
+        ('F1', createFormat('F1', '.', 'String', 'desc')),
+        ('F2', createFormat('F2', '.', 'Integer', 'desc')),
+        ('FU', createFormat('FU', '.', 'Float', 'desc'))])
     original_header = vcf_header_io.VcfHeader(infos=infos, formats=formats)
 
     schema = schema_converter.generate_schema_from_header_fields(

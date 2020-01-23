@@ -16,7 +16,7 @@
 
 from collections import OrderedDict
 import unittest
-import vcf
+from pysam import libcbcf
 
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
@@ -47,14 +47,16 @@ FILE_2_LINES = [
 class MergeHeadersTest(unittest.TestCase):
   """Test cases for GetMergeHeaders `PTransform`."""
 
-  def _get_header_from_reader(self, reader):
-    """Extracts values from a pyVCF reader into a VcfHeader object."""
-    return vcf_header_io.VcfHeader(
-        infos=reader.infos,
-        filters=reader.filters,
-        alts=reader.alts,
-        formats=reader.formats,
-        contigs=reader.contigs)
+  def _get_header_from_lines(self, lines):
+    """Extracts header from lines."""
+    header = libcbcf.VariantHeader()
+    for line in lines[:-1]:
+      header.add_line(line)
+    return vcf_header_io.VcfHeader(infos=header.info,
+                                   filters=header.filters,
+                                   alts=header.alts,
+                                   formats=header.formats,
+                                   contigs=header.contigs)
 
   def _get_combiner_fn(self, split_alternate_allele_info_fields=True):
     resolver = vcf_field_conflict_resolver.FieldConflictResolver(
@@ -64,8 +66,7 @@ class MergeHeadersTest(unittest.TestCase):
     return combiner_fn
 
   def test_combine_single_header(self):
-    vcf_reader = vcf.Reader(fsock=iter(FILE_1_LINES))
-    headers = self._get_header_from_reader(vcf_reader)
+    headers = self._get_header_from_lines(FILE_1_LINES)
     combiner_fn = self._get_combiner_fn()
 
     merged_headers = combiner_fn.create_accumulator()
@@ -76,10 +77,8 @@ class MergeHeadersTest(unittest.TestCase):
     self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ'])
 
   def test_combine_multiple_headers_as_inputs(self):
-    vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))
-    vcf_reader_2 = vcf.Reader(fsock=iter(FILE_2_LINES))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(FILE_1_LINES)
+    headers_2 = self._get_header_from_lines(FILE_2_LINES)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -92,10 +91,8 @@ class MergeHeadersTest(unittest.TestCase):
     self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ', 'GQ2'])
 
   def test_combine_multiple_headers_as_accumulators(self):
-    vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))
-    vcf_reader_2 = vcf.Reader(fsock=iter(FILE_2_LINES))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(FILE_1_LINES)
+    headers_2 = self._get_header_from_lines(FILE_2_LINES)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -122,10 +119,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -150,8 +145,7 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n']
 
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    headers = self._get_header_from_reader(vcf_reader)
+    headers = self._get_header_from_lines(lines)
     headers.infos['NS']['type'] = None
 
     combiner_fn = self._get_combiner_fn()
@@ -180,10 +174,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -213,10 +205,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=3,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -249,10 +239,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn(
         split_alternate_allele_info_fields=False)
@@ -287,11 +275,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=.,Type=Integer,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
-
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -312,10 +297,8 @@ class MergeHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Float,Description="Number samples">\n',
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n']
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(lines_1)
+    headers_2 = self._get_header_from_lines(lines_2)
 
     combiner_fn = self._get_combiner_fn()
 
@@ -327,10 +310,8 @@ class MergeHeadersTest(unittest.TestCase):
 
 
   def test_combine_pipeline(self):
-    vcf_reader_1 = vcf.Reader(fsock=iter(FILE_1_LINES))
-    vcf_reader_2 = vcf.Reader(fsock=iter(FILE_2_LINES))
-    headers_1 = self._get_header_from_reader(vcf_reader_1)
-    headers_2 = self._get_header_from_reader(vcf_reader_2)
+    headers_1 = self._get_header_from_lines(FILE_1_LINES)
+    headers_2 = self._get_header_from_lines(FILE_2_LINES)
 
     # TODO(nmousavi): Either use TestPipeline or combiner_fn.* everywhere.
     # After moving out _HeaderMerger to its file, it makes sense to use

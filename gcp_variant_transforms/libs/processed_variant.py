@@ -31,6 +31,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import bigquery_sanitizer
@@ -38,7 +39,7 @@ from gcp_variant_transforms.libs import infer_headers_util
 from gcp_variant_transforms.libs.annotation import annotation_parser
 from gcp_variant_transforms.libs.annotation.vep import descriptions
 
-_FIELD_COUNT_ALTERNATE_ALLELE = 'A'
+_FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 
 # An alias for the header key constants to make referencing easier.
 _HeaderKeyConstants = vcf_header_io.VcfParserHeaderKeyConstants
@@ -310,7 +311,6 @@ class ProcessedVariantFactory(object):
               mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
               description=_BigQuerySchemaSanitizer.get_sanitized_string(
                   field[_HeaderKeyConstants.DESC])))
-
     for annot_field in self._annotation_field_set:
       if annot_field not in self._header_fields.infos:
         raise ValueError('Annotation field {} not found'.format(annot_field))
@@ -388,12 +388,8 @@ class ProcessedVariantFactory(object):
             [_HeaderKeyConstants.NUM]))
 
   def _is_num_a(self, field_value):
-    # Checks for both PyVCF and PySAM values for Number='A'.
-    return (
-        field_value in vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION and
-        vcf_header_io.VCF_HEADER_INFO_NUM_FIELD_CONVERSION[field_value] ==
-        _FIELD_COUNT_ALTERNATE_ALLELE)
-
+    # Checks for PySAM values for Number='A'.
+    return field_value == _FIELD_COUNT_ALTERNATE_ALLELE
 
 
 class _AnnotationProcessor(object):

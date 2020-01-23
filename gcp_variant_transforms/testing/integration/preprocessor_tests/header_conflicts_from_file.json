@@ -8,8 +8,8 @@
     "expected_contents": [
       "Header Conflicts",
       "ID\tCategory\tConflicts\tFile Paths\tProposed Resolution",
-      "AF\tINFO\tnum=None type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf\tnum=None type=Float",
-      " \t \tnum=-1 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf\t ",
+      "AF\tINFO\tnum=. type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf\tnum=. type=Float",
+      " \t \tnum=A type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf\t ",
       "",
       "No Inferred Headers Found.",
       "",

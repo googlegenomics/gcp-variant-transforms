@@ -15,7 +15,7 @@
 """Test cases for merge_header_definitions module."""
 
 import unittest
-import vcf
+from pysam import libcbcf
 
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
@@ -29,12 +29,15 @@ from gcp_variant_transforms.libs.vcf_header_definitions_merger import VcfHeaderD
 
 class MergeHeadersTest(unittest.TestCase):
 
-  def _get_vcf_header_from_reader(self, reader, file_path):
-    return vcf_header_io.VcfHeader(infos=reader.infos,
-                                   filters=reader.filters,
-                                   alts=reader.alts,
-                                   formats=reader.formats,
-                                   contigs=reader.contigs,
+  def _get_header_from_lines(self, lines, file_path):
+    header = libcbcf.VariantHeader()
+    for line in lines[:-1]:
+      header.add_line(line)
+    return vcf_header_io.VcfHeader(infos=header.info,
+                                   filters=header.filters,
+                                   alts=header.alts,
+                                   formats=header.formats,
+                                   contigs=header.contigs,
                                    file_path=file_path)
 
   def test_merge_header_definitions_one_header(self):
@@ -43,8 +46,7 @@ class MergeHeadersTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample1 Sample2\n'
     ]
 
-    vcf_reader = vcf.Reader(fsock=iter(lines))
-    headers = self._get_vcf_header_from_reader(vcf_reader, 'file1')
+    headers = self._get_header_from_lines(lines, 'file1')
     pipeline = TestPipeline()
     merged_definitions = (
         pipeline
@@ -66,10 +68,8 @@ class MergeHeadersTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_vcf_header_from_reader(vcf_reader_1, 'file1')
-    headers_2 = self._get_vcf_header_from_reader(vcf_reader_2, 'file2')
+    headers_1 = self._get_header_from_lines(lines_1, 'file1')
+    headers_2 = self._get_header_from_lines(lines_2, 'file2')
     pipeline = TestPipeline()
     merged_definitions = (
         pipeline
@@ -92,10 +92,8 @@ class MergeHeadersTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_vcf_header_from_reader(vcf_reader_1, 'file1')
-    headers_2 = self._get_vcf_header_from_reader(vcf_reader_2, 'file2')
+    headers_1 = self._get_header_from_lines(lines_1, 'file1')
+    headers_2 = self._get_header_from_lines(lines_2, 'file2')
     pipeline = TestPipeline()
     merged_definitions = (
         pipeline
@@ -118,10 +116,8 @@ class MergeHeadersTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
-    headers_1 = self._get_vcf_header_from_reader(vcf_reader_1, 'file1')
-    headers_2 = self._get_vcf_header_from_reader(vcf_reader_2, 'file2')
+    headers_1 = self._get_header_from_lines(lines_1, 'file1')
+    headers_2 = self._get_header_from_lines(lines_2, 'file2')
     pipeline = TestPipeline()
     merged_definitions = (
         pipeline
@@ -145,13 +141,11 @@ class MergeHeadersTest(unittest.TestCase):
         '#CHROM  POS ID  REF ALT QUAL  FILTER  INFO  FORMAT  Sample3\n'
     ]
 
-    vcf_reader_1 = vcf.Reader(fsock=iter(lines_1))
-    vcf_reader_2 = vcf.Reader(fsock=iter(lines_2))
     file_names = ['file1', 'file2', 'file3', 'file4', 'file5', 'file6']
     headers = []
     for file_name in file_names:
-      headers.append(self._get_vcf_header_from_reader(vcf_reader_1, file_name))
-    headers.append(self._get_vcf_header_from_reader(vcf_reader_2, 'file7'))
+      headers.append(self._get_header_from_lines(lines_1, file_name))
+    headers.append(self._get_header_from_lines(lines_2, 'file7'))
 
     pipeline = TestPipeline()
     merged_definitions = (

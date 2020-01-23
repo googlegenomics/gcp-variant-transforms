@@ -21,7 +21,6 @@ from __future__ import absolute_import
 
 from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
-import enum
 
 import apache_beam as beam
 from apache_beam.coders import coders
@@ -39,7 +38,6 @@ from gcp_variant_transforms.beam_io import vcf_parser
 # All other modules depend on vcfio for the following const values.
 # In order to keep the current setting we re-declared them here.
 MalformedVcfRecord = vcf_parser.MalformedVcfRecord
-FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
 PASS_FILTER = vcf_parser.PASS_FILTER
 END_INFO_KEY = vcf_parser.END_INFO_KEY
@@ -49,13 +47,6 @@ DEFAULT_PHASESET_VALUE = vcf_parser.DEFAULT_PHASESET_VALUE
 MISSING_GENOTYPE_VALUE = vcf_parser.MISSING_GENOTYPE_VALUE
 Variant = vcf_parser.Variant
 VariantCall = vcf_parser.VariantCall
-
-
-class VcfParserType(enum.Enum):
-  """An Enum specifying the parser used for reading VCF files."""
-  PYVCF = 0
-  NUCLEUS = 1
-  PYSAM = 2
 
 
 class _ToVcfRecordCoder(coders.Coder):
@@ -183,7 +174,7 @@ class _ToVcfRecordCoder(coders.Coder):
 class _VcfSource(filebasedsource.FileBasedSource):
   """A source for reading VCF files.
 
-  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  Parses VCF files (version 4) using PySam library. If file_pattern specifies
   multiple files, then the header from each file is used separately to parse
   the content. However, the output will be a uniform PCollection of
   :class:`Variant` objects.
@@ -198,7 +189,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
                validate=True,  # type: bool
                allow_malformed_records=False,  # type: bool
-               vcf_parser_type=VcfParserType.PYVCF  # type: int
+               pre_infer_headers=False,  # type: bool
               ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -208,30 +199,21 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
-    self._vcf_parser_type = vcf_parser_type
+    self._pre_infer_headers = pre_infer_headers
 
   def read_records(self,
                    file_name,  # type: str
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    vcf_parser_class = None
-    if self._vcf_parser_type == VcfParserType.PYVCF:
-      vcf_parser_class = vcf_parser.PyVcfParser
-    elif self._vcf_parser_type == VcfParserType.NUCLEUS:
-      vcf_parser_class = vcf_parser.NucleusParser
-    elif self._vcf_parser_type == VcfParserType.PYSAM:
-      vcf_parser_class = vcf_parser.PySamParser
-    else:
-      raise ValueError(
-          'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
-    record_iterator = vcf_parser_class(
+    record_iterator = vcf_parser.PySamParser(
         file_name,
         range_tracker,
         self._compression_type,
         self._allow_malformed_records,
         file_pattern=self._pattern,
         representative_header_lines=self._representative_header_lines,
+        pre_infer_headers=self._pre_infer_headers,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -247,7 +229,7 @@ class ReadFromBGZF(beam.PTransform):
                input_files,
                representative_header_lines,
                allow_malformed_records,
-               vcf_parser_type=VcfParserType.PYVCF):
+               pre_infer_headers):
     # type: (List[str], List[str], bool) -> None
     """Initializes the transform.
 
@@ -261,25 +243,19 @@ class ReadFromBGZF(beam.PTransform):
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
-    self._vcf_parser_class = None
-    if vcf_parser_type == VcfParserType.PYVCF:
-      self._vcf_parser_class = vcf_parser.PyVcfParser
-    elif vcf_parser_type == VcfParserType.PYSAM:
-      self._vcf_parser_class = vcf_parser.PySamParser
-    else:
-      raise ValueError(
-          'Unrecognized vcf_parser_type: %s.' % str(vcf_parser_type))
+    self._pre_infer_headers = pre_infer_headers
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
-    record_iterator = self._vcf_parser_class(
+    record_iterator = vcf_parser.PySamParser(
         file_path,
         block,
         filesystems.CompressionTypes.GZIP,
         self._allow_malformed_records,
         representative_header_lines=self._representative_header_lines,
-        splittable_bgzf=True)
+        splittable_bgzf=True,
+        pre_infer_headers=self._pre_infer_headers)
 
     for record in record_iterator:
       yield record
@@ -296,7 +272,7 @@ class ReadFromVcf(PTransform):
   """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading VCF
   files.
 
-  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  Parses VCF files (version 4) using PySam library. If file_pattern specifies
   multiple files, then the header from each file is used separately to parse
   the content. However, the output will be a PCollection of
   :class:`Variant` (or :class:`MalformedVcfRecord for failed reads) objects.
@@ -309,7 +285,7 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type=VcfParserType.PYVCF,  # type: int
+      pre_infer_headers=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -328,13 +304,14 @@ class ReadFromVcf(PTransform):
         time.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
+
     self._source = _VcfSource(
         file_pattern,
         representative_header_lines,
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=vcf_parser_type)
+        pre_infer_headers=pre_infer_headers)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -342,12 +319,12 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None, vcf_parser_type=VcfParserType.PYVCF):
+    allow_malformed_records=None, pre_infer_headers=False):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
-                    vcf_parser_type=vcf_parser_type)
+                    pre_infer_headers=pre_infer_headers)
 
 
 class ReadAllFromVcf(PTransform):
@@ -370,7 +347,7 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type=VcfParserType.PYVCF,  # type: int
+      pre_infer_headers=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -396,7 +373,7 @@ class ReadAllFromVcf(PTransform):
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=vcf_parser_type)
+        pre_infer_headers=pre_infer_headers)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

@@ -188,8 +188,7 @@ def get_estimates(pipeline, pipeline_mode, all_patterns):
 def read_headers(
     pipeline,  #type: beam.Pipeline
     pipeline_mode,  #type: int
-    all_patterns,  #type: List[str]
-    vcf_parser=vcfio.VcfParserType.PYVCF  #type: vcfio.VcfParserType
+    all_patterns  #type: List[str]
     ):
   # type: (...) -> pvalue.PCollection
   """Creates an initial PCollection by reading the VCF file headers."""
@@ -198,13 +197,11 @@ def read_headers(
     headers = (pipeline
                | beam.Create(all_patterns)
                | vcf_header_io.ReadAllVcfHeaders(
-                   compression_type=compression_type,
-                   vcf_parser=vcf_parser))
+                   compression_type=compression_type))
   else:
     headers = pipeline | vcf_header_io.ReadVcfHeaders(
         all_patterns[0],
-        compression_type=compression_type,
-        vcf_parser=vcf_parser)
+        compression_type=compression_type)
 
   return headers
 
@@ -215,7 +212,7 @@ def read_variants(
     pipeline_mode,  # type: PipelineModes
     allow_malformed_records,  # type: bool
     representative_header_lines=None,  # type: List[str]
-    vcf_parser=vcfio.VcfParserType.PYVCF  # type: vcfio.VcfParserType
+    pre_infer_headers=False  # type: bool
     ):
   # type: (...) -> pvalue.PCollection
   """Returns a PCollection of Variants by reading VCFs."""
@@ -228,7 +225,7 @@ def read_variants(
               >> vcfio.ReadFromBGZF(splittable_bgzf,
                                     representative_header_lines,
                                     allow_malformed_records,
-                                    vcf_parser_type=vcf_parser))
+                                    pre_infer_headers))
 
   if pipeline_mode == PipelineModes.LARGE:
     variants = (pipeline
@@ -237,14 +234,14 @@ def read_variants(
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
-                    vcf_parser_type=vcf_parser))
+                    pre_infer_headers=pre_infer_headers))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=vcf_parser)
+        pre_infer_headers=pre_infer_headers)
 
   if compression_type == filesystem.CompressionTypes.GZIP:
     variants |= 'FusionBreak' >> fusion_break.FusionBreak()

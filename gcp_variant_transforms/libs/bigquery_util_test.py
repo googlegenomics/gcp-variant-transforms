@@ -75,7 +75,7 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.get_vcf_type_from_bigquery_type, 'DUMMY')
 
   def test_get_vcf_num_from_bigquery_schema(self):
-    self.assertEqual(None,
+    self.assertEqual('.',
                      bigquery_util.get_vcf_num_from_bigquery_schema(
                          bigquery_util.TableFieldConstants.MODE_REPEATED,
                          bigquery_util.TableFieldConstants.TYPE_INTEGER))

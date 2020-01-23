@@ -19,13 +19,10 @@ from __future__ import absolute_import
 from collections import OrderedDict
 import unittest
 
-
-from vcf.parser import _Format as Format
-from vcf.parser import _Info as Info
-from vcf.parser import field_counts
-
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateFormatField as createFormat
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.libs import infer_headers_util
 
 
@@ -115,12 +112,12 @@ class InferHeaderUtilTest(unittest.TestCase):
 
   def test_infer_mismatched_info_field_no_mismatches(self):
     variant = self._get_sample_variant_info_ia_float_2_0_in_list()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', 'A', 'Integer', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IF': createInfo('IF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', 'A', 'Integer', '')}
     corrected_info = infer_headers_util._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
@@ -129,98 +126,93 @@ class InferHeaderUtilTest(unittest.TestCase):
 
   def test_infer_mismatched_info_field_correct_num(self):
     variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Float', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IF': createInfo('IF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', 'A', 'Float', '')}
     corrected_info = infer_headers_util._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
         len(variant.alternate_bases))
-    expected = Info('IA', None, 'Float', '', '', '')
+    expected = createInfo('IA', '.', 'Float', '')
     self.assertEqual(expected, corrected_info)
 
   def test_infer_mismatched_info_field_correct_type(self):
     variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', None, 'Integer', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IF': createInfo('IF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', '.', 'Integer', '')}
     corrected_info = infer_headers_util._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
         len(variant.alternate_bases)
     )
-    expected = Info('IA', None, 'Float', '', '', '')
+    expected = createInfo('IA', '.', 'Float', '')
     self.assertEqual(expected, corrected_info)
 
   def test_infer_mismatched_info_field_correct_type_list(self):
     variant = self._get_sample_variant_info_ia_float_in_list()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', None, 'Integer', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IF': createInfo('IF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', '.', 'Integer', '')}
     corrected_info = infer_headers_util._infer_mismatched_info_field(
         'IA', variant.info.get('IA'),
         vcf_header_io.VcfHeader(infos=infos).infos.get('IA'),
         len(variant.alternate_bases)
     )
-    expected = Info('IA', None, 'Float', '', '', '')
+    expected = createInfo('IA', '.', 'Float', '')
     self.assertEqual(expected, corrected_info)
 
   def test_infer_info_fields_no_conflicts(self):
     variant = self._get_sample_variant_1()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IF': Info('IF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Float', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IF': createInfo('IF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', 'A', 'Float', '')}
     inferred_infos = infer_headers_util.infer_info_fields(
         variant, vcf_header_io.VcfHeader(infos=infos), infer_headers=True)
     self.assertEqual({}, inferred_infos)
 
   def test_infer_info_fields_combined_conflicts(self):
     variant = self._get_sample_variant_info_ia_cardinality_mismatch()
-    infos = {'IS': Info('IS', 1, 'String', '', '', ''),
-             'ISI': Info('ISI', 1, 'Integer', '', '', ''),
-             'ISF': Info('ISF', 1, 'Float', '', '', ''),
-             'IB': Info('IB', 0, 'Flag', '', '', ''),
-             'IA': Info('IA', -1, 'Integer', '', '', '')}
+    infos = {'IS': createInfo('IS', 1, 'String', ''),
+             'ISI': createInfo('ISI', 1, 'Integer', ''),
+             'ISF': createInfo('ISF', 1, 'Float', ''),
+             'IB': createInfo('IB', 0, 'Flag', ''),
+             'IA': createInfo('IA', 'A', 'Integer', '')}
     inferred_infos = infer_headers_util.infer_info_fields(
         variant, vcf_header_io.VcfHeader(infos=infos), infer_headers=True)
-    expected_infos = {'IF': Info('IF', 1, 'Float', '', '', ''),
-                      'IA': Info('IA', None, 'Float', '', '', '')}
+    expected_infos = {'IF': createInfo('IF', 1, 'Float', ''),
+                      'IA': createInfo('IA', '.', 'Float', '')}
     self.assertEqual(expected_infos, inferred_infos)
 
   def test_infer_mismatched_format_field(self):
     variant = self._get_sample_variant_format_fi_float_value()
-    formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
     corrected_format = infer_headers_util._infer_mismatched_format_field(
         'FI', variant.calls[0].info.get('FI'),
-        vcf_header_io.VcfHeader(formats=formats).formats.get('FI'))
-    expected_formats = Format('FI', 2, 'Float', 'desc')
+        createFormat('FI', 2, 'Integer', 'desc'))
+    expected_formats = createFormat('FI', 2, 'Float', 'desc')
     self.assertEqual(expected_formats, corrected_format)
 
   def test_infer_format_fields_no_conflicts(self):
     variant = self._get_sample_variant_1()
     formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('FU', Format('FU', field_counts['.'], 'Float', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+        ('FS', createFormat('FS', 1, 'String', 'desc')),
+        ('FI', createFormat('FI', 2, 'Integer', 'desc')),
+        ('FU', createFormat('FU', '.', 'Float', 'desc')),
+        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
+
     header = infer_headers_util.infer_format_fields(
         variant, vcf_header_io.VcfHeader(formats=formats))
     self.assertEqual({}, header)
@@ -228,40 +220,38 @@ class InferHeaderUtilTest(unittest.TestCase):
   def test_infer_format_fields_combined_conflicts(self):
     variant = self._get_sample_variant_format_fi_float_value()
     formats = OrderedDict([
-        ('FS', Format('FS', 1, 'String', 'desc')),
-        ('FI', Format('FI', 2, 'Integer', 'desc')),
-        ('GT', Format('GT', 2, 'Integer', 'Special GT key')),
-        ('PS', Format('PS', 1, 'Integer', 'Special PS key'))])
+        ('FS', createFormat('FS', 1, 'String', 'desc')),
+        ('FI', createFormat('FI', 2, 'Integer', 'desc')),
+        ('GT', createFormat('GT', 2, 'Integer', 'Special GT key')),
+        ('PS', createFormat('PS', 1, 'Integer', 'Special PS key'))])
     inferred_formats = infer_headers_util.infer_format_fields(
         variant, vcf_header_io.VcfHeader(formats=formats))
-    expected_formats = {'FI': Format('FI', 2, 'Float', 'desc'),
-                        'FU': Format('FU', field_counts['.'], 'Float', '')}
+    expected_formats = {'FI': createFormat('FI', 2, 'Float', 'desc'),
+                        'FU': createFormat('FU', '.', 'Float', '')}
     self.assertEqual(expected_formats, inferred_formats)
 
   def _get_annotation_infos(self):
     return OrderedDict([
-        ('CSQ', Info(
+        ('CSQ', createInfo(
             'CSQ',
-            field_counts['.'],
+            '.',
             'String',
             'Annotations from VEP. Format: Allele|Gene|Position|Score',
             'src',
             'v')),
-        ('IS', Info('I1', 1, 'String', 'desc', 'src', 'v')),
-        ('ISI', Info('ISI', 1, 'Int', 'desc', 'src', 'v')),
-        ('ISF', Info('ISF', 1, 'Float', 'desc', 'src', 'v')),
-        ('IF', Info('IF', 1, 'Float', 'desc', 'src', 'v')),
-        ('IB', Info('I1', 1, 'Flag', 'desc', 'src', 'v')),
-        ('IA', Info('IA', field_counts['A'], 'Integer', 'desc', 'src', 'v'))])
+        ('IS', createInfo('I1', 1, 'String', 'desc', 'src', 'v')),
+        ('ISI', createInfo('ISI', 1, 'Integer', 'desc', 'src', 'v')),
+        ('ISF', createInfo('ISF', 1, 'Float', 'desc', 'src', 'v')),
+        ('IF', createInfo('IF', 1, 'Float', 'desc', 'src', 'v')),
+        ('IB', createInfo('I1', 1, 'Flag', 'desc', 'src', 'v')),
+        ('IA', createInfo('IA', 'A', 'Integer', 'desc', 'src', 'v'))])
 
   def _get_inferred_info(self, field, annotation, info_type):
-    return Info(
-        id='{0}_{1}_TYPE'.format(field, annotation),
-        num=1,
-        type=info_type,
-        desc='Inferred type field for annotation {0}.'.format(annotation),
-        source='',
-        version='')
+    return createInfo(
+        '{0}_{1}_TYPE'.format(field, annotation),
+        1,
+        info_type,
+        'Inferred type field for annotation {0}.'.format(annotation))
 
   def test_infer_annotation_empty_info(self):
     anno_fields = ['CSQ']
@@ -317,7 +307,7 @@ class InferHeaderUtilTest(unittest.TestCase):
     inferred_infos = infer_headers_util.infer_info_fields(
         variant, vcf_header_io.VcfHeader(infos=infos), False, anno_fields)
     expected_infos = {
-        'CSQ_Gene_TYPE': self._get_inferred_info('CSQ', 'Gene', None),
+        'CSQ_Gene_TYPE': self._get_inferred_info('CSQ', 'Gene', '.'),
         'CSQ_Position_TYPE':
             self._get_inferred_info('CSQ', 'Position', 'Integer'),
         'CSQ_Score_TYPE': self._get_inferred_info('CSQ', 'Score', 'Float')
@@ -327,9 +317,9 @@ class InferHeaderUtilTest(unittest.TestCase):
   def test_infer_annotation_types_with_multiple_annotation_fields(self):
     anno_fields = ['CSQ', 'CSQ_VT']
     infos = self._get_annotation_infos()
-    infos['CSQ_VT'] = Info(
+    infos['CSQ_VT'] = createInfo(
         'CSQ_VT',
-        -1,
+        'A',
         'String',
         'Annotations from VEP. Format: Allele|Gene|Position|Score',
         'source',

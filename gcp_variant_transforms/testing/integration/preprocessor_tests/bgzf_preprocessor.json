@@ -8,8 +8,8 @@
     "expected_contents": [
       "Header Conflicts",
       "ID\tCategory\tConflicts\tFile Paths\tProposed Resolution",
-      "GL\tFORMAT\tnum=None type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.genome_strip_hq.20101123.svs.low_coverage.genotypes.vcf.gz\tnum=None type=Float",
-      " \t \tnum=3 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.phase1_samtools_si.20101123.snps.low_coverage.genotypes.vcf.gz\t ",
+      "GL\tFORMAT\tnum=3 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.phase1_samtools_si.20101123.snps.low_coverage.genotypes.vcf.gz\tnum=. type=Float",
+      " \t \tnum=. type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.genome_strip_hq.20101123.svs.low_coverage.genotypes.vcf.gz\t ",
       "GQ\tFORMAT\tnum=1 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.genome_strip_hq.20101123.svs.low_coverage.genotypes.vcf.gz\tnum=1 type=Float",
       " \t \tnum=1 type=Integer\tgs://gcp-variant-transforms-testfiles/small_tests/bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.phase1_samtools_si.20101123.snps.low_coverage.genotypes.vcf.gz\t ",
       "",
