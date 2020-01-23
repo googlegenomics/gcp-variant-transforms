@@ -85,6 +85,7 @@ _MERGE_HEADERS_FILE_NAME = 'merged_headers.vcf'
 _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 _ANNOTATE_FILES_JOB_NAME = 'annotate-files'
 _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
+_BQ_SCHEMA_FILE_SUFFIX = 'schema.json'
 _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 
@@ -479,6 +480,8 @@ def run(argv=None):
     num_partitions = 1
 
   if known_args.output_table:
+    schema_file = tempfile.mkstemp(prefix=known_args.output_table,
+                                   suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
     for i in range(num_partitions):
       table_suffix = ''
       if partitioner and partitioner.get_partition_name(i):
@@ -496,7 +499,8 @@ def run(argv=None):
                omit_empty_sample_calls=known_args.omit_empty_sample_calls,
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
-                   known_args.null_numeric_value_replacement)))
+                   known_args.null_numeric_value_replacement),
+               temp_schema_file_path=schema_file))
       if known_args.generate_sample_info_table:
         _create_sample_info_table(pipeline, pipeline_mode, known_args)
 

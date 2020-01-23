@@ -20,6 +20,7 @@ import random
 from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
+from apache_beam.io import filesystems
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_row_generator
@@ -76,7 +77,8 @@ class VariantToBigQuery(beam.PTransform):
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1,  # type: int
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      temp_schema_file_path=None  # type: str
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -129,6 +131,15 @@ class VariantToBigQuery(beam.PTransform):
     if update_schema_on_append:
       bigquery_util.update_bigquery_schema_on_append(self._schema.fields,
                                                      self._output_table)
+    self._temp_schema_file_path = temp_schema_file_path
+    self._store_json_schema(
+        schema_converter.convert_table_schema_to_json_bq_schema(self._schema),
+        self._temp_schema_file_path)
+
+
+  def _store_json_schema(self, schema, temp_schema_file_path):
+    with filesystems.FileSystems.create(temp_schema_file_path) as file_to_write:
+      file_to_write.write(schema)
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
