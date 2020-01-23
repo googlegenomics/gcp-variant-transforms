@@ -14,6 +14,8 @@
 
 from typing import Dict, Union  # pylint: disable=unused-import
 
+from datetime import datetime
+
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
@@ -22,6 +24,7 @@ from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import hashing_util
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
+_DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 
 
 class ConvertSampleInfoToRow(beam.DoFn):
@@ -44,7 +47,8 @@ class ConvertSampleInfoToRow(beam.DoFn):
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
-          sample_info_table_schema_generator.FILE_PATH: vcf_header.file_path
+          sample_info_table_schema_generator.FILE_PATH: vcf_header.file_path,
+          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute
       }
       yield row
 

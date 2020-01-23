@@ -14,6 +14,7 @@
 
 """Tests for `sample_info_to_bigquery` module."""
 
+from datetime import datetime
 import unittest
 
 from apache_beam import transforms
@@ -37,19 +38,26 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
+    current_minute = datetime.now().strftime(
+        sample_info_to_bigquery._DATETIME_FORMAT)
+
     expected_rows = [
         {sample_info_table_schema_generator.SAMPLE_ID: 1603149767211015963,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 7039455832764509387,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 4840534050208649594,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 7113221774487715893,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2'}
+         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
     ]
     pipeline = test_pipeline.TestPipeline()
     bigquery_rows = (
@@ -67,19 +75,26 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
+    current_minute = datetime.now().strftime(
+        sample_info_to_bigquery._DATETIME_FORMAT)
+
     expected_rows = [
         {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2'},
+         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
         {sample_info_table_schema_generator.SAMPLE_ID: 8341768597576477893,
          sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2'}
+         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+         sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
     ]
     pipeline = test_pipeline.TestPipeline()
     bigquery_rows = (
