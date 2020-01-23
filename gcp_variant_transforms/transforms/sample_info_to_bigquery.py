@@ -34,9 +34,12 @@ class ConvertSampleInfoToRow(beam.DoFn):
     # type: (int) -> None
     self._sample_name_encoding = sample_name_encoding
 
+  def _get_now_to_minute(self):
+    return datetime.now().strftime(_DATETIME_FORMAT)
+
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
-
+    current_minute = self._get_now_to_minute()
     for sample in vcf_header.samples:
       if self._sample_name_encoding == SampleNameEncoding.WITHOUT_FILE_PATH:
         sample_id = hashing_util.generate_sample_id(sample)
