@@ -21,7 +21,7 @@ from typing import List  # pylint: disable=unused-import
 import farmhash
 
 
-def generate_unsigned_hash_code(strings, max_hash_value=sys.maxint):
+def _generate_unsigned_hash_code(strings, max_hash_value=sys.maxint):
   # type: (List[str], int) -> int
   """Generates a forever-fixed hash code for `strings`.
 
@@ -36,5 +36,5 @@ def generate_sample_id(sample_name, file_path=''):
 
   The hash code generated is in the range [0, pow(2, 63)).
   """
-  return generate_unsigned_hash_code([file_path, sample_name],
-                                     max_hash_value=pow(2, 63))
+  strings = [file_path, sample_name] if file_path else [sample_name]
+  return _generate_unsigned_hash_code(strings, max_hash_value=pow(2, 63))
