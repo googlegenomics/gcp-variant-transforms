@@ -150,7 +150,7 @@ class MergeHeadersTest(unittest.TestCase):
     pipeline = TestPipeline()
     merged_definitions = (
         pipeline
-        | Create(headers)
+        | Create(headers, reshuffle=False)
         | 'MergeDefinitions' >> merge_header_definitions.MergeDefinitions())
 
     expected = VcfHeaderDefinitions()

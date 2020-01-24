@@ -101,7 +101,7 @@ class MergeVariantsTest(unittest.TestCase):
     pipeline = TestPipeline()
     merged_variants = (
         pipeline
-        | Create(variant_list + unmerged_variant_list)
+        | Create(variant_list + unmerged_variant_list, reshuffle=False)
         | 'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
     assert_that(merged_variants,
                 asserts.variants_equal_to_ignore_order([merged_variant] +
