@@ -77,7 +77,7 @@ class ExtractInputSizeTest(unittest.TestCase):
     pipeline = TestPipeline()
     sample_map = (
         pipeline
-        | transforms.Create(vcf_estimates)
+        | transforms.Create(vcf_estimates, reshuffle=False)
         | 'GetSampleMap' >> extract_input_size.GetSampleMap())
     assert_that(sample_map, equal_to(self._create_sample_map()))
     pipeline.run()

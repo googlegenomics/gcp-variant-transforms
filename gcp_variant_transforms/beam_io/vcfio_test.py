@@ -794,7 +794,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | beam.Create(self.variants)
+    pcoll = pipeline | beam.Create(self.variants, reshuffle=False)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
     pipeline.run()
 
@@ -808,7 +808,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow_auto_compression(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | beam.Create(self.variants)
+    pcoll = pipeline | beam.Create(self.variants, reshuffle=False)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
         compression_type=CompressionTypes.AUTO)
@@ -824,7 +824,7 @@ class VcfSinkTest(unittest.TestCase):
 
   def test_write_dataflow_header(self):
     pipeline = TestPipeline()
-    pcoll = pipeline | 'Create' >> beam.Create(self.variants)
+    pcoll = pipeline | 'Create' >> beam.Create(self.variants, reshuffle=False)
     headers = ['foo\n']
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
