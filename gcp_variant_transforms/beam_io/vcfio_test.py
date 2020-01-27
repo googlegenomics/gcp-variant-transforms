@@ -37,6 +37,8 @@ from gcp_variant_transforms.beam_io.vcfio import ReadAllFromVcf
 from gcp_variant_transforms.beam_io.vcfio import ReadFromVcf
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
+from gcp_variant_transforms.beam_io.vcfio import SampleNameEncoding
+from gcp_variant_transforms.libs import hashing_util
 from gcp_variant_transforms.testing import testdata_util
 from gcp_variant_transforms.testing.temp_dir import TempDir
 
@@ -62,7 +64,17 @@ _SAMPLE_TEXT_LINES = [
     '19\t12\t.\tC\t<SYMBOLIC>\t49\tq10\tAF=0.5\tGT:GQ\t0|1:45\t.:.\n'
 ]
 
-def _get_sample_variant_1():
+def _hash_name(sample_name, file_name=''):
+  return hex(hashing_util.generate_sample_id(sample_name, file_name))
+
+VCF_LINE_1 = ('20	1234	rs123;rs2	C	A,T	50	'
+              'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
+VCF_LINE_2 = '19	123	rs1234	GTC	.	40	q10;s50	NS=2	GT:GQ	.|0:48	0/.:.\n'
+VCF_LINE_3 = (
+    '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:PS:GQ	0|1:1:45	.:.:.\n')
+GVCF_LINE = '19	1234	.	C	<NON_REF>	50	.	END=1236	GT:GQ	0/0:99\n'
+
+def _get_sample_variant_1(file_name=''):
   """Get first sample variant.
 
   Features:
@@ -71,22 +83,20 @@ def _get_sample_variant_1():
     multiple names
     utf-8 encoded
   """
-  vcf_line = ('20	1234	rs123;rs2	C	A,T	50	'
-              'PASS	AF=0.5,0.1;NS=1;SVTYPE=BÑD	GT:GQ	0/0:48	1/0:20\n')
   variant = vcfio.Variant(
       reference_name='20', start=1233, end=1234, reference_bases='C',
       alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
       filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
   variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 48}))
+      vcfio.VariantCall(name=_hash_name('Sample1', file_name), genotype=[0, 0],
+                        info={'GQ': 48}))
   variant.calls.append(
-      vcfio.VariantCall(name='Sample2', genotype=[1, 0], info={'GQ': 20}))
+      vcfio.VariantCall(name=_hash_name('Sample2', file_name), genotype=[1, 0],
+                        info={'GQ': 20}))
 
+  return variant
 
-  return variant, vcf_line
-
-
-def _get_sample_variant_2():
+def _get_sample_variant_2(file_name=''):
   """Get second sample variant.
 
   Features:
@@ -96,23 +106,20 @@ def _get_sample_variant_2():
     multiple filters
     missing format field
   """
-  vcf_line = (
-      '19	123	rs1234	GTC	.	40	q10;s50	NS=2	'
-      'GT:GQ	.|0:48	0/.:.\n')
   variant = vcfio.Variant(
       reference_name='19', start=122, end=125, reference_bases='GTC',
       alternate_bases=[], names=['rs1234'], quality=40,
       filters=['q10', 's50'], info={'NS': 2})
   variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[-1, 0],
-                        phaseset=vcfio.DEFAULT_PHASESET_VALUE,
-                        info={'GQ': 48}))
+      vcfio.VariantCall(name=_hash_name('Sample1', file_name), genotype=[-1, 0],
+                        phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48}))
   variant.calls.append(
-      vcfio.VariantCall(name='Sample2', genotype=[0, -1], info={'GQ': None}))
-  return variant, vcf_line
+      vcfio.VariantCall(name=_hash_name('Sample2', file_name), genotype=[0, -1],
+                        info={'GQ': None}))
+  return variant
 
 
-def _get_sample_variant_3():
+def _get_sample_variant_3(file_name=''):
   """Get third sample variant.
 
   Features:
@@ -120,34 +127,30 @@ def _get_sample_variant_3():
     no calls for sample 2
     alternate phaseset
   """
-  vcf_line = (
-      '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	'
-      'GT:PS:GQ	0|1:1:45	.:.:.\n')
   variant = vcfio.Variant(
       reference_name='19', start=11, end=12, reference_bases='C',
       alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
       info={'AF': [0.5]})
   variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+      vcfio.VariantCall(name=_hash_name('Sample1', file_name), genotype=[0, 1],
                         phaseset='1', info={'GQ': 45}))
   variant.calls.append(
-      vcfio.VariantCall(name='Sample2',
+      vcfio.VariantCall(name=_hash_name('Sample2', file_name),
                         genotype=[vcfio.MISSING_GENOTYPE_VALUE],
                         info={'GQ': None}))
-  return variant, vcf_line
+  return variant
 
 
 def _get_sample_non_variant():
   """Get sample non variant."""
-  gvcf_line = (
-      '19	1234	.	C	<NON_REF>	50	.	END=1236	GT:GQ	0/0:99\n')
   non_variant = vcfio.Variant(
       reference_name='19', start=1233, end=1236, reference_bases='C',
       alternate_bases=['<NON_REF>'], quality=50)
   non_variant.calls.append(
-      vcfio.VariantCall(name='Sample1', genotype=[0, 0], info={'GQ': 99}))
+      vcfio.VariantCall(name=_hash_name('Sample1'), genotype=[0, 0],
+                        info={'GQ': 99}))
 
-  return non_variant, gvcf_line
+  return non_variant
 
 
 class VcfSourceTest(unittest.TestCase):
@@ -170,17 +173,27 @@ class VcfSourceTest(unittest.TestCase):
         suffix=suffix, lines=lines, compression_type=compression_type)
 
   def _read_records(self, file_or_pattern, representative_header_lines=None,
+                    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
                     **kwargs):
     return source_test_utils.read_from_source(
         VcfSource(file_or_pattern,
                   representative_header_lines=representative_header_lines,
+                  sample_name_encoding=sample_name_encoding,
                   **kwargs))
 
   def _create_temp_file_and_read_records(
-      self, lines, representative_header_lines=None):
+      self, lines, representative_header_lines=None,
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH):
+    return self._create_temp_file_and_return_records_with_file_name(
+        lines, representative_header_lines, sample_name_encoding)[0]
+
+  def _create_temp_file_and_return_records_with_file_name(
+      self, lines, representative_header_lines=None,
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH):
     with TempDir() as tempdir:
       file_name = tempdir.create_temp_file(suffix='.vcf', lines=lines)
-      return self._read_records(file_name, representative_header_lines)
+      return (self._read_records(file_name, representative_header_lines,
+                                 sample_name_encoding), file_name)
 
   def _assert_variants_equal(self, actual, expected):
     self.assertEqual(
@@ -256,31 +269,71 @@ class VcfSourceTest(unittest.TestCase):
           content, _SAMPLE_HEADER_LINES))
 
   def test_single_file_verify_details(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1()
     read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES + [vcf_line_1])
+        _SAMPLE_HEADER_LINES + [VCF_LINE_1])
+    variant_1 = _get_sample_variant_1()
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [VCF_LINE_1])
     self.assertEqual(1, len(read_data))
     self.assertEqual(variant_1, read_data[0])
 
-    variant_2, vcf_line_2 = _get_sample_variant_2()
-    variant_3, vcf_line_3 = _get_sample_variant_3()
+    variant_2 = _get_sample_variant_2()
+    variant_3 = _get_sample_variant_3()
     read_data = self._create_temp_file_and_read_records(
-        _SAMPLE_HEADER_LINES + [vcf_line_1, vcf_line_2, vcf_line_3])
+        _SAMPLE_HEADER_LINES + [VCF_LINE_1, VCF_LINE_2, VCF_LINE_3])
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
   def test_file_pattern_verify_details(self):
-    variant_1, vcf_line_1 = _get_sample_variant_1()
-    variant_2, vcf_line_2 = _get_sample_variant_2()
-    variant_3, vcf_line_3 = _get_sample_variant_3()
+    variant_1 = _get_sample_variant_1()
+    variant_2 = _get_sample_variant_2()
+    variant_3 = _get_sample_variant_3()
     with TempDir() as tempdir:
-      self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [vcf_line_1], tempdir)
+      self._create_temp_vcf_file(_SAMPLE_HEADER_LINES + [VCF_LINE_1], tempdir)
       self._create_temp_vcf_file((_SAMPLE_HEADER_LINES +
-                                  [vcf_line_2, vcf_line_3]),
+                                  [VCF_LINE_2, VCF_LINE_3]),
                                  tempdir)
       read_data = self._read_records(os.path.join(tempdir.get_path(), '*.vcf'))
       self.assertEqual(3, len(read_data))
       self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
+  def test_single_file_verify_details_encoded_sample_name_without_file(self):
+    variant_1 = _get_sample_variant_1()
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [VCF_LINE_1],
+        sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH)
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant_1, read_data[0])
+
+    variant_2 = _get_sample_variant_2()
+    variant_3 = _get_sample_variant_3()
+    read_data = self._create_temp_file_and_read_records(
+        _SAMPLE_HEADER_LINES + [VCF_LINE_1, VCF_LINE_2, VCF_LINE_3],
+        sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH)
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
+  def test_single_file_verify_details_encoded_sample_name_with_file(self):
+    read_data, file_name = (
+        self._create_temp_file_and_return_records_with_file_name(
+            _SAMPLE_HEADER_LINES + [VCF_LINE_1],
+            sample_name_encoding=SampleNameEncoding.WITH_FILE_PATH))
+
+    variant_1 = _get_sample_variant_1(file_name)
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant_1, read_data[0])
+    read_data, file_name = (
+        self._create_temp_file_and_return_records_with_file_name(
+            _SAMPLE_HEADER_LINES + [VCF_LINE_1, VCF_LINE_2, VCF_LINE_3],
+            sample_name_encoding=SampleNameEncoding.WITH_FILE_PATH))
+
+    variant_1 = _get_sample_variant_1(file_name)
+    variant_2 = _get_sample_variant_2(file_name)
+    variant_3 = _get_sample_variant_3(file_name)
+
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
 
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_after_splitting(self):
@@ -335,9 +388,11 @@ class VcfSourceTest(unittest.TestCase):
     record_line = 'chr19	123	.	.	.	.	.	.	GT	.	.'
     expected_variant = Variant(reference_name='chr19', start=122, end=123)
     expected_variant.calls.append(
-        VariantCall(name='Sample1', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
+        VariantCall(name=_hash_name('Sample1'),
+                    genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     expected_variant.calls.append(
-        VariantCall(name='Sample2', genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
+        VariantCall(name=_hash_name('Sample2'),
+                    genotype=[vcfio.MISSING_GENOTYPE_VALUE]))
     read_data = self._create_temp_file_and_read_records(
         _SAMPLE_HEADER_LINES + [record_line])
     self.assertEqual(1, len(read_data))
@@ -358,14 +413,18 @@ class VcfSourceTest(unittest.TestCase):
         alternate_bases=['T', 'C'],
         info={'HA': ['a1', 'a2'], 'HG': [1, 2, 3], 'HR': ['a', 'b', 'c'],
               'HF': True, 'HU': [0.1]})
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
     variant_2 = Variant(
         reference_name='19', start=123, end=124, reference_bases='A',
         alternate_bases=['T'],
         info={'HG': [3, 4, 5], 'HR': ['d', 'e'], 'HU': [1.1, 1.2]})
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[0, 0]))
+    variant_2.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
     read_data = self._create_temp_file_and_read_records(
         info_headers + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
@@ -387,8 +446,10 @@ class VcfSourceTest(unittest.TestCase):
     variant = Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
-    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                     genotype=[0, 0]))
+    variant.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                     genotype=[0, 1]))
 
     # `file_headers` is used.
     read_data = self._create_temp_file_and_read_records(file_content)
@@ -423,12 +484,14 @@ class VcfSourceTest(unittest.TestCase):
     variant_1 = Variant(
         reference_name='9', start=1, end=2, reference_bases='A',
         alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[0, 0]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[0, 0]))
 
     variant_2 = Variant(
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T'], info={'HU': ['a', 'b']})
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_2.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
 
     read_data_1 = self._create_temp_file_and_read_records(
         file_content_1, representative_header_lines)
@@ -448,13 +511,17 @@ class VcfSourceTest(unittest.TestCase):
     variant_1 = Variant(
         reference_name='19', start=122, end=1111, reference_bases='A',
         alternate_bases=['T'])
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
     variant_2 = Variant(
         reference_name='19', start=122, end=123, reference_bases='A',
         alternate_bases=['T'])
-    variant_2.calls.append(VariantCall(name='Sample1', genotype=[0, 1]))
-    variant_2.calls.append(VariantCall(name='Sample2', genotype=[1, 1]))
+    variant_2.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[0, 1]))
+    variant_2.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[1, 1]))
     read_data = self._create_temp_file_and_read_records(
         [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
@@ -467,8 +534,10 @@ class VcfSourceTest(unittest.TestCase):
     variant_1 = Variant(
         reference_name='19', start=122, end=1111, reference_bases='A',
         alternate_bases=['T'])
-    variant_1.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                       genotype=[1, 0]))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
     read_data = self._create_temp_file_and_read_records(
         [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(1, len(read_data))
@@ -481,8 +550,10 @@ class VcfSourceTest(unittest.TestCase):
     variant = Variant(
         reference_name='19', start=122, end=150, reference_bases='A',
         alternate_bases=['T'])
-    variant.calls.append(VariantCall(name='Sample1', genotype=[1, 0]))
-    variant.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+    variant.calls.append(VariantCall(name=_hash_name('Sample1'),
+                                     genotype=[1, 0]))
+    variant.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                     genotype=[0, 1]))
     read_data = self._create_temp_file_and_read_records(
         [end_info_header_line] + _SAMPLE_HEADER_LINES[1:] +
         ['19	123	.	A	T	.	.	END=150,160	GT	1/0	0/1\n'])
@@ -513,15 +584,19 @@ class VcfSourceTest(unittest.TestCase):
         reference_name='19', start=122, end=123, reference_bases='A',
         alternate_bases=['T'])
     variant_1.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='1111'))
-    variant_1.calls.append(VariantCall(name='Sample2', genotype=[0, 1]))
+        VariantCall(name=_hash_name('Sample1'), genotype=[1, 0],
+                    phaseset='1111'))
+    variant_1.calls.append(VariantCall(name=_hash_name('Sample2'),
+                                       genotype=[0, 1]))
     variant_2 = Variant(
         reference_name='19', start=120, end=121, reference_bases='A',
         alternate_bases=['T'])
     variant_2.calls.append(
-        VariantCall(name='Sample1', genotype=[1, 0], phaseset='2222'))
+        VariantCall(name=_hash_name('Sample1'), genotype=[1, 0],
+                    phaseset='2222'))
     variant_2.calls.append(
-        VariantCall(name='Sample2', genotype=[0, 1], phaseset='2222'))
+        VariantCall(name=_hash_name('Sample2'), genotype=[0, 1],
+                    phaseset='2222'))
     read_data = self._create_temp_file_and_read_records(
         [phaseset_header_line] + _SAMPLE_HEADER_LINES[1:] + record_lines)
     self.assertEqual(2, len(read_data))
@@ -543,12 +618,12 @@ class VcfSourceTest(unittest.TestCase):
         reference_name='19', start=1, end=2, reference_bases='A',
         alternate_bases=['T', 'C'])
     expected_variant.calls.append(VariantCall(
-        name='Sample1',
+        name=_hash_name('Sample1'),
         genotype=[1, 0],
         info={'FU': ['a1'], 'F1': 3, 'F2': ['a', 'b'], 'AO': [1],
               'AD': [3, 4]}))
     expected_variant.calls.append(VariantCall(
-        name='Sample2',
+        name=_hash_name('Sample2'),
         genotype=[0, 1],
         info={'FU': ['a2', 'a3'], 'F1': 4, 'F2': ['b', 'c'], 'AO': [1, 2],
               'AD':[3]}))
@@ -685,10 +760,11 @@ class VcfSinkTest(unittest.TestCase):
   def setUp(self):
     super(VcfSinkTest, self).setUp()
     self.path = tempfile.NamedTemporaryFile(suffix='.vcf').name
-    self.variants, self.variant_lines = zip(_get_sample_variant_1(),
-                                            _get_sample_variant_2(),
-                                            _get_sample_variant_3(),
-                                            _get_sample_non_variant())
+    self.variants, self.variant_lines = zip(
+        (_get_sample_variant_1(), VCF_LINE_1),
+        (_get_sample_variant_2(), VCF_LINE_2),
+        (_get_sample_variant_3(), VCF_LINE_3),
+        (_get_sample_non_variant(), GVCF_LINE))
 
   def _assert_variant_lines_equal(self, actual, expected):
     actual_fields = actual.strip().split('\t')
@@ -736,9 +812,9 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
-        name='Sample1', genotype=[0, 1], info={'GQ': 10, 'AF': 20}))
+        name=_hash_name('Sample1'), genotype=[0, 1], info={'GQ': 10, 'AF': 20}))
     variant.calls.append(VariantCall(
-        name='Sample2', genotype=[0, 1], info={'AF': 20}))
+        name=_hash_name('Sample2'), genotype=[0, 1], info={'AF': 20}))
     expected = ('.	.	.	.	.	.	.	.	GT:AF:GQ	0/1:20:10	'
                 '0/1:20:.\n')
 
@@ -748,7 +824,7 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
-        name='Sample', genotype=[0, 1], info={'LI': [1, None, 3]}))
+        name=_hash_name('Sample'), genotype=[0, 1], info={'LI': [1, None, 3]}))
     expected = '.	.	.	.	.	.	.	.	GT:LI	0/1:1,.,3\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
@@ -770,7 +846,7 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     variant = Variant()
     variant.calls.append(
-        VariantCall(name='Sample2', genotype=-1))
+        VariantCall(name=_hash_name('Sample2'), genotype=-1))
     expected = '.	.	.	.	.	.	.	.	GT	.\n'
     self._assert_variant_lines_equal(coder.encode(variant), expected)
 
@@ -778,7 +854,7 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
-        name='Sample', genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
+        name=_hash_name('Sample'), genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
     expected = '.	.	.	.	.	.	.	.	GT	1/.\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
@@ -787,7 +863,7 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     variant = Variant()
     variant.calls.append(VariantCall(
-        name='Sample', genotype=[1, 0, 1]))
+        name=_hash_name('Sample'), genotype=[1, 0, 1]))
     expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)

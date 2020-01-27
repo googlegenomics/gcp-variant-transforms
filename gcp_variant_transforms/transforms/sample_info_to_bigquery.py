@@ -24,14 +24,21 @@ from gcp_variant_transforms.libs import hashing_util
 class ConvertSampleInfoToRow(beam.DoFn):
   """Extracts sample info from `VcfHeader` and converts it to a BigQuery row."""
 
-  def process(self, vcf_header, samples_span_multiple_files):
+  def __init__(self,
+               samples_span_multiple_files=False,  # type: bool
+              ):
+    self._samples_span_multiple_files = samples_span_multiple_files
+
+  def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
+
     for sample in vcf_header.samples:
-      if samples_span_multiple_files:
+      if self._samples_span_multiple_files:
         sample_id = hashing_util.generate_sample_id(sample)
       else:
-        sample_id = hashing_util.generate_sample_id(sample,
-                                                    vcf_header.file_path)
+        sample_id = hashing_util.generate_sample_id(
+            sample, vcf_header.file_path)
+
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
@@ -58,14 +65,14 @@ class SampleInfoToBigQuery(beam.PTransform):
     self._output_table = sample_info_table_schema_generator.compose_table_name(
         output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX)
     self._append = append
-    self.samples_span_multiple_files = samples_span_multiple_files
+    self._samples_span_multiple_files = samples_span_multiple_files
     self._schema = sample_info_table_schema_generator.generate_schema()
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
                 ConvertSampleInfoToRow(self._samples_span_multiple_files))
-            | 'WriteSampleInfoToBigQuery' >> beam.io.WriteToBigQuery(
+            | 'WriteSampleInfoToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
                 self._output_table,
                 schema=self._schema,
                 create_disposition=(
@@ -73,5 +80,4 @@ class SampleInfoToBigQuery(beam.PTransform):
                 write_disposition=(
                     beam.io.BigQueryDisposition.WRITE_APPEND
                     if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE),
-                method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
+                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))

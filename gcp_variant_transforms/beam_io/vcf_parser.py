@@ -20,6 +20,7 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 from __future__ import absolute_import
 
 from collections import namedtuple
+import enum
 from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
@@ -30,6 +31,7 @@ from apache_beam.io import textio
 from pysam import libcbcf
 
 from gcp_variant_transforms.beam_io import bgzf
+from gcp_variant_transforms.libs import hashing_util
 
 # Stores data about failed VCF record reads. `line` is the text line that
 # caused the failed read and `file_name` is the name of the file that the read
@@ -54,6 +56,13 @@ MISSING_GENOTYPE_VALUE = -1  # Genotype to use when '.' is used in GT field.
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 INFO_HEADER_TAG = '##INFO'
 LAST_HEADER_LINE_PREFIX = '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO'
+
+
+class SampleNameEncoding(enum.Enum):
+  """An Enum specifying the way we encode sample_name."""
+  WITHOUT_FILE_PATH = 0
+  WITH_FILE_PATH = 1
+
 
 class Variant(object):
   """A class to store info about a genomic variant.
@@ -244,17 +253,19 @@ class VcfParser(object):
   ```
   """
 
-  def __init__(self,
-               file_name,  # type: str
-               range_tracker,  # type: range_trackers.OffsetRangeTracker
-               file_pattern,  # type: str
-               compression_type,  # type: str
-               allow_malformed_records,  # type: bool
-               representative_header_lines=None,  # type:  List[str]
-               splittable_bgzf=False,  # type: bool
-               pre_infer_headers=False,  # type: bool
-               **kwargs  # type: **str
-              ):
+  def __init__(
+      self,
+      file_name,  # type: str
+      range_tracker,  # type: range_trackers.OffsetRangeTracker
+      file_pattern,  # type: str
+      compression_type,  # type: str
+      allow_malformed_records,  # type: bool
+      representative_header_lines=None,  # type:  List[str]
+      splittable_bgzf=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      **kwargs  # type: **str
+      ):
     # type: (...) -> None
     # If `representative_header_lines` is given, header lines in `file_name`
     # are ignored; refer to _process_header_lines() logic.
@@ -262,6 +273,7 @@ class VcfParser(object):
     self._file_name = file_name
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
+    self._sample_name_encoding = sample_name_encoding
 
     if splittable_bgzf:
       text_source = bgzf.BGZFBlockSource(
@@ -405,17 +417,19 @@ class PySamParser(VcfParser):
   class - we could only use a single pipe, but it will divert the parsers.
   """
 
-  def __init__(self,
-               file_name,  # type: str
-               range_tracker,  # type: range_trackers.OffsetRangeTracker
-               compression_type,  # type: str
-               allow_malformed_records,  # type: bool
-               file_pattern=None,  # type: str
-               representative_header_lines=None,  # type:  List[str]
-               splittable_bgzf=False,  # type: bool
-               pre_infer_headers=False,  # type: bool
-               **kwargs  # type: **str
-              ):
+  def __init__(
+      self,
+      file_name,  # type: str
+      range_tracker,  # type: range_trackers.OffsetRangeTracker
+      compression_type,  # type: str
+      allow_malformed_records,  # type: bool
+      file_pattern=None,  # type: str
+      representative_header_lines=None,  # type:  List[str]
+      splittable_bgzf=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      **kwargs  # type: **str
+      ):
     # type: (...) -> None
     super(PySamParser, self).__init__(file_name,
                                       range_tracker,
@@ -425,12 +439,18 @@ class PySamParser(VcfParser):
                                       representative_header_lines,
                                       splittable_bgzf,
                                       pre_infer_headers,
+                                      sample_name_encoding,
                                       **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
     self._to_child = None
     self._original_info_list = None
     self._process_pid = None
+    self._encoded_sample_names = {}
+
+    self._file_name = ''
+    if sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
+      self._file_name = file_name
 
   def send_kill_signal_to_child(self):
     self._to_child.write('\n')
@@ -592,6 +612,14 @@ class PySamParser(VcfParser):
       value = value.encode('utf-8')
     return str(value)
 
+  def _encode(self, sample_name):
+    sample_code_hex = self._encoded_sample_names.get(sample_name)
+    if not sample_code_hex:
+      sample_code_hex = hex(hashing_util.generate_sample_id(sample_name,
+                                                            self._file_name))
+      self._encoded_sample_names[sample_name] = sample_code_hex
+    return sample_code_hex
+
   def _get_variant_calls(self, samples):
     # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
     calls = []
@@ -623,6 +651,7 @@ class PySamParser(VcfParser):
       # before settings default phaseset value.
       if phaseset is None and sample.phased and len(genotype) > 1:
         phaseset = DEFAULT_PHASESET_VALUE
-      calls.append(VariantCall(name, genotype, phaseset, info))
+      encoded_name = self._encode(name)
+      calls.append(VariantCall(encoded_name, genotype, phaseset, info))
 
     return calls

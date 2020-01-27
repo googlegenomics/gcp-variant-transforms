@@ -109,7 +109,8 @@ def _read_variants(all_patterns,  # type: List[str]
       pipeline_mode,
       known_args.allow_malformed_records,
       representative_header_lines,
-      pre_infer_headers=pre_infer_headers)
+      pre_infer_headers=pre_infer_headers,
+      sample_name_encoding=known_args.sample_name_encoding)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace

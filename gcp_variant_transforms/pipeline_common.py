@@ -35,6 +35,7 @@ from apache_beam.runners.direct import direct_runner
 from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_estimate_io
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.transforms import fusion_break
 from gcp_variant_transforms.transforms import merge_headers
@@ -45,6 +46,7 @@ _SMALL_DATA_THRESHOLD = 100
 _LARGE_DATA_THRESHOLD = 50000
 
 _DATAFLOW_RUNNER_ARG_VALUE = 'DataflowRunner'
+SampleNameEncoding = vcf_parser.SampleNameEncoding
 
 
 class PipelineModes(enum.Enum):
@@ -75,6 +77,11 @@ def parse_args(argv, command_line_options):
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
+  if (hasattr(known_args, 'samples_span_multiple_files') and
+      known_args.samples_span_multiple_files):
+    known_args.sample_name_encoding = SampleNameEncoding.WITHOUT_FILE_PATH
+  else:
+    known_args.sample_name_encoding = SampleNameEncoding.WITH_FILE_PATH
   return known_args, pipeline_args
 
 
@@ -212,7 +219,8 @@ def read_variants(
     pipeline_mode,  # type: PipelineModes
     allow_malformed_records,  # type: bool
     representative_header_lines=None,  # type: List[str]
-    pre_infer_headers=False  # type: bool
+    pre_infer_headers=False,  # type: bool
+    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH  # type: int
     ):
   # type: (...) -> pvalue.PCollection
   """Returns a PCollection of Variants by reading VCFs."""
@@ -225,7 +233,8 @@ def read_variants(
               >> vcfio.ReadFromBGZF(splittable_bgzf,
                                     representative_header_lines,
                                     allow_malformed_records,
-                                    pre_infer_headers))
+                                    pre_infer_headers,
+                                    sample_name_encoding))
 
   if pipeline_mode == PipelineModes.LARGE:
     variants = (pipeline
@@ -234,14 +243,16 @@ def read_variants(
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
-                    pre_infer_headers=pre_infer_headers))
+                    pre_infer_headers=pre_infer_headers,
+                    sample_name_encoding=sample_name_encoding))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
-        pre_infer_headers=pre_infer_headers)
+        pre_infer_headers=pre_infer_headers,
+        sample_name_encoding=sample_name_encoding)
 
   if compression_type == filesystem.CompressionTypes.GZIP:
     variants |= 'FusionBreak' >> fusion_break.FusionBreak()
