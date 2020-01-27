@@ -47,7 +47,6 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev
 
 # Install dependencies.
-
 RUN python -m pip install --upgrade pip && \
     python -m pip install --upgrade virtualenv && \
     virtualenv /opt/gcp_variant_transforms/venv && \

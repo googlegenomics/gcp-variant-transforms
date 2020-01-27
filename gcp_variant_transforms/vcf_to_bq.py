@@ -47,6 +47,7 @@ from apache_beam.options import pipeline_options
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_partition
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
@@ -482,6 +483,14 @@ def run(argv=None):
   if known_args.output_table:
     schema_file = tempfile.mkstemp(prefix=known_args.output_table,
                                    suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
+    schema = (
+        schema_converter.generate_schema_from_header_fields(
+            header_fields, processed_variant_factory, variant_merger))
+    schema_json = (
+        schema_converter.convert_table_schema_to_json_bq_schema(schema))
+    with filesystems.FileSystems.create(schema_file) as file_to_write:
+      file_to_write.write(schema_json)
+
     for i in range(num_partitions):
       table_suffix = ''
       if partitioner and partitioner.get_partition_name(i):
@@ -490,17 +499,14 @@ def run(argv=None):
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
-               header_fields,
-               variant_merger,
-               processed_variant_factory,
+               schema,
                append=known_args.append,
                update_schema_on_append=known_args.update_schema_on_append,
                allow_incompatible_records=known_args.allow_incompatible_records,
                omit_empty_sample_calls=known_args.omit_empty_sample_calls,
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
-                   known_args.null_numeric_value_replacement),
-               temp_schema_file_path=schema_file))
+                   known_args.null_numeric_value_replacement)))
       if known_args.generate_sample_info_table:
         _create_sample_info_table(pipeline, pipeline_mode, known_args)
 
