@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
+import logging
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from oauth2client.client import GoogleCredentials
@@ -499,18 +500,31 @@ class PreprocessOptions(VariantTransformsOptions):
     _validate_inputs(parsed_args)
 
 
-class PartitionOptions(VariantTransformsOptions):
-  """Options for partitioning Variant records."""
+class ShardingOptions(VariantTransformsOptions):
+  """Options for sharding Variant records into multiple output tables."""
 
   def add_arguments(self, parser):
     parser.add_argument(
         '--partition_config_path',
         default='',
-        help=('File containing list of partitions and output table names. You '
-              'can use provided default partition_config file to split output '
+        help=('This argument is deprecated and will be removed in the next '
+              'release. It has been replaced by --sharding_config_path .'))
+    parser.add_argument(
+        '--sharding_config_path',
+        default='',
+        help=('File containing list of shards and output table names. You '
+              'can use provided default sharding_config file to split output '
               'by chromosome (one table per chromosome) which is located at: '
-              'gcp_variant_transforms/data/partition_configs/'
+              'gcp_variant_transforms/data/sharding_configs/'
               'homo_sapiens_default.yaml'))
+
+  def validate(self, parsed_args):
+    # type: (argparse.Namespace) -> None
+    if (parsed_args.partition_config_path and
+        not parsed_args.sharding_config_path):
+      logging.warning('--partition_config_path will be deprecated soon. '
+                      'Please use --sharding_config_path instead.')
+      parsed_args.sharding_config_path = parsed_args.partition_config_path
 
 
 class BigQueryToVcfOptions(VariantTransformsOptions):

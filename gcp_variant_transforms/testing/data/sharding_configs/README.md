@@ -5,7 +5,7 @@ All files in this folder are used as inputs for --partition_config_path flag.
 
 `residual_at_end.yaml`, `residual_in_middle.yaml`, and `residual_missing.yaml`
 are used by unit tests in gcp_variant_transforms/libs/variant_partition_test.py
-which are testing the functionality of VariantPartition class. This class
+which are testing the functionality of VariantSharding class. This class
 contains the core logic of partitioning functionality of VariantTransform.
 
 The main difference between these 3 yaml files is related to their residual

@@ -19,7 +19,7 @@ clause. This extra cost can add up to a significant amount, specially if a few
 
 We are offering three solutions for situations like this: one solution is using
 BigQuery [clustering](https://cloud.google.com/bigquery/docs/clustered-tables),
-another solution is using Variant Transforms' native partitioning, and a third
+another solution is using Variant Transforms' native sharding, and a third
 hybrid solution.
 
 ## Solution 1: BigQuery clustering
@@ -71,7 +71,7 @@ CLUSTER BY reference_name, start_position, end_position AS (
 ```
 
 Since clustering currently is only supported for partitioned tables, in this
-query first we add a dummy `DATE` column to our table. By Partitioning table
+query first we add a dummy `DATE` column to our table. By partitioning table
 using this `DATE` column, we are able to cluster it based on the values of
 `reference_name, start_position, end_position` columns.
 
@@ -116,10 +116,10 @@ it has a few limitations:
  * If you append data to an existing clustered table it will become partially
  sorted. So you need to regularly re-cluster your table.
 
-## Solution 2: Partitioning output table
+## Solution 2: Sharding output table
 
 The second solution for reducing the cost of queries is to use Variant
-Transforms' native partitioning. Variant transforms is able to split the output
+Transforms' native sharding. Variant transforms is able to split the output
 table into several smaller tables, each containing variants of a specific region of a
 genome. For example, you can have one output table per chromosome, in that
 case the above query can be written as:
@@ -142,18 +142,18 @@ This solution has some limitations comparing to clustering. For example, you
 will be charged for processing of a whole chromosome's table even if only a
 small region is being processed. As an example, the previous query, will cost
 152 GB or $0.74. This is significantly less than the original cost without
-partitioning but it's more than clustering cost.
+sharding but it's more than clustering cost.
 
-You could define your partitions to be more fine grained and have multiple
+You could define your shards to be more fine grained and have multiple
 tables per chromosome. However, you need to anticipate how your future queries
-are going to be in order to optimize your output partitions. Since in many
+are going to be in order to optimize your output shards. Since in many
 use cases it not obvious to anticipate future queries, we offer the
 third solution as the most practical and cost effective solution.
 
 ## Solution 3: Hybrid Solution
 
 This solution combines two previous solutions to offer the benefits of both.
-Using the Variant Transforms' native partitioning, the output table will be
+Using the Variant Transforms' native sharding, the output table will be
 split into several smaller tables (perhaps one table per chromosome) and then
 each table will be clustered based on the `start_position, end_position`
 columns to further optimize them for running queries.
@@ -165,23 +165,23 @@ this hybrid solution.
 
 If you append new rows to your clustered table and your table gradually becomes
 partially sorted, you still have a strict guarantee that your query cost will
-be limited to the size of the partitioned table ($0.74 in this case).
-Also, partitioning output table into several smaller tables reduces the initial
+be limited to the size of the sharded table ($0.74 in this case).
+Also, sharding output table into several smaller tables reduces the initial
 clustering time significantly.
 
 In the following section we will explain how you could use Variant Transforms
-to easily partition your output table to minimize the cost of your queries.
+to easily shard your output table to minimize the cost of your queries.
 
-## Partition Config files
+## Sharding Config files
 
-Solution #2 or #3 require a *partition config file* to specify the output
-tables. The config file is set using the `--partition_config_path` flag and is
+Solution #2 or #3 require a *sharding config file* to specify the output
+tables. The config file is set using the `--sharding_config_path` flag and is
 formatted as a [`YAML`](https://en.wikipedia.org/wiki/YAML) file with a straight
-forward structure. [Here](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml)
+forward structure. [Here](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml)
 you can find a config file that splits output table into 25 tables, one per
-chromosome plus an extra [residual partition](#residual-partition). We
+chromosome plus an extra [residual shard](#residual-shard). We
 recommend using this config file as default for human samples by adding:
-`--partition_config_path gcp_variant_transforms/data/partition_configs/homo_sapiens_default.yaml`
+`--sharding_config_path gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml`
 flag to your variant transforms command. Here is a snippet of that file:
 
 ```
@@ -192,12 +192,12 @@ flag to your variant transforms command. Here is a snippet of that file:
        - "1"
 ```
 
-This defines a partition, named `chr1`, that will include all variants whose
+This defines a shard, named `chr1`, that will include all variants whose
 `reference_name` is equal to `chr1` or `1`. Note that the `reference_name`
 string is *case-insensitive*, so if your variants have `Chr1` or `CHR1` they
-will all be matched to this partition.
+will all be matched to this shard.
 
-The final output table name for this partition will have `_chr1`
+The final output table name for this shard will have `_chr1`
 suffix. More precisely, if
 `--output_table my-project:my_dataset.my_table`
 is set, then the output table for chromosome 1
@@ -206,9 +206,9 @@ variants will be available at
 suffix for your table names. Here, for simplicity, we used the same string
 (`chr1`) for both `reference_name` matching and table name suffix.
 
-As we mentioned earlier, partitioning can be done at a more fine grained level
+As we mentioned earlier, sharding can be done at a more fine grained level
 and does not have to be limited to chromosomes. For example, the following
-config defines two partitions that contain variants of chromosome X:
+config defines two shards that contain variants of chromosome X:
 ```
 -  partition:
      partition_name: "chrX_part1"
@@ -223,12 +223,12 @@ If the *start position* of a variant on chromosome X is less than `100,000,000`
 it will be assigned to `chrX_part1` table otherwise it will be assigned to
 `chrX_part2` table.
 
-### Residual Partition
-All partitions defined in a config file follow the same principal, variants will
+### Residual Shard
+All shards defined in a config file follow the same principal, variants will
 be assigned to them based on their defined `regions`. The only exception is the
-`residual` partition, this partition acts as *default partition* meaning that
-all variants that were not assigned to any partition will end up in this
-partition. For example consider the following config file:
+`residual` shard, this shard acts as *default shard* that
+all variants that were not assigned to any shard will end up in this
+shard. For example consider the following config file:
 ```
 -  partition:
      partition_name: "first_50M"
@@ -257,11 +257,11 @@ This config file splits all the variants into 3 tables:
    * All variants of `chr1`, `chr2`, and `chr3` with start position `>= 100M`
    * All variants of other chromosomes.
 
-Using the `residual` partition you can make sure your output tables will include
+Using the `residual` shard you can make sure your output tables will include
 *all* input variants. However, if in your analysis you don't need the residual
-variants, you can simply remove the last partition from your config file. In
+variants, you can simply remove the last shard from your config file. In
 the case of previous example, you will have only 2 tables as output and variants
-that did not match to those two partitions will be dropped from the final output.
+that did not match to those two shards will be dropped from the final output.
 
 This feature can be used more broadly for filtering out unwanted variants from
 the output tables. Filtering reduces the cost of running Variant Transforms

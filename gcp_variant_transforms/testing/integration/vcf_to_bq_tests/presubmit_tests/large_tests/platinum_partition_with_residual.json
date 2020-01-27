@@ -3,7 +3,7 @@
     "test_name": "platinum-partition-with-residual",
     "table_name": "platinum_partition_with_residual",
     "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
-    "partition_config": "gcp_variant_transforms/testing/data/partition_configs/integration_with_residual.yaml",
+    "sharding_config": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
     "runner": "DataflowRunner",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "worker_machine_type": "n1-highmem-4",

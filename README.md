@@ -179,7 +179,7 @@ details.
 * [Handling large inputs](docs/large_inputs.md)
 * [Appending data to existing tables](docs/data_append.md)
 * [Variant Annotation](docs/variant_annotation.md)
-* [Partitioning](docs/partitioning.md)
+* [Sharding](docs/sharding.md)
 * [Flattening the BigQuery table](docs/flattening_table.md)
 * [Troubleshooting](docs/troubleshooting.md)
 
