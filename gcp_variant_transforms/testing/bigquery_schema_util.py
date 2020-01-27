@@ -113,7 +113,7 @@ def get_sample_table_schema(with_annotation_fields=False):
       mode=bigquery_util.TableFieldConstants.MODE_REPEATED,
       description='One record for each call.')
   calls_record.fields.append(bigquery.TableFieldSchema(
-      name=bigquery_util.ColumnKeyConstants.CALLS_NAME,
+      name=bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Name of the call.'))

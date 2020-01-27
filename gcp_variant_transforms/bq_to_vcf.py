@@ -65,7 +65,7 @@ from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
-from gcp_variant_transforms.transforms import combine_call_names
+from gcp_variant_transforms.transforms import combine_call_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
 
 
@@ -109,7 +109,7 @@ def run(argv=None):
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      '{}_header_with_call_names.vcf'.format(unique_temp_id))
+      '{}_header_with_call_sample_ids.vcf'.format(unique_temp_id))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
@@ -165,7 +165,7 @@ def _bigquery_to_vcf_shards(
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  # TODO(allieychen): Modify the SQL query with the specified call_names.
+  # TODO(allieychen): Modify the SQL query with the specified call_sample_ids.
   query = _get_bigquery_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
@@ -176,25 +176,27 @@ def _bigquery_to_vcf_shards(
     variants = (p
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
-    if known_args.call_names:
-      call_names = (p
-                    | transforms.Create(known_args.call_names, reshuffle=False)
-                    | beam.combiners.ToList())
+    if known_args.call_sample_ids:
+      call_sample_ids = (p
+                         | transforms.Create(known_args.call_sample_ids,
+                                             reshuffle=False)
+                         | beam.combiners.ToList())
     else:
-      call_names = (variants
-                    | 'CombineCallNames' >>
-                    combine_call_names.CallNamesCombiner(
-                        known_args.preserve_call_names_order))
+      call_sample_ids = (variants
+                         | 'CombineCallSampleIds' >>
+                         combine_call_sample_ids.CallSampleIdsCombiner(
+                             known_args.preserve_call_sample_ids_order))
 
-    _ = (call_names
+    _ = (call_sample_ids
          | 'GenerateVcfDataHeader' >>
-         beam.ParDo(_write_vcf_header_with_call_names,
+         beam.ParDo(_write_vcf_header_with_call_sample_ids,
                     _VCF_FIXED_COLUMNS,
                     known_args.representative_header_file,
                     header_file_path))
 
     _ = (variants
-         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(call_names))
+         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(
+             call_sample_ids))
          | 'PairVariantWithKey' >>
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
@@ -275,10 +277,10 @@ def _get_query_columns(schema):
   return columns
 
 
-def _write_vcf_header_with_call_names(sample_names,
-                                      vcf_fixed_columns,
-                                      representative_header_file,
-                                      file_path):
+def _write_vcf_header_with_call_sample_ids(sample_names,
+                                           vcf_fixed_columns,
+                                           representative_header_file,
+                                           file_path):
   # type: (List[str], List[str], str, str) -> None
   """Writes VCF header containing meta info and header line with call names.
 

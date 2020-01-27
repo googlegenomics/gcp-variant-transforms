@@ -183,7 +183,7 @@ class VariantCall(object):
   variant. It may include associated information such as quality and phasing.
   """
 
-  def __init__(self, name=None, genotype=None, phaseset=None, info=None):
+  def __init__(self, sample_id=None, genotype=None, phaseset=None, info=None):
     # type: (str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
 
@@ -203,18 +203,18 @@ class VariantCall(object):
         in the VCF record and the type of the value is specified by the VCF
         header FORMAT.
     """
-    self.name = name
+    self.sample_id = sample_id
     self.genotype = genotype or []
     self.phaseset = phaseset
     self.info = info or {}
 
   def __eq__(self, other):
-    return ((self.name, self.genotype, self.phaseset, self.info) ==
-            (other.name, other.genotype, other.phaseset, other.info))
+    return ((self.sample_id, self.genotype, self.phaseset, self.info) ==
+            (other.sample_id, other.genotype, other.phaseset, other.info))
 
   def __lt__(self, other):
-    if self.name != other.name:
-      return self.name < other.name
+    if self.sample_id != other.sample_id:
+      return self.sample_id < other.sample_id
     elif self.genotype != other.genotype:
       return self.genotype < other.genotype
     elif self.phaseset != other.phaseset:
@@ -236,7 +236,8 @@ class VariantCall(object):
 
   def __repr__(self):
     return ', '.join(
-        [str(s) for s in [self.name, self.genotype, self.phaseset, self.info]])
+        [str(s) for s in [
+            self.sample_id, self.genotype, self.phaseset, self.info]])
 
 
 class VcfParser(object):

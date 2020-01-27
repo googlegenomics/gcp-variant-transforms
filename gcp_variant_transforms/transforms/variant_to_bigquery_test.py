@@ -33,6 +33,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.testing import vcf_header_util
+from gcp_variant_transforms.testing.testdata_util import hash_name
 from gcp_variant_transforms.transforms.variant_to_bigquery import ConvertVariantToRow
 
 
@@ -109,10 +110,10 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
               'IS': 'some data', 'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FB': True}),
         ]
     )
@@ -125,11 +126,11 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.QUALITY: 2,
            ColumnKeyConstants.FILTER: ['PASS'],
            ColumnKeyConstants.CALLS: [
-               {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
                 'GQ': 20, 'FIR': [10, 20]},
-               {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
                 ColumnKeyConstants.CALLS_PHASESET: None,
                 'GQ': 10, 'FB': True}],
@@ -183,7 +184,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         info={'II': 1234},
         calls=[
             vcfio.VariantCall(
-                name='EmptySample', genotype=[], phaseset='*',
+                sample_id=hash_name('EmptySample'), genotype=[], phaseset='*',
                 info={}),
         ])
     header_num_dict = {'II': '1'}
@@ -204,7 +205,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         info={'IFR': ['0.1', '0.2'], 'IS': 1, 'ISR': 1},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10.0, 20.0]}),
         ]
     )
@@ -216,7 +217,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.ALTERNATE_BASES: [],
            ColumnKeyConstants.FILTER: ['PASS'],
            ColumnKeyConstants.CALLS: [
-               {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
                 'GQ': 20, 'FIR': [10, 20]}],

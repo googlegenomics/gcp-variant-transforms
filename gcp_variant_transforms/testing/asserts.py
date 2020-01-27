@@ -49,14 +49,14 @@ def count_equals_to(expected_count):
   return _count_equal
 
 
-def has_calls(call_names):
+def has_sample_ids(call_sample_ids):
   """Returns a function for checking presence of calls_names in variants."""
-  def _has_calls(variants):
-    assert_fn = items_equal(call_names)
+  def _has_sample_ids(variants):
+    assert_fn = items_equal(call_sample_ids)
     for variant in variants:
-      variant_call_names = [call.name for call in variant.calls]
-      assert_fn(variant_call_names)
-  return _has_calls
+      variant_call_sample_ids = [call.sample_id for call in variant.calls]
+      assert_fn(variant_call_sample_ids)
+  return _has_sample_ids
 
 
 def header_vars_equal(expected):
