@@ -20,12 +20,12 @@ import random
 from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
+from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -66,11 +66,7 @@ class VariantToBigQuery(beam.PTransform):
   def __init__(
       self,
       output_table,  # type: str
-      header_fields,  # type: vcf_header_io.VcfHeader
-      variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
-      proc_var_factory=None,  # type: processed_variant.ProcessedVariantFactory
-      # TODO(bashir2): proc_var_factory is a required argument and if `None` is
-      # supplied this will fail in schema generation.
+      schema,  # type: bigquery.TableSchema
       append=False,  # type: bool
       update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
@@ -83,14 +79,7 @@ class VariantToBigQuery(beam.PTransform):
 
     Args:
       output_table: Full path of the output BigQuery table.
-      header_fields: Representative header fields for all variants. This is
-        needed for dynamically generating the schema.
-      variant_merger: The strategy used for merging variants (if any). Some
-        strategies may change the schema, which is why this may be needed here.
-      proc_var_factory: The factory class that knows how to convert Variant
-        instances to ProcessedVariant. As a side effect it also knows how to
-        modify BigQuery schema based on the ProcessedVariants that it generates.
-        The latter functionality is what is needed here.
+      schema: Schema of the table to be generated.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
       update_schema_on_append: If true, BigQuery schema will be updated by
@@ -107,13 +96,8 @@ class VariantToBigQuery(beam.PTransform):
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
     """
     self._output_table = output_table
-    self._header_fields = header_fields
-    self._variant_merger = variant_merger
-    self._proc_var_factory = proc_var_factory
     self._append = append
-    self._schema = (
-        schema_converter.generate_schema_from_header_fields(
-            self._header_fields, self._proc_var_factory, self._variant_merger))
+    self._schema = schema
     # Resolver makes extra effort to resolve conflict when flag
     # allow_incompatible_records is set.
     self._bigquery_row_generator = (

@@ -318,6 +318,25 @@ def convert_table_schema_to_json_avro_schema(schema):
   logging.info('The Avro schema is: %s', json_str)
   return json_str
 
+def _add_bq_field(field):
+  sub_schema = OrderedDict()
+  sub_schema["description"] = field.description
+  if field.fields:
+    sub_schema["fields"] = [_add_bq_field(elem) for elem in field.fields]
+  sub_schema["mode"] = field.mode
+  sub_schema["name"] = field.name
+  sub_schema["type"] = field.type
+  return sub_schema
+
+def convert_table_schema_to_json_bq_schema(schema):
+  # type: (bigquery.TableSchema) -> str
+  """Returns the Bigquery equivalent of the given `schema` in json format."""
+  if not isinstance(schema, bigquery.TableSchema):
+    raise ValueError(
+        'Expected an instance of bigquery.TableSchema got {}'.format(
+            type(schema)))
+  return json.dumps([_add_bq_field(elem) for elem in schema.fields])
+
 
 def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
   # type: (bigquery.TableSchema, bool) -> vcf_header_io.VcfHeader
