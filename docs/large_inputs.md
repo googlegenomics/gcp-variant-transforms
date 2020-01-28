@@ -132,18 +132,18 @@ loading large (>5TB) data to BigQuery at once.
 As a result, we recommend setting `--num_bigquery_write_shards 20` when loading
 any data that has more than 1 billion rows (after merging) or 1TB of final
 output. You may use a smaller number of write shards (e.g. 5) when using
-[partitioned output](#--partition_config_path) as each partition also acts as a
+[sharded output](#--sharding_config_path) as each partition also acts as a
 "shard". Note that using a larger value (e.g. 50) can cause BigQuery write to
 fail as there is a maximum limit on the number of concurrent writes per table.
 
-### `--partition_config_path`
+### `--sharding_config_path`
 
-Partitioning the output can save significant query costs once the data is in
+Sharding the output can save significant query costs once the data is in
 BigQuery. It can also optimize the cost/time of the pipeline (e.g. it natively
 shards the BigQuery output per partition and merging can also occur per
 partition).
 
 As a result, we recommend setting the partition config for very large data
-where possible. Please see the [documentation](partitioning.md) for more
+where possible. Please see the [documentation](sharding.md) for more
 details.
 

@@ -49,7 +49,7 @@ from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
-from gcp_variant_transforms.libs import variant_partition
+from gcp_variant_transforms.libs import variant_sharding
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
@@ -64,7 +64,7 @@ from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
-from gcp_variant_transforms.transforms import partition_variants
+from gcp_variant_transforms.transforms import shard_variants
 from gcp_variant_transforms.transforms import variant_to_avro
 from gcp_variant_transforms.transforms import variant_to_bigquery
 from gcp_variant_transforms.transforms import write_variants_to_shards
@@ -76,7 +76,7 @@ _COMMAND_LINE_OPTIONS = [
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
     variant_transform_options.MergeOptions,
-    variant_transform_options.PartitionOptions,
+    variant_transform_options.ShardingOptions,
     variant_transform_options.ExperimentalOptions,
 ]
 
@@ -442,33 +442,33 @@ def run(argv=None):
       known_args.infer_annotation_types,
       counter_factory)
 
-  partitioner = None
+  sharding = None
   if ((known_args.optimize_for_large_inputs and variant_merger) or
-      known_args.partition_config_path):
-    partitioner = variant_partition.VariantPartition(
-        known_args.partition_config_path)
+      known_args.sharding_config_path):
+    sharding = variant_sharding.VariantSharding(
+        known_args.sharding_config_path)
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   variants |= 'FilterVariants' >> filter_variants.FilterVariants(
       reference_names=known_args.reference_names)
-  if partitioner:
-    num_partitions = partitioner.get_num_partitions()
-    partitioned_variants = variants | 'PartitionVariants' >> beam.Partition(
-        partition_variants.PartitionVariants(partitioner), num_partitions)
+  if sharding:
+    num_shards = sharding.get_num_shards()
+    sharded_variants = variants | 'ShardVariants' >> beam.Partition(
+        shard_variants.ShardVariants(sharding), num_shards)
     variants = []
-    for i in range(num_partitions):
-      if partitioner.should_keep_partition(i):
-        variants.append(partitioned_variants[i])
+    for i in range(num_shards):
+      if sharding.should_keep_shard(i):
+        variants.append(sharded_variants[i])
       else:
-        num_partitions -= 1
+        num_shards -= 1
   else:
-    # By default we don't partition the data, so we have only 1 partition.
-    num_partitions = 1
+    # By default we don't shard output table, so we have only 1 shard.
+    num_shards = 1
     variants = [variants]
 
-  for i in range(num_partitions):
+  for i in range(num_shards):
     if variant_merger:
       variants[i] |= ('MergeVariants' + str(i) >>
                       merge_variants.MergeVariants(variant_merger))
@@ -476,9 +476,9 @@ def run(argv=None):
         'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
             with_output_types(processed_variant.ProcessedVariant))
-  if partitioner and partitioner.should_flatten():
-    variants = [variants | 'FlattenPartitions' >> beam.Flatten()]
-    num_partitions = 1
+  if sharding and sharding.should_flatten():
+    variants = [variants | 'FlattenShards' >> beam.Flatten()]
+    num_shards = 1
 
   if known_args.output_table:
     schema_file = tempfile.mkstemp(prefix=known_args.output_table,
@@ -491,10 +491,10 @@ def run(argv=None):
     with filesystems.FileSystems.create(schema_file) as file_to_write:
       file_to_write.write(schema_json)
 
-    for i in range(num_partitions):
+    for i in range(num_shards):
       table_suffix = ''
-      if partitioner and partitioner.get_partition_name(i):
-        table_suffix = '_' + partitioner.get_partition_name(i)
+      if sharding and sharding.get_shard_name(i):
+        table_suffix = '_' + sharding.get_shard_name(i)
       table_name = known_args.output_table + table_suffix
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
