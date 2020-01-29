@@ -178,7 +178,7 @@ def _bigquery_to_vcf_shards(
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
     if known_args.call_names:
       call_names = (p
-                    | transforms.Create(known_args.call_names)
+                    | transforms.Create(known_args.call_names, reshuffle=False)
                     | beam.combiners.ToList())
     else:
       call_names = (variants
