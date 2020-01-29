@@ -1,125 +1,150 @@
--  partition:
-     partition_name: "chr1"
+-  output_table:
+     table_name_suffix: "chr1"
      regions:
        - "chr1"
        - "1"
--  partition:
-     partition_name: "chr2"
+     total_base_pairs: 249240615
+-  output_table:
+     table_name_suffix: "chr2"
      regions:
        - "chr2"
        - "2"
--  partition:
-     partition_name: "chr3"
+     total_base_pairs: 243189284
+-  output_table:
+     table_name_suffix: "chr3"
      regions:
        - "chr3"
        - "3"
--  partition:
-     partition_name: "chr4"
+     total_base_pairs: 197961643
+-  output_table:
+     table_name_suffix: "chr4"
      regions:
        - "chr4"
        - "4"
--  partition:
-     partition_name: "chr5"
+     total_base_pairs: 191044274
+-  output_table:
+     table_name_suffix: "chr5"
      regions:
        - "chr5"
        - "5"
--  partition:
-     partition_name: "chr6"
+     total_base_pairs: 180905191
+-  output_table:
+     table_name_suffix: "chr6"
      regions:
        - "chr6"
        - "6"
--  partition:
-     partition_name: "chr7"
+     total_base_pairs: 171053767
+-  output_table:
+     table_name_suffix: "chr7"
      regions:
        - "chr7"
        - "7"
--  partition:
-     partition_name: "chr8"
+     total_base_pairs: 159128660
+-  output_table:
+     table_name_suffix: "chr8"
      regions:
        - "chr8"
        - "8"
--  partition:
-     partition_name: "chr9"
+     total_base_pairs: 146303973
+-  output_table:
+     table_name_suffix: "chr9"
      regions:
        - "chr9"
        - "9"
-
--  partition:
-     partition_name: "chr10"
+     total_base_pairs: 141149922
+-  output_table:
+     table_name_suffix: "chr10"
      regions:
        - "chr10"
        - "10"
--  partition:
-     partition_name: "chr11"
+     total_base_pairs: 135524745
+-  output_table:
+     table_name_suffix: "chr11"
      regions:
        - "chr11"
        - "11"
--  partition:
-     partition_name: "chr12"
+     total_base_pairs: 134946513
+-  output_table:
+     table_name_suffix: "chr12"
      regions:
        - "chr12"
        - "12"
--  partition:
-     partition_name: "chr13"
+     total_base_pairs: 133841700
+-  output_table:
+     table_name_suffix: "chr13"
      regions:
        - "chr13"
        - "13"
--  partition:
-     partition_name: "chr14"
+     total_base_pairs: 115109876
+-  output_table:
+     table_name_suffix: "chr14"
      regions:
        - "chr14"
        - "14"
--  partition:
-     partition_name: "chr15"
+     total_base_pairs: 107289538
+-  output_table:
+     table_name_suffix: "chr15"
      regions:
        - "chr15"
        - "15"
--  partition:
-     partition_name: "chr16"
+     total_base_pairs: 102521390
+-  output_table:
+     table_name_suffix: "chr16"
      regions:
        - "chr16"
        - "16"
--  partition:
-     partition_name: "chr17"
+     total_base_pairs: 90294745
+-  output_table:
+     table_name_suffix: "chr17"
      regions:
        - "chr17"
        - "17"
--  partition:
-     partition_name: "chr18"
+     total_base_pairs: 81195200
+-  output_table:
+     table_name_suffix: "chr18"
      regions:
        - "chr18"
        - "18"
--  partition:
-     partition_name: "chr19"
+     total_base_pairs: 78017161
+-  output_table:
+     table_name_suffix: "chr19"
      regions:
        - "chr19"
        - "19"
--  partition:
-     partition_name: "chr20"
+     total_base_pairs: 59118975
+-  output_table:
+     table_name_suffix: "chr20"
      regions:
        - "chr20"
        - "20"
--  partition:
-     partition_name: "chr21"
+     total_base_pairs: 62965515
+-  output_table:
+     table_name_suffix: "chr21"
      regions:
        - "chr21"
        - "21"
--  partition:
-     partition_name: "chr22"
+     total_base_pairs: 48119890
+-  output_table:
+     table_name_suffix: "chr22"
      regions:
        - "chr22"
        - "22"
--  partition:
-     partition_name: "chrX"
+     total_base_pairs: 51244528
+-  output_table:
+     table_name_suffix: "chrX"
      regions:
        - "chrX"
        - "x"
--  partition:
-     partition_name: "chrY"
+     total_base_pairs: 155260473
+-  output_table:
+     table_name_suffix: "chrY"
      regions:
        - "chrY"
        - "y"
--  partition:
-     partition_name: "residual"
+     total_base_pairs: 57227415
+-  output_table:
+     table_name_suffix: "residual"
      regions:
        - "residual"
+     total_base_pairs: 249240615
+
