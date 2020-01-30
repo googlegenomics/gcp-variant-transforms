@@ -52,6 +52,7 @@ from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_sharding
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
+from gcp_variant_transforms.libs.sample_info_table_schema_generator import compose_table_name
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -445,43 +446,20 @@ def run(argv=None):
       known_args.infer_annotation_types,
       counter_factory)
 
-  sharding = None
-  if ((known_args.optimize_for_large_inputs and variant_merger) or
-      known_args.sharding_config_path):
-    sharding = variant_sharding.VariantSharding(
-        known_args.sharding_config_path)
-
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
-  variants |= 'FilterVariants' >> filter_variants.FilterVariants(
-      reference_names=known_args.reference_names)
-  if sharding:
-    num_shards = sharding.get_num_shards()
-    sharded_variants = variants | 'ShardVariants' >> beam.Partition(
-        shard_variants.ShardVariants(sharding), num_shards)
-    variants = []
-    for i in range(num_shards):
-      if sharding.should_keep_shard(i):
-        variants.append(sharded_variants[i])
-      else:
-        num_shards -= 1
-  else:
-    # By default we don't shard output table, so we have only 1 shard.
-    num_shards = 1
-    variants = [variants]
+
+  sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
+  num_shards = sharding.get_num_shards()
+  sharded_variants = variants | 'ShardVariants' >> beam.Partition(
+    shard_variants.ShardVariants(sharding), num_shards)
 
   for i in range(num_shards):
-    if variant_merger:
-      variants[i] |= ('MergeVariants' + str(i) >>
-                      merge_variants.MergeVariants(variant_merger))
-    variants[i] |= (
+    sharded_variants[i] |= (
         'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
             with_output_types(processed_variant.ProcessedVariant))
-  if sharding and sharding.should_flatten():
-    variants = [variants | 'FlattenShards' >> beam.Flatten()]
-    num_shards = 1
 
   if known_args.output_table:
     schema_file = tempfile.mkstemp(prefix=known_args.output_table,
@@ -495,11 +473,9 @@ def run(argv=None):
       file_to_write.write(schema_json)
 
     for i in range(num_shards):
-      table_suffix = ''
-      if sharding and sharding.get_shard_name(i):
-        table_suffix = '_' + sharding.get_shard_name(i)
-      table_name = known_args.output_table + table_suffix
-      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
+      table_suffix = sharding.get_output_table_suffix(i)
+      table_name = compose_table_name(known_args.output_table, table_suffix)
+      _ = (sharded_variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
                schema,
@@ -517,19 +493,21 @@ def run(argv=None):
     # TODO(bashir2): Add an integration test that outputs to Avro files and
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
-    _ = (
-        variants | 'FlattenToOnePCollection' >> beam.Flatten()
-        | 'VariantToAvro' >>
-        variant_to_avro.VariantToAvroFiles(
-            known_args.output_avro_path,
-            header_fields,
-            processed_variant_factory,
-            variant_merger=variant_merger,
-            allow_incompatible_records=known_args.allow_incompatible_records,
-            omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-            null_numeric_value_replacement=(
-                known_args.null_numeric_value_replacement))
-    )
+    for i in range(num_shards):
+      avro_path = compose_table_name(known_args.output_avro_path,
+                                     sharding.get_output_table_suffix(i))
+      _ = (
+          sharded_variants[i] | 'VariantToAvro' >>
+          variant_to_avro.VariantToAvroFiles(
+              avro_path,
+              header_fields,
+              processed_variant_factory,
+              variant_merger=variant_merger,
+              allow_incompatible_records=known_args.allow_incompatible_records,
+              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+              null_numeric_value_replacement=(
+                  known_args.null_numeric_value_replacement))
+      )
 
   result = pipeline.run()
   result.wait_until_finish()

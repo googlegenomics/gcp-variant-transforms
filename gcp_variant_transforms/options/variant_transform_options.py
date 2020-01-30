@@ -383,9 +383,9 @@ class FilterOptions(VariantTransformsOptions):
     parser.add_argument(
         '--reference_names',
         default=None, nargs='+',
-        help=('A list of reference names (separated by a space) to load '
-              'to BigQuery. If this parameter is not specified, all '
-              'references will be kept.'))
+        help=('This flag is deprecated and will be removed in the next '
+              'release. You can achieve the same goal by using a sharding '
+              'file and setting the --sharding_config_path flag.'))
 
 
 class MergeOptions(VariantTransformsOptions):
@@ -509,7 +509,9 @@ class ShardingOptions(VariantTransformsOptions):
   def add_arguments(self, parser):
     parser.add_argument(
         '--partition_config_path',
-        default='',
+        default=('gcp_variant_transforms/data/sharding_configs/'
+                 'homo_sapiens_default.yaml'),
+        required=True,
         help=('This argument is deprecated and will be removed in the next '
               'release. It has been replaced by --sharding_config_path .'))
     parser.add_argument(
