@@ -447,7 +447,6 @@ class PySamParser(VcfParser):
     self._original_info_list = None
     self._process_pid = None
     self._encoded_sample_names = {}
-
     self._file_name = ''
     if sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
       self._file_name = file_name
@@ -612,7 +611,7 @@ class PySamParser(VcfParser):
       value = value.encode('utf-8')
     return str(value)
 
-  def _encode(self, sample_name):
+  def _lookup_encoded_sample_name(self, sample_name):
     sample_code_hex = self._encoded_sample_names.get(sample_name)
     if not sample_code_hex:
       sample_code_hex = hex(hashing_util.generate_sample_id(sample_name,
@@ -651,7 +650,7 @@ class PySamParser(VcfParser):
       # before settings default phaseset value.
       if phaseset is None and sample.phased and len(genotype) > 1:
         phaseset = DEFAULT_PHASESET_VALUE
-      encoded_name = self._encode(name)
+      encoded_name = self._lookup_encoded_sample_name(name)
       calls.append(VariantCall(encoded_name, genotype, phaseset, info))
 
     return calls

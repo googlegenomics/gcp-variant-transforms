@@ -397,7 +397,7 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
        sample_info_to_bigquery.SampleInfoToBigQuery(
            known_args.output_table,
            known_args.append,
-           known_args.samples_span_multiple_files))
+           known_args.sample_name_encoding))
 
 
 def run(argv=None):
