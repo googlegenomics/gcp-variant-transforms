@@ -141,10 +141,12 @@ class QueryFormatter(object):
   """
 
   class _QueryMacros(enum.Enum):
-    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
+    # Due to sharding of output table there will be multiple output tables with
+    # different suffixes, such as: "_chr1", "_chr2", ...and "_residual".
+    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*'
     SUM_START_QUERY = (
-        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}')
-    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
+        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}_*')
+    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}_*'
 
   def __init__(self, table_name):
     # type: (str) -> None

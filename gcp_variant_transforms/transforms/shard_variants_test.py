@@ -32,69 +32,64 @@ from gcp_variant_transforms.libs import variant_sharding
 class ShardVariantsTest(unittest.TestCase):
   """Test cases for the ``ShardVariants`` transform."""
 
-  def _get_standard_variant_shards(self):
-    # Valid variants reference_name.strip().lower() will successfully matched to
-    #   re.compile(r'^(chr)?([0-9][0-9]?)$')
+  def _get_expected_variant_shards(self):
+    # reference_name.strip().lower() matched to shards defined in
+    #   data/sharding_configs/homo_sapiens_default.yaml will be assigned to
+    #   the corresponding shard, otherwise they will end up in residual shard.
     expected_shards = {}
-    # Partition 0
+    # Shard 0
     expected_shards[0] = [vcfio.Variant(reference_name='chr1', start=0),
                           vcfio.Variant(reference_name='CHR1', start=0)]
-    # Partition 1
+    # Shard 1
     expected_shards[1] = [vcfio.Variant(reference_name='cHr2', start=0),
                           vcfio.Variant(reference_name='chR2', start=0)]
-    # Partition 2
+    # Shard 2
     expected_shards[2] = [vcfio.Variant(reference_name='chr3', start=0),
-                          vcfio.Variant(reference_name='chr03', start=0)]
-    # Partition 5
+                          vcfio.Variant(reference_name='ChR3', start=0)]
+    # Shard 5
     expected_shards[5] = [vcfio.Variant(reference_name='6', start=0),
-                          vcfio.Variant(reference_name='06', start=0),
-                          vcfio.Variant(reference_name='chr06', start=0)]
-    # Partition 9
+                          vcfio.Variant(reference_name='chr6', start=0)]
+    # Shard 9
     expected_shards[9] = [vcfio.Variant(reference_name='chr10', start=0),
                           vcfio.Variant(reference_name='  chr10 ', start=0)]
-    # Partition 21
+    # Shard 21
     expected_shards[21] = [vcfio.Variant(reference_name='chr22', start=0),
-                           vcfio.Variant(reference_name='chr22  ', start=0)]
-    return expected_shards
-
-  def _get_nonstandard_variant_shards(self):
-    # All these variants will not match to standard reference_name Reg Exp, thus
-    # they will all end up in shards >= 22.
-    expected_shards = {}
-    # Partition 22
-    expected_shards[22] = [vcfio.Variant(reference_name='NOT6', start=0),
-                           vcfio.Variant(reference_name='NOTch3', start=0)]
-    # Partition 24
-    expected_shards[24] = [vcfio.Variant(reference_name='NOTchr1', start=0),
-                           vcfio.Variant(reference_name='chr99', start=0)]
-    # Partition 25
-    expected_shards[25] = [vcfio.Variant(reference_name='NOT07', start=0),
-                           vcfio.Variant(reference_name='chr008', start=0),
-                           vcfio.Variant(reference_name='chr23', start=0),
+                           vcfio.Variant(reference_name='    22  ', start=0)]
+    # Shard 22
+    expected_shards[22] = [vcfio.Variant(reference_name='chrx', start=0),
                            vcfio.Variant(reference_name='chrX', start=0),
+                           vcfio.Variant(reference_name=' X  ', start=0)]
+    # Shard 23
+    expected_shards[23] = [vcfio.Variant(reference_name='chry', start=0),
+                           vcfio.Variant(reference_name='chrY', start=0),
+                           vcfio.Variant(reference_name=' Y  ', start=0)]
+    # Shard 24, aka residual
+    expected_shards[24] = [vcfio.Variant(reference_name='ch1', start=0),
+                           vcfio.Variant(reference_name='chr001', start=0),
+                           vcfio.Variant(reference_name='01', start=0),
+                           vcfio.Variant(reference_name='contig1', start=0),
+                           vcfio.Variant(reference_name='contig1000', start=0),
+                           vcfio.Variant(reference_name='chr23', start=0),
+                           vcfio.Variant(reference_name='chr24', start=0),
+                           vcfio.Variant(reference_name='chr99', start=0),
                            vcfio.Variant(reference_name='chrM', start=0)]
-    # Partition 26
-    expected_shards[26] = [vcfio.Variant(reference_name='NOTc4', start=0),
-                           vcfio.Variant(reference_name='chr0', start=0),
-                           vcfio.Variant(reference_name='chrY', start=0)]
     return expected_shards
 
   def test_shard_variants(self):
-    expected_shards = self._get_standard_variant_shards()
-    expected_shards.update(self._get_nonstandard_variant_shards())
+    expected_shards = self._get_expected_variant_shards()
     variants = [variant
                 for variant_list in expected_shards.values()
                 for variant in variant_list]
 
-    sharder = variant_sharding.VariantSharding()
+    sharding = variant_sharding.VariantSharding('gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml')
     pipeline = TestPipeline()
     shards = (
         pipeline
-        | Create(variants)
+        | Create(variants, reshuffle=False)
         | 'ShardVariants' >> beam.Partition(
-            shard_variants.ShardVariants(sharder),
-            sharder.get_num_shards()))
-    for i in xrange(sharder.get_num_shards()):
+            shard_variants.ShardVariants(sharding),
+            sharding.get_num_shards()))
+    for i in range(sharding.get_num_shards()):
       assert_that(shards[i], equal_to(expected_shards.get(i, [])),
                   label=str(i))
     pipeline.run()

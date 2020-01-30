@@ -30,4 +30,5 @@ class ShardVariants(beam.PartitionFn):
 
   def partition_for(self, variant, _):
     # type: (vcfio.Variant, int) -> int
-    return self._shard.get_shard(variant.reference_name, variant.start)
+    return self._shard.get_shard_index(variant.reference_name.strip(),
+                                       variant.start)
