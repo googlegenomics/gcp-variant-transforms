@@ -3,6 +3,7 @@
     "test_name": "valid-4-1",
     "table_name": "valid_4_1",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.1-large.vcf",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DirectRunner",
     "assertion_configs": [
       {

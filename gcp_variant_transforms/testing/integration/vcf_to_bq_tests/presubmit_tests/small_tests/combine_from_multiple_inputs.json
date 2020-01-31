@@ -4,6 +4,7 @@
     "table_name": "combine_from_multiple_inputs",
     "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
     "allow_incompatible_records": "True",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DirectRunner",
     "assertion_configs": [
       {
@@ -11,11 +12,11 @@
         "expected_result": {"num_rows": 9895}
       },
       {
-        "query": ["SELECT SUM(DP) AS sum FROM {TABLE_NAME}"],
+        "query": ["SELECT SUM(DP) AS sum FROM {TABLE_NAME}_*"],
         "expected_result": {"sum": 131}
       },
       {
-        "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
+        "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}_*"],
         "expected_result": {"cnt": 2}
       }
     ]
