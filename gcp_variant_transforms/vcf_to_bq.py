@@ -65,6 +65,7 @@ from gcp_variant_transforms.transforms import extract_input_size
 from gcp_variant_transforms.transforms import filter_variants
 from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
+from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import shard_variants
 from gcp_variant_transforms.transforms import variant_to_avro
 from gcp_variant_transforms.transforms import variant_to_bigquery
@@ -455,6 +456,9 @@ def run(argv=None):
       shard_variants.ShardVariants(sharding), num_shards)
 
   for i in range(num_shards):
+    if variant_merger:
+      sharded_variants[i] |= ('MergeVariants' + str(i) >>
+                              merge_variants.MergeVariants(variant_merger))
     sharded_variants[i] |= (
         'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
