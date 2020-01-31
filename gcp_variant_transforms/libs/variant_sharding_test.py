@@ -392,8 +392,8 @@ class VariantShardingTest(unittest.TestCase):
         ValueError,
         'Wrong sharing config file, output_table field missing.'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(missing_output_table)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_output_table)))
 
     missing_table_name_suffix = [
         '-  output_table:',
@@ -406,40 +406,40 @@ class VariantShardingTest(unittest.TestCase):
         ValueError,
         'Wrong sharding config file, table_name_suffix field missing.'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(missing_table_name_suffix)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_table_name_suffix)))
 
     missing_chrom_values = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, regions field missing.'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(missing_chrom_values)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_chrom_values)))
 
     missing_filters = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, regions field missing.'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(missing_filters)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(missing_filters)))
 
     missing_total_base_pairs = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr1"',
-      '       - "1"',
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr1"',
+        '       - "1"',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -451,153 +451,152 @@ class VariantShardingTest(unittest.TestCase):
   def test_config_failed_wrong_fields(self):
     tempdir = temp_dir.TempDir()
     empty_suffix = [
-      '-  output_table:',
-      '     table_name_suffix: " "',
-      '     regions:',
-      '       - "chr1"',
-      '       - "1"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: " "',
+        '     regions:',
+        '       - "chr1"',
+        '       - "1"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, table_name_suffix can not be empty.'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(empty_suffix)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(empty_suffix)))
     tempdir = temp_dir.TempDir()
 
     wrong_table_name = [
-      '-  output_table:',
-      '     table_name_suffix: "chr#"',
-      '     regions:',
-      '       - "chr1"',
-      '       - "1"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr#"',
+        '     regions:',
+        '       - "chr1"',
+        '       - "1"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, BigQuery table name can only contain *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(wrong_table_name)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(wrong_table_name)))
     tempdir = temp_dir.TempDir()
 
     duplicate_suffix = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr1"',
-      '     total_base_pairs: 249240615',
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr2"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr1"',
+        '     total_base_pairs: 249240615',
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr2"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, table name suffixes must be unique*'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(duplicate_suffix)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(duplicate_suffix)))
     tempdir = temp_dir.TempDir()
 
     empty_chrom_value = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr1"',
-      '       - " "',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr1"',
+        '       - " "',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, reference_name can not be empty string: '):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(empty_chrom_value)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(empty_chrom_value)))
     tempdir = temp_dir.TempDir()
 
     duplicate_chrom_value1 = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "dup_value"',
-      '       - "dup_value"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "dup_value"',
+        '       - "dup_value"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, regions must be unique in config file: *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(duplicate_chrom_value1)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(duplicate_chrom_value1)))
 
     duplicate_chrom_value2 = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "dup_value"',
-      '     total_base_pairs: 249240615',
-      '-  output_table:',
-      '     table_name_suffix: "chr2"',
-      '     regions:',
-      '       - "dup_value"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "dup_value"',
+        '     total_base_pairs: 249240615',
+        '-  output_table:',
+        '     table_name_suffix: "chr2"',
+        '     regions:',
+        '       - "dup_value"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, regions must be unique in config file: *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(duplicate_chrom_value2)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(duplicate_chrom_value2)))
 
     duplicate_residual = [
-      '-  output_table:',
-      '     table_name_suffix: "residual1"',
-      '     regions:',
-      '       - "residual"',
-      '     total_base_pairs: 249240615',
-      '-  output_table:',
-      '     table_name_suffix: "residual2"',
-      '     regions:',
-      '       - "residual"',
-      '     total_base_pairs: 249240615'
+        '-  output_table:',
+        '     table_name_suffix: "residual1"',
+        '     regions:',
+        '       - "residual"',
+        '     total_base_pairs: 249240615',
+        '-  output_table:',
+        '     table_name_suffix: "residual2"',
+        '     regions:',
+        '       - "residual"',
+        '     total_base_pairs: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, there can be only one residual output *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(duplicate_residual)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(duplicate_residual)))
 
     not_int_total_base_pairs = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr1"',
-      '       - "1"',
-      '     total_base_pairs: "not int"'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr1"',
+        '       - "1"',
+        '     total_base_pairs: "not int"'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(not_int_total_base_pairs)))
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(not_int_total_base_pairs)))
 
     not_pos_total_base_pairs = [
-      '-  output_table:',
-      '     table_name_suffix: "chr1"',
-      '     regions:',
-      '       - "chr1"',
-      '       - "1"',
-      '     total_base_pairs: -10'
+        '-  output_table:',
+        '     table_name_suffix: "chr1"',
+        '     regions:',
+        '       - "chr1"',
+        '       - "1"',
+        '     total_base_pairs: -10'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(
-        tempdir.create_temp_file(suffix='.yaml',
-                                 lines='\n'.join(not_pos_total_base_pairs)))
-
+          tempdir.create_temp_file(suffix='.yaml',
+                                   lines='\n'.join(not_pos_total_base_pairs)))

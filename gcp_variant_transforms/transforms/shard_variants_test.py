@@ -81,7 +81,9 @@ class ShardVariantsTest(unittest.TestCase):
                 for variant_list in expected_shards.values()
                 for variant in variant_list]
 
-    sharding = variant_sharding.VariantSharding('gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml')
+    sharding = variant_sharding.VariantSharding(
+        'gcp_variant_transforms/data/sharding_configs/'
+        'homo_sapiens_default.yaml')
     pipeline = TestPipeline()
     shards = (
         pipeline

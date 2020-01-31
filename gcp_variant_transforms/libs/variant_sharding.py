@@ -28,9 +28,7 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 import re
-import sys
 import intervaltree
-from mmh3 import hash  # pylint: disable=no-name-in-module,redefined-builtin
 import yaml
 
 from apache_beam.io.filesystems import FileSystems
@@ -133,7 +131,7 @@ class VariantSharding(object):
     if len(shards) > _MAX_NUM_SHARDS:
       raise ValueError(
           'There can be at most {} output tables but given config file '
-          'contains {}'.format(_MAX_NUM_OUTPUT_TABLES, len(shards)))
+          'contains {}'.format(_MAX_NUM_SHARDS, len(shards)))
     if not shards:
       raise ValueError('At least one output table is needed in config file.')
 
@@ -144,12 +142,12 @@ class VariantSharding(object):
       output_table = item.get(_OUTPUT_TABLE, None)
       if output_table is None:
         raise ValueError('Wrong sharing config file, {} field missing.'.format(
-          _OUTPUT_TABLE))
+            _OUTPUT_TABLE))
       # Validate table_name_suffix
       table_name_suffix = output_table.get(_TABLE_NAME_SUFFIX)
       if not table_name_suffix:
         raise ValueError('Wrong sharding config file, {} field missing.'.format(
-          _TABLE_NAME_SUFFIX))
+            _TABLE_NAME_SUFFIX))
       table_name_suffix = table_name_suffix.strip()
       if not table_name_suffix:
         raise ValueError(
@@ -167,7 +165,7 @@ class VariantSharding(object):
       regions = output_table.get(_REGIONS, None)
       if regions is None:
         raise ValueError('Wrong sharding config file, {} field missing.'.format(
-          _REGIONS))
+            _REGIONS))
       if len(regions) > _MAX_NUM_REGIONS:
         raise ValueError('Wrong sharding config file, at most {} CHROM '
                          'values per output table is allowed: {}'.format(
@@ -195,8 +193,8 @@ class VariantSharding(object):
       total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS, None)
       if not total_base_pairs:
         raise ValueError('Wrong sharding config file, {} field missing.'.format(
-          _TOTAL_BASE_PAIRS))
-      if type(total_base_pairs) is not int:
+            _TOTAL_BASE_PAIRS))
+      if not isinstance(total_base_pairs, int):
         try:
           total_base_pairs = genomic_region_parser.parse_comma_sep_int(
               total_base_pairs)
@@ -227,7 +225,7 @@ class VariantSharding(object):
       output_table = shards[shard_index].get(_OUTPUT_TABLE)
       # Store table_name_suffix
       self._table_name_suffixes.insert(
-        shard_index, output_table.get(_TABLE_NAME_SUFFIX).strip())
+          shard_index, output_table.get(_TABLE_NAME_SUFFIX).strip())
       # Store regions
       regions = output_table.get(_REGIONS, None)
       if self._is_residual_shard(regions):
@@ -242,9 +240,9 @@ class VariantSharding(object):
           self._region_to_shard[ref_name] = shard_index
       # Store num_base_pairs
       total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS)
-      if type(total_base_pairs) is not int:
+      if not isinstance(total_base_pairs, int):
         total_base_pairs = genomic_region_parser.parse_comma_sep_int(
-          total_base_pairs)
+            total_base_pairs)
       self._total_base_pairs.insert(shard_index, total_base_pairs)
 
     if self._residual_index == _UNDEFINED_SHARD_INDEX:
@@ -281,8 +279,8 @@ class VariantSharding(object):
       return True
     else:
       raise ValueError(
-        'Given shard index {} is outside of expected range: '
-        '[0, {})'.format(shard_index, self._num_shards))
+          'Given shard index {} is outside of expected range: '
+          '[0, {})'.format(shard_index, self._num_shards))
 
   def _is_index_in_the_range(self, shard_index):
     if shard_index < 0:
@@ -299,20 +297,18 @@ class VariantSharding(object):
     # type: (int) -> Optional[str]
     if not self._is_index_in_the_range(shard_index):
       raise ValueError(
-        'Given shard index {} is outside of expected range: '
-        '[0, {})'.format(shard_index, self._num_shards))
+          'Given shard index {} is outside of expected range: '
+          '[0, {})'.format(shard_index, self._num_shards))
     return self._table_name_suffixes[shard_index]
 
-  def get_output_table_num_base_pairs(self, shard_index):
+  def get_output_table_total_base_pairs(self, shard_index):
     # type: (int) -> Optional[int]
     if not self._is_index_in_the_range(shard_index):
       raise ValueError(
-        'Given shard index {} is outside of expected range: '
-        '[0, {})'.format(shard_index, self._num_shards))
-    return self._num_base_paris[shard_index]
+          'Given shard index {} is outside of expected range: '
+          '[0, {})'.format(shard_index, self._num_shards))
+    return self._total_base_pairs[shard_index]
 
   def get_num_shards(self):
     # type: (None) -> int
     return self._num_shards
-
-

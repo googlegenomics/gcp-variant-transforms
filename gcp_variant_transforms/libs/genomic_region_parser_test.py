@@ -37,8 +37,8 @@ class GenomicRegionParserTest(unittest.TestCase):
         ('chr', 0, genomic_region_parser._DEFAULT_END_POSITION)
     )
     self.assertEqual(
-      genomic_region_parser.parse_genomic_region('cHrM123XY'),
-      ('chrm123xy', 0, genomic_region_parser._DEFAULT_END_POSITION)
+        genomic_region_parser.parse_genomic_region('cHrM123XY'),
+        ('chrm123xy', 0, genomic_region_parser._DEFAULT_END_POSITION)
     )
     with self.assertRaises(ValueError):
       genomic_region_parser.parse_genomic_region('chr1:5-5')
