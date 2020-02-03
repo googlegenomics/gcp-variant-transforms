@@ -455,11 +455,14 @@ def run(argv=None):
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
       shard_variants.ShardVariants(sharding), num_shards)
 
+  variants = []
   for i in range(num_shards):
+    # Convert tuples to list
+    variants.append(sharded_variants[i])
     if variant_merger:
-      sharded_variants[i] |= ('MergeVariants' + str(i) >>
-                              merge_variants.MergeVariants(variant_merger))
-    sharded_variants[i] |= (
+      variants[i] |= ('MergeVariants' + str(i) >>
+                      merge_variants.MergeVariants(variant_merger))
+    variants[i] |= (
         'ProcessVariants' + str(i) >>
         beam.Map(processed_variant_factory.create_processed_variant).\
             with_output_types(processed_variant.ProcessedVariant))
@@ -478,7 +481,7 @@ def run(argv=None):
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
       table_name = compose_table_name(known_args.output_table, table_suffix)
-      _ = (sharded_variants[i] | 'VariantToBigQuery' + table_suffix >>
+      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
                schema,
@@ -500,7 +503,7 @@ def run(argv=None):
       avro_path = compose_table_name(known_args.output_avro_path,
                                      sharding.get_output_table_suffix(i))
       _ = (
-          sharded_variants[i] | 'VariantToAvro' >>
+          variants[i] | 'VariantToAvro' >>
           variant_to_avro.VariantToAvroFiles(
               avro_path,
               header_fields,
