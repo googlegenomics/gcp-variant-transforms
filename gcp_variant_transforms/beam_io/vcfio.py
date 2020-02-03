@@ -248,7 +248,7 @@ class ReadFromBGZF(beam.PTransform):
         returned as `MalformedVcfRecord` instead of failing the pipeline.
       pre_infer_headers: If true, drop headers and make sure PySam return the
         exact data for variants and calls, without type matching.
-      sample_name_encoding: specify whether we want to encode sample_name mainly
+      sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files.
     """
     self._input_files = input_files
@@ -318,7 +318,7 @@ class ReadFromVcf(PTransform):
         time.
       pre_infer_headers: If true, drop headers and make sure PySam return the
         exact data for variants and calls, without type matching.
-      sample_name_encoding: specify whether we want to encode sample_name mainly
+      sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files
     """
     super(ReadFromVcf, self).__init__(**kwargs)
@@ -390,7 +390,7 @@ class ReadAllFromVcf(PTransform):
         returned as :class:`MalformedVcfRecord` instead of failing the pipeline.
       pre_infer_headers: If true, drop headers and make sure PySam return the
         exact data for variants and calls, without type matching.
-      sample_name_encoding: specify whether we want to encode sample_name mainly
+      sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)

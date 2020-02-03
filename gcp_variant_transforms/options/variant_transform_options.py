@@ -20,6 +20,7 @@ import logging
 from apache_beam.io.gcp.internal.clients import bigquery
 from oauth2client.client import GoogleCredentials
 
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
@@ -127,7 +128,6 @@ class AvroWriteOptions(VariantTransformsOptions):
       raise ValueError('At least one of --output_table or --output_avro_path '
                        'options should be provided.')
 
-
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
@@ -147,11 +147,15 @@ class BigQueryWriteOptions(VariantTransformsOptions):
              ).format(sample_info_table_schema_generator.TABLE_SUFFIX))
 
     parser.add_argument(
-        '--samples_span_multiple_files',
-        type='bool', default=True, nargs='?', const=True,
-        help=('If True sample_id will be the hash of [sample_name] thus it '
-              'will be independent of file_path, otherwise hash of '
-              '[file_path, sample_name] will be used as sample_id. '))
+        '--sample_name_encoding',
+        default=vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
+        choices=[encoding.name for encoding in vcf_parser.SampleNameEncoding],
+        help=('Choose the way sample ID should be hashed. if `{}` is supplied, '
+              'sample_id will be [sample_name] (default); alternatively, if '
+              '`{}` is supplied, sample_id will be hashed from '
+              '[file_name, sample_id]'.format(
+                  vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
+                  vcf_parser.SampleNameEncoding.WITH_FILE_PATH.name)))
 
     parser.add_argument(
         '--split_alternate_allele_info_fields',
@@ -228,7 +232,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                                                 project_id,
                                                 dataset_id,
                                                 table_id)
-
 
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""

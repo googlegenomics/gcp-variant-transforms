@@ -77,11 +77,6 @@ def parse_args(argv, command_line_options):
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
-  if (hasattr(known_args, 'samples_span_multiple_files') and
-      known_args.samples_span_multiple_files):
-    known_args.sample_name_encoding = SampleNameEncoding.WITHOUT_FILE_PATH
-  else:
-    known_args.sample_name_encoding = SampleNameEncoding.WITH_FILE_PATH
   return known_args, pipeline_args
 
 
