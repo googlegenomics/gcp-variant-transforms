@@ -79,7 +79,7 @@ class _ChromosomeSharder(object):
     # If everything goes well we add the new region to the interval tree.
     self._interval_tree.addi(start, end, shard_index)
 
-  def get_index(self, pos=0):
+  def get_shard_index(self, pos=0):
     """Finds a region that includes pos, if none _UNDEFINED_SHARD_INDEX."""
     matched_regions = self._interval_tree.search(pos)
     # Ensure at most one region is matching to the give position.
@@ -102,7 +102,8 @@ class VariantSharding(object):
     self._num_shards = 0
     self._residual_index = _UNDEFINED_SHARD_INDEX
     self._should_keep_residual = False
-
+    # If none of the regions contain interval (such as "chr1:2000-3000") then we
+    # don't need interval trees and shard index only depends on CHROM value.
     if self._use_interval_tree:
       self._region_to_shard = defaultdict(_ChromosomeSharder)
     else:
@@ -120,8 +121,15 @@ class VariantSharding(object):
 
   def _validate_config(self, config_file_path):
     # type: (str) -> bool
-    # Validates the config file and also find if there are any intervals in the
-    # regions, for example: chr1:1000-2000 is an interval.
+    """Validates the config file and finds if any region contains interval.
+    Args:
+      config_file_path: name of the input partition_config file.
+    Raises:
+      A ValueError if any of the expected config formats are violated.
+    Returns:
+      True if any region is interval, for example "chr1:1000-2000" is interval.
+      False if all regions are simple CHROM value, for example "chr1".
+    """
     has_any_interval = False
     with FileSystems.open(config_file_path, 'r') as f:
       try:
@@ -175,19 +183,20 @@ class VariantSharding(object):
           raise ValueError('Wrong sharding config file, there can be only '
                            'one residual output table.')
         residual_partition_index += 1
-      for r in regions:
-        ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
-        if (start != genomic_region_parser._DEFAULT_START_POSITION or
-            end != genomic_region_parser._DEFAULT_END_POSITION):
-          has_any_interval = True
-        else:
-          if not ref_name:
-            raise ValueError('Wrong sharding config file, reference_name can '
-                             'not be empty string: {}'.format(r))
-          if ref_name in existing_ref_names:
-            raise ValueError('Wrong sharding config file, regions must be '
-                             'unique in config file: {}'.format(ref_name))
-          existing_ref_names.add(ref_name)
+      else:
+        for r in regions:
+          ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
+          if (start != genomic_region_parser._DEFAULT_START_POSITION or
+              end != genomic_region_parser._DEFAULT_END_POSITION):
+            has_any_interval = True
+          else:
+            if not ref_name:
+              raise ValueError('Wrong sharding config file, reference_name can '
+                               'not be empty string: {}'.format(r))
+            if ref_name in existing_ref_names:
+              raise ValueError('Wrong sharding config file, regions must be '
+                               'unique in config file: {}'.format(ref_name))
+            existing_ref_names.add(ref_name)
 
       # Validate total_base_pairs
       total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS, None)
@@ -211,8 +220,6 @@ class VariantSharding(object):
     """Parses the given partitioning config file.
     Args:
       config_file_path: name of the input partition_config file.
-    Raises:
-      A ValueError if any of the expected config formats are violated.
     """
     with FileSystems.open(config_file_path, 'r') as f:
       try:
@@ -261,7 +268,7 @@ class VariantSharding(object):
     if self._use_interval_tree:
       sharder = self._region_to_shard.get(chrom, None)
       if sharder:
-        shard_index = sharder.get_index(pos)
+        shard_index = sharder.get_shard_index(pos)
     else:
       shard_index = self._region_to_shard.get(chrom, _UNDEFINED_SHARD_INDEX)
 
@@ -269,6 +276,9 @@ class VariantSharding(object):
       return self._residual_index
     else:
       return shard_index
+
+  def get_residual_index(self):
+    return self._residual_index
 
   def should_keep_shard(self, shard_index):
     # type: (int) -> bool

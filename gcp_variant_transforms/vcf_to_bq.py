@@ -449,11 +449,15 @@ def run(argv=None):
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
-
+  if known_args.allow_malformed_records:
+    variants |= 'DropMalformedRecords' >> filter_variants.FilterVariants()
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   num_shards = sharding.get_num_shards()
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
       shard_variants.ShardVariants(sharding), num_shards)
+  # In case there is no residual in config we will ignore the last shahrd.
+  if not sharding.should_keep_shard(sharding.get_residual_index()):
+    num_shards -= 1
 
   variants = []
   for i in range(num_shards):

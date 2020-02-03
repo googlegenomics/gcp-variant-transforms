@@ -96,6 +96,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     query_formatter = QueryFormatter(self._table_name)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
+      print('samanvp: query is: {}'.format(query))
       assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
@@ -143,10 +144,10 @@ class QueryFormatter(object):
   class _QueryMacros(enum.Enum):
     # Due to sharding of output table there will be multiple output tables with
     # different suffixes, such as: "_chr1", "_chr2", ...and "_residual".
-    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*'
+    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}`'
     SUM_START_QUERY = (
-        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}_*')
-    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}_*'
+        'SELECT SUM(start_position) AS sum_start FROM `{TABLE_NAME}`')
+    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM `{TABLE_NAME}`'
 
   def __init__(self, table_name):
     # type: (str) -> None
@@ -164,7 +165,7 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    return query.format(TABLE_NAME=self._table_name)
+    return query.format(TABLE_NAME=self._table_name + '_*')
 
   def _replace_macros(self, query):
     for macro in self._QueryMacros:

@@ -151,20 +151,6 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
       raise
 
 
-def raise_error_if_table_not_exists(client, project_id, dataset_id, table_id):
-  # type: (bigquery.BigqueryV2, str, str) -> None
-  try:
-    client.tables.Get(bigquery.BigqueryTablesGetRequest(
-        projectId=project_id, datasetId=dataset_id, tableId=table_id))
-  except exceptions.HttpError as e:
-    if e.status_code == 404:
-      raise ValueError('Dataset %s:%s does not exist.' %
-                       (project_id, dataset_id))
-    else:
-      # For the rest of the errors, use BigQuery error message.
-      raise
-
-
 def raise_error_if_table_exists(client, project_id, dataset_id, table_id):
   # type: (bigquery.BigqueryV2, str, str, str) -> None
   try:
