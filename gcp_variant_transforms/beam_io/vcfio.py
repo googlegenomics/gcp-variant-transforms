@@ -47,6 +47,7 @@ DEFAULT_PHASESET_VALUE = vcf_parser.DEFAULT_PHASESET_VALUE
 MISSING_GENOTYPE_VALUE = vcf_parser.MISSING_GENOTYPE_VALUE
 Variant = vcf_parser.Variant
 VariantCall = vcf_parser.VariantCall
+SampleNameEncoding = vcf_parser.SampleNameEncoding
 
 
 class _ToVcfRecordCoder(coders.Coder):
@@ -58,7 +59,6 @@ class _ToVcfRecordCoder(coders.Coder):
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
     encoded_calls = self._encode_variant_calls(variant, format_keys)
-
     columns = [
         variant.reference_name,
         None if variant.start is None else variant.start + 1,
@@ -182,15 +182,17 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
   DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
 
-  def __init__(self,
-               file_pattern,  # type: str
-               representative_header_lines=None,  # type: List[str]
-               compression_type=CompressionTypes.AUTO,  # type: str
-               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
-               validate=True,  # type: bool
-               allow_malformed_records=False,  # type: bool
-               pre_infer_headers=False,  # type: bool
-              ):
+  def __init__(
+      self,
+      file_pattern,  # type: str
+      representative_header_lines=None,  # type: List[str]
+      compression_type=CompressionTypes.AUTO,  # type: str
+      buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
+      validate=True,  # type: bool
+      allow_malformed_records=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH  # type: int
+      ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
@@ -200,6 +202,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
+    self._sample_name_encoding = sample_name_encoding
+
 
   def read_records(self,
                    file_name,  # type: str
@@ -214,6 +218,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         file_pattern=self._pattern,
         representative_header_lines=self._representative_header_lines,
         pre_infer_headers=self._pre_infer_headers,
+        sample_name_encoding=self._sample_name_encoding,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -229,7 +234,9 @@ class ReadFromBGZF(beam.PTransform):
                input_files,
                representative_header_lines,
                allow_malformed_records,
-               pre_infer_headers):
+               pre_infer_headers,
+               sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH
+              ):
     # type: (List[str], List[str], bool) -> None
     """Initializes the transform.
 
@@ -239,11 +246,16 @@ class ReadFromBGZF(beam.PTransform):
         VCF files.
       allow_malformed_records: If true, malformed records from VCF files will be
         returned as `MalformedVcfRecord` instead of failing the pipeline.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files.
     """
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
+    self._sample_name_encoding = sample_name_encoding
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
@@ -255,7 +267,8 @@ class ReadFromBGZF(beam.PTransform):
         self._allow_malformed_records,
         representative_header_lines=self._representative_header_lines,
         splittable_bgzf=True,
-        pre_infer_headers=self._pre_infer_headers)
+        pre_infer_headers=self._pre_infer_headers,
+        sample_name_encoding=self._sample_name_encoding)
 
     for record in record_iterator:
       yield record
@@ -286,6 +299,7 @@ class ReadFromVcf(PTransform):
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -302,6 +316,10 @@ class ReadFromVcf(PTransform):
         underlying file_path's extension will be used to detect the compression.
       validate: flag to verify that the files exist during the pipeline creation
         time.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files
     """
     super(ReadFromVcf, self).__init__(**kwargs)
 
@@ -311,7 +329,8 @@ class ReadFromVcf(PTransform):
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        pre_infer_headers=pre_infer_headers)
+        pre_infer_headers=pre_infer_headers,
+        sample_name_encoding=sample_name_encoding)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -319,12 +338,14 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None, pre_infer_headers=False):
+    allow_malformed_records=None, pre_infer_headers=False,
+    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
-                    pre_infer_headers=pre_infer_headers)
+                    pre_infer_headers=pre_infer_headers,
+                    sample_name_encoding=sample_name_encoding)
 
 
 class ReadAllFromVcf(PTransform):
@@ -348,6 +369,7 @@ class ReadAllFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -366,6 +388,10 @@ class ReadAllFromVcf(PTransform):
         underlying file_path's extension will be used to detect the compression.
       allow_malformed_records: If true, malformed records from VCF files will be
         returned as :class:`MalformedVcfRecord` instead of failing the pipeline.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(
@@ -373,7 +399,8 @@ class ReadAllFromVcf(PTransform):
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
-        pre_infer_headers=pre_infer_headers)
+        pre_infer_headers=pre_infer_headers,
+        sample_name_encoding=sample_name_encoding)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

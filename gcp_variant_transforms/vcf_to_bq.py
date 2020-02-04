@@ -45,6 +45,7 @@ from apache_beam.io import filesystems
 from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import schema_converter
@@ -89,6 +90,7 @@ _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _BQ_SCHEMA_FILE_SUFFIX = 'schema.json'
 _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
+SampleNameEncoding = vcf_parser.SampleNameEncoding
 
 
 def _read_variants(all_patterns,  # type: List[str]
@@ -109,7 +111,8 @@ def _read_variants(all_patterns,  # type: List[str]
       pipeline_mode,
       known_args.allow_malformed_records,
       representative_header_lines,
-      pre_infer_headers=pre_infer_headers)
+      pre_infer_headers=pre_infer_headers,
+      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding])
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -395,8 +398,8 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
   _ = (headers | 'SampleInfoToBigQuery' >>
        sample_info_to_bigquery.SampleInfoToBigQuery(
            known_args.output_table,
-           known_args.append,
-           known_args.samples_span_multiple_files))
+           SampleNameEncoding[known_args.sample_name_encoding],
+           known_args.append))
 
 
 def run(argv=None):

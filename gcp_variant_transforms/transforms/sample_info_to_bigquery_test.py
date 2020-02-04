@@ -22,6 +22,7 @@ from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io.vcf_parser import SampleNameEncoding
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.transforms import sample_info_to_bigquery
 
@@ -56,7 +57,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
         >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
-            ), False))
+            SampleNameEncoding.WITH_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
@@ -86,7 +87,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
         >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
-            ), True))
+            SampleNameEncoding.WITHOUT_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
