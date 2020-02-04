@@ -398,8 +398,8 @@ def _create_sample_info_table(pipeline,  # type: beam.Pipeline
   _ = (headers | 'SampleInfoToBigQuery' >>
        sample_info_to_bigquery.SampleInfoToBigQuery(
            known_args.output_table,
-           known_args.append,
-           SampleNameEncoding[known_args.sample_name_encoding]))
+           SampleNameEncoding[known_args.sample_name_encoding],
+           known_args.append))
 
 
 def run(argv=None):

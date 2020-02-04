@@ -27,7 +27,7 @@ SampleNameEncoding = vcf_parser.SampleNameEncoding
 class ConvertSampleInfoToRow(beam.DoFn):
   """Extracts sample info from `VcfHeader` and converts it to a BigQuery row."""
 
-  def __init__(self, sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH):
+  def __init__(self, sample_name_encoding):
     # type: (int) -> None
     self._sample_name_encoding = sample_name_encoding
 
@@ -52,8 +52,7 @@ class ConvertSampleInfoToRow(beam.DoFn):
 class SampleInfoToBigQuery(beam.PTransform):
   """Writes sample info to BigQuery."""
 
-  def __init__(self, output_table_prefix, append=False,
-               sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH):
+  def __init__(self, output_table_prefix, sample_name_encoding, append=False):
     # type: (str, Dict[str, str], bool, int) -> None
     """Initializes the transform.
 

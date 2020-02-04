@@ -447,7 +447,6 @@ class PySamParser(VcfParser):
     self._original_info_list = None
     self._process_pid = None
     self._encoded_sample_names = {}
-    self._file_name = file_name
     self._sample_name_encoding = sample_name_encoding
 
   def send_kill_signal_to_child(self):
