@@ -22,7 +22,7 @@
       },
       {
         "query": [
-          "SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_* ",
+          "SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}` ",
           "WHERE 100000 IN UNNEST(AF)"
         ],
         "expected_result": {"num_rows": 1}

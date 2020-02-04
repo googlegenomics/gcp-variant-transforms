@@ -22,7 +22,7 @@
       {
         "query": [
           "SELECT alternate_bases.AF AS AF ",
-          "FROM {TABLE_NAME}_* t, t.alternate_bases as alternate_bases ",
+          "FROM `{TABLE_NAME}` t, t.alternate_bases as alternate_bases ",
           "WHERE reference_name = '20' and start_position = 17329"
         ],
         "expected_result": {"AF": 0.017}
@@ -30,7 +30,7 @@
       {
         "query": [
           "SELECT SUM(alternate_bases.AF) AS AF_sum ",
-          "FROM {TABLE_NAME}_* t, t.alternate_bases as alternate_bases ",
+          "FROM `{TABLE_NAME}` t, t.alternate_bases as alternate_bases ",
           "WHERE reference_name = '20' and start_position = 1234566"
         ],
         "expected_result": {"AF_sum": 0.1}
@@ -38,7 +38,7 @@
       {
         "query": [
           "SELECT COUNT(IFNULL(alternate_bases.AF, 0)) AS AF_count ",
-          "FROM {TABLE_NAME}_* t, t.alternate_bases as alternate_bases ",
+          "FROM `{TABLE_NAME}` t, t.alternate_bases as alternate_bases ",
           "WHERE reference_name = '20' and start_position = 1234566"
         ],
         "expected_result": {"AF_count": 2}

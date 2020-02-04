@@ -1,7 +1,7 @@
 [
   {
     "test_name": "platinum-partition-with-residual",
-    "table_name": "platinum_partition_with_residual",
+    "table_name": "platinum_partition_with_residual__",
     "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
     "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
     "runner": "DataflowRunner",
@@ -11,47 +11,47 @@
     "num_workers": "60",
     "assertion_configs": [
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr01"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr01"],
         "expected_result": {"num_rows": 20206691}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr02"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr02"],
         "expected_result": {"num_rows": 20712382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr03"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr03"],
         "expected_result": {"num_rows": 16194801}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr04_05"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr04_05"],
         "expected_result": {"num_rows": 31051681}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr06_07_08_09"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr06_07_08_09"],
         "expected_result": {"num_rows": 52523434}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr19_10M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr19_10M"],
         "expected_result": {"num_rows": 1241683}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chr19_20M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chr19_20M"],
         "expected_result": {"num_rows": 1077097}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chrX"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chrX"],
         "expected_result": {"num_rows": 19388563}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_chrY_M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}chrY_M"],
         "expected_result": {"num_rows": 2188382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_*_all_remaining"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}all_remaining"],
         "expected_result": {"num_rows": 96701092}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}_**`"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}*`"],
         "expected_result": {"num_rows": 261285806}
       }
     ]

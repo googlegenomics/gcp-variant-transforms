@@ -20,7 +20,7 @@
         "expected_result": {"sum_end": 23033052}
       },
       {
-        "query": ["SELECT COUNT(AF) AS num_rows FROM {TABLE_NAME}_*"],
+        "query": ["SELECT COUNT(AF) AS num_rows FROM `{TABLE_NAME}`"],
         "expected_result": {"num_rows": 13}
       }
     ]

@@ -52,6 +52,7 @@ from apache_beam.io import filesystems
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
 
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _TOOL_NAME = 'vcf_to_bq'
@@ -96,7 +97,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     query_formatter = QueryFormatter(self._table_name)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
-      print('samanvp: query is: {}'.format(query))
+      print('$$$$$$$$$$$$$$$$$$$$$$$$ query is: {} $$$$$'.format(query))
       assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
@@ -142,8 +143,6 @@ class QueryFormatter(object):
   """
 
   class _QueryMacros(enum.Enum):
-    # Due to sharding of output table there will be multiple output tables with
-    # different suffixes, such as: "_chr1", "_chr2", ...and "_residual".
     NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}`'
     SUM_START_QUERY = (
         'SELECT SUM(start_position) AS sum_start FROM `{TABLE_NAME}`')
@@ -165,7 +164,16 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    return query.format(TABLE_NAME=self._table_name + '_*')
+    # Due to sharding of output table there will be multiple output tables with
+    # different suffixes, such as: "__chr1", "__chr2", ...and "__residual".
+    if self._table_name.endswith(
+        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR):
+      table_name = self._table_name
+    else:
+      table_name = (self._table_name +
+                    sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR +
+                    '*')
+    return query.format(TABLE_NAME=table_name)
 
   def _replace_macros(self, query):
     for macro in self._QueryMacros:

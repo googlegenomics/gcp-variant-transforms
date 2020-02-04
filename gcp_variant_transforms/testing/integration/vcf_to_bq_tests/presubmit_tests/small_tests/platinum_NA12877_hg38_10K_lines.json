@@ -14,7 +14,7 @@
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
-          "FROM {TABLE_NAME}_* AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_annotation_sets": 45770}
       },
@@ -24,7 +24,7 @@
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
-          "  FROM {TABLE_NAME}_* AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
+          "  FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
           "  GROUP BY 1, 2, 3",
           ")"
         ],
@@ -33,14 +33,14 @@
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-          "FROM {TABLE_NAME}_* AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
-          "FROM {TABLE_NAME}_* AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_symbol": 206}
       }

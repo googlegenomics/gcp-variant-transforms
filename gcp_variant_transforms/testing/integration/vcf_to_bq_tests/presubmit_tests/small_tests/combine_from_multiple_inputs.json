@@ -12,11 +12,11 @@
         "expected_result": {"num_rows": 9895}
       },
       {
-        "query": ["SELECT SUM(DP) AS sum FROM {TABLE_NAME}_*"],
+        "query": ["SELECT SUM(DP) AS sum FROM `{TABLE_NAME}`"],
         "expected_result": {"sum": 131}
       },
       {
-        "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}_*"],
+        "query": ["SELECT COUNT(DB) AS cnt FROM `{TABLE_NAME}`"],
         "expected_result": {"cnt": 2}
       }
     ]
