@@ -151,9 +151,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         default=vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
         choices=[encoding.name for encoding in vcf_parser.SampleNameEncoding],
         help=('Choose the way sample ID should be hashed. if `{}` is supplied, '
-              'sample_id will be [sample_name] (default); alternatively, if '
-              '`{}` is supplied, sample_id will be hashed from '
-              '[file_name, sample_id]'.format(
+              'sample_id will be hash value of [sample_name] (default); '
+              'alternatively, if `{}` is supplied, sample_id will be hashed '
+              'from [file_name, sample_id]'.format(
                   vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
                   vcf_parser.SampleNameEncoding.WITH_FILE_PATH.name)))
 
