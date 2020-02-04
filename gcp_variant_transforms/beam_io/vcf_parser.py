@@ -447,9 +447,8 @@ class PySamParser(VcfParser):
     self._original_info_list = None
     self._process_pid = None
     self._encoded_sample_names = {}
-    self._file_name = ''
-    if sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
-      self._file_name = file_name
+    self._file_name = file_name
+    self._sample_name_encoding = sample_name_encoding
 
   def send_kill_signal_to_child(self):
     self._to_child.write('\n')
@@ -612,12 +611,15 @@ class PySamParser(VcfParser):
     return str(value)
 
   def _lookup_encoded_sample_name(self, sample_name):
-    sample_code_hex = self._encoded_sample_names.get(sample_name)
-    if not sample_code_hex:
-      sample_code_hex = hex(hashing_util.generate_sample_id(sample_name,
-                                                            self._file_name))
-      self._encoded_sample_names[sample_name] = sample_code_hex
-    return sample_code_hex
+    sample_id = self._encoded_sample_names.get(sample_name)
+    if not sample_id:
+      if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
+        sample_id = hex(hashing_util.generate_sample_id(
+            sample_name, self._file_name))
+      else:
+        sample_id = hex(hashing_util.generate_sample_id(sample_name))
+      self._encoded_sample_names[sample_name] = sample_id
+    return sample_id
 
   def _get_variant_calls(self, samples):
     # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
