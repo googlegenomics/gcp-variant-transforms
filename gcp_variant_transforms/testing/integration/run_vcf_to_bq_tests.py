@@ -147,10 +147,21 @@ class QueryFormatter(object):
     SUM_START_QUERY = (
         'SELECT SUM(start_position) AS sum_start FROM `{TABLE_NAME}`')
     SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM `{TABLE_NAME}`'
+    NUM_OUTPUT_TABLES = (
+        'SELECT COUNT(0) AS num_tables FROM `{DATASET_NAME}.__TABLES_SUMMARY__`'
+        ' WHERE STARTS_WITH(table_id, "{TABLE_PREFIX}")')
 
   def __init__(self, table_name):
     # type: (str) -> None
-    self._table_name = table_name
+    # Due to sharding of output table there will be multiple output tables with
+    # different suffixes, such as: "__chr1", "__chr2", ...and "__residual".
+    # That's why we use the given table_name as table_suffix.
+    self._table_prefix = table_name
+    self._table_name = (
+        self._table_prefix +
+        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR + '*')
+    self._dataset_name = self._table_prefix.split('.')[0]
+
 
   def format_query(self, query):
     # type: (List[str]) -> str
@@ -164,16 +175,9 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    # Due to sharding of output table there will be multiple output tables with
-    # different suffixes, such as: "__chr1", "__chr2", ...and "__residual".
-    if self._table_name.endswith(
-        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR):
-      table_name = self._table_name
-    else:
-      table_name = (self._table_name +
-                    sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR +
-                    '*')
-    return query.format(TABLE_NAME=table_name)
+    return query.format(TABLE_NAME=self._table_name,
+                        TABLE_PREFIX=self._table_prefix,
+                        DATASET_NAME=self._dataset_name)
 
   def _replace_macros(self, query):
     for macro in self._QueryMacros:
