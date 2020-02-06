@@ -48,11 +48,11 @@ from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_sharding
 from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
-from gcp_variant_transforms.libs.sample_info_table_schema_generator import compose_table_name
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -484,7 +484,8 @@ def run(argv=None):
 
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
-      table_name = compose_table_name(known_args.output_table, table_suffix)
+      table_name = sample_info_table_schema_generator.compose_table_name(
+          known_args.output_table, table_suffix)
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
@@ -504,8 +505,8 @@ def run(argv=None):
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
     for i in range(num_shards):
-      avro_path = compose_table_name(known_args.output_avro_path,
-                                     sharding.get_output_table_suffix(i))
+      avro_path = sample_info_table_schema_generator.compose_table_name(
+          known_args.output_avro_path, sharding.get_output_table_suffix(i))
       _ = (
           variants[i] | 'VariantToAvro' >>
           variant_to_avro.VariantToAvroFiles(

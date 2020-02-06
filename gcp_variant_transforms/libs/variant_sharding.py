@@ -117,7 +117,7 @@ class VariantSharding(object):
   def _is_residual_shard(self, regions):
     # type: (List[str]) -> bool
     return (len(regions) == 1 and
-            regions[0].strip().lower() == _RESIDUAL_REGION_LITERAL)
+            regions[0].strip() == _RESIDUAL_REGION_LITERAL)
 
   def _validate_config(self, config_file_path):
     # type: (str) -> bool
@@ -263,7 +263,6 @@ class VariantSharding(object):
     """Returns output table index for the given chrom value and position."""
     if not chrom or pos < 0:
       raise ValueError('Cannot shard given {}:{}'.format(chrom, pos))
-    chrom = chrom.lower()
     shard_index = _UNDEFINED_SHARD_INDEX
     if self._use_interval_tree:
       sharder = self._region_to_shard.get(chrom, None)

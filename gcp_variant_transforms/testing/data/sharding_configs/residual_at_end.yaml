@@ -24,8 +24,8 @@
 -  output_table:
      table_name_suffix: "chrom04_05_part_06"
      regions:
-       - "CHR4"
-       - "cHr5"
+       - "chr4"
+       - "chr5"
        - "chr6:1,000,000-2,000,000"
      total_base_pairs: 191,044,274
 -  output_table:

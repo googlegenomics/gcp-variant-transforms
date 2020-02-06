@@ -70,34 +70,35 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
                **kwargs  # type: **str
               ):
     # type: (...) -> None
-    dataset_id = context.dataset_id
-    self._table_name = '{}.{}'.format(dataset_id, table_name)
+    self._dataset_id = context.dataset_id
+    self._table_id = table_name
+    dataset_table = '{}.{}'.format(self._dataset_id, self._table_id)
     self._name = test_name
     self._project = context.project
-    output_table = '{}:{}'.format(context.project, self._table_name)
+    full_table_id = '{}:{}'.format(self._project, dataset_table)
     self._assertion_configs = assertion_configs
-    args = ['--output_table {}'.format(output_table),
+    args = ['--output_table {}'.format(full_table_id),
             '--staging_location {}'.format(context.staging_location),
             '--temp_location {}'.format(context.temp_location),
-            '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
+            '--job_name {}-{}'.format(test_name, self._dataset_id.replace('_',
+                                                                          '-'))]
     for k, v in kwargs.iteritems():
       value = v
       if isinstance(v, basestring):
-        value = v.format(TABLE_NAME=self._table_name)
+        value = v.format(TABLE_NAME=dataset_table)
       args.append('--{} {}'.format(k, value))
     self.run_test_command = run_tests_common.form_command(
         context.project,
         context.region,
-        filesystems.FileSystems.join(context.logging_location, output_table),
+        filesystems.FileSystems.join(context.logging_location, full_table_id),
         context.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
-    query_formatter = QueryFormatter(self._table_name)
+    query_formatter = QueryFormatter(self._dataset_id, self._table_id)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
-      print('$$$$$$$$$$$$$$$$$$$$$$$$ query is: {} $$$$$'.format(query))
       assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
@@ -148,20 +149,19 @@ class QueryFormatter(object):
         'SELECT SUM(start_position) AS sum_start FROM `{TABLE_NAME}`')
     SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM `{TABLE_NAME}`'
     NUM_OUTPUT_TABLES = (
-        'SELECT COUNT(0) AS num_tables FROM `{DATASET_NAME}.__TABLES_SUMMARY__`'
-        ' WHERE STARTS_WITH(table_id, "{TABLE_PREFIX}")')
+        'SELECT COUNT(0) AS num_tables FROM `{DATASET_ID}.__TABLES_SUMMARY__`'
+        ' WHERE STARTS_WITH(table_id, "{TABLE_ID}")')
 
-  def __init__(self, table_name):
-    # type: (str) -> None
+  def __init__(self, dataset_id, table_id):
+    # type: (str, str) -> None
+    self._dataset_id = dataset_id
     # Due to sharding of output table there will be multiple output tables with
     # different suffixes, such as: "__chr1", "__chr2", ...and "__residual".
     # That's why we use the given table_name as table_suffix.
-    self._table_prefix = table_name
-    self._table_name = (
-        self._table_prefix +
-        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR + '*')
-    self._dataset_name = self._table_prefix.split('.')[0]
-
+    self._table_id = table_id
+    self._dataset_table_wildcard = '{}.{}{}*'.format(
+        self._dataset_id, self._table_id,
+        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR)
 
   def format_query(self, query):
     # type: (List[str]) -> str
@@ -175,9 +175,9 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    return query.format(TABLE_NAME=self._table_name,
-                        TABLE_PREFIX=self._table_prefix,
-                        DATASET_NAME=self._dataset_name)
+    return query.format(TABLE_NAME=self._dataset_table_wildcard,
+                        TABLE_ID=self._table_id,
+                        DATASET_ID=self._dataset_id)
 
   def _replace_macros(self, query):
     for macro in self._QueryMacros:

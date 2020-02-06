@@ -21,7 +21,8 @@ import sys
 from typing import Tuple  # pylint: disable=unused-import
 
 # Matches to regions formatted as 'chr12:10,000-20,000'.
-_REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
+_REGION_LITERAL_REGEXP = re.compile(
+    r'^\s*(\S+)\s*:\s*([0-9,]+)\s*-\s*([0-9,]+)\s*$')
 _DEFAULT_START_POSITION = 0
 _DEFAULT_END_POSITION = sys.maxsize
 
@@ -44,11 +45,9 @@ def parse_genomic_region(genomic_region):
   Returns:
     A tuple containing reference name, start position and end position.
   """
-  genomic_region = genomic_region.lower()
   matched = _REGION_LITERAL_REGEXP.match(genomic_region)
   if matched:
     ref_name, start, end = matched.groups()
-    ref_name = ref_name.strip()
     start = parse_comma_sep_int(start)
     end = parse_comma_sep_int(end)
     if start < 0:

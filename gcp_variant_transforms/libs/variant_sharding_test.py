@@ -42,18 +42,21 @@ class VariantShardingTest(unittest.TestCase):
     self.assertEqual(sharder.get_shard_index('chr1', 999999998), 2)
     self.assertEqual(sharder.get_shard_index('chr1', 999999999), 7)
 
-    # 'chr2' OR 'chr2_alternate_name1' OR 'chr2_alternate_name2' OR '2'.
+    # 'chr2' OR 'chr2_alternate_name1' OR 'chr2_ALteRNate_NAME2' OR '2'.
     self.assertEqual(sharder.get_shard_index('chr2', 0), 3)
     self.assertEqual(sharder.get_shard_index('chr2', 999999999000), 3)
     self.assertEqual(
         sharder.get_shard_index('chr2_alternate_name1', 0), 3)
     self.assertEqual(
         sharder.get_shard_index('chr2_alternate_name1', 999999999000), 3)
-    self.assertEqual(sharder.get_shard_index('chr2_alternate_name2', 0), 3)
     self.assertEqual(
-        sharder.get_shard_index('CHR2_ALTERNATE_NAME2', 999999999000), 3)
+        sharder.get_shard_index('chr2_ALteRNate_NAME2', 0), 3)
     self.assertEqual(sharder.get_shard_index('2', 0), 3)
     self.assertEqual(sharder.get_shard_index('2', 999999999000), 3)
+    self.assertEqual(sharder.get_shard_index('CHR2', 0), 7)
+    self.assertEqual(sharder.get_shard_index('chr2_alternate_name2', 0), 7)
+    self.assertEqual(sharder.get_shard_index('CHR2_ALTERNATE_NAME2', 0), 7)
+
 
     # 'chr4' OR 'chr5' OR 'chr6:1,000,000-2,000,000'
     self.assertEqual(sharder.get_shard_index('chr4', 0), 4)
@@ -74,7 +77,7 @@ class VariantShardingTest(unittest.TestCase):
     self.assertEqual(sharder.get_shard_index('3', 999999), 6)
     self.assertEqual(sharder.get_shard_index('3', 1000000), 7)
 
-  def test_config_case_insensitive(self):
+  def test_config_case_sensitive(self):
     sharder = variant_sharding.VariantSharding(
         'gcp_variant_transforms/testing/data/sharding_configs/'
         'residual_at_end.yaml')
@@ -84,9 +87,9 @@ class VariantShardingTest(unittest.TestCase):
 
     # 'chr1:0-1,000,000'
     self.assertEqual(sharder.get_shard_index('chr1', 0), 0)
-    self.assertEqual(sharder.get_shard_index('Chr1', 0), 0)
-    self.assertEqual(sharder.get_shard_index('CHr1', 0), 0)
-    self.assertEqual(sharder.get_shard_index('CHR1', 0), 0)
+    self.assertEqual(sharder.get_shard_index('Chr1', 0), 7)
+    self.assertEqual(sharder.get_shard_index('CHr1', 0), 7)
+    self.assertEqual(sharder.get_shard_index('CHR1', 0), 7)
 
   def test_config_get_output_table_suffix(self):
     sharder = variant_sharding.VariantSharding(
@@ -142,6 +145,8 @@ class VariantShardingTest(unittest.TestCase):
     # All the followings are assigned to residual shard.
     self.assertEqual(sharder.get_shard_index('chr1', 2000000), 1)
     self.assertEqual(sharder.get_shard_index('chr1', 999999999), 1)
+    self.assertEqual(sharder.get_shard_index('cHr1', 0), 1)
+    self.assertEqual(sharder.get_shard_index('CHR1', 0), 1)
 
     self.assertEqual(sharder.get_shard_index('3', 0), 1)
     self.assertEqual(sharder.get_shard_index('3', 499999), 1)
@@ -181,6 +186,8 @@ class VariantShardingTest(unittest.TestCase):
     # All the followings are assigned to residual shard.
     self.assertEqual(sharder.get_shard_index('chr1', 2000000), 4)
     self.assertEqual(sharder.get_shard_index('chr1', 999999999), 4)
+    self.assertEqual(sharder.get_shard_index('cHr1', 0), 4)
+    self.assertEqual(sharder.get_shard_index('CHR1', 0), 4)
 
     self.assertEqual(sharder.get_shard_index('3', 0), 4)
     self.assertEqual(sharder.get_shard_index('3', 499999), 4)

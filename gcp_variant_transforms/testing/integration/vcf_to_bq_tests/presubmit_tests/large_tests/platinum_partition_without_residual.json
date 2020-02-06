@@ -1,7 +1,7 @@
 [
   {
     "test_name": "platinum-partition-without-residual",
-    "table_name": "platinum_partition_without_residual__",
+    "table_name": "platinum_partition_without_residual",
     "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
     "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_without_residual.yaml",
     "runner": "DataflowRunner",
@@ -11,51 +11,55 @@
     "num_workers": "20",
     "assertion_configs": [
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr19_1M"],
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 6}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr19_1M"],
         "expected_result": {"num_rows": 158383}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr05_1M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr05_1M"],
         "expected_result": {"num_rows": 153501}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr07_1M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr07_1M"],
         "expected_result": {"num_rows": 140597}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr01_100M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr01_100M"],
         "expected_result": {"num_rows": 8870895}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr01_200M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr01_200M"],
         "expected_result": {"num_rows": 7017069}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_PREFIX}__chr01_remaining"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr01_remaining"],
         "expected_result": {"num_rows": 4318727}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr19_1M"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr19_1M"],
         "expected_result": {"sum_start": 85839400831}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr05_1M"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr05_1M"],
         "expected_result": {"sum_start": 77369307142}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr07_1M"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr07_1M"],
         "expected_result": {"sum_start": 73321432863}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr01_100M"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr01_100M"],
         "expected_result": {"sum_start": 419294441736840}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr01_200M"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr01_200M"],
         "expected_result": {"sum_start": 1078363993898219}
       },
       {
-        "query": ["SELECT SUM(start_position) AS sum_start FROM {TABLE_PREFIX}__chr01_remaining"],
+        "query": ["SELECT SUM(start_position) AS sum_start FROM {DATASET_ID}.{TABLE_ID}__chr01_remaining"],
         "expected_result": {"sum_start": 971922576966397}
       }]
   }

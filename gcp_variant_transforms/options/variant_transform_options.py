@@ -509,7 +509,7 @@ class ShardingOptions(VariantTransformsOptions):
   def add_arguments(self, parser):
     parser.add_argument(
         '--partition_config_path',
-        default=(''),
+        default='',
         help=('This argument is deprecated and will be removed in the next '
               'release. It has been replaced by --sharding_config_path .'))
     parser.add_argument(

@@ -33,40 +33,47 @@ class ShardVariantsTest(unittest.TestCase):
   """Test cases for the ``ShardVariants`` transform."""
 
   def _get_expected_variant_shards(self):
-    # reference_name.strip().lower() matched to shards defined in
+    # reference_name matched to shards defined in
     #   data/sharding_configs/homo_sapiens_default.yaml will be assigned to
     #   the corresponding shard, otherwise they will end up in residual shard.
     expected_shards = {}
     # Shard 0
     expected_shards[0] = [vcfio.Variant(reference_name='chr1', start=0),
-                          vcfio.Variant(reference_name='CHR1', start=0)]
+                          vcfio.Variant(reference_name='1', start=100000000)]
     # Shard 1
-    expected_shards[1] = [vcfio.Variant(reference_name='cHr2', start=0),
-                          vcfio.Variant(reference_name='chR2', start=0)]
+    expected_shards[1] = [vcfio.Variant(reference_name='chr2', start=0),
+                          vcfio.Variant(reference_name='2', start=100000000)]
     # Shard 2
     expected_shards[2] = [vcfio.Variant(reference_name='chr3', start=0),
-                          vcfio.Variant(reference_name='ChR3', start=0)]
+                          vcfio.Variant(reference_name='3', start=100000000)]
     # Shard 5
-    expected_shards[5] = [vcfio.Variant(reference_name='6', start=0),
-                          vcfio.Variant(reference_name='chr6', start=0)]
+    expected_shards[5] = [vcfio.Variant(reference_name='chr6', start=0),
+                          vcfio.Variant(reference_name='6', start=100000000)]
     # Shard 9
     expected_shards[9] = [vcfio.Variant(reference_name='chr10', start=0),
-                          vcfio.Variant(reference_name='  chr10 ', start=0)]
+                          vcfio.Variant(reference_name='10', start=100000000)]
     # Shard 21
     expected_shards[21] = [vcfio.Variant(reference_name='chr22', start=0),
-                           vcfio.Variant(reference_name='    22  ', start=0)]
+                           vcfio.Variant(reference_name='22', start=100000000)]
     # Shard 22
-    expected_shards[22] = [vcfio.Variant(reference_name='chrx', start=0),
-                           vcfio.Variant(reference_name='chrX', start=0),
-                           vcfio.Variant(reference_name=' X  ', start=0)]
+    expected_shards[22] = [vcfio.Variant(reference_name='chrX', start=0),
+                           vcfio.Variant(reference_name='chrx', start=0),
+                           vcfio.Variant(reference_name='X', start=0),
+                           vcfio.Variant(reference_name='x', start=0)]
     # Shard 23
-    expected_shards[23] = [vcfio.Variant(reference_name='chry', start=0),
-                           vcfio.Variant(reference_name='chrY', start=0),
-                           vcfio.Variant(reference_name=' Y  ', start=0)]
+    expected_shards[23] = [vcfio.Variant(reference_name='chrY', start=0),
+                           vcfio.Variant(reference_name='chry', start=0),
+                           vcfio.Variant(reference_name='Y', start=0),
+                           vcfio.Variant(reference_name='y', start=0)]
     # Shard 24, aka residual
     expected_shards[24] = [vcfio.Variant(reference_name='ch1', start=0),
                            vcfio.Variant(reference_name='chr001', start=0),
                            vcfio.Variant(reference_name='01', start=0),
+                           vcfio.Variant(reference_name='CHR1', start=0),
+                           vcfio.Variant(reference_name='cHr1', start=0),
+                           vcfio.Variant(reference_name='chR1', start=0),
+                           vcfio.Variant(reference_name='CHRX', start=0),
+                           vcfio.Variant(reference_name='CHRY', start=0),
                            vcfio.Variant(reference_name='contig1', start=0),
                            vcfio.Variant(reference_name='contig1000', start=0),
                            vcfio.Variant(reference_name='chr23', start=0),

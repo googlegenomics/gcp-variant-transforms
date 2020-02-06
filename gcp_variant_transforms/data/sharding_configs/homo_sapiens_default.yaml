@@ -134,12 +134,16 @@
      table_name_suffix: "chrX"
      regions:
        - "chrX"
+       - "chrx"
+       - "X"
        - "x"
      total_base_pairs: 155,260,473
 -  output_table:
      table_name_suffix: "chrY"
      regions:
        - "chrY"
+       - "chry"
+       - "Y"
        - "y"
      total_base_pairs: 57,227,415
 -  output_table:
