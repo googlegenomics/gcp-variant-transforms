@@ -3,6 +3,7 @@
     "test_name": "option-update-schema-on-append-step-1",
     "table_name": "option_update_schema_on_append",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
     "assertion_configs": [
       {
@@ -23,6 +24,7 @@
     "test_name": "option-update-schema-on-append-step-2",
     "table_name": "option_update_schema_on_append",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
     "append": true,
     "update_schema": true,

@@ -3,7 +3,7 @@
     "test_name": "platinum-partition-with-residual",
     "table_name": "platinum_partition_with_residual",
     "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
-    "sharding_config": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
     "runner": "DataflowRunner",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "worker_machine_type": "n1-highmem-4",
@@ -11,48 +11,48 @@
     "num_workers": "60",
     "assertion_configs": [
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr01"],
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 10}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr01"],
         "expected_result": {"num_rows": 20206691}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr02"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr02"],
         "expected_result": {"num_rows": 20712382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr03"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr03"],
         "expected_result": {"num_rows": 16194801}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr04_05"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr04_05"],
         "expected_result": {"num_rows": 31051681}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr06_07_08_09"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr06_07_08_09"],
         "expected_result": {"num_rows": 52523434}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr19_10M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr19_10M"],
         "expected_result": {"num_rows": 1241683}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chr19_20M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chr19_20M"],
         "expected_result": {"num_rows": 1077097}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chrX"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chrX"],
         "expected_result": {"num_rows": 19388563}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_chrY_M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__chrY_M"],
         "expected_result": {"num_rows": 2188382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}_all_remaining"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}__all_remaining"],
         "expected_result": {"num_rows": 96701092}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}*`"],
-        "expected_result": {"num_rows": 261285806}
       }
     ]
   }

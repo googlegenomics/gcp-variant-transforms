@@ -21,10 +21,19 @@ import sys
 from typing import Tuple  # pylint: disable=unused-import
 
 # Matches to regions formatted as 'chr12:10,000-20,000'.
-_REGION_LITERAL_REGEXP = re.compile(r'^(\S+):([0-9,]+)-([0-9,]+)$')
+_REGION_LITERAL_REGEXP = re.compile(
+    r'^\s*(\S+)\s*:\s*([0-9,]+)\s*-\s*([0-9,]+)\s*$')
 _DEFAULT_START_POSITION = 0
 _DEFAULT_END_POSITION = sys.maxsize
 
+
+def parse_comma_sep_int(int_str):
+  # type: (str) -> int
+  try:
+    int_value = int(int_str.replace(',', ''))
+  except:
+    raise ValueError('Given value is not integer: {}'.format(int_str))
+  return int_value
 
 def parse_genomic_region(genomic_region):
   # type: (str) -> Tuple[str, int, int]
@@ -36,16 +45,11 @@ def parse_genomic_region(genomic_region):
   Returns:
     A tuple containing reference name, start position and end position.
   """
-  def _parse_position(pos_str):
-    # type: (str) -> int
-    return int(pos_str.replace(',', ''))
-
   matched = _REGION_LITERAL_REGEXP.match(genomic_region)
   if matched:
     ref_name, start, end = matched.groups()
-    ref_name = ref_name.strip()
-    start = _parse_position(start)
-    end = _parse_position(end)
+    start = parse_comma_sep_int(start)
+    end = parse_comma_sep_int(end)
     if start < 0:
       raise ValueError(
           'Start position on a region cannot be negative: {}'.format(start))

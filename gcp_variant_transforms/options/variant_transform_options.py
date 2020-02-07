@@ -383,9 +383,9 @@ class FilterOptions(VariantTransformsOptions):
     parser.add_argument(
         '--reference_names',
         default=None, nargs='+',
-        help=('A list of reference names (separated by a space) to load '
-              'to BigQuery. If this parameter is not specified, all '
-              'references will be kept.'))
+        help=('This flag is deprecated and will be removed in the next '
+              'release. You can achieve the same goal by using a sharding '
+              'file and setting the --sharding_config_path flag.'))
 
 
 class MergeOptions(VariantTransformsOptions):
