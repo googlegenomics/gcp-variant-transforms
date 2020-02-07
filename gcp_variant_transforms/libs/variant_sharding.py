@@ -28,10 +28,11 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 import re
-import intervaltree
-import yaml
+from typing import List, Optional  # pylint: disable=unused-import
 
 from apache_beam.io.filesystems import FileSystems
+import intervaltree
+import yaml
 
 from gcp_variant_transforms.libs import genomic_region_parser
 
@@ -80,7 +81,10 @@ class _ChromosomeSharder(object):
     self._interval_tree.addi(start, end, shard_index)
 
   def get_shard_index(self, pos=0):
-    """Finds a region that includes pos, if none _UNDEFINED_SHARD_INDEX."""
+    """Finds an interval that pos falls into and return its index.
+
+    If no interval is found returns _UNDEFINED_SHARD_INDEX.
+    """
     matched_regions = self._interval_tree.search(pos)
     # Ensure at most one region is matching to the give position.
     assert len(matched_regions) <= 1
@@ -95,8 +99,8 @@ class VariantSharding(object):
   def __init__(self, config_file_path=None):
     if not config_file_path or not config_file_path.strip():
       raise ValueError('You must provide path to a yaml config file.')
-    self._use_interval_tree = self._validate_config(config_file_path)
-
+    self._use_interval_tree = self._validate_config_and_check_intervals(
+        config_file_path)
     # Residual partition will contain all remaining variants that do not match
     # to any other partition.
     self._num_shards = 0
@@ -119,7 +123,7 @@ class VariantSharding(object):
     return (len(regions) == 1 and
             regions[0].strip() == _RESIDUAL_REGION_LITERAL)
 
-  def _validate_config(self, config_file_path):
+  def _validate_config_and_check_intervals(self, config_file_path):
     # type: (str) -> bool
     """Validates the config file and finds if any region contains interval.
     Args:
