@@ -73,13 +73,11 @@ class SampleInfoToBigQuery(beam.PTransform):
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
-                ConvertSampleInfoToRow(self._sample_name_encoding))
-            | 'WriteSampleInfoToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
+                ConvertSampleInfoToRow(self.sample_name_encoding))
+            | 'WriteSampleInfoToBigQuery' >> beam.io.WriteToBigQuery(
                 self._output_table,
                 schema=self._schema,
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_APPEND
-                    if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+                method=beam.io.WriteToBigQuery.Method.FILE_LOADS))

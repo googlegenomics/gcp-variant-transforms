@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 
-import random
 from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
@@ -29,13 +28,6 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
-from gcp_variant_transforms.transforms import limit_write
-
-
-# TODO(samanvp): remove this hack when BQ custom sink is added to Python SDK,
-# see: https://issues.apache.org/jira/browse/BEAM-2801
-# This has to be less than 10000.
-_WRITE_SHARDS_LIMIT = 1000
 
 
 @beam.typehints.with_input_types(processed_variant.ProcessedVariant)
@@ -71,7 +63,6 @@ class VariantToBigQuery(beam.PTransform):
       update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      num_bigquery_write_shards=1,  # type: int
       null_numeric_value_replacement=None  # type: int
       ):
     # type: (...) -> None
@@ -88,8 +79,6 @@ class VariantToBigQuery(beam.PTransform):
 +       schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
-      num_bigquery_write_shards: If > 1, we will limit number of sources which
-        are used for writing to the output BigQuery table.
       null_numeric_value_replacement: the value to use instead of null for
         numeric (float/int/long) lists. For instance, [0, None, 1] will become
         [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
@@ -109,7 +98,6 @@ class VariantToBigQuery(beam.PTransform):
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
-    self._num_bigquery_write_shards = num_bigquery_write_shards
     if update_schema_on_append:
       bigquery_util.update_bigquery_schema_on_append(self._schema.fields,
                                                      self._output_table)
@@ -120,35 +108,11 @@ class VariantToBigQuery(beam.PTransform):
             self._bigquery_row_generator,
             self._allow_incompatible_records,
             self._omit_empty_sample_calls))
-    if self._num_bigquery_write_shards > 1:
-      # We split data into self._num_bigquery_write_shards random partitions
-      # and then write each part to final BQ by appending them together.
-      # Combined with LimitWrite transform, this will avoid the BQ failure.
-      bq_row_partitions = bq_rows | beam.Partition(
-          lambda _, n: random.randint(0, n - 1),
-          self._num_bigquery_write_shards)
-      bq_writes = []
-      for i in range(self._num_bigquery_write_shards):
-        bq_rows = (bq_row_partitions[i] | 'LimitWrite' + str(i) >>
-                   limit_write.LimitWrite(_WRITE_SHARDS_LIMIT))
-        bq_writes.append(
-            bq_rows | 'WriteToBigQuery' + str(i) >>
-            beam.io.Write(beam.io.BigQuerySink(
+    return (bq_rows
+            | 'WriteToBigQuery' >> beam.io.WriteToBigQuery(
                 self._output_table,
                 schema=self._schema,
                 create_disposition=(
                     beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_APPEND))))
-      return bq_writes
-    else:
-      return (bq_rows
-              | 'WriteToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
-                  self._output_table,
-                  schema=self._schema,
-                  create_disposition=(
-                      beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                  write_disposition=(
-                      beam.io.BigQueryDisposition.WRITE_APPEND
-                      if self._append
-                      else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+                method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
