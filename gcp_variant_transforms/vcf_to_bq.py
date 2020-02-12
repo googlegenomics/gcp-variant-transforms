@@ -78,7 +78,6 @@ _COMMAND_LINE_OPTIONS = [
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
     variant_transform_options.MergeOptions,
-    variant_transform_options.ShardingOptions,
     variant_transform_options.ExperimentalOptions,
 ]
 
