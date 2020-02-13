@@ -332,6 +332,12 @@ def _merge_headers(known_args, pipeline_args,
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
+    if known_args.generate_sample_info_table:
+      _ = (headers | 'SampleInfoToBigQuery' >>
+           sample_info_to_bigquery.SampleInfoToBigQuery(
+               known_args.output_table,
+               SampleNameEncoding[known_args.sample_name_encoding],
+               known_args.append))
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -499,8 +505,6 @@ def run(argv=None):
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
                null_numeric_value_replacement=(
                    known_args.null_numeric_value_replacement)))
-      if known_args.generate_sample_info_table:
-        _create_sample_info_table(pipeline, pipeline_mode, known_args)
 
   if known_args.output_avro_path:
     # TODO(bashir2): Add an integration test that outputs to Avro files and

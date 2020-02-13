@@ -24,7 +24,7 @@ from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import hashing_util
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
-_DATETIME_FORMAT = "%Y-%m-%d %H:%M"
+_DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
 
 
 class ConvertSampleInfoToRow(beam.DoFn):
