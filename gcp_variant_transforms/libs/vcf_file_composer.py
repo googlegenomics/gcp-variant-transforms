@@ -44,7 +44,7 @@ def compose_gcs_vcf_shards(project,  # type: str
   Args:
     project: The project name.
     vcf_header_file_path: The path of the VCF header file, it contains the meta
-      information, as well as the data header line with the call names.
+      information, as well as the data header line with the sample names.
     vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
     delete: If true, delete the original VCF shards.
@@ -81,7 +81,7 @@ def compose_local_vcf_shards(vcf_header_file_path,
 
   Args:
     vcf_header_file_path: The path of the VCF header file, it contains the meta
-      information, as well as the data header line with the call names.
+      information, as well as the data header line with the sample names.
     vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
   """

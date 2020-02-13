@@ -51,7 +51,7 @@ class GetSampleMap(beam.PTransform):
   The keys of this map will be used to find the count of distinct samples, while
   the sum of values will give us estimated value count.
   """
-  def _get_call_sample_ids(self, estimate):
+  def _get_sample_ids(self, estimate):
     # type: (vcf_parser.Variant) -> Tuple[str]
     """Returns the names of all calls for the variant."""
     return tuple(
@@ -61,7 +61,7 @@ class GetSampleMap(beam.PTransform):
   def expand(self, estimates):
     return (estimates
             | 'MapSamplesToValueCount' >> beam.FlatMap(
-                self._get_call_sample_ids)
+                self._get_sample_ids)
             | 'GroupAllSamples' >> beam.GroupByKey())
 
 

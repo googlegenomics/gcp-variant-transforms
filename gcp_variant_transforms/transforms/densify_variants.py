@@ -25,49 +25,49 @@ __all__ = ['DensifyVariants']
 
 
 class DensifyVariants(beam.PTransform):
-  """Densifys each Variant's calls to contain data for `all_call_sample_ids`."""
+  """Densifys each Variant's calls to contain data for `all_sample_ids`."""
 
-  def __init__(self, all_call_sample_ids):
+  def __init__(self, all_sample_ids):
     # type: (List[str]) -> None
     """Initializes a `DensifyVariants` object.
 
     Args:
-      all_call_sample_ids: A list of sample names that used to select/extend
+      all_sample_ids: A list of sample names that used to select/extend
       each variant calls.
     """
-    self._all_call_sample_ids = all_call_sample_ids
+    self._all_sample_ids = all_sample_ids
 
-  def _densify_variants(self, variant, all_call_sample_ids):
+  def _densify_variants(self, variant, all_sample_ids):
     # type: (vcf_parser.Variant, List[str]) -> vcf_parser.Variant
     """Cherry-picks calls for the variant.
 
-    The calls are in the same order as the `all_call_sample_ids`.
+    The calls are in the same order as the `all_sample_ids`.
     Args:
       variant: The variant that will be modified to contain calls for
-        `all_call_sample_ids`.
-      all_call_sample_ids: A list of sample names that used to cherry-pick each
+        `all_sample_ids`.
+      all_sample_ids: A list of sample names that used to cherry-pick each
         variant'calls. If one call is missing, an empty `VariantCall` is added.
 
     Returns:
-      `variant` modified to contain calls for `all_call_sample_ids`.
+      `variant` modified to contain calls for `all_sample_ids`.
     """
-    existing_call_sample_id = {call.sample_id: call for call in variant.calls}
+    existing_sample_ids = {call.sample_id: call for call in variant.calls}
 
     new_calls = []
-    for call_sample_id in all_call_sample_ids:
-      if call_sample_id in existing_call_sample_id.keys():
-        new_calls.append(existing_call_sample_id.get(call_sample_id))
+    for sample_id in all_sample_ids:
+      if sample_id in existing_sample_ids.keys():
+        new_calls.append(existing_sample_ids.get(sample_id))
       else:
         new_calls.append(
-            vcfio.VariantCall(sample_id=call_sample_id,
+            vcfio.VariantCall(sample_id=sample_id,
                               genotype=vcfio.MISSING_GENOTYPE_VALUE))
     variant.calls = new_calls
 
     return variant
 
   def expand(self, pcoll):
-    # Extend each variant's list of calls to contain `all_call_sample_ids`.
+    # Extend each variant's list of calls to contain `all_sample_ids`.
     return (pcoll
             | 'DensifyVariants' >> beam.Map(
                 self._densify_variants,
-                all_call_sample_ids=self._all_call_sample_ids))
+                all_sample_ids=self._all_sample_ids))

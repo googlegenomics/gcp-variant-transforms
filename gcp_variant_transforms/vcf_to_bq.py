@@ -59,7 +59,7 @@ from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # 
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
 from gcp_variant_transforms.transforms import sample_info_to_bigquery
-from gcp_variant_transforms.transforms import combine_call_sample_ids
+from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
 from gcp_variant_transforms.transforms import filter_variants
@@ -186,15 +186,18 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
   with beam.Pipeline(options=options) as p:
     variants = _read_variants(
         known_args.all_patterns, p, known_args, pipeline_mode)
-    call_sample_ids = (variants
-                       | 'CombineCallSampleIds' >>
-                       combine_call_sample_ids.CallSampleIdsCombiner())
+    sample_ids = (variants
+                  | 'CombineSampleIds' >>
+                  combine_sample_ids.SampleIdsCombiner())
+    # TODO(tneymanov): Annotation pipeline currently stores sample IDs instead
+    # of sample names in the the sharded VCF files, which would lead to double
+    # hashing of samples. Needs to be fixed ASAP.
     _ = (variants
          | 'DensifyVariants' >> densify_variants.DensifyVariants(
-             beam.pvalue.AsSingleton(call_sample_ids))
+             beam.pvalue.AsSingleton(sample_ids))
          | 'WriteToShards' >> write_variants_to_shards.WriteToShards(
              vcf_shards_output_dir,
-             beam.pvalue.AsSingleton(call_sample_ids),
+             beam.pvalue.AsSingleton(sample_ids),
              known_args.number_of_variants_per_shard))
 
   return [vep_runner_util.format_dir_path(vcf_shards_output_dir) +

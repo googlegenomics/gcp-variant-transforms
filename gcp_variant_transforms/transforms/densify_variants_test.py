@@ -51,13 +51,13 @@ class DensifyVariantsTest(unittest.TestCase):
     pipeline.run()
 
   def test_densify_variants_pipeline(self):
-    call_sample_ids = [hash_name('sample1'),
-                       hash_name('sample2'),
-                       hash_name('sample3')]
+    sample_ids = [hash_name('sample1'),
+                  hash_name('sample2'),
+                  hash_name('sample3')]
     variant_calls = [
-        vcfio.VariantCall(sample_id=call_sample_ids[0]),
-        vcfio.VariantCall(sample_id=call_sample_ids[1]),
-        vcfio.VariantCall(sample_id=call_sample_ids[2]),
+        vcfio.VariantCall(sample_id=sample_ids[0]),
+        vcfio.VariantCall(sample_id=sample_ids[1]),
+        vcfio.VariantCall(sample_id=sample_ids[2]),
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
@@ -68,8 +68,7 @@ class DensifyVariantsTest(unittest.TestCase):
     densified_variants = (
         pipeline
         | Create(variants)
-        | 'DensifyVariants' >> densify_variants.DensifyVariants(
-            call_sample_ids))
-    assert_that(densified_variants, asserts.has_sample_ids(call_sample_ids))
+        | 'DensifyVariants' >> densify_variants.DensifyVariants(sample_ids))
+    assert_that(densified_variants, asserts.has_sample_ids(sample_ids))
 
     pipeline.run()

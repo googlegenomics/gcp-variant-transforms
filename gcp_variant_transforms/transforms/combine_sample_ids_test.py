@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for `combine_call_sample_ids` module."""
+"""Tests for `combine_sample_ids` module."""
 
 import unittest
 
@@ -23,21 +23,20 @@ from apache_beam.testing.util import equal_to
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.testing.testdata_util import hash_name
-from gcp_variant_transforms.transforms import combine_call_sample_ids
+from gcp_variant_transforms.transforms import combine_sample_ids
 
 
-class GetCallSampleIdsTest(unittest.TestCase):
-  """Test cases for the `CallSampleIdsCombiner` transform."""
+class GetSampleIdsTest(unittest.TestCase):
+  """Test cases for the `SampleIdsCombiner` transform."""
 
-  def test_call_sample_ids_combiner_pipe_preserve_call_sample_ids_order_error(
-      self):
-    call_sample_ids = [hash_name('sample1'),
-                       hash_name('sample2'),
-                       hash_name('sample3')]
+  def test_sample_ids_combiner_pipeline_preserve_sample_order_error(self):
+    sample_ids = [hash_name('sample1'),
+                  hash_name('sample2'),
+                  hash_name('sample3')]
     variant_calls = [
-        vcfio.VariantCall(sample_id=call_sample_ids[0]),
-        vcfio.VariantCall(sample_id=call_sample_ids[1]),
-        vcfio.VariantCall(sample_id=call_sample_ids[2])
+        vcfio.VariantCall(sample_id=sample_ids[0]),
+        vcfio.VariantCall(sample_id=sample_ids[1]),
+        vcfio.VariantCall(sample_id=sample_ids[2])
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
@@ -48,20 +47,20 @@ class GetCallSampleIdsTest(unittest.TestCase):
     _ = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineCallSampleIds' >>
-        combine_call_sample_ids.CallSampleIdsCombiner(
-            preserve_call_sample_ids_order=True))
+        | 'CombineSampleIds' >>
+        combine_sample_ids.SampleIdsCombiner(
+            preserve_sample_order=True))
     with self.assertRaises(ValueError):
       pipeline.run()
 
-  def test_call_sample_ids_combiner_pipe_preserve_call_sample_ids_order(self):
-    call_sample_ids = [hash_name('sample2'),
-                       hash_name('sample1'),
-                       hash_name('sample3')]
+  def test_sample_ids_combiner_pipeline_preserve_sample_order(self):
+    sample_ids = [hash_name('sample2'),
+                  hash_name('sample1'),
+                  hash_name('sample3')]
     variant_calls = [
-        vcfio.VariantCall(sample_id=call_sample_ids[0]),
-        vcfio.VariantCall(sample_id=call_sample_ids[1]),
-        vcfio.VariantCall(sample_id=call_sample_ids[2])
+        vcfio.VariantCall(sample_id=sample_ids[0]),
+        vcfio.VariantCall(sample_id=sample_ids[1]),
+        vcfio.VariantCall(sample_id=sample_ids[2])
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0],
@@ -73,23 +72,23 @@ class GetCallSampleIdsTest(unittest.TestCase):
     ]
 
     pipeline = TestPipeline()
-    combined_call_sample_ids = (
+    combined_sample_ids = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineCallSampleIds' >>
-        combine_call_sample_ids.CallSampleIdsCombiner(
-            preserve_call_sample_ids_order=True))
-    assert_that(combined_call_sample_ids, equal_to([call_sample_ids]))
+        | 'CombineSampleIds' >>
+        combine_sample_ids.SampleIdsCombiner(
+            preserve_sample_order=True))
+    assert_that(combined_sample_ids, equal_to([sample_ids]))
     pipeline.run()
 
-  def test_call_sample_ids_combiner_pipeline(self):
-    call_sample_ids = [hash_name('sample3'),
-                       hash_name('sample2'),
-                       hash_name('sample1')]
+  def test_sample_ids_combiner_pipeline(self):
+    sample_ids = [hash_name('sample3'),
+                  hash_name('sample2'),
+                  hash_name('sample1')]
     variant_calls = [
-        vcfio.VariantCall(sample_id=call_sample_ids[0]),
-        vcfio.VariantCall(sample_id=call_sample_ids[1]),
-        vcfio.VariantCall(sample_id=call_sample_ids[2])
+        vcfio.VariantCall(sample_id=sample_ids[0]),
+        vcfio.VariantCall(sample_id=sample_ids[1]),
+        vcfio.VariantCall(sample_id=sample_ids[2])
     ]
     variants = [
         vcfio.Variant(calls=[variant_calls[0], variant_calls[1]]),
@@ -97,15 +96,15 @@ class GetCallSampleIdsTest(unittest.TestCase):
     ]
 
     pipeline = TestPipeline()
-    combined_call_sample_ids = (
+    combined_sample_ids = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineCallSampleIds' >>
-        combine_call_sample_ids.CallSampleIdsCombiner())
-    assert_that(combined_call_sample_ids, equal_to([call_sample_ids]))
+        | 'CombineSampleIds' >>
+        combine_sample_ids.SampleIdsCombiner())
+    assert_that(combined_sample_ids, equal_to([sample_ids]))
     pipeline.run()
 
-  def test_call_sample_ids_combiner_pipeline_duplicate_call_sample_ids(self):
+  def test_sample_ids_combiner_pipeline_duplicate_sample_ids(self):
     variant_call = vcfio.VariantCall(sample_id=hash_name('sample1'))
     variants = [vcfio.Variant(calls=[variant_call, variant_call])]
 
@@ -113,7 +112,7 @@ class GetCallSampleIdsTest(unittest.TestCase):
     _ = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineCallSampleIds' >>
-        combine_call_sample_ids.CallSampleIdsCombiner())
+        | 'CombineSampleIds' >>
+        combine_sample_ids.SampleIdsCombiner())
     with self.assertRaises(ValueError):
       pipeline.run()

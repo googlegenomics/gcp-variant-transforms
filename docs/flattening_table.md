@@ -30,13 +30,13 @@ the table on the repeated call record as follows:
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id
+  call.sample_id AS sample_id
 FROM
   `project.dataset.table` AS t,
   t.call AS call
 ```
 
-![Flatten call sample_ids](images/flatten_call_names.png)
+![Flatten repeated sample_ids in call column](images/flatten_call_names.png)
 
 
 Note that BigQuery throws the error
@@ -58,7 +58,7 @@ an array of integers) to the result.
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id, call.genotype
+  call.sample_id AS sample_id, call.genotype
 FROM
   `project.dataset.table` AS t,
   t.call AS call
@@ -74,7 +74,7 @@ follows:
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id, genotype
+  call.sample_id AS sample_id, genotype
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
@@ -83,8 +83,8 @@ FROM
 
 ![Flatten call, genotype](images/flatten_call_flatten_genotype.png)
 
-Note that in this case, the call sample ids are duplicated as each call contains
-two genotype values.
+Note that in this case, the sample ids are duplicated as each call contains two
+genotype values.
 
 Let's add `alternate_bases` to the `SELECT` clause, which is an independently
 repeated record:
@@ -93,7 +93,7 @@ repeated record:
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id, genotype, alternate_bases
+  call.sample_id AS sample_id, genotype, alternate_bases
 FROM
   `project.dataset.table` AS t,
   t.call AS call,
@@ -111,7 +111,7 @@ can be done using `ORDINAL` as follows:
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id, genotype,
+  call.sample_id AS sample_id, genotype,
   IF(genotype > 0, alternate_bases[ORDINAL(genotype)], NULL) AS alternate_bases
 FROM
   `project.dataset.table` AS t,
@@ -138,7 +138,7 @@ a filtering criteria as follows:
 #standardSQL
 SELECT
   reference_name, start_position, end_position, reference_bases,
-  call.sample_id AS call_sample_id,
+  call.sample_id AS sample_id,
   IF(genotype > 0, 1, genotype) AS alt_genotype,
   IF(genotype > 0, alts.alt, NULL) AS alt
 FROM
@@ -183,7 +183,7 @@ SELECT
   ARRAY_TO_STRING(t.names, ' ') AS names,
   t.quality,
   ARRAY_TO_STRING(t.filter, ' ') AS filter,
-  call.sample_id AS call_sample_id,
+  call.sample_id AS sample_id,
   IF(genotype > 0, 1, genotype) AS alt_genotype,
   call.phaseset
 FROM

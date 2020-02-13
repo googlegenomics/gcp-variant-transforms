@@ -38,7 +38,7 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     self._vcf_shards_output_dir = vcf_shards_output_dir
     self._number_of_variants_per_shard = number_of_variants_per_shard
     self._coder = vcfio._ToVcfRecordCoder()
-    self._call_sample_ids = []
+    self._sample_names = []
     self._variant_lines = []
     self._counter = 0
 
@@ -50,10 +50,10 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     if self._variant_lines:
       self._write_variant_lines_to_vcf_shard(self._variant_lines)
 
-  def process(self, variant, call_sample_ids):
+  def process(self, variant, sample_names):
     # type: (vcfio.Variant, List[str]) -> None
     self._counter += 1
-    self._call_sample_ids = call_sample_ids
+    self._sample_names = sample_names
     self._variant_lines.append(self._coder.encode(variant).strip('\n'))
     if self._counter == self._number_of_variants_per_shard:
       self._write_variant_lines_to_vcf_shard(self._variant_lines)
@@ -65,9 +65,8 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     """Writes variant lines to one VCF shard."""
     vcf_fixed_columns = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                          'INFO', 'FORMAT']
-    str_call_sample_ids = (
-        [str(call_sample_id) for call_sample_id in self._call_sample_ids])
-    vcf_header = str('\t'.join(vcf_fixed_columns + str_call_sample_ids))
+    str_sample_names = [str(sample_name) for sample_name in self._sample_names]
+    vcf_header = str('\t'.join(vcf_fixed_columns + str_sample_names))
     vcf_data_file = self._generate_unique_file_path(len(variant_lines))
     with filesystems.FileSystems.create(vcf_data_file) as file_to_write:
       file_to_write.write(vcf_header)
@@ -97,19 +96,19 @@ class WriteToShards(beam.PTransform):
 
   def __init__(self,
                vcf_shards_output_dir,
-               call_sample_ids,
+               sample_names,
                number_of_variants_per_shard=20000):
     # type (str, List[str], int) -> None
     """Initializes `WriteToShards` object.
 
      Args:
        vcf_shards_output_dir: The location for all VCF shards.
-       call_sample_ids: Names of all calls.
+       sample_names: Names of all samples.
        number_of_variants_per_shard: The maximum number of variants that is
          written into one VCF shard.
     """
     self._vcf_shards_output_dir = vcf_shards_output_dir
-    self._call_sample_ids = call_sample_ids
+    self._sample_names = sample_names
     self._number_of_variants_per_shard = number_of_variants_per_shard
 
   def expand(self, pcoll):
@@ -117,4 +116,4 @@ class WriteToShards(beam.PTransform):
          | 'GenerateKeys' >> beam.ParDo(
              _WriteVariantsToVCFShards(self._vcf_shards_output_dir,
                                        self._number_of_variants_per_shard),
-             self._call_sample_ids))
+             self._sample_names))
