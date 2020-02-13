@@ -316,7 +316,7 @@ def _get_merged_field_schemas(
   return merged_field_schemas
 
 
-def calculate_optimize_partition_size(total_base_pairs):
+def calculate_optimal_partition_size(total_base_pairs):
   # These two operations adds [10^4, 2 * 10^4) buffer to total_base_pairs.
   total_base_pairs += math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS)
   total_base_pairs = (
@@ -330,4 +330,3 @@ def calculate_optimize_partition_size(total_base_pairs):
       math.pow(10, _PARTITION_SIZE_SIG_DIGITS))
   return (partition_size_round_up,
           partition_size_round_up * (_NUM_BQ_RANGE_PARTITIONS - 1))
-

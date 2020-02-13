@@ -339,10 +339,10 @@ BQ_CREATE_PARTITIONED_TABLE = (
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_JSON}')
 
-def make_output_table_if_needed(known_args, full_table_id, total_base_pairs):
+def create_output_table_if_needed(known_args, full_table_id, total_base_pairs):
   if not known_args.append:
     (partition_size, total_base_pairs_enlarged) = (
-        bigquery_util.calculate_optimize_partition_size(total_base_pairs))
+        bigquery_util.calculate_optimal_partition_size(total_base_pairs))
     bq_command = BQ_CREATE_PARTITIONED_TABLE.format(
         TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
         PARTITION_SIZE=partition_size,
@@ -352,4 +352,4 @@ def make_output_table_if_needed(known_args, full_table_id, total_base_pairs):
     if result != 0:
       raise ValueError(
           'Failed to create a bigquery table using "{}" command.'.format(
-              bq_make_command))
+              bq_command))

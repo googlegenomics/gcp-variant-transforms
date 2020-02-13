@@ -480,8 +480,8 @@ def run(argv=None):
       table_name = sample_info_table_schema_generator.compose_table_name(
           known_args.output_table, table_suffix)
       total_base_pairs = sharding.get_output_table_total_base_pairs(i)
-      pipeline_common.make_output_table_if_needed(
-        known_args, table_name, total_base_pairs)
+      pipeline_common.create_output_table_if_needed(
+          known_args, table_name, total_base_pairs)
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
