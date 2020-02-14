@@ -32,7 +32,7 @@ class DensifyVariants(beam.PTransform):
     """Initializes a `DensifyVariants` object.
 
     Args:
-      all_sample_ids: A list of sample names that used to select/extend
+      all_sample_ids: A list of sample_ids that is used to select/extend
       each variant calls.
     """
     self._all_sample_ids = all_sample_ids
