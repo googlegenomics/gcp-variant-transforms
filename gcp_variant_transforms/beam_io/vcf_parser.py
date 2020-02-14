@@ -184,7 +184,7 @@ class VariantCall(object):
   """
 
   def __init__(self, sample_id=None, genotype=None, phaseset=None, info=None):
-    # type: (str, List[int], str, Dict[str, Any]) -> None
+    # type: (int, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
 
     Args:
@@ -614,10 +614,10 @@ class PySamParser(VcfParser):
     sample_id = self._encoded_sample_names.get(sample_name)
     if not sample_id:
       if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
-        sample_id = hex(hashing_util.generate_sample_id(
-            sample_name, self._file_name))
+        sample_id = hashing_util.generate_sample_id(
+            sample_name, self._file_name)
       else:
-        sample_id = hex(hashing_util.generate_sample_id(sample_name))
+        sample_id = hashing_util.generate_sample_id(sample_name)
       self._encoded_sample_names[sample_name] = sample_id
     return sample_id
 

@@ -40,12 +40,12 @@ class BigQueryToVariantTest(unittest.TestCase):
            unicode(ColumnKeyConstants.FILTER): ['PASS'],
            unicode(ColumnKeyConstants.CALLS): [
                {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                   unicode(hash_name('Sample1'))),
+                   hash_name('Sample1')),
                 unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
                 unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
                 unicode('GQ'): 20, unicode('FIR'): [10, 20]},
                {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                   unicode(hash_name('Sample2'))),
+                   hash_name('Sample2')),
                 unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
                 unicode(ColumnKeyConstants.CALLS_PHASESET): None,
                 unicode('GQ'): 10, unicode('FB'): True}

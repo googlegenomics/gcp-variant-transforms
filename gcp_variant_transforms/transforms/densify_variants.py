@@ -28,7 +28,7 @@ class DensifyVariants(beam.PTransform):
   """Densifys each Variant's calls to contain data for `all_sample_ids`."""
 
   def __init__(self, all_sample_ids):
-    # type: (List[str]) -> None
+    # type: (List[int]) -> None
     """Initializes a `DensifyVariants` object.
 
     Args:
@@ -38,7 +38,7 @@ class DensifyVariants(beam.PTransform):
     self._all_sample_ids = all_sample_ids
 
   def _densify_variants(self, variant, all_sample_ids):
-    # type: (vcf_parser.Variant, List[str]) -> vcf_parser.Variant
+    # type: (vcf_parser.Variant, List[int]) -> vcf_parser.Variant
     """Cherry-picks calls for the variant.
 
     The calls are in the same order as the `all_sample_ids`.

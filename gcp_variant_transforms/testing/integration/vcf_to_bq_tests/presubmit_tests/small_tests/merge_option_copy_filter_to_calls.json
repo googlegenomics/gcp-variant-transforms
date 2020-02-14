@@ -25,7 +25,7 @@
           "SELECT COUNT(0) AS num_rows ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
-          "AND call.sample_id ='0x1447114f17e91025L' ",
+          "AND call.sample_id = 1461155635506253861 ",
           "AND 'q10' IN UNNEST (call.filter)"
         ],
         "expected_result": {"num_rows": 1}
@@ -35,7 +35,7 @@
           "SELECT COUNT(0) AS num_rows ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
-          "AND call.sample_id ='0x7588a624d89b0eb2L' ",
+          "AND call.sample_id = 8469201776453291698 ",
           "AND 'q10' IN UNNEST (call.filter)"
         ],
         "expected_result": {"num_rows": 1}
@@ -45,7 +45,7 @@
           "SELECT COUNT(0) AS num_rows ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
-          "AND call.sample_id ='0x276d7d35dbcc18a6L' ",
+          "AND call.sample_id = 2841064610214975654 ",
           "AND 'PASS' IN UNNEST (call.filter)"
         ],
         "expected_result": {"num_rows": 1}
@@ -55,7 +55,7 @@
           "SELECT COUNT(0) AS num_rows ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
-          "AND call.sample_id ='0x65101f53be02557dL' ",
+          "AND call.sample_id = 7282355041988662653 ",
           "AND 'PASS' IN UNNEST (call.filter)"
         ],
         "expected_result": {"num_rows": 1}
