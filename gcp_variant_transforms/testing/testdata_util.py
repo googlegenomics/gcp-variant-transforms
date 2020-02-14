@@ -18,7 +18,12 @@ from __future__ import absolute_import
 
 import os.path
 
+from gcp_variant_transforms.libs import hashing_util
+
 __all__ = ['get_full_file_path', 'get_full_dir']
+
+def hash_name(sample_name, file_name=''):
+  return hex(hashing_util.generate_sample_id(sample_name, file_name))
 
 
 def get_full_file_path(file_name):

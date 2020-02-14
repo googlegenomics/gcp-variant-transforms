@@ -247,8 +247,8 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
         VariantCallRowGenerator, self)._get_call_record(
             call, schema_descriptor, allow_incompatible_records)
     call_record.update({
-        bigquery_util.ColumnKeyConstants.CALLS_NAME:
-            self._bigquery_field_sanitizer.get_sanitized_field(call.name)
+        bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID:
+            self._bigquery_field_sanitizer.get_sanitized_field(call.sample_id)
     })
     return call_record, is_empty
 

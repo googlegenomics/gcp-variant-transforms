@@ -26,6 +26,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 class MoveToCallsStrategyTest(unittest.TestCase):
@@ -37,9 +38,9 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         filters=['PASS'],
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
-            vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+            vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
-            vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
     variant_2 = vcfio.Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
@@ -47,8 +48,8 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         filters=['q10'],
         info={'A1': 'some data2', 'A3': ['data3', 'data4']},
         calls=[
-            vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
-            vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
+            vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                               info={'GQ': 20})])
     return [variant_1, variant_2]
 
@@ -77,12 +78,13 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     merged_variant = strategy.get_merged_variants(variants)[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20]}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0], info={'GQ': 20})],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
+         vcfio.VariantCall(
+             sample_id=hash_name('Sample4'), genotype=[1, 0], info={'GQ': 20})],
         merged_variant.calls)
     self.assertItemsEqual(['A1', 'A2', 'A3'], merged_variant.info.keys())
     self.assertTrue(
@@ -102,11 +104,11 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']})],
@@ -116,18 +118,18 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     merged_variant = strategy.get_merged_variants(variants)[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20,
                                  ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']})],
@@ -150,9 +152,9 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True, 'A1': 'some data'})],
         single_merged_variant.calls)
 
@@ -160,13 +162,13 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     merged_variant = strategy.get_merged_variants(variants)[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True, 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={'A1': 'some data2'}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20, 'A1': 'some data2'})],
         merged_variant.calls)
     self.assertItemsEqual(['A2', 'A3'], merged_variant.info.keys())
@@ -185,12 +187,12 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = strategy.get_merged_variants([variants[0]])[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
@@ -200,21 +202,21 @@ class MoveToCallsStrategyTest(unittest.TestCase):
     merged_variant = strategy.get_merged_variants(variants)[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={'A1': 'some data2', 'A3': ['data3', 'data4'],
                                  ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20,
                                  'A1': 'some data2', 'A3': ['data3', 'data4'],
                                  ColumnKeyConstants.QUALITY: 20,
@@ -271,7 +273,7 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         type=TableFieldConstants.TYPE_RECORD,
         mode=TableFieldConstants.MODE_REPEATED)
     calls_record.fields.append(bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS_NAME,
+        name=ColumnKeyConstants.CALLS_SAMPLE_ID,
         type=TableFieldConstants.TYPE_STRING))
     schema.fields.append(calls_record)
     for key in info_keys:
@@ -302,7 +304,8 @@ class MoveToCallsStrategyTest(unittest.TestCase):
          ColumnKeyConstants.QUALITY,
          ColumnKeyConstants.FILTER,
          ColumnKeyConstants.CALLS,
-         '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.CALLS_NAME]),
+         '.'.join([ColumnKeyConstants.CALLS,
+                   ColumnKeyConstants.CALLS_SAMPLE_ID]),
          'INFO_KEY1'],
         self._get_fields_from_schema(base_schema))
 
@@ -319,7 +322,8 @@ class MoveToCallsStrategyTest(unittest.TestCase):
          ColumnKeyConstants.QUALITY,
          ColumnKeyConstants.FILTER,
          ColumnKeyConstants.CALLS,
-         '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.CALLS_NAME]),
+         '.'.join([ColumnKeyConstants.CALLS,
+                   ColumnKeyConstants.CALLS_SAMPLE_ID]),
          '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.QUALITY]),
          '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.FILTER]),
          'INFO_KEY1'],
@@ -338,7 +342,8 @@ class MoveToCallsStrategyTest(unittest.TestCase):
          ColumnKeyConstants.QUALITY,
          ColumnKeyConstants.FILTER,
          ColumnKeyConstants.CALLS,
-         '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.CALLS_NAME]),
+         '.'.join([ColumnKeyConstants.CALLS,
+                   ColumnKeyConstants.CALLS_SAMPLE_ID]),
          '.'.join([ColumnKeyConstants.CALLS, 'INFO_KEY1']),
          'INFO_KEY2'],
         self._get_fields_from_schema(base_schema))
@@ -356,7 +361,8 @@ class MoveToCallsStrategyTest(unittest.TestCase):
          ColumnKeyConstants.QUALITY,
          ColumnKeyConstants.FILTER,
          ColumnKeyConstants.CALLS,
-         '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.CALLS_NAME]),
+         '.'.join([ColumnKeyConstants.CALLS,
+                   ColumnKeyConstants.CALLS_SAMPLE_ID]),
          '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.QUALITY]),
          '.'.join([ColumnKeyConstants.CALLS, ColumnKeyConstants.FILTER]),
          '.'.join([ColumnKeyConstants.CALLS, 'INFO_KEY1']),
@@ -368,7 +374,7 @@ class MoveToCallsStrategyTest(unittest.TestCase):
         info_keys_to_move_to_calls_regex='.*',
         copy_quality_to_calls=True,
         copy_filter_to_calls=True)
-    info_keys = [ColumnKeyConstants.CALLS_NAME]
+    info_keys = [ColumnKeyConstants.CALLS_SAMPLE_ID]
     base_schema = self._get_base_schema(info_keys)
     try:
       strategy.modify_bigquery_schema(base_schema, info_keys)

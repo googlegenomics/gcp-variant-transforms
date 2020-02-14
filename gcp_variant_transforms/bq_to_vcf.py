@@ -65,7 +65,7 @@ from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
-from gcp_variant_transforms.transforms import combine_call_names
+from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
 
 
@@ -109,7 +109,7 @@ def run(argv=None):
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      '{}_header_with_call_names.vcf'.format(unique_temp_id))
+      '{}_header_with_sample_ids.vcf'.format(unique_temp_id))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
@@ -145,7 +145,6 @@ def _write_vcf_meta_info(input_table,
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields, _VCF_VERSION_LINE)
 
-
 def _bigquery_to_vcf_shards(
     known_args,  # type: argparse.Namespace
     beam_pipeline_options,  # type: pipeline_options.PipelineOptions
@@ -161,11 +160,11 @@ def _bigquery_to_vcf_shards(
   writes to one VCF file. All VCF data files are saved in
   `vcf_data_temp_folder`.
 
-  Also, it writes the meta info and data header with the call names to
+  Also, it writes the meta info and data header with the sample names to
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  # TODO(allieychen): Modify the SQL query with the specified call_names.
+  # TODO(allieychen): Modify the SQL query with the specified sample_ids.
   query = _get_bigquery_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
   bq_source = bigquery.BigQuerySource(query=query,
@@ -176,25 +175,28 @@ def _bigquery_to_vcf_shards(
     variants = (p
                 | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
-    if known_args.call_names:
-      call_names = (p
-                    | transforms.Create(known_args.call_names, reshuffle=False)
+    if known_args.sample_names:
+      sample_ids = (p
+                    | transforms.Create(known_args.sample_names,
+                                        reshuffle=False)
                     | beam.combiners.ToList())
     else:
-      call_names = (variants
-                    | 'CombineCallNames' >>
-                    combine_call_names.CallNamesCombiner(
-                        known_args.preserve_call_names_order))
-
-    _ = (call_names
+      sample_ids = (variants
+                    | 'CombineSampleIds' >>
+                    combine_sample_ids.SampleIdsCombiner(
+                        known_args.preserve_sample_order))
+    # TODO(tneymanov): Add logic to extract sample names from sample IDs by
+    # joining with sample id-name mapping table, once that code is implemented.
+    sample_names = sample_ids
+    _ = (sample_names
          | 'GenerateVcfDataHeader' >>
-         beam.ParDo(_write_vcf_header_with_call_names,
+         beam.ParDo(_write_vcf_header_with_sample_names,
                     _VCF_FIXED_COLUMNS,
                     known_args.representative_header_file,
                     header_file_path))
 
     _ = (variants
-         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(call_names))
+         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(sample_ids))
          | 'PairVariantWithKey' >>
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
@@ -275,12 +277,12 @@ def _get_query_columns(schema):
   return columns
 
 
-def _write_vcf_header_with_call_names(sample_names,
-                                      vcf_fixed_columns,
-                                      representative_header_file,
-                                      file_path):
+def _write_vcf_header_with_sample_names(sample_names,
+                                        vcf_fixed_columns,
+                                        representative_header_file,
+                                        file_path):
   # type: (List[str], List[str], str, str) -> None
-  """Writes VCF header containing meta info and header line with call names.
+  """Writes VCF header containing meta info and header line with sample names.
 
   It writes all meta-information starting with `##` extracted from
   `representative_header_file`, followed by one data header line with

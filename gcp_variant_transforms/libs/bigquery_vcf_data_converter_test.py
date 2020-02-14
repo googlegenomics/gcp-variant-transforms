@@ -31,6 +31,7 @@ from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
 from gcp_variant_transforms.testing import vcf_header_util
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 def _get_processed_variant(variant, header_num_dict=None):
@@ -153,11 +154,13 @@ def _get_big_query_row():
           unicode(ColumnKeyConstants.QUALITY): 2,
           unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
           unicode(ColumnKeyConstants.CALLS): [
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
+              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  unicode(hash_name('Sample1'))),
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
                unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
                unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
+              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  unicode(hash_name('Sample2'))),
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
                unicode(ColumnKeyConstants.CALLS_PHASESET): None,
                unicode('GQ'): 10, unicode('FB'): True}
@@ -263,10 +266,10 @@ class VariantGeneratorTest(unittest.TestCase):
 
     expected_calls = [
         vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'GQ': 20, 'FIR': [10, 20]}),
         vcfio.VariantCall(
-            name='Sample2', genotype=[1, 0],
+            sample_id=hash_name('Sample2'), genotype=[1, 0],
             info={'GQ': 10, 'FB': True}),
     ]
 
@@ -284,10 +287,10 @@ class VariantGeneratorTest(unittest.TestCase):
               'IS': 'some data', 'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FB': True})
         ]
     )
@@ -327,13 +330,13 @@ class ConverterCombinationTest(unittest.TestCase):
               'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FB': True}),
-            vcfio.VariantCall(
-                name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
+            vcfio.VariantCall(sample_id=hash_name('Sample3'),
+                              genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
     header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
 
     proc_variant = _get_processed_variant(variant, header_num_dict)

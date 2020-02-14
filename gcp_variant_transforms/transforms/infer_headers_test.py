@@ -30,6 +30,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcf_header_io import CreateFormatField as createFormat
 from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.testing import asserts
+from gcp_variant_transforms.testing.testdata_util import hash_name
 from gcp_variant_transforms.transforms import infer_headers
 
 
@@ -78,7 +79,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
         info={'IS': 'some data', 'ISI': '1', 'ISF': '1.0',
               'IF': 1.0, 'IB': True, 'IA': [1, 2]},
         calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]
     )
     return variant
@@ -88,8 +89,9 @@ class InferHeaderFieldsTest(unittest.TestCase):
         reference_name='20', start=123, end=125, reference_bases='CT',
         alternate_bases=[], filters=['q10', 's10'],
         info={'IS_2': 'some data'},
-        calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*', info={'FI_2': 20})]
+        calls=[vcfio.VariantCall(sample_id=hash_name('Sample1'),
+                                 genotype=[0, 1],
+                                 phaseset='*', info={'FI_2': 20})]
     )
     return variant
 
@@ -105,7 +107,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
               'IB': True,
               'IA': [0.1]},
         calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]
     )
     return variant
@@ -122,7 +124,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
               'IB': True,
               'IA': [1, 0.2]},
         calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]
     )
     return variant
@@ -139,7 +141,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
               'IB': True,
               'IA': [1, 2.0]},
         calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'FI': 20, 'FU': [10.0, 20.0]})]
     )
     return variant
@@ -156,7 +158,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
               'IB': True,
               'IA': [0.1, 0.2]},
         calls=[vcfio.VariantCall(
-            name='Sample1', genotype=[0, 1], phaseset='*',
+            sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
             info={'FI': 20.1, 'FU': [10.0, 20.0]})]
     )
     return variant

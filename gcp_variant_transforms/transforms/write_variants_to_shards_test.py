@@ -23,6 +23,7 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.testing import temp_dir
+from gcp_variant_transforms.testing.testdata_util import hash_name
 from gcp_variant_transforms.transforms import write_variants_to_shards
 
 
@@ -77,6 +78,7 @@ class WriteVariantsToShardsTest(unittest.TestCase):
           pipeline
           | Create(self._get_variants())
           | 'WriteToShards' >> write_variants_to_shards.WriteToShards(
-              tempdir.get_path(), ['Sample 1', 'Sample 2'])
+              tempdir.get_path(),
+              [hash_name('Sample 1'), hash_name('Sample 2')])
       )
       pipeline.run()

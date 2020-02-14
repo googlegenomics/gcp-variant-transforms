@@ -76,7 +76,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
                    ColumnKeyConstants.FILTER,
                    ColumnKeyConstants.CALLS,
                    '.'.join([ColumnKeyConstants.CALLS,
-                             ColumnKeyConstants.CALLS_NAME]),
+                             ColumnKeyConstants.CALLS_SAMPLE_ID]),
                    '.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_GENOTYPE]),
                    '.'.join([ColumnKeyConstants.CALLS,

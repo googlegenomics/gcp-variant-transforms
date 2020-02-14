@@ -28,6 +28,7 @@ from gcp_variant_transforms.libs.annotation import annotation_parser
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
 from gcp_variant_transforms.testing import vcf_header_util
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 class _CounterSpy(metrics_util.CounterInterface):
@@ -63,9 +64,9 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         filters=['PASS'],
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
-            vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+            vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
-            vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
 
   def test_create_processed_variant_no_change(self):

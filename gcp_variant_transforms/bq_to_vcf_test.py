@@ -44,7 +44,7 @@ class BqToVcfTest(unittest.TestCase):
       representative_header = tempdir.create_temp_file(lines=lines)
       file_path = filesystems.FileSystems.join(tempdir.get_path(),
                                                'data_header')
-      bq_to_vcf._write_vcf_header_with_call_names(
+      bq_to_vcf._write_vcf_header_with_sample_names(
           ['Sample 1', 'Sample 2'],
           ['#CHROM', 'POS', 'ID', 'REF', 'ALT'],
           representative_header,

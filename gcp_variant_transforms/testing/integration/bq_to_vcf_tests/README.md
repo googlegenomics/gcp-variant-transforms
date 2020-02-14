@@ -13,7 +13,7 @@ schema.
 `option_representative_header_file.json` is used to test the option
 `--representative_header_file`, which loads all meta information from
 `representative_header_file`. The test case `option_customized_export.json`
-is used to test the options `--genomic_regions` and `--call_names`.
+is used to test the options `--genomic_regions` and `--sample_names`.
 
 Table `4_2` is created by loading the file
 "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf". Note that in
@@ -32,6 +32,6 @@ with `--annotation_fields` specified as `CSQ`. The test case
 Table `merge_option_move_to_calls` is created by loading files
 "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf" with
 `variant_merge_strategy=MOVE_TO_CALLS`. The test case
-`option_preserve_call_names_order.json` is used to test the option
-`--preserve_call_names_order` and densify process for BigQuery table
+`option_preserve_sample_order.json` is used to test the option
+`--preserve_sample_order` and densify process for BigQuery table
 with missing variants for some of the calls.

@@ -64,9 +64,9 @@ argument in the above script:
   all variants in `chr1` and all variants in `chr2` with `start_position` in
   `[1000,2000)` from BigQuery. If this flag is not specified, all variants will
   be loaded.
-* `--call_names`: A list of call names (separated by a space). Only variants for
-  these calls will be loaded from BigQuery. If this parameter is not specified,
-  all calls will be loaded.
+* `--sample_names`: A list of sample names (separated by a space). Only
+  variants for these calls will be loaded from BigQuery. If this parameter is
+  not specified, all calls will be loaded.
 * `--allow_incompatible_schema`: If `representative_header_file` is not
   provided, the meta-information is inferred from the BigQuery schema. There are
   some reserved fields based on
@@ -76,10 +76,10 @@ argument in the above script:
   incompatibilities between BigQuery schema and the reserved fields will not
   raise errors. Instead, the VCF meta-information are inferred from the schema
   without validation.
-* `--preserve_call_names_order`: By default, call names in the output VCF file
-  are generated in ascending order. If set to true, the order of call names will
-  be the same as the BigQuery table, but it requires all extracted variants to
-  have the same call name ordering (usually true for tables from single VCF file
+* `--preserve_sample_order`: By default, samples names in the output VCF file
+  are generated in ascending order. If set to true, the order of sample names
+  will be the same as the BigQuery table, but it requires all extracted variants
+  to have the same sample ordering (usually true for tables from single VCF file
   import).
 * `--number_of_bases_per_shard`: The maximum number of base pairs per
   chromosome to include in a shard. A shard is a collection of data within a
@@ -111,7 +111,7 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --output_file gs://BUCKET/loaded_file.vcf \
   --project "${GOOGLE_CLOUD_PROJECT}" \
   --genomic_regions 1:124852-124853 \
-  --call_names HG00099 HG00105
+  --sample_names HG00099 HG00105
 ```
 
 Example command for DataflowRunner:
@@ -124,7 +124,7 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --project "${GOOGLE_CLOUD_PROJECT}" \
   --temp_location gs://BUCKET/temp \
   --genomic_regions 1:124852-124853 \
-  --call_names HG00099 HG00105 \
+  --sample_names HG00099 HG00105 \
   --job_name bq-to-vcf \
   --setup_file ./setup.py \
   --runner DataflowRunner

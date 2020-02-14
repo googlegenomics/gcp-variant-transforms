@@ -38,7 +38,7 @@ RESERVED_BQ_COLUMNS = [bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
                        bigquery_util.ColumnKeyConstants.CALLS]
 
 RESERVED_VARIANT_CALL_COLUMNS = [
-    bigquery_util.ColumnKeyConstants.CALLS_NAME,
+    bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
     bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
     bigquery_util.ColumnKeyConstants.CALLS_PHASESET
 ]
@@ -114,7 +114,8 @@ class VariantGenerator(object):
             not self._is_null_or_empty(value)):
           info.update({key: value})
       variant_call = vcfio.VariantCall(
-          name=call_record[bigquery_util.ColumnKeyConstants.CALLS_NAME],
+          sample_id=call_record[
+              bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID],
           genotype=call_record[bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE],
           phaseset=call_record[bigquery_util.ColumnKeyConstants.CALLS_PHASESET],
           info=info)

@@ -24,7 +24,8 @@
         "query": [
           "SELECT call.NS AS NS ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
-          "WHERE start_position = 14369 AND call.name ='0x1447114f17e91025L'"
+          "WHERE start_position = 14369 ",
+          "AND call.sample_id ='0x1447114f17e91025L'"
         ],
         "expected_result": {"NS": 2}
       },
@@ -32,7 +33,8 @@
         "query": [
           "SELECT call.NS AS NS ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
-          "WHERE start_position = 14369 AND call.name ='0x7588a624d89b0eb2L'"
+          "WHERE start_position = 14369 ",
+          "AND call.sample_id ='0x7588a624d89b0eb2L'"
         ],
         "expected_result": {"NS": 2}
       },
@@ -40,7 +42,8 @@
         "query": [
           "SELECT call.NS AS NS ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
-          "WHERE start_position = 14369 AND call.name ='0x276d7d35dbcc18a6L'"
+          "WHERE start_position = 14369 ",
+          "AND call.sample_id ='0x276d7d35dbcc18a6L'"
         ],
         "expected_result": {"NS": 1}
       },
@@ -48,7 +51,8 @@
         "query": [
           "SELECT call.NS AS NS ",
           "FROM `{TABLE_NAME}` AS t, t.call as call ",
-          "WHERE start_position = 14369 AND call.name ='0x65101f53be02557dL'"
+          "WHERE start_position = 14369 ",
+          "AND call.sample_id ='0x65101f53be02557dL'"
         ],
         "expected_result": {"NS": 1}
       }

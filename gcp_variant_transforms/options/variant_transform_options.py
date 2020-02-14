@@ -576,11 +576,11 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               '`[1000,2000)` from BigQuery. If this flag is not specified, all '
               'variants will be loaded.'))
     parser.add_argument(
-        '--call_names',
+        '--sample_names',
         default=None, nargs='+',
-        help=('A list of call names (separated by a space). Only variants for '
-              'these calls will be loaded from BigQuery. If this parameter is '
-              'not specified, all calls will be loaded.'))
+        help=('A list of sample ids (separated by a space). Only variants '
+              'for these calls will be loaded from BigQuery. If this parameter '
+              'is not specified, all calls will be loaded.'))
     parser.add_argument(
         '--allow_incompatible_schema',
         type='bool', default=False, nargs='?', const=True,
@@ -591,12 +591,12 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'meta-information are inferred from the schema without '
               'validation.'))
     parser.add_argument(
-        '--preserve_call_names_order',
+        '--preserve_sample_order',
         type='bool', default=False, nargs='?', const=True,
-        help=('By default, call names in the output VCF file are generated in '
-              'ascending order. If set to true, the order of call names will '
-              'be the same as the BigQuery table, but it requires all '
-              'extracted variants to have the same call name ordering (usually '
+        help=('By default, sample names in the output VCF file are generated '
+              'in ascending order. If set to true, the order of sample names '
+              'will be the same as the BigQuery table, but it requires all '
+              'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
 
 

@@ -30,6 +30,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.testing import vcf_header_util
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 def _get_processed_variant(variant, header_num_dict=None):
@@ -147,11 +148,13 @@ def _get_big_query_row():
           unicode(ColumnKeyConstants.QUALITY): 2,
           unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
           unicode(ColumnKeyConstants.CALLS): [
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample1'),
+              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  unicode(hash_name('Sample1'))),
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
                unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
                unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-              {unicode(ColumnKeyConstants.CALLS_NAME): unicode('Sample2'),
+              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  unicode(hash_name('Sample2'))),
                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
                unicode(ColumnKeyConstants.CALLS_PHASESET): None,
                unicode('GQ'): 10, unicode('FB'): True}
@@ -191,13 +194,13 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
               'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FB': True}),
-            vcfio.VariantCall(
-                name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
+            vcfio.VariantCall(sample_id=hash_name('Sample3'),
+                              genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
     header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -213,15 +216,15 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.QUALITY: 2,
         ColumnKeyConstants.FILTER: ['PASS'],
         ColumnKeyConstants.CALLS: [
-            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
              ColumnKeyConstants.CALLS_PHASESET: '*',
              'GQ': 20, 'FIR': [10, 20]},
-            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
              ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'GQ': 10, 'FB': True},
-            {ColumnKeyConstants.CALLS_NAME: 'Sample3',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample3'),
              ColumnKeyConstants.CALLS_GENOTYPE: [vcfio.MISSING_GENOTYPE_VALUE],
              ColumnKeyConstants.CALLS_PHASESET: None}],
         'IS': 'some data',
@@ -339,8 +342,9 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',
         alternate_bases=['A', 'C', 'T', 'TC'], filters=[],
-        calls=[vcfio.VariantCall(name='Sample1', genotype=[0, 1], phaseset='*',
-                                 info={'GQ': float('inf')})],
+        calls=[vcfio.VariantCall(
+            sample_id=hash_name('Sample1'), genotype=[0, 1],
+            phaseset='*', info={'GQ': float('inf')})],
         info={'IF': float('inf'),
               'IFR': [float('-inf'), float('nan'), 1.2],
               'IF2': float('nan'),
@@ -361,7 +365,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ],
         ColumnKeyConstants.CALLS: [
             {
-                ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
                 'GQ': bigquery_sanitizer._INF_FLOAT_VALUE
@@ -409,8 +413,8 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
               'IS': 'some data'},
         calls=[
             vcfio.VariantCall(
-                name='Sample{}'.format(i), genotype=[0, 1], phaseset='*',
-                info={'GQ': 20, 'FIR': [10, 20]})
+                sample_id=hash_name('Sample{}'.format(i)), genotype=[0, 1],
+                phaseset='*', info={'GQ': 20, 'FIR': [10, 20]})
             for i in range(num_calls)])
     header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1'}
     proc_variant = _get_processed_variant(variant, header_num_dict)
@@ -430,7 +434,8 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
             ColumnKeyConstants.QUALITY: 2,
             ColumnKeyConstants.FILTER: ['PASS'],
             ColumnKeyConstants.CALLS: [
-                {ColumnKeyConstants.CALLS_NAME: 'Sample{}'.format(i),
+                {ColumnKeyConstants.CALLS_SAMPLE_ID: (
+                    hash_name('Sample{}'.format(i))),
                  ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                  ColumnKeyConstants.CALLS_PHASESET: '*',
                  'GQ': 20, 'FIR': [10, 20]}
@@ -451,7 +456,8 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
             ColumnKeyConstants.QUALITY: 2,
             ColumnKeyConstants.FILTER: ['PASS'],
             ColumnKeyConstants.CALLS: [
-                {ColumnKeyConstants.CALLS_NAME: 'Sample{}'.format(i),
+                {ColumnKeyConstants.CALLS_SAMPLE_ID: (
+                    hash_name('Sample{}'.format(i))),
                  ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                  ColumnKeyConstants.CALLS_PHASESET: '*',
                  'GQ': 20, 'FIR': [10, 20]}
@@ -477,13 +483,14 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         info={},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', info={'GQ': None}),
+                sample_id=hash_name('Sample1'), info={'GQ': None}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10}),
             vcfio.VariantCall(
-                name='Sample3', genotype=[vcfio.MISSING_GENOTYPE_VALUE,
-                                          vcfio.MISSING_GENOTYPE_VALUE])])
+                sample_id=hash_name('Sample3'),
+                genotype=[vcfio.MISSING_GENOTYPE_VALUE,
+                          vcfio.MISSING_GENOTYPE_VALUE])])
     proc_variant = _get_processed_variant(variant)
     expected_row = {
         ColumnKeyConstants.REFERENCE_NAME: 'chr19',
@@ -495,7 +502,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.QUALITY: 2,
         ColumnKeyConstants.FILTER: ['PASS'],
         ColumnKeyConstants.CALLS: [
-            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
              ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'GQ': 10}]}
@@ -580,10 +587,10 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         alternate_bases=[], filters=[],
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'FB': '', 'FI': 1.0, 'FSR': [1, 2]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'FB': 1, 'FI': True, 'FSR': [1.0, 2.0]})])
     proc_variant = _get_processed_variant(variant)
     expected_row = {
@@ -593,11 +600,11 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: [
-            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
              ColumnKeyConstants.CALLS_PHASESET: '*',
              'FB': False, 'FI': 1, 'FSR': ['1', '2']},
-            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
              ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'FB': True, 'FI': 1, 'FSR': ['1.0', '2.0']}],
@@ -615,7 +622,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
           # String cannot be casted to integer.
           calls=[
               vcfio.VariantCall(
-                  name='Sample1', genotype=[0, 1], phaseset='*',
+                  sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                   info={'FI': 'string_for_int_field'})])
       proc_variant = _get_processed_variant(variant)
       list(self._row_generator.get_rows(proc_variant,
@@ -628,10 +635,10 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         alternate_bases=[], filters=[],
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'FB': [1, 2], 'FI': [1, 2], 'FSR': 'str'}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'FB': [], 'FI': [], 'FSR': ''})])
     proc_variant = _get_processed_variant(variant)
     expected_row = {
@@ -641,11 +648,11 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.REFERENCE_BASES: 'CT',
         ColumnKeyConstants.ALTERNATE_BASES: [],
         ColumnKeyConstants.CALLS: [
-            {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
              ColumnKeyConstants.CALLS_PHASESET: '*',
              'FB': True, 'FI': 1, 'FSR': ['str']},
-            {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
              ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'FB': False, 'FI': None, 'FSR': ['']}],

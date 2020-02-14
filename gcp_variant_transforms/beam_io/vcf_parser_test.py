@@ -23,7 +23,7 @@ from itertools import permutations
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io.vcfio import Variant
 from gcp_variant_transforms.beam_io.vcfio import VariantCall
-
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 class VariantTest(unittest.TestCase):
 
@@ -73,7 +73,7 @@ class VariantCallTest(unittest.TestCase):
 
   def _default_variant_call(self):
     return vcfio.VariantCall(
-        name='Sample1', genotype=[1, 0],
+        sample_id=hash_name('Sample1'), genotype=[1, 0],
         phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48})
 
   def test_variant_call_order(self):
