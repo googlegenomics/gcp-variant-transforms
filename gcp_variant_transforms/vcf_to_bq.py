@@ -473,15 +473,16 @@ def run(argv=None):
         schema_converter.convert_table_schema_to_json_bq_schema(schema))
     with filesystems.FileSystems.create(schema_file) as file_to_write:
       file_to_write.write(schema_json)
-    known_args.schema_json = schema_file
 
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
       table_name = sample_info_table_schema_generator.compose_table_name(
           known_args.output_table, table_suffix)
-      total_base_pairs = sharding.get_output_table_total_base_pairs(i)
-      pipeline_common.create_output_table_if_needed(
-          known_args, table_name, total_base_pairs)
+      if not known_args.append:
+        pipeline_common.create_output_table(
+            table_name,
+            sharding.get_output_table_total_base_pairs(i),
+            schema_file)
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,

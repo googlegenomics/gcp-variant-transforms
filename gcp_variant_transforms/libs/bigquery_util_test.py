@@ -478,5 +478,5 @@ class BigqueryUtilTest(unittest.TestCase):
               total_base_pairs))
       self.assertEqual(expected_partition_size, partition_size)
       self.assertEqual(expected_partition_size *
-                       (bigquery_util._NUM_BQ_RANGE_PARTITIONS - 1),
+                       (bigquery_util._MAX_BQ_NUM_PARTITIONS - 1),
                        total_base_pairs_enlarged)
