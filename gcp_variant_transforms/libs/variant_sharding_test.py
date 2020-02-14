@@ -108,6 +108,23 @@ class VariantShardingTest(unittest.TestCase):
     self.assertEqual(sharder.get_output_table_suffix(6), 'chr3_02')
     self.assertEqual(sharder.get_output_table_suffix(7), 'all_remaining')
 
+  def test_config_get_total_base_pairs(self):
+    sharder = variant_sharding.VariantSharding(
+        'gcp_variant_transforms/testing/data/sharding_configs/'
+        'residual_at_end.yaml')
+    self.assertEqual(sharder.get_num_shards(), 8)
+    for i in range(sharder.get_num_shards()):
+      self.assertTrue(sharder.should_keep_shard(i))
+
+    self.assertEqual(sharder.get_output_table_total_base_pairs(0), 1000000)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(1), 2000000)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(2), 249240615)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(3), 243189284)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(4), 191044274)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(5), 500000)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(6), 1000000)
+    self.assertEqual(sharder.get_output_table_total_base_pairs(7), 249240615)
+
   def test_config_non_existent_shard_name(self):
     sharder = variant_sharding.VariantSharding(
         'gcp_variant_transforms/testing/data/sharding_configs/'

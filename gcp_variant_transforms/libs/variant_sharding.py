@@ -117,6 +117,7 @@ class VariantSharding(object):
     self._total_base_pairs = []
 
     self._parse_config(config_file_path)
+    assert len(self._table_name_suffixes) == len(self._total_base_pairs)
 
   def _is_residual_shard(self, regions):
     # type: (List[str]) -> bool
@@ -242,13 +243,13 @@ class VariantSharding(object):
       if self._is_residual_shard(regions):
         self._residual_index = shard_index
         self._should_keep_residual = True
-        continue
-      for r in regions:
-        ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
-        if self._use_interval_tree:
-          self._region_to_shard[ref_name].add_region(start, end, shard_index)
-        else:
-          self._region_to_shard[ref_name] = shard_index
+      else:
+        for r in regions:
+          ref_name, start, end = genomic_region_parser.parse_genomic_region(r)
+          if self._use_interval_tree:
+            self._region_to_shard[ref_name].add_region(start, end, shard_index)
+          else:
+            self._region_to_shard[ref_name] = shard_index
       # Store num_base_pairs
       total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS)
       if not isinstance(total_base_pairs, int):
