@@ -325,7 +325,7 @@ def calculate_optimal_partition_size(total_base_pairs):
   # We use 4000 - 1 = 3999 partitions just to avoid hitting the BQ limits.
   partition_size = total_base_pairs / (_NUM_BQ_RANGE_PARTITIONS - 1)
   # This operation adds another [0, 10 * 3999) buffer to the total_base_pairs.
-  partition_size_round_up = (
+  partition_size_round_up = int(
       math.ceil(partition_size / pow(10, _PARTITION_SIZE_SIG_DIGITS)) *
       math.pow(10, _PARTITION_SIZE_SIG_DIGITS))
   return (partition_size_round_up,

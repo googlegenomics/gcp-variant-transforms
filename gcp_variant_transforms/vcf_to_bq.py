@@ -473,7 +473,7 @@ def run(argv=None):
         schema_converter.convert_table_schema_to_json_bq_schema(schema))
     with filesystems.FileSystems.create(schema_file) as file_to_write:
       file_to_write.write(schema_json)
-    known_args.schema_json = schema_json
+    known_args.schema_json = schema_file
 
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
