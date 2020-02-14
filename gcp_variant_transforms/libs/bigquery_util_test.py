@@ -424,19 +424,19 @@ class BigqueryUtilTest(unittest.TestCase):
         tableReference=bigquery.TableReference(
             projectId='project', datasetId='dataset', tableId='table'))
     self.assertEqual(
-        bigquery_util.does_table_exist(client, 'project', 'dataset', 'table'),
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
         True)
 
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
     self.assertEqual(
-        bigquery_util.does_table_exist(client, 'project', 'dataset', 'table'),
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
         False)
 
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '401'}, url='', content='')
     self.assertRaises(exceptions.HttpError,
-                      bigquery_util.does_table_exist,
+                      bigquery_util.table_exist,
                       client, 'project', 'dataset', 'table')
 
   def test_raise_error_if_dataset_not_exists(self):

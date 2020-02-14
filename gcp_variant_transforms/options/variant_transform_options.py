@@ -144,10 +144,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'approximate number of total base pairs which is used to conduct '
               'BigQuery integer range partitioning. Default value is set to a '
               'file which is optimized for the human genome. It results in one '
-              'table per chromosome (overall 25 BigQuery tables). You can '
-              'easily modify the provided config file for other organisms. '
-              'If you need help with this task please submit a Github issue, '
-              'we will assist you with it.'))
+              'table per chromosome (overall 25 BigQuery tables). For more '
+              'information visit gcp-variant-trannsforms/docs/sharding.md'))
     parser.add_argument(
         '--generate_sample_info_table',
         type='bool', default=False, nargs='?', const=True,
@@ -211,7 +209,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'For instance, [0, None, 1] will become '
               '[0, `null_numeric_value_replacement`, 1].'))
 
-
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
     if not parsed_args.output_table and parsed_args.output_avro_path:
@@ -243,7 +240,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()
-      # In case there is no residual in config we will ignore the last shahrd.
+      # In case there is no residual in config we will ignore the last shard.
       if not sharding.should_keep_shard(sharding.get_residual_index()):
         num_shards -= 1
       for i in range(num_shards):
@@ -254,14 +251,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
       for output_table in all_output_tables:
         if parsed_args.append:
-          if not bigquery_util.does_table_exist(client, project_id,
-                                                dataset_id, output_table):
+          if not bigquery_util.table_exist(client, project_id,
+                                           dataset_id, output_table):
             raise ValueError(
                 'Table {}:{}.{} does not exist, cannot append to it.'.format(
                     project_id, dataset_id, output_table))
         else:
-          if bigquery_util.does_table_exist(client, project_id,
-                                            dataset_id, output_table):
+          if bigquery_util.table_exist(client, project_id,
+                                       dataset_id, output_table):
             raise ValueError(
                 ('Table {}:{}.{} already exists, cannot overwrite it. Please '
                  'set `--append True` if you want to append to it.').format(

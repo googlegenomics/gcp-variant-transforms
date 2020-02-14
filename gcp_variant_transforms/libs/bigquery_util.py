@@ -151,7 +151,7 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
       raise
 
 
-def does_table_exist(client, project_id, dataset_id, table_id):
+def table_exist(client, project_id, dataset_id, table_id):
   # type: (bigquery.BigqueryV2, str, str, str) -> bool
   try:
     client.tables.Get(bigquery.BigqueryTablesGetRequest(

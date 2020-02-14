@@ -457,7 +457,7 @@ def run(argv=None):
   num_shards = sharding.get_num_shards()
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
       shard_variants.ShardVariants(sharding), num_shards)
-  # In case there is no residual in config we will ignore the last shahrd.
+  # In case there is no residual in config we will ignore the last shard.
   if not sharding.should_keep_shard(sharding.get_residual_index()):
     num_shards -= 1
 
