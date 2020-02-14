@@ -417,26 +417,26 @@ class BigqueryUtilTest(unittest.TestCase):
                                                 field_schemas_2),
         expected_merged_field_schemas)
 
-  def test_raise_error_if_table_exists(self):
+
+  def test_does_table_exist(self):
     client = mock.Mock()
     client.tables.Get.return_value = bigquery.Table(
         tableReference=bigquery.TableReference(
             projectId='project', datasetId='dataset', tableId='table'))
-    self.assertRaises(ValueError,
-                      bigquery_util.raise_error_if_table_exists,
-                      client, 'project', 'dataset', 'table')
+    self.assertEqual(
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
+        True)
 
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
-    bigquery_util.raise_error_if_table_exists(client,
-                                              'project',
-                                              'dataset',
-                                              'table')
+    self.assertEqual(
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
+        False)
 
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '401'}, url='', content='')
     self.assertRaises(exceptions.HttpError,
-                      bigquery_util.raise_error_if_table_exists,
+                      bigquery_util.table_exist,
                       client, 'project', 'dataset', 'table')
 
   def test_raise_error_if_dataset_not_exists(self):

@@ -102,18 +102,60 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     self._options.validate(args, client)
 
   def test_existing_table(self):
-    args = self._make_args(['--append', 'False',
-                            '--output_table', 'project:dataset.table'])
+    args = self._make_args(
+        ['--append', 'False', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
     client = mock.Mock()
-    with self.assertRaisesRegexp(ValueError, 'project:dataset.table '):
+    client.tables.Get.return_value = bigquery.Table(
+        tableReference=bigquery.TableReference(projectId='project',
+                                               datasetId='dataset',
+                                               tableId='table__chr1_part1'))
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__chr01_part1 already exists'):
       self._options.validate(args, client)
 
-    args = self._make_args(['--append', 'False',
-                            '--output_table', 'project:dataset.table',
-                            '--generate_sample_info_table'])
+    args = self._make_args(
+        ['--append', 'False', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml',
+         '--generate_sample_info_table'])
+    client.tables.Get.return_value = bigquery.Table(
+        tableReference=bigquery.TableReference(projectId='project',
+                                               datasetId='dataset',
+                                               tableId='table__sample_info'))
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__sample_info already exists'):
+      self._options.validate(args, client)
+
+  def test_missing_table(self):
+    args = self._make_args(
+        ['--append', 'True', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
     client = mock.Mock()
-    with self.assertRaisesRegexp(ValueError,
-                                 'project:dataset.table_sample_info'):
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__chr01_part1 does not exist'):
+      self._options.validate(args, client)
+
+    args = self._make_args(
+        ['--append', 'True', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml',
+         '--generate_sample_info_table'])
+
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__sample_info does not exist.'):
       self._options.validate(args, client)
 
   def test_no_project(self):

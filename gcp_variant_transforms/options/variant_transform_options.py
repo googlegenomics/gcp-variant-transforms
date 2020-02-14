@@ -15,7 +15,6 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import logging
 
 from apache_beam.io.gcp.internal.clients import bigquery
 from oauth2client.client import GoogleCredentials
@@ -24,6 +23,7 @@ from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import variant_sharding
 
 
 class VariantTransformsOptions(object):
@@ -137,6 +137,16 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                         default='',
                         help='BigQuery table to store the results.')
     parser.add_argument(
+        '--sharding_config_path',
+        default=('gcp_variant_transforms/data/sharding_configs/'
+                 'homo_sapiens_default.yaml'),
+        help=('File containing list of output tables, their name suffixes, and '
+              'approximate number of total base pairs which is used to conduct '
+              'BigQuery integer range partitioning. Default value is set to a '
+              'file which is optimized for the human genome. It results in one '
+              'table per chromosome (overall 25 BigQuery tables). For more '
+              'information visit gcp-variant-trannsforms/docs/sharding.md'))
+    parser.add_argument(
         '--generate_sample_info_table',
         type='bool', default=False, nargs='?', const=True,
         help=('If set to True, a sample info table with the name '
@@ -204,34 +214,56 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     if not parsed_args.output_table and parsed_args.output_avro_path:
       # Writing into BigQuery is not requested; no more BigQuery checks needed.
       return
+    if parsed_args.update_schema_on_append and not parsed_args.append:
+      raise ValueError('--update_schema_on_append requires --append to be '
+                       'true.')
+    if (not parsed_args.sharding_config_path or
+        not parsed_args.sharding_config_path.strip()):
+      raise ValueError(
+          '--sharding_config_path must point to a valid config file.')
+    # Ensuring (not) existence of output tables is aligned with --append value.
+    if parsed_args.output_table:
+      if not client:
+        credentials = GoogleCredentials.get_application_default().create_scoped(
+            ['https://www.googleapis.com/auth/bigquery'])
+        client = bigquery.BigqueryV2(credentials=credentials)
 
-    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
-        parsed_args.output_table)
-
-    if not client:
-      credentials = GoogleCredentials.get_application_default().create_scoped(
-          ['https://www.googleapis.com/auth/bigquery'])
-      client = bigquery.BigqueryV2(credentials=credentials)
-
-    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
-                                                    dataset_id)
-    # Ensuring given output table doesn't already exist to avoid overwriting it.
-    if not parsed_args.append:
-      if parsed_args.update_schema_on_append:
-        raise ValueError('--update_schema_on_append requires --append to be '
-                         'true.')
+      project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+          parsed_args.output_table)
+      bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
+                                                      dataset_id)
+      all_output_tables = []
       if parsed_args.generate_sample_info_table:
-        bigquery_util.raise_error_if_table_exists(
-            client,
-            project_id,
-            dataset_id,
-            '_'.join([table_id,
-                      sample_info_table_schema_generator.TABLE_SUFFIX]))
+        all_output_tables.append(
+            sample_info_table_schema_generator.compose_table_name(
+                table_id, sample_info_table_schema_generator.TABLE_SUFFIX))
+      sharding = variant_sharding.VariantSharding(
+          parsed_args.sharding_config_path)
+      num_shards = sharding.get_num_shards()
+      # In case there is no residual in config we will ignore the last shard.
+      if not sharding.should_keep_shard(sharding.get_residual_index()):
+        num_shards -= 1
+      for i in range(num_shards):
+        table_suffix = sharding.get_output_table_suffix(i)
+        all_output_tables.append(
+            sample_info_table_schema_generator.compose_table_name(
+                table_id, table_suffix))
 
-      bigquery_util.raise_error_if_table_exists(client,
-                                                project_id,
-                                                dataset_id,
-                                                table_id)
+      for output_table in all_output_tables:
+        if parsed_args.append:
+          if not bigquery_util.table_exist(client, project_id,
+                                           dataset_id, output_table):
+            raise ValueError(
+                'Table {}:{}.{} does not exist, cannot append to it.'.format(
+                    project_id, dataset_id, output_table))
+        else:
+          if bigquery_util.table_exist(client, project_id,
+                                       dataset_id, output_table):
+            raise ValueError(
+                ('Table {}:{}.{} already exists, cannot overwrite it. Please '
+                 'set `--append True` if you want to append to it.').format(
+                     project_id, dataset_id, output_table))
+
 
 class AnnotationOptions(VariantTransformsOptions):
   """Options for how to treat annotation fields."""
@@ -501,33 +533,6 @@ class PreprocessOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args):
     _validate_inputs(parsed_args)
-
-
-class ShardingOptions(VariantTransformsOptions):
-  """Options for sharding Variant records into multiple output tables."""
-
-  def add_arguments(self, parser):
-    parser.add_argument(
-        '--partition_config_path',
-        default='',
-        help=('This argument is deprecated and will be removed in the next '
-              'release. It has been replaced by --sharding_config_path .'))
-    parser.add_argument(
-        '--sharding_config_path',
-        default='',
-        help=('File containing list of shards and output table names. You '
-              'can use provided default sharding_config file to split output '
-              'by chromosome (one table per chromosome) which is located at: '
-              'gcp_variant_transforms/data/sharding_configs/'
-              'homo_sapiens_default.yaml'))
-
-  def validate(self, parsed_args):
-    # type: (argparse.Namespace) -> None
-    if (parsed_args.partition_config_path and
-        not parsed_args.sharding_config_path):
-      logging.warning('--partition_config_path will be deprecated soon. '
-                      'Please use --sharding_config_path instead.')
-      parsed_args.sharding_config_path = parsed_args.partition_config_path
 
 
 class BigQueryToVcfOptions(VariantTransformsOptions):
