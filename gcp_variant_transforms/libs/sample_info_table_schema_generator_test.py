@@ -25,5 +25,6 @@ class GenerateSampleInfoTableSchemaTest(unittest.TestCase):
     schema = sample_info_table_schema_generator.generate_schema()
     expected_fields = [sample_info_table_schema_generator.SAMPLE_ID,
                        sample_info_table_schema_generator.SAMPLE_NAME,
-                       sample_info_table_schema_generator.FILE_PATH]
+                       sample_info_table_schema_generator.FILE_PATH,
+                       sample_info_table_schema_generator.INGESTION_DATETIME]
     self.assertEqual(expected_fields, [field.name for field in schema.fields])

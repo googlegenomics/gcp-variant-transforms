@@ -14,6 +14,8 @@
 
 from typing import Dict, Union  # pylint: disable=unused-import
 
+from datetime import datetime
+
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
@@ -22,6 +24,7 @@ from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import hashing_util
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
+_DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
 
 
 class ConvertSampleInfoToRow(beam.DoFn):
@@ -31,9 +34,12 @@ class ConvertSampleInfoToRow(beam.DoFn):
     # type: (int) -> None
     self._sample_name_encoding = sample_name_encoding
 
+  def _get_now_to_minute(self):
+    return datetime.now().strftime(_DATETIME_FORMAT)
+
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
-
+    current_minute = self._get_now_to_minute()
     for sample in vcf_header.samples:
       if self._sample_name_encoding == SampleNameEncoding.WITHOUT_FILE_PATH:
         sample_id = hashing_util.generate_sample_id(sample)
@@ -44,7 +50,8 @@ class ConvertSampleInfoToRow(beam.DoFn):
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
           sample_info_table_schema_generator.SAMPLE_NAME: sample,
-          sample_info_table_schema_generator.FILE_PATH: vcf_header.file_path
+          sample_info_table_schema_generator.FILE_PATH: vcf_header.file_path,
+          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute
       }
       yield row
 

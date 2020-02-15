@@ -21,6 +21,7 @@ from gcp_variant_transforms.libs import bigquery_util
 SAMPLE_ID = 'sample_id'
 SAMPLE_NAME = 'sample_name'
 FILE_PATH = 'file_path'
+INGESTION_DATETIME = 'ingestion_datetime'
 TABLE_SUFFIX = 'sample_info'
 TABLE_SUFFIX_SEPARATOR = '__'
 
@@ -48,5 +49,10 @@ def generate_schema():
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description=('Full file path on GCS of the sample.')))
+  schema.fields.append(bigquery.TableFieldSchema(
+      name=INGESTION_DATETIME,
+      type=bigquery_util.TableFieldConstants.TYPE_DATETIME,
+      mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+      description=('Ingestion datetime (up to current minute) of samples.')))
 
   return schema
