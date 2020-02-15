@@ -120,24 +120,16 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument('--output_table',
                         default='',
                         help='BigQuery table to store the results.')
+
     parser.add_argument(
         '--sharding_config_path',
-        default=('gcp_variant_transforms/data/sharding_configs/'
-                 'homo_sapiens_default.yaml'),
-        help=('File containing list of output tables, their name suffixes, and '
-              'approximate number of total base pairs which is used to conduct '
-              'BigQuery integer range partitioning. Default value is set to a '
-              'file which is optimized for the human genome. It results in one '
-              'table per chromosome (overall 25 BigQuery tables). For more '
-              'information visit gcp-variant-trannsforms/docs/sharding.md'))
-    parser.add_argument(
-        '--generate_sample_info_table',
-        type='bool', default=False, nargs='?', const=True,
-        help=('If set to True, a sample info table with the name '
-              'output_table_ + {} will be created. This table contains a '
-              'unique sample_id for each sample read from the VCF file. This '
-              'sample_id can be used to distinguish between sample names. '
-              '[EXPERIMENTAL]').format(bigquery_util.TABLE_SUFFIX))
+        default='gcp_variant_transforms/data/sharding_configs/'
+                'homo_sapiens_default.yaml',
+        help=('File containing list of shards and output table names. You '
+              'can use provided default sharding_config file to split output '
+              'by chromosome (one table per chromosome) which is located at: '
+              'gcp_variant_transforms/data/sharding_configs/'
+              'homo_sapiens_default.yaml'))
 
     parser.add_argument(
         '--sample_name_encoding',
@@ -213,9 +205,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
                                                       dataset_id)
       all_output_tables = []
-      if parsed_args.generate_sample_info_table:
-        all_output_tables.append(bigquery_util.compose_table_name(
-            table_id, bigquery_util.TABLE_SUFFIX))
+      all_output_tables.append(
+          sample_info_table_schema_generator.compose_table_name(
+              table_id, sample_info_table_schema_generator.TABLE_SUFFIX))
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()

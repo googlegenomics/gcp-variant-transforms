@@ -1,7 +1,7 @@
 This file summarizes the contents and the purpose for each files/folder within
 current folder.
 
-All files in this folder are used as inputs for --partition_config_path flag.
+All files in this folder are used as inputs for --sharding_config_path flag.
 
 `residual_at_end.yaml`, `residual_in_middle.yaml`, and `residual_missing.yaml`
 are used by unit tests in gcp_variant_transforms/libs/variant_partition_test.py
