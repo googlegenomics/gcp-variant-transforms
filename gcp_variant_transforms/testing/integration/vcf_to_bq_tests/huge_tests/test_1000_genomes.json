@@ -8,8 +8,8 @@
     "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-64",
-    "max_num_workers": "64",
-    "num_workers": "20",
+    "max_num_workers": "96",
+    "num_workers": "32",
     "num_bigquery_write_shards": "2",
     "assertion_configs": [
       {

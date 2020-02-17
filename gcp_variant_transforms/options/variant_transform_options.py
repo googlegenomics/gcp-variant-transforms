@@ -209,7 +209,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'For instance, [0, None, 1] will become '
               '[0, `null_numeric_value_replacement`, 1].'))
 
-
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
     if not parsed_args.output_table and parsed_args.output_avro_path:

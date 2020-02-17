@@ -49,6 +49,12 @@ _LARGE_DATA_THRESHOLD = 50000
 _DATAFLOW_RUNNER_ARG_VALUE = 'DataflowRunner'
 SampleNameEncoding = vcf_parser.SampleNameEncoding
 
+_BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
+    'bq mk --table '
+    '--range_partitioning=start_position,0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
+    '--clustering_fields=start_position,end_position '
+    '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
+
 
 class PipelineModes(enum.Enum):
   """An Enum specifying the mode of the pipeline based on the data size."""
@@ -332,12 +338,6 @@ def generate_unique_name(job_name):
                    str(uuid.uuid4())])
 
 
-BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
-    'bq mk --table '
-    '--range_partitioning=start_position,0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
-    '--clustering_fields=start_position,end_position '
-    '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
-
 def create_output_table(full_table_id, total_base_pairs, schema_file_path):
   # type: (str, int, str) -> None
   """Creates an integer range partitioned table using `bq mk table...` command.
@@ -353,7 +353,7 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
   """
   (partition_size, total_base_pairs_enlarged) = (
       bigquery_util.calculate_optimal_partition_size(total_base_pairs))
-  bq_command = BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
+  bq_command = _BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
       TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
       PARTITION_SIZE=partition_size,
       FULL_TABLE_ID=full_table_id,

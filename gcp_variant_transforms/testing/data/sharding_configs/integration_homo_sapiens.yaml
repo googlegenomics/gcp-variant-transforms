@@ -1,3 +1,8 @@
+# Every total_base_pairs value is set to 249,240,615 (max of all chromosomes)
+# so that all output tables will have the same integer range partitions.
+# This is required because in our integration tests we use wildcards to query
+# multiple tables simultaneously. For example:
+#         SELECT count(1) FROM `projoct_id:dataset_id:base_table_name__*`
 -  output_table:
      table_name_suffix: "chr1"
      regions:
