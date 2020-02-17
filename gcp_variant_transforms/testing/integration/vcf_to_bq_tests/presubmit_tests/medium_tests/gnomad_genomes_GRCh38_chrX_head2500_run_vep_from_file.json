@@ -5,7 +5,7 @@
     "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/gnomad_input",
     "annotation_fields": "CSQ",
     "vep_assembly": "GRCh37",
-    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
     "runner": "DataflowRunner",
     "run_annotation_pipeline": "True",
     "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
