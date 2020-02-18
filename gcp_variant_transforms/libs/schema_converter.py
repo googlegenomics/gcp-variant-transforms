@@ -125,7 +125,7 @@ def generate_schema_from_header_fields(
       description='One record for each call.')
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
-      type=bigquery_util.TableFieldConstants.TYPE_STRING,
+      type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Name of the call.'))
   calls_record.fields.append(bigquery.TableFieldSchema(

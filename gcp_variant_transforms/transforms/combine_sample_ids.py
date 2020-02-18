@@ -39,7 +39,7 @@ class SampleIdsCombiner(beam.PTransform):
     self._preserve_sample_order = preserve_sample_order
 
   def _get_sample_ids(self, variant):
-    # type: (vcf_parser.Variant) -> Tuple[str]
+    # type: (vcf_parser.Variant) -> Tuple[int]
     """Returns the sample ids of all calls for the variant."""
     sample_ids = [call.sample_id for call in variant.calls]
     if len(sample_ids) != len(set(sample_ids)):
@@ -48,7 +48,7 @@ class SampleIdsCombiner(beam.PTransform):
     return tuple(sample_ids)
 
   def _extract_unique_sample_ids(self, sample_ids):
-    # type: (List[Tuple[str]]) -> List[str]
+    # type: (List[Tuple[int]]) -> List[int]
     """Extracts unique sample ids from all variants.
 
     Returns:

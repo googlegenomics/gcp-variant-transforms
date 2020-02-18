@@ -52,8 +52,8 @@ class GetSampleMap(beam.PTransform):
   the sum of values will give us estimated value count.
   """
   def _get_sample_ids(self, estimate):
-    # type: (vcf_parser.Variant) -> Tuple[str]
-    """Returns the names of all calls for the variant."""
+    # type: (vcf_parser.Variant) -> Tuple[int]
+    """Returns the ids of all calls for the variant."""
     return tuple(
         zip(estimate.samples,
             [estimate.estimated_variant_count] * len(estimate.samples)))
