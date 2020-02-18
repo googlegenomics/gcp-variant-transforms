@@ -614,8 +614,8 @@ class PySamParser(VcfParser):
     sample_id = self._encoded_sample_names.get(sample_name)
     if not sample_id:
       if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
-        sample_id = hashing_util.generate_sample_id(
-            sample_name, self._file_name)
+        sample_id = hashing_util.generate_sample_id(sample_name,
+                                                    self._file_name)
       else:
         sample_id = hashing_util.generate_sample_id(sample_name)
       self._encoded_sample_names[sample_name] = sample_id
