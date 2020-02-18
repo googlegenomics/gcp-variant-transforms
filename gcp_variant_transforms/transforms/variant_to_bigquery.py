@@ -137,7 +137,7 @@ class VariantToBigQuery(beam.PTransform):
                 self._output_table,
                 schema=self._schema,
                 create_disposition=(
-                    beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
+                    beam.io.BigQueryDisposition.CREATE_NEVER),
                 write_disposition=(
                     beam.io.BigQueryDisposition.WRITE_APPEND))))
       return bq_writes
@@ -147,8 +147,8 @@ class VariantToBigQuery(beam.PTransform):
                   self._output_table,
                   schema=self._schema,
                   create_disposition=(
-                      beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
+                      beam.io.BigQueryDisposition.CREATE_NEVER),
                   write_disposition=(
                       beam.io.BigQueryDisposition.WRITE_APPEND
                       if self._append
-                      else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+                      else beam.io.BigQueryDisposition.WRITE_EMPTY))))

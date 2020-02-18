@@ -459,3 +459,24 @@ class BigqueryUtilTest(unittest.TestCase):
     self.assertRaises(exceptions.HttpError,
                       bigquery_util.raise_error_if_dataset_not_exists,
                       client, 'project', 'dataset')
+
+  def test_calculate_optimal_partition_size(self):
+    total_base_pairs_to_expected_partition_size = {
+        39980000: 10000,
+        (39980000 - 1): 10000,
+        (39980000 - 9999): 10000,
+        39990000: 10010,
+        40000000: 10010,
+        40010000: 10010,
+        40020000: 10020,
+        40030000: 10020,
+    }
+    for total_base_pairs, expected_partition_size in (
+        total_base_pairs_to_expected_partition_size.items()):
+      (partition_size, total_base_pairs_enlarged) = (
+          bigquery_util.calculate_optimal_partition_size(
+              total_base_pairs))
+      self.assertEqual(expected_partition_size, partition_size)
+      self.assertEqual(expected_partition_size *
+                       (bigquery_util._MAX_BQ_NUM_PARTITIONS - 1),
+                       total_base_pairs_enlarged)

@@ -17,6 +17,7 @@
 import enum
 import exceptions
 import re
+import math
 from typing import List, Tuple, Union  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery
@@ -27,6 +28,10 @@ from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
+_MAX_BQ_NUM_PARTITIONS = 4000
+_TOTAL_BASE_PAIRS_SIG_DIGITS = 4
+_PARTITION_SIZE_SIG_DIGITS = 1
 
 
 class ColumnKeyConstants(object):
@@ -309,3 +314,41 @@ def _get_merged_field_schemas(
         existing_field_schema.fields = _get_merged_field_schemas(
             existing_field_schema.fields, field_schema.fields)
   return merged_field_schemas
+
+
+def calculate_optimal_partition_size(total_base_pairs):
+  # type: (int) -> Tuple[int, int]
+  """Calculates the optimal partition size given total_base_pairs value.
+
+  BQ allows up to 4000 integer range partitions. This method divides
+  [0, total_base_pairs] range into 3999 partitions. Every value outside of this
+  range will fall into the 4000th partition. Note this partitioning method
+  assumes variants are distributed uniformly.
+
+  Since given total_base_pairs might be a lower estimate, we add a little extra
+  buffer to the given value to avoid a situation where too many rows fall
+  into the 4000th partition. The size of added buffer is controlled by the
+  value of two consts:
+    * _TOTAL_BASE_PAIRS_SIG_DIGITS is set to 4 which adds [10^4, 2 * 10^4)
+    * _PARTITION_SIZE_SIG_DIGITS is set to 1 which adds [0, 10i^1 * 3999)
+  In total we add [10^4, 10 * 3999 + 2 * 10^4) buffer to total_base_pairs.
+
+  Args:
+    total_base_paris: The number of total base pairs expected in the BQ table.
+
+  Returns:
+    A tuple (partition size, partition size * 3999).
+  """
+  # These two operations add [10^4, 2 * 10^4) buffer to total_base_pairs.
+  total_base_pairs += math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS)
+  total_base_pairs = (
+      math.ceil(total_base_pairs / math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS)) *
+      math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS))
+  # We use 4000 - 1 = 3999 partitions just to avoid hitting the BQ limits.
+  partition_size = total_base_pairs / (_MAX_BQ_NUM_PARTITIONS - 1)
+  # This operation adds another [0, 10 * 3999) buffer to the total_base_pairs.
+  partition_size_round_up = int(
+      math.ceil(partition_size / pow(10, _PARTITION_SIZE_SIG_DIGITS)) *
+      math.pow(10, _PARTITION_SIZE_SIG_DIGITS))
+  return (partition_size_round_up,
+          partition_size_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))

@@ -478,6 +478,11 @@ def run(argv=None):
       table_suffix = sharding.get_output_table_suffix(i)
       table_name = sample_info_table_schema_generator.compose_table_name(
           known_args.output_table, table_suffix)
+      if not known_args.append:
+        pipeline_common.create_output_table(
+            table_name,
+            sharding.get_output_table_total_base_pairs(i),
+            schema_file)
       _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
            variant_to_bigquery.VariantToBigQuery(
                table_name,
