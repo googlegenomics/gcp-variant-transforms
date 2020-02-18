@@ -46,9 +46,9 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_parser
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_sharding
@@ -476,7 +476,7 @@ def run(argv=None):
 
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
-      table_name = sample_info_table_schema_generator.compose_table_name(
+      table_name = bigquery_util.compose_table_name(
           known_args.output_table, table_suffix)
       if not known_args.append:
         pipeline_common.create_output_table(
@@ -500,7 +500,7 @@ def run(argv=None):
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
     for i in range(num_shards):
-      avro_path = sample_info_table_schema_generator.compose_table_name(
+      avro_path = bigquery_util.compose_table_name(
           known_args.output_avro_path, sharding.get_output_table_suffix(i))
       _ = (
           variants[i] | 'VariantToAvro' >>

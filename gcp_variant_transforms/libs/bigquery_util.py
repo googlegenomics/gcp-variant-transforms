@@ -32,6 +32,15 @@ _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 _MAX_BQ_NUM_PARTITIONS = 4000
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
+TABLE_SUFFIX_SEPARATOR = '__'
+SAMPLE_TABLE_SUFFIX_SEPARATOR = '_'
+
+
+def compose_table_name(base_name, suffix, is_sample=False):
+  # type: (str, List[str]) -> str
+  separator = (
+      SAMPLE_TABLE_SUFFIX_SEPARATOR if is_sample else TABLE_SUFFIX_SEPARATOR)
+  return separator.join([base_name, suffix])
 
 
 class ColumnKeyConstants(object):

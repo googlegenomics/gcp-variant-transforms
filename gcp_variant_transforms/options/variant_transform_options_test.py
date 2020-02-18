@@ -129,7 +129,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
                                                tableId='table__sample_info'))
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__sample_info already exists'):
+        'project:dataset.table_sample_info already exists'):
       self._options.validate(args, client)
 
   def test_missing_table(self):
@@ -155,7 +155,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__sample_info does not exist.'):
+        'project:dataset.table_sample_info does not exist.'):
       self._options.validate(args, client)
 
   def test_no_project(self):

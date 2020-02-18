@@ -23,12 +23,6 @@ SAMPLE_NAME = 'sample_name'
 FILE_PATH = 'file_path'
 INGESTION_DATETIME = 'ingestion_datetime'
 TABLE_SUFFIX = 'sample_info'
-TABLE_SUFFIX_SEPARATOR = '__'
-
-
-def compose_table_name(base_name, suffix):
-  # type: (str, List[str]) -> str
-  return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
 
 
 def generate_schema():
