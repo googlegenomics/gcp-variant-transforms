@@ -111,10 +111,10 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client.tables.Get.return_value = bigquery.Table(
         tableReference=bigquery.TableReference(projectId='project',
                                                datasetId='dataset',
-                                               tableId='table__sample_info'))
+                                               tableId='table_sample_info'))
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__sample_info already exists'):
+        'project:dataset.table_sample_info already exists'):
       self._options.validate(args, client)
 
   def test_existing_main_table(self):
@@ -123,7 +123,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
       if (request == bigquery.BigqueryTablesGetRequest(
           projectId='project',
           datasetId='dataset',
-          tableId='table__sample_info')):
+          tableId='table_sample_info')):
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
       else:
@@ -155,7 +155,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
         response={'status': '404'}, url='', content='')
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__sample_info does not exist'):
+        'project:dataset.table_sample_info does not exist'):
       self._options.validate(args, client)
 
   def test_missing_main_table(self):
@@ -164,11 +164,11 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
       if (request == bigquery.BigqueryTablesGetRequest(
           projectId='project',
           datasetId='dataset',
-          tableId='table__sample_info')):
+          tableId='table_sample_info')):
         return bigquery.Table(tableReference=bigquery.TableReference(
             projectId='project',
             datasetId='dataset',
-            tableId='table__sample_info'))
+            tableId='table_sample_info'))
       else:
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
