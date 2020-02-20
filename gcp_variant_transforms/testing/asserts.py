@@ -59,6 +59,15 @@ def has_sample_ids(sample_ids):
   return _has_sample_ids
 
 
+def dict_values_equal(expected_dict):
+  """Verifies that dictionary is the same as expected."""
+  def _items_equal(actual_dict):
+    if expected_dict != actual_dict[0]:
+      raise BeamAssertException(
+          'Failed assert: %d == %d' % (expected_dict, actual_dict))
+  return _items_equal
+
+
 def header_vars_equal(expected):
   def _vars_equal(actual):
     expected_vars = [vars(header) for header in expected]

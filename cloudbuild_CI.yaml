@@ -43,7 +43,6 @@ steps:
       - '--image_tag ${COMMIT_SHA}'
       - '--run_unit_tests'
       - '--run_preprocessor_tests'
-      - '--run_bq_to_vcf_tests'
       - '--run_all_tests'
       - '--test_name_prefix cloud-ci-'
     id: 'test-gcp-variant-transforms-docker'
