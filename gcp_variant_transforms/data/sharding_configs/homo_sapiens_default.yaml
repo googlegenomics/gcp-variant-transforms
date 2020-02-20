@@ -15,7 +15,7 @@
      regions:
        - "chr3"
        - "3"
-     total_base_pairs: 197,961,643
+     total_base_pairs: 198,233,091
 -  output_table:
      table_name_suffix: "chr4"
      regions:
@@ -27,7 +27,7 @@
      regions:
        - "chr5"
        - "5"
-     total_base_pairs: 180,905,191
+     total_base_pairs: 181,478,212
 -  output_table:
      table_name_suffix: "chr6"
      regions:
@@ -39,7 +39,7 @@
      regions:
        - "chr7"
        - "7"
-     total_base_pairs: 159,128,660
+     total_base_pairs: 159,335,971
 -  output_table:
      table_name_suffix: "chr8"
      regions:
@@ -63,7 +63,7 @@
      regions:
        - "chr11"
        - "11"
-     total_base_pairs: 134,946,513
+     total_base_pairs: 135,076,620
 -  output_table:
      table_name_suffix: "chr12"
      regions:
@@ -99,13 +99,13 @@
      regions:
        - "chr17"
        - "17"
-     total_base_pairs: 81,195,200
+     total_base_pairs: 83,247,376
 -  output_table:
      table_name_suffix: "chr18"
      regions:
        - "chr18"
        - "18"
-     total_base_pairs: 78,017,161
+     total_base_pairs: 80,263,277
 -  output_table:
      table_name_suffix: "chr19"
      regions:
@@ -117,7 +117,7 @@
      regions:
        - "chr20"
        - "20"
-     total_base_pairs: 62,965,515
+     total_base_pairs: 64,334,162
 -  output_table:
      table_name_suffix: "chr21"
      regions:
@@ -137,7 +137,7 @@
        - "chrx"
        - "X"
        - "x"
-     total_base_pairs: 155,260,473
+     total_base_pairs: 156,030,808
 -  output_table:
      table_name_suffix: "chrY"
      regions:
