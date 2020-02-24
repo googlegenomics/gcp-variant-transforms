@@ -1,0 +1,45 @@
+[
+  {
+    "test_name": "option-append-step-1",
+    "table_name": "option_append",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
+    "runner": "DataflowRunner",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 5}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 3607195}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 3607203}
+      }
+    ]
+  },
+  {
+    "test_name": "option-append-step-2",
+    "table_name": "option_append",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
+    "runner": "DataflowRunner",
+    "append": true,
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 10}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 7214390}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 7214406}
+      }
+    ]
+  }
+]
