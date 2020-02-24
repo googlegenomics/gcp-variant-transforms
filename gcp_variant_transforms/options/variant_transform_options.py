@@ -535,21 +535,22 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         help=('BigQuery table that will be loaded to VCF. It must be in the '
               'format of (PROJECT:DATASET.TABLE).'))
     parser.add_argument(
-        '--genomic_region',
-        required=True, default=None,
-        help=('A genomic region (separated by a space) to load from BigQuery. '
+        '--genomic_regions',
+        required=True, default=None, nargs='+',
+        help=('A genomic regions (separated by a space) to load from BigQuery. '
               'The format of the genomic region should be '
               'REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if '
               'the full chromosome is requested. Only variants matching at '
               'this region will be loaded. The chromosome identifier should be '
               'identical to the one provided in config file when the tables '
               'were being created. For example, '
-              '`--genomic_region chr2:1000-2000` will load all variants '
+              '`--genomic_regions chr2:1000-2000` will load all variants '
               '`chr2` with `start_position` in `[1000,2000)` from BigQuery. '
               'If the table with suffix `my_chrom3` was imported, '
-              '`--genomic_region my_chrom3` would return all the variants in '
+              '`--genomic_regions my_chrom3` would return all the variants in '
               'that shard. This flag must be specified to indicate the table '
-              'shard that needs to be exported to VCF file.'))
+              'shard that needs to be exported to VCF file. NOTE:At the moment '
+              'one and only one genomic region must be supplied.'))
     parser.add_argument(
         '--number_of_bases_per_shard',
         type=int, default=1000000,
@@ -591,10 +592,13 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
 
+  def validate(self, parsed_args):
+    if len(parsed_args.genomic_regions) > 1:
+      raise ValueError(
+          'Exactly one genomic region has to be supplied in this release')
+
 
 def _validate_inputs(parsed_args):
-  #ref, start, end = genomic_region_parser.parse_genomic_region(
-  #    parsed_args.genomic_region)
   if ((parsed_args.input_pattern and parsed_args.input_file) or
       (not parsed_args.input_pattern and not parsed_args.input_file)):
     raise ValueError('Exactly one of input_pattern and input_file has to be '

@@ -64,7 +64,7 @@ def dict_values_equal(expected_dict):
   def _items_equal(actual_dict):
     if expected_dict != actual_dict[0]:
       raise BeamAssertException(
-          'Failed assert: %d == %d' % (expected_dict, actual_dict))
+          'Failed assert: %s == %s' % (expected_dict, actual_dict))
   return _items_equal
 
 

@@ -71,15 +71,15 @@ from gcp_variant_transforms.transforms import sample_mapping_table
 
 
 
-_BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}__{CHROM}`'
+_BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}___{CHROM}`'
 _BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
-_FULL_INPUT_TABLE = '{TABLE}__{SUFFIX}'
+_FULL_INPUT_TABLE = '{TABLE}___{SUFFIX}'
 _GENOMIC_REGION_TEMPLATE = ('({START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')
 _SAMPLE_INFO_QUERY_TEMPLATE = (
     'SELECT sample_id, sample_name, file_path '
-    'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}_sample_info`')
+    'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}__sample_info`')
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
 _VCF_VERSION_LINE = '##fileformat=VCFv4.3\n'
@@ -123,7 +123,7 @@ def run(argv=None):
     _write_vcf_meta_info(known_args.input_table,
                          known_args.representative_header_file,
                          known_args.allow_incompatible_schema,
-                         known_args.genomic_region)
+                         known_args.genomic_regions)
 
   _bigquery_to_vcf_shards(known_args,
                           options,
@@ -143,12 +143,12 @@ def run(argv=None):
 def _write_vcf_meta_info(input_table,
                          representative_header_file,
                          allow_incompatible_schema,
-                         genomic_region):
+                         genomic_regions):
   # type: (str, str, bool, str) -> None
   """Writes the meta information generated from BigQuery schema."""
   header_fields = (
       schema_converter.generate_header_fields_from_schema(
-          _get_schema(input_table, genomic_region), allow_incompatible_schema))
+          _get_schema(input_table, genomic_regions), allow_incompatible_schema))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields, _VCF_VERSION_LINE)
 
@@ -170,7 +170,7 @@ def _bigquery_to_vcf_shards(
   Also, it writes the meta info and data header with the sample names to
   `vcf_header_file_path`.
   """
-  schema = _get_schema(known_args.input_table, known_args.genomic_region)
+  schema = _get_schema(known_args.input_table, known_args.genomic_regions)
   # TODO(allieychen): Modify the SQL query with the specified sample_ids.
   query = _get_bigquery_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
@@ -195,7 +195,7 @@ def _bigquery_to_vcf_shards(
         p
         | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
     if known_args.sample_names:
-      hash_table = (
+      name_to_id_hash_table = (
           sample_table_rows
           | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
       sample_names = (p
@@ -204,23 +204,21 @@ def _bigquery_to_vcf_shards(
       sample_ids = (sample_names
                     | 'GetSampleIds' >>
                     sample_mapping_table.GetSampleIds(
-                        beam.pvalue.AsSingleton(hash_table))
-                    | 'CombineSampleIds' >> beam.combiners.ToList())
-      sample_names = sample_names | beam.combiners.ToList()
+                        beam.pvalue.AsSingleton(name_to_id_hash_table)))
     else:
-      hash_table = (
-          sample_table_rows
-          | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
       sample_ids = (variants
                     | 'CombineSampleIds' >>
                     combine_sample_ids.SampleIdsCombiner(
                         known_args.preserve_sample_order))
-      sample_names = (sample_ids
-                      | 'GetSampleNames' >>
-                      sample_mapping_table.GetSampleNames(
-                          beam.pvalue.AsSingleton(hash_table))
-                      | 'CombineSampleNames' >> beam.combiners.ToList())
-      sample_ids = sample_ids | beam.combiners.ToList()
+    hash_table = (
+        sample_table_rows
+        | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
+    sample_names = (sample_ids
+                    | 'GetSampleNames' >>
+                    sample_mapping_table.GetSampleNames(
+                        beam.pvalue.AsSingleton(hash_table))
+                    | 'CombineSampleNames' >> beam.combiners.ToList())
+    sample_ids = sample_ids | beam.combiners.ToList()
     _ = (sample_names
          | 'GenerateVcfDataHeader' >>
          beam.ParDo(_write_vcf_header_with_sample_names,
@@ -237,9 +235,9 @@ def _bigquery_to_vcf_shards(
          | vcfio.WriteVcfDataLines())
 
 
-def _get_schema(input_table, genomic_region):
+def _get_schema(input_table, genomic_regions):
   # type: (str, str) -> bigquery_v2.TableSchema
-  ref, _, _ = genomic_region_parser.parse_genomic_region(genomic_region)
+  ref, _, _ = genomic_region_parser.parse_genomic_region(genomic_regions[0])
   project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
       _FULL_INPUT_TABLE.format(TABLE=input_table, SUFFIX=ref))
   credentials = (client.GoogleCredentials.get_application_default().
@@ -255,7 +253,7 @@ def _get_bigquery_query(known_args, schema):
   """Returns a BigQuery query for the interested regions."""
   columns = _get_query_columns(schema)
   ref, start, end = genomic_region_parser.parse_genomic_region(
-      known_args.genomic_region)
+      known_args.genomic_regions[0])
   base_query = _BASE_QUERY_TEMPLATE.format(
       COLUMNS=', '.join(columns),
       INPUT_TABLE='.'.join(
