@@ -173,7 +173,7 @@ class QueryFormatter(object):
     # type: (str, str) -> None
     self._dataset_id = dataset_id
     # Due to sharding of output table there will be multiple output tables with
-    # different suffixes, such as: "__chr1", "__chr2", ...and "__residual".
+    # different suffixes, such as: "___chr1", "___chr2", ...and "___residual".
     # That's why we use the given table_name as table_suffix.
     self._table_id = table_id
     self._dataset_table_wildcard = '{}.{}{}*'.format(

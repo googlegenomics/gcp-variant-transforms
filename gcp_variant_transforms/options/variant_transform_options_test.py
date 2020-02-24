@@ -111,10 +111,10 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client.tables.Get.return_value = bigquery.Table(
         tableReference=bigquery.TableReference(projectId='project',
                                                datasetId='dataset',
-                                               tableId='table_sample_info'))
+                                               tableId='table__sample_info'))
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table_sample_info already exists'):
+        'project:dataset.table__sample_info already exists'):
       self._options.validate(args, client)
 
   def test_existing_main_table(self):
@@ -123,14 +123,14 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
       if (request == bigquery.BigqueryTablesGetRequest(
           projectId='project',
           datasetId='dataset',
-          tableId='table_sample_info')):
+          tableId='table__sample_info')):
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
       else:
-        return bigquery.Table(
-            tableReference=bigquery.TableReference(projectId='project',
-                                                   datasetId='dataset',
-                                                   tableId='table__chr1_part1'))
+        return bigquery.Table(tableReference=bigquery.TableReference(
+            projectId='project',
+            datasetId='dataset',
+            tableId='table___chr1_part1'))
     args = self._make_args(
         ['--append', 'False', '--output_table', 'project:dataset.table',
          '--sharding_config_path',
@@ -141,7 +141,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client.tables.Get.side_effect = side_effect
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__chr01_part1 already exists'):
+        'project:dataset.table___chr01_part1 already exists'):
       self._options.validate(args, client)
 
   def test_missing_sample_table(self):
@@ -155,7 +155,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
         response={'status': '404'}, url='', content='')
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table_sample_info does not exist'):
+        'project:dataset.table__sample_info does not exist'):
       self._options.validate(args, client)
 
   def test_missing_main_table(self):
@@ -164,11 +164,11 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
       if (request == bigquery.BigqueryTablesGetRequest(
           projectId='project',
           datasetId='dataset',
-          tableId='table_sample_info')):
+          tableId='table__sample_info')):
         return bigquery.Table(tableReference=bigquery.TableReference(
             projectId='project',
             datasetId='dataset',
-            tableId='table_sample_info'))
+            tableId='table__sample_info'))
       else:
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
@@ -183,7 +183,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client.tables.Get.side_effect = side_effect
     with self.assertRaisesRegexp(
         ValueError,
-        'project:dataset.table__chr01_part1 does not exist'):
+        'project:dataset.table___chr01_part1 does not exist'):
       self._options.validate(args, client)
 
   def test_no_project(self):

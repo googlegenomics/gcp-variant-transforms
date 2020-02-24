@@ -125,11 +125,12 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--sharding_config_path',
         default='gcp_variant_transforms/data/sharding_configs/'
                 'homo_sapiens_default.yaml',
-        help=('File containing list of shards and output table names. You '
-              'can use provided default sharding_config file to split output '
-              'by chromosome (one table per chromosome) which is located at: '
-              'gcp_variant_transforms/data/sharding_configs/'
-              'homo_sapiens_default.yaml'))
+        help=('File containing list of output tables, their name suffixes, and '
+              'approximate number of total base pairs which is used to conduct '
+              'BigQuery integer range partitioning. Default value is set to a '
+              'file which is optimized for the human genome. It results in one '
+              'table per chromosome (overall 25 BigQuery tables). For more '
+              'information visit gcp-variant-trannsforms/docs/sharding.md'))
 
     parser.add_argument(
         '--sample_name_encoding',
