@@ -54,6 +54,10 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
     '--range_partitioning=start_position,0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
+_BQ_LOAD_AVRO_COMMAND = (
+    'bq load --source_format=AVRO {FULL_TABLE_ID} {AVRO_FILE_BASE_NAME}-*')
+_BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
+_GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 
 
 class PipelineModes(enum.Enum):
@@ -363,3 +367,23 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
     raise ValueError(
         'Failed to create a bigquery table using "{}" command.'.format(
             bq_command))
+
+
+def load_avro_to_output_table(full_table_id, avro_file_base_name):
+  bq_command = _BQ_LOAD_AVRO_COMMAND.format(
+      FULL_TABLE_ID=full_table_id, AVRO_FILE_BASE_NAME=avro_file_base_name)
+  result = os.system(bq_command)
+  if result != 0:
+    raise ValueError(
+        'Failed to load AVRO file to bigquery table using "{}" command.'.format(
+            bq_command))
+
+
+def delete_table(full_table_id):
+  bq_command = _BQ_DELETE_TABLE_COMMAND.format(FULL_TABLE_ID=full_table_id)
+  return os.system(bq_command)
+
+
+def delete_gcs_files(root_path):
+  gcs_command = _GCS_DELETE_FILES_COMMAND.format(ROOT_PATH=root_path)
+  return os.system(gcs_command)

@@ -403,6 +403,14 @@ def _write_schema_to_temp_file(schema):
   return schema_file
 
 
+def _get_avro_root_path(beam_pipeline_options):
+  google_cloud_options = beam_pipeline_options.view_as(
+      pipeline_options.GoogleCloudOptions)
+  return filesystems.FileSystems.join(google_cloud_options.temp_location,
+                                      _AVRO_FOLDER,
+                                      google_cloud_options.job_name, '')
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -464,6 +472,8 @@ def run(argv=None):
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  avro_root_path = _get_avro_root_path(beam_pipeline_options)
+
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   if known_args.allow_malformed_records:
@@ -527,6 +537,48 @@ def run(argv=None):
   result.wait_until_finish()
 
   metrics_util.log_all_counters(result)
+
+  # After pipeline is done, create output tables and load AVRO files into them.
+  schema_file = _write_schema_to_temp_file(schema)
+  updated_tables = []
+  try:
+    for i in range(num_shards):
+      table_suffix = sharding.get_output_table_suffix(i)
+      table_name = sample_info_table_schema_generator.compose_table_name(
+          known_args.output_table, table_suffix)
+      if not known_args.append:
+        pipeline_common.create_output_table(
+            table_name,
+            sharding.get_output_table_total_base_pairs(i),
+            schema_file)
+      pipeline_common.load_avro_to_output_table(table_name,
+                                                avro_root_path + table_suffix)
+      updated_tables.append(table_name)
+  except Exception as e:
+    logging.error('Something unexpected happened during the loading of AVRO '
+                  'files to BigQuery: {}'.format(e.message))
+    logging.warning('Trying to revert as much as possible.')
+    for table_name in updated_tables:
+      if known_args.append:
+        logging.warning('Since tables were appended, cannot revert the change'
+                        'in this table: {}'.format(table_name))
+      else:
+        if pipeline_common.delete_table(table_name) != 0:
+          logging.error('Failed to delete table: {}'.format(table_name))
+        else:
+          logging.info('Table was successfully deleted: {}'.format(table_name))
+    logging.info('Since write to BQ stage failed, we do not delete AVRO files. '
+                 'You can find them located at: {}'.format(avro_root_path))
+    raise(e)
+  else:
+    logging.warning('All AVRO files were successfully loaded to BigQuery.')
+    if not known_args.keep_intermediate_avro_files:
+      if pipeline_common.delete_gcs_files(avro_root_path) != 0:
+        logging.error('Was not able to delete intermediate AVRO files located '
+                      'at: {}'.format(avro_root_path))
+    else:
+      logging.info(
+          'Intermediate AVRO files are located at: {}'.format(avro_root_path))
 
 
 if __name__ == '__main__':
