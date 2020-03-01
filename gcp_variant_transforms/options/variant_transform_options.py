@@ -138,9 +138,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--keep_intermediate_avro_files',
         type='bool', default=False, nargs='?', const=True,
-        help= ('If set to True, the intermediate AVRO files will be kept. They '
-               'are stored in your temp directory (set by --temp_location) '
-               '/avro/JOB_NAME/...'))
+        help=('If set to True, the intermediate AVRO files will be kept. They '
+              'are stored in your temp directory (set by --temp_location) '
+              'under gs://[YOUR-TEMP-DIRECTORY]/avro/JOB_NAME/'))
     parser.add_argument(
         '--sharding_config_path',
         default=('gcp_variant_transforms/data/sharding_configs/'

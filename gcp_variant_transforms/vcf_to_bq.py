@@ -535,15 +535,16 @@ def run(argv=None):
 
   result = pipeline.run()
   result.wait_until_finish()
-
+  logging.info('Dataflow pipeline finished successfully.')
   metrics_util.log_all_counters(result)
 
   # After pipeline is done, create output tables and load AVRO files into them.
   schema_file = _write_schema_to_temp_file(schema)
-  updated_tables = []
+  suffixes = []
   try:
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
+      suffixes.append(table_suffix)
       table_name = sample_info_table_schema_generator.compose_table_name(
           known_args.output_table, table_suffix)
       if not known_args.append:
@@ -551,34 +552,37 @@ def run(argv=None):
             table_name,
             sharding.get_output_table_total_base_pairs(i),
             schema_file)
-      pipeline_common.load_avro_to_output_table(table_name,
-                                                avro_root_path + table_suffix)
-      updated_tables.append(table_name)
+        logging.info('Integer range partitioned table %s was created.',
+                     table_name)
+    pipeline_common.load_avro_to_output_tables(
+        avro_root_path, known_args.output_table, suffixes)
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
-                  'files to BigQuery: {}'.format(e.message))
+                  'files to BigQuery: %s', str(e))
     logging.warning('Trying to revert as much as possible.')
-    for table_name in updated_tables:
+    for suffix in suffixes:
+      table_name = sample_info_table_schema_generator.compose_table_name(
+          known_args.output_table, suffix)
       if known_args.append:
         logging.warning('Since tables were appended, cannot revert the change'
-                        'in this table: {}'.format(table_name))
+                        'in this table: %s', table_name)
       else:
         if pipeline_common.delete_table(table_name) != 0:
-          logging.error('Failed to delete table: {}'.format(table_name))
+          logging.error('Failed to delete table: %s', table_name)
         else:
-          logging.info('Table was successfully deleted: {}'.format(table_name))
+          logging.info('Table was successfully deleted: %s', table_name)
     logging.info('Since write to BQ stage failed, we do not delete AVRO files. '
-                 'You can find them located at: {}'.format(avro_root_path))
-    raise(e)
+                 'You can find them located at: %s', avro_root_path)
+    raise e
   else:
     logging.warning('All AVRO files were successfully loaded to BigQuery.')
     if not known_args.keep_intermediate_avro_files:
       if pipeline_common.delete_gcs_files(avro_root_path) != 0:
         logging.error('Was not able to delete intermediate AVRO files located '
-                      'at: {}'.format(avro_root_path))
+                      'at: %s', avro_root_path)
     else:
       logging.info(
-          'Intermediate AVRO files are located at: {}'.format(avro_root_path))
+          'Intermediate AVRO files are located at: %s', avro_root_path)
 
 
 if __name__ == '__main__':
