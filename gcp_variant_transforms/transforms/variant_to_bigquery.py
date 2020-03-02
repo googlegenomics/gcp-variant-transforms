@@ -25,7 +25,6 @@ from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unus
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
-from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
@@ -68,7 +67,6 @@ class VariantToBigQuery(beam.PTransform):
       output_table,  # type: str
       schema,  # type: bigquery.TableSchema
       append=False,  # type: bool
-      update_schema_on_append=False,  # type: bool
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1,  # type: int
@@ -82,8 +80,6 @@ class VariantToBigQuery(beam.PTransform):
       schema: Schema of the table to be generated.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
-      update_schema_on_append: If true, BigQuery schema will be updated by
-        combining the existing schema and the new schema if they are compatible.
       allow_incompatible_records: If true, field values are casted to Bigquery
 +       schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
@@ -110,9 +106,6 @@ class VariantToBigQuery(beam.PTransform):
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._num_bigquery_write_shards = num_bigquery_write_shards
-    if update_schema_on_append:
-      bigquery_util.update_bigquery_schema_on_append(self._schema.fields,
-                                                     self._output_table)
 
   def expand(self, pcoll):
     bq_rows = pcoll | 'ConvertToBigQueryTableRow' >> beam.ParDo(
