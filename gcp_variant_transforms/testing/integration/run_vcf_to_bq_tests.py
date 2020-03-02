@@ -40,9 +40,11 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
+from concurrent.futures import TimeoutError
 import enum
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
@@ -57,7 +59,7 @@ from gcp_variant_transforms.testing.integration import run_tests_common
 
 _TOOL_NAME = 'vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
-
+_NUM_QUERY_RETIRES = 3
 
 class VcfToBQTestCase(run_tests_common.TestCaseInterface):
   """Test case that holds information to run in Pipelines API."""
@@ -119,7 +121,19 @@ class QueryAssertion(object):
 
   def run_assertion(self):
     query_job = self._client.query(self._query)
-    iterator = query_job.result(timeout=180)
+    num_retries = 0
+    while True:
+      try:
+        iterator = query_job.result(timeout=30)
+      except TimeoutError as e:
+        if num_retries < _NUM_QUERY_RETIRES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          raise e
+      else:
+        break
+
     rows = list(iterator)
     if len(rows) != 1:
       raise run_tests_common.TestCaseFailure(
@@ -214,6 +228,7 @@ class TestContextManager(object):
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
       dataset = bigquery.Dataset(dataset_ref)
+      dataset.location = 'US'
       _ = client.create_dataset(dataset)  # See #171, pylint: disable=no-member
     return self
 
