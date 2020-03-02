@@ -46,6 +46,7 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_parser
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
@@ -395,6 +396,14 @@ def _run_annotation_pipeline(known_args, pipeline_args):
   return annotated_vcf_pattern
 
 
+def _write_schema_to_temp_file(schema):
+  schema_json = schema_converter.convert_table_schema_to_json_bq_schema(schema)
+  schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
+  with filesystems.FileSystems.create(schema_file) as file_to_write:
+    file_to_write.write(schema_json)
+  return schema_file
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -438,19 +447,30 @@ def run(argv=None):
       known_args.infer_annotation_types,
       counter_factory)
 
+  schema = schema_converter.generate_schema_from_header_fields(
+      header_fields, processed_variant_factory, variant_merger)
+  schema_file = _write_schema_to_temp_file(schema)
+
+  sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
+  if sharding.should_keep_shard(sharding.get_residual_index()):
+    num_shards = sharding.get_num_shards()
+  else:
+    num_shards = sharding.get_num_shards() - 1
+
+  if known_args.update_schema_on_append:
+    for i in range(num_shards):
+      table_suffix = sharding.get_output_table_suffix(i)
+      table_name = sample_info_table_schema_generator.compose_table_name(
+          known_args.output_table, table_suffix)
+      bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
+
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   if known_args.allow_malformed_records:
     variants |= 'DropMalformedRecords' >> filter_variants.FilterVariants()
-  sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
-  num_shards = sharding.get_num_shards()
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
-      shard_variants.ShardVariants(sharding), num_shards)
-  # In case there is no residual in config we will ignore the last shard.
-  if not sharding.should_keep_shard(sharding.get_residual_index()):
-    num_shards -= 1
-
+      shard_variants.ShardVariants(sharding), sharding.get_num_shards())
   variants = []
   for i in range(num_shards):
     # Convert tuples to list
@@ -464,16 +484,6 @@ def run(argv=None):
             with_output_types(processed_variant.ProcessedVariant))
 
   if known_args.output_table:
-    schema_file = tempfile.mkstemp(prefix=known_args.output_table,
-                                   suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
-    schema = (
-        schema_converter.generate_schema_from_header_fields(
-            header_fields, processed_variant_factory, variant_merger))
-    schema_json = (
-        schema_converter.convert_table_schema_to_json_bq_schema(schema))
-    with filesystems.FileSystems.create(schema_file) as file_to_write:
-      file_to_write.write(schema_json)
-
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
       table_name = sample_info_table_schema_generator.compose_table_name(
@@ -488,7 +498,6 @@ def run(argv=None):
                table_name,
                schema,
                append=known_args.append,
-               update_schema_on_append=known_args.update_schema_on_append,
                allow_incompatible_records=known_args.allow_incompatible_records,
                omit_empty_sample_calls=known_args.omit_empty_sample_calls,
                num_bigquery_write_shards=known_args.num_bigquery_write_shards,
