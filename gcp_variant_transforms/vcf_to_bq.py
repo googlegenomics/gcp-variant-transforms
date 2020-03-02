@@ -68,12 +68,10 @@ from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import shard_variants
 from gcp_variant_transforms.transforms import variant_to_avro
-from gcp_variant_transforms.transforms import variant_to_bigquery
 from gcp_variant_transforms.transforms import write_variants_to_shards
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
-    variant_transform_options.AvroWriteOptions,
     variant_transform_options.BigQueryWriteOptions,
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
@@ -88,6 +86,7 @@ _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 _ANNOTATE_FILES_JOB_NAME = 'annotate-files'
 _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _BQ_SCHEMA_FILE_SUFFIX = 'schema.json'
+_AVRO_FOLDER = 'avro'
 _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 SampleNameEncoding = vcf_parser.SampleNameEncoding
@@ -456,7 +455,6 @@ def run(argv=None):
 
   schema = schema_converter.generate_schema_from_header_fields(
       header_fields, processed_variant_factory, variant_merger)
-  schema_file = _write_schema_to_temp_file(schema)
 
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   if sharding.should_keep_shard(sharding.get_residual_index()):
@@ -482,57 +480,29 @@ def run(argv=None):
       shard_variants.ShardVariants(sharding), sharding.get_num_shards())
   variants = []
   for i in range(num_shards):
+    suffix = sharding.get_output_table_suffix(i)
     # Convert tuples to list
     variants.append(sharded_variants[i])
     if variant_merger:
-      variants[i] |= ('MergeVariants' + str(i) >>
+      variants[i] |= ('MergeVariants' + suffix >>
                       merge_variants.MergeVariants(variant_merger))
     variants[i] |= (
-        'ProcessVariants' + str(i) >>
-        beam.Map(processed_variant_factory.create_processed_variant).\
-            with_output_types(processed_variant.ProcessedVariant))
-
-  if known_args.output_table:
-    for i in range(num_shards):
-      table_suffix = sharding.get_output_table_suffix(i)
-      table_name = bigquery_util.compose_table_name(known_args.output_table,
-                                                    table_suffix)
-      if not known_args.append:
-        pipeline_common.create_output_table(
-            table_name,
-            sharding.get_output_table_total_base_pairs(i),
-            schema_file)
-      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
-           variant_to_bigquery.VariantToBigQuery(
-               table_name,
-               schema,
-               append=known_args.append,
-               allow_incompatible_records=known_args.allow_incompatible_records,
-               omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-               num_bigquery_write_shards=known_args.num_bigquery_write_shards,
-               null_numeric_value_replacement=(
-                   known_args.null_numeric_value_replacement)))
-
-  if known_args.output_avro_path:
+        'ProcessVariants' + suffix >>
+        beam.Map(processed_variant_factory.create_processed_variant). \
+        with_output_types(processed_variant.ProcessedVariant))
     # TODO(bashir2): Add an integration test that outputs to Avro files and
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
-    for i in range(num_shards):
-      avro_path = bigquery_util.compose_table_name(
-          known_args.output_avro_path, sharding.get_output_table_suffix(i))
-      _ = (
-          variants[i] | 'VariantToAvro' >>
-          variant_to_avro.VariantToAvroFiles(
-              avro_path,
-              header_fields,
-              processed_variant_factory,
-              variant_merger=variant_merger,
-              allow_incompatible_records=known_args.allow_incompatible_records,
-              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-              null_numeric_value_replacement=(
-                  known_args.null_numeric_value_replacement))
-      )
-
+    _ = (
+        variants[i] | 'VariantToAvro' + suffix >>
+        variant_to_avro.VariantToAvroFiles(
+            avro_root_path + suffix,
+            schema,
+            allow_incompatible_records=known_args.allow_incompatible_records,
+            omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+            null_numeric_value_replacement=(
+                known_args.null_numeric_value_replacement))
+    )
   result = pipeline.run()
   result.wait_until_finish()
   logging.info('Dataflow pipeline finished successfully.')

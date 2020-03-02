@@ -57,3 +57,5 @@ steps:
 images:
   - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
 timeout: 360m
+options:
+ machineType: N1_HIGHCPU_8
