@@ -63,6 +63,7 @@ _BQ_LOAD_AVRO_COMMAND = (
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 _BQ_LOAD_JOB_NUM_RETRIES = 5
+_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
 
 
 class PipelineModes(enum.Enum):
@@ -388,18 +389,20 @@ def _run_one_load_job(avro_root_path, table_base_name, suffix):
 def load_avro_to_output_tables(avro_root_path, table_base_name, suffixes):
   # type: (str, str, List[str]) -> None
   num_retries = 0
-  # We run load jobs in parallel.
+  # We run _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS load jobs in parallel.
   suffixes_to_processes = {}  # type: Dict[str, subprocess.Popen]
-  for suffix in suffixes:
+  remaining_suffixes = suffixes
+  for _ in range(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS):
+    suffix = remaining_suffixes.pop()
     suffixes_to_processes.update(
         {suffix: _run_one_load_job(avro_root_path, table_base_name, suffix)})
 
   # Now wait until all operations are done.
   try:
     while suffixes_to_processes:
-      time.sleep(30)
-      remaining_suffixes = suffixes_to_processes.keys()
-      for suffix in remaining_suffixes:
+      time.sleep(60)
+      processed_suffixes = suffixes_to_processes.keys()
+      for suffix in processed_suffixes:
         proc = suffixes_to_processes.get(suffix)
         return_code = proc.poll()
         if return_code is not None:
@@ -420,6 +423,12 @@ def load_avro_to_output_tables(avro_root_path, table_base_name, suffixes):
                   'Failed to load AVRO to BigQuery table {} \n stdout: {} \n '
                   'stderr: {} \n return code: {}.'.format(table_id, stdout,
                                                           stderr, return_code))
+          else:
+            if remaining_suffixes:
+              suffix = remaining_suffixes.pop()
+              suffixes_to_processes.update(
+                  {suffix: _run_one_load_job(avro_root_path, table_base_name,
+                                             suffix)})
   except Exception as e:
     # Load jobs have failed more than _BQ_LOAD_JOB_NUM_RETRIES,
     # terminate all remaining jobs.
