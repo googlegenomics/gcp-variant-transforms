@@ -126,6 +126,7 @@ class QueryAssertion(object):
       try:
         iterator = query_job.result(timeout=30)
       except TimeoutError as e:
+        print 'WARNING: Time out waiting for query: {}'.format(self._query)
         if num_retries < _NUM_QUERY_RETIRES:
           num_retries += 1
           time.sleep(90)
@@ -136,6 +137,8 @@ class QueryAssertion(object):
 
     rows = list(iterator)
     if len(rows) != 1:
+      print 'ERROR: Query did not returned expected results: {}'.format(
+          self._query)
       raise run_tests_common.TestCaseFailure(
           'Expected one row in query result, got {} in test {}'.format(
               len(rows), self._test_name))
@@ -334,5 +337,7 @@ def main():
 
 
 if __name__ == '__main__':
+  print 'Starting vcf_to_bq tests...'
   ret_code = main()
+  print 'Finished all vcf_to_bq tests successfully.'
   sys.exit(ret_code)

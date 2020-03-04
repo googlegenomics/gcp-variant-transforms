@@ -140,5 +140,7 @@ def main():
 
 
 if __name__ == '__main__':
+  print 'Starting bq_to_vcf tests...'
   ret_code = main()
+  print 'Finished all bq_to_vcf tests successfully.'
   sys.exit(ret_code)
