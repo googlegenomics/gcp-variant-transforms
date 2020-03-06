@@ -41,7 +41,6 @@ steps:
       - '--skip_build'
       - '--project ${PROJECT_ID}'
       - '--image_tag ${COMMIT_SHA}'
-      - '--run_unit_tests'
       - '--run_preprocessor_tests'
       - '--run_bq_to_vcf_tests'
       - '--run_all_tests'
@@ -56,6 +55,4 @@ steps:
       # - '--gs_dir bashir-variant_integration_test_runs'
 images:
   - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-timeout: 360m
-options:
- machineType: N1_HIGHCPU_8
+timeout: 240m

@@ -490,9 +490,6 @@ def run(argv=None):
         'ProcessVariants' + suffix >>
         beam.Map(processed_variant_factory.create_processed_variant). \
         with_output_types(processed_variant.ProcessedVariant))
-    # TODO(bashir2): Add an integration test that outputs to Avro files and
-    # also imports to BigQuery. Then import those Avro outputs using the bq
-    # tool and verify that the two tables are identical.
     _ = (
         variants[i] | 'VariantToAvro' + suffix >>
         variant_to_avro.VariantToAvroFiles(
@@ -511,48 +508,49 @@ def run(argv=None):
   # After pipeline is done, create output tables and load AVRO files into them.
   schema_file = _write_schema_to_temp_file(schema)
   suffixes = []
+  total_base_pairs = []
   try:
     for i in range(num_shards):
-      table_suffix = sharding.get_output_table_suffix(i)
-      suffixes.append(table_suffix)
-      table_name = sample_info_table_schema_generator.compose_table_name(
-          known_args.output_table, table_suffix)
+      suffixes.append(sharding.get_output_table_suffix(i))
+      total_base_pairs.append(sharding.get_output_table_total_base_pairs(i))
       if not known_args.append:
+        table_name = sample_info_table_schema_generator.compose_table_name(
+            known_args.output_table, suffixes[i])
         pipeline_common.create_output_table(
-            table_name,
-            sharding.get_output_table_total_base_pairs(i),
-            schema_file)
+            table_name, total_base_pairs[i], schema_file)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    pipeline_common.load_avro_to_output_tables(
-        avro_root_path, known_args.output_table, suffixes)
+    load_avro = pipeline_common.LoadAvro(
+        avro_root_path, known_args.output_table, suffixes, total_base_pairs)
+    load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
-    logging.warning('Trying to revert as much as possible.')
-    for suffix in suffixes:
-      table_name = sample_info_table_schema_generator.compose_table_name(
-          known_args.output_table, suffix)
-      if known_args.append:
-        logging.warning('Since tables were appended, cannot revert the change'
-                        'in this table: %s', table_name)
-      else:
-        if pipeline_common.delete_table(table_name) != 0:
-          logging.error('Failed to delete table: %s', table_name)
-        else:
+    logging.warning('Trying to revert as much as possible...')
+    if known_args.append:
+      logging.warning(
+          'Since tables were appended, we cannot revert added rows. You can '
+          'utilize BigQuery snapshot decorators to recover your table up to 7 '
+          'days ago. For more information please refer to: '
+          'https://cloud.google.com/bigquery/table-decorators')
+    else:
+      for suffix in suffixes:
+        table_name = sample_info_table_schema_generator.compose_table_name(
+            known_args.output_table, suffix)
+        if pipeline_common.delete_table(table_name) == 0:
           logging.info('Table was successfully deleted: %s', table_name)
-    logging.info('Since write to BQ stage failed, we do not delete AVRO files. '
-                 'You can find them located at: %s', avro_root_path)
+        else:
+          logging.error('Failed to delete table: %s', table_name)
+    logging.info('Because write to BigQuery stage failed, we did not delete '
+                 'AVRO files in your GCS bucket. You can manually import them '
+                 'BigQuery. To avoid extra storage charges, delete them if you '
+                 'do not need them, they are located at: %s', avro_root_path)
     raise e
   else:
     logging.warning('All AVRO files were successfully loaded to BigQuery.')
-    if not known_args.keep_intermediate_avro_files:
-      if pipeline_common.delete_gcs_files(avro_root_path) != 0:
-        logging.error('Was not able to delete intermediate AVRO files located '
-                      'at: %s', avro_root_path)
-    else:
-      logging.info(
-          'Intermediate AVRO files are located at: %s', avro_root_path)
+    if pipeline_common.delete_gcs_files(avro_root_path) != 0:
+      logging.error('Was not able to delete intermediate AVRO files located '
+                    'at: %s', avro_root_path)
 
 
 if __name__ == '__main__':
