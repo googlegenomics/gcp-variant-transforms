@@ -54,7 +54,7 @@ from apache_beam.io import filesystems
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
 
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _TOOL_NAME = 'vcf_to_bq'
@@ -177,8 +177,7 @@ class QueryFormatter(object):
     # That's why we use the given table_name as table_suffix.
     self._table_id = table_id
     self._dataset_table_wildcard = '{}.{}{}*'.format(
-        self._dataset_id, self._table_id,
-        sample_info_table_schema_generator.TABLE_SUFFIX_SEPARATOR)
+        self._dataset_id, self._table_id, bigquery_util.TABLE_SUFFIX_SEPARATOR)
 
   def format_query(self, query):
     # type: (List[str]) -> str

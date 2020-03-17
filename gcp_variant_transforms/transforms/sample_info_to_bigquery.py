@@ -20,8 +20,9 @@ import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_parser
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import hashing_util
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
 _DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
@@ -71,8 +72,8 @@ class SampleInfoToBigQuery(beam.PTransform):
         sample_id would only use sample_name in to get a hashed name; otherwise
         both sample_name and file_name will be used.
     """
-    self._output_table = sample_info_table_schema_generator.compose_table_name(
-        output_table_prefix, sample_info_table_schema_generator.TABLE_SUFFIX)
+    self._output_table = bigquery_util.compose_table_name(
+        output_table_prefix, bigquery_util.TABLE_SUFFIX)
     self._append = append
     self._sample_name_encoding = sample_name_encoding
     self._schema = sample_info_table_schema_generator.generate_schema()

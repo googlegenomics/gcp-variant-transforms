@@ -22,7 +22,6 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import variant_sharding
 
 
@@ -153,8 +152,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'output_table_ + {} will be created. This table contains a '
               'unique sample_id for each sample read from the VCF file. This '
               'sample_id can be used to distinguish between sample names. '
-              '[EXPERIMENTAL]'
-             ).format(sample_info_table_schema_generator.TABLE_SUFFIX))
+              '[EXPERIMENTAL]').format(bigquery_util.TABLE_SUFFIX))
 
     parser.add_argument(
         '--sample_name_encoding',
@@ -234,9 +232,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                                                       dataset_id)
       all_output_tables = []
       if parsed_args.generate_sample_info_table:
-        all_output_tables.append(
-            sample_info_table_schema_generator.compose_table_name(
-                table_id, sample_info_table_schema_generator.TABLE_SUFFIX))
+        all_output_tables.append(bigquery_util.compose_table_name(
+            table_id, bigquery_util.TABLE_SUFFIX))
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()
@@ -245,9 +242,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         num_shards -= 1
       for i in range(num_shards):
         table_suffix = sharding.get_output_table_suffix(i)
-        all_output_tables.append(
-            sample_info_table_schema_generator.compose_table_name(
-                table_id, table_suffix))
+        all_output_tables.append(bigquery_util.compose_table_name(table_id,
+                                                                  table_suffix))
 
       for output_table in all_output_tables:
         if parsed_args.append:

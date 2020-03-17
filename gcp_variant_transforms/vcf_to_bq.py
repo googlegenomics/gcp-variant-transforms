@@ -49,7 +49,6 @@ from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_sharding
@@ -460,8 +459,8 @@ def run(argv=None):
   if known_args.update_schema_on_append:
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
-      table_name = sample_info_table_schema_generator.compose_table_name(
-          known_args.output_table, table_suffix)
+      table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                    table_suffix)
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
@@ -486,8 +485,8 @@ def run(argv=None):
   if known_args.output_table:
     for i in range(num_shards):
       table_suffix = sharding.get_output_table_suffix(i)
-      table_name = sample_info_table_schema_generator.compose_table_name(
-          known_args.output_table, table_suffix)
+      table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                    table_suffix)
       if not known_args.append:
         pipeline_common.create_output_table(
             table_name,
@@ -509,7 +508,7 @@ def run(argv=None):
     # also imports to BigQuery. Then import those Avro outputs using the bq
     # tool and verify that the two tables are identical.
     for i in range(num_shards):
-      avro_path = sample_info_table_schema_generator.compose_table_name(
+      avro_path = bigquery_util.compose_table_name(
           known_args.output_avro_path, sharding.get_output_table_suffix(i))
       _ = (
           variants[i] | 'VariantToAvro' >>
