@@ -516,11 +516,11 @@ def run(argv=None):
       if not known_args.append:
         table_name = sample_info_table_schema_generator.compose_table_name(
             known_args.output_table, suffixes[i])
-        pipeline_common.create_output_table(
+        bigquery_util.create_output_table(
             table_name, total_base_pairs[i], schema_file)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    load_avro = pipeline_common.LoadAvro(
+    load_avro = bigquery_util.LoadAvro(
         avro_root_path, known_args.output_table, suffixes, total_base_pairs)
     load_avro.start_loading()
   except Exception as e:
@@ -529,7 +529,7 @@ def run(argv=None):
     logging.warning('Trying to revert as much as possible...')
     if known_args.append:
       logging.warning(
-          'Since tables were appended, we cannot revert added rows. You can '
+          'Since tables were appended, added rows cannot be reverted. You can '
           'utilize BigQuery snapshot decorators to recover your table up to 7 '
           'days ago. For more information please refer to: '
           'https://cloud.google.com/bigquery/table-decorators')
@@ -537,20 +537,21 @@ def run(argv=None):
       for suffix in suffixes:
         table_name = sample_info_table_schema_generator.compose_table_name(
             known_args.output_table, suffix)
-        if pipeline_common.delete_table(table_name) == 0:
+        if bigquery_util.delete_table(table_name) == 0:
           logging.info('Table was successfully deleted: %s', table_name)
         else:
           logging.error('Failed to delete table: %s', table_name)
-    logging.info('Because write to BigQuery stage failed, we did not delete '
+    logging.info('Since the write to BigQuery stage failed, we did not delete '
                  'AVRO files in your GCS bucket. You can manually import them '
-                 'BigQuery. To avoid extra storage charges, delete them if you '
-                 'do not need them, they are located at: %s', avro_root_path)
+                 'to BigQuery. To avoid extra storage charges, delete them if '
+                 'you do not need them, AVRO files are located at: %s',
+                 avro_root_path)
     raise e
   else:
     logging.warning('All AVRO files were successfully loaded to BigQuery.')
-    if pipeline_common.delete_gcs_files(avro_root_path) != 0:
-      logging.error('Was not able to delete intermediate AVRO files located '
-                    'at: %s', avro_root_path)
+    if bigquery_util.delete_gcs_files(avro_root_path) != 0:
+      logging.error('Deletion of intermediate AVRO files located at "%s" has '
+                    'failed.', avro_root_path)
 
 
 if __name__ == '__main__':

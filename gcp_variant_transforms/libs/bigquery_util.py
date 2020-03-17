@@ -18,23 +18,38 @@ import enum
 import exceptions
 import re
 import math
+import time
 from typing import List, Tuple, Union  # pylint: disable=unused-import
 
-from apache_beam.io.gcp.internal.clients import bigquery
+from apache_beam.io.gcp.internal.clients import bigquery as beam_bigquery
 from apitools.base.py import exceptions
+from google.cloud import bigquery
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
+
+TABLE_SUFFIX = 'sample_info'
+TABLE_SUFFIX_SEPARATOR = '__'
 
 _MAX_BQ_NUM_PARTITIONS = 4000
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
 
-TABLE_SUFFIX = 'sample_info'
-TABLE_SUFFIX_SEPARATOR = '__'
+_BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
+    'bq mk --table '
+    '--range_partitioning=start_position,0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
+    '--clustering_fields=start_position,end_position '
+    '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
+_BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
+_GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
+_BQ_LOAD_JOB_NUM_RETRIES = 5
+_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 5
+_PARTITIONING_FIELD = 'start_position'
+_CLUSTERING_FIELDS = ['start_position', 'end_position']
 
 
 class ColumnKeyConstants(object):
@@ -147,9 +162,9 @@ def parse_table_reference(input_table):
 
 
 def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
-  # type: (bigquery.BigqueryV2, str, str) -> None
+  # type: (beam_beam_bigquery.BigqueryV2, str, str) -> None
   try:
-    client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
+    client.datasets.Get(beam_beam_bigquery.BigqueryDatasetsGetRequest(
         projectId=project_id, datasetId=dataset_id))
   except exceptions.HttpError as e:
     if e.status_code == 404:
@@ -161,9 +176,9 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
 
 
 def table_exist(client, project_id, dataset_id, table_id):
-  # type: (bigquery.BigqueryV2, str, str, str) -> bool
+  # type: (beam_beam_bigquery.BigqueryV2, str, str, str) -> bool
   try:
-    client.tables.Get(bigquery.BigqueryTablesGetRequest(
+    client.tables.Get(beam_beam_bigquery.BigqueryTablesGetRequest(
         projectId=project_id,
         datasetId=dataset_id,
         tableId=table_id))
@@ -234,7 +249,7 @@ def get_avro_type_from_bigquery_type_mode(bigquery_type, bigquery_mode):
     return avro_type
 
 def update_bigquery_schema_on_append(schema_fields, output_table):
-  # type: (List[bigquery.TableFieldSchema], str) -> None
+  # type: (List[beam_bigquery.TableFieldSchema], str) -> None
   """Update BQ schema by combining existing one with a new one, if possible.
 
   If table does not exist, do not need to update the schema.
@@ -245,24 +260,24 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
       output_table)
   credentials = GoogleCredentials.get_application_default().create_scoped(
       ['https://www.googleapis.com/auth/bigquery'])
-  client = bigquery.BigqueryV2(credentials=credentials)
+  client = beam_bigquery.BigqueryV2(credentials=credentials)
   try:
     project_id = output_table_re_match.group('project')
     dataset_id = output_table_re_match.group('dataset')
     table_id = output_table_re_match.group('table')
-    existing_table = client.tables.Get(bigquery.BigqueryTablesGetRequest(
+    existing_table = client.tables.Get(beam_bigquery.BigqueryTablesGetRequest(
         projectId=project_id,
         datasetId=dataset_id,
         tableId=table_id))
   except exceptions.HttpError:
     return
 
-  new_schema = bigquery.TableSchema()
+  new_schema = beam_bigquery.TableSchema()
   new_schema.fields = _get_merged_field_schemas(existing_table.schema.fields,
                                                 schema_fields)
   existing_table.schema = new_schema
   try:
-    client.tables.Update(bigquery.BigqueryTablesUpdateRequest(
+    client.tables.Update(beam_bigquery.BigqueryTablesUpdateRequest(
         projectId=project_id,
         datasetId=dataset_id,
         table=existing_table,
@@ -272,10 +287,10 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
 
 
 def _get_merged_field_schemas(
-    field_schemas_1,  # type: List[bigquery.TableFieldSchema]
-    field_schemas_2  # type: List[bigquery.TableFieldSchema]
+    field_schemas_1,  # type: List[beam_bigquery.TableFieldSchema]
+    field_schemas_2  # type: List[beam_bigquery.TableFieldSchema]
     ):
-  # type: (...) -> List[bigquery.TableFieldSchema]
+  # type: (...) -> List[beam_bigquery.TableFieldSchema]
   """Merges the `field_schemas_1` and `field_schemas_2`.
 
   Args:
@@ -290,8 +305,8 @@ def _get_merged_field_schemas(
     ValueError: If there are fields with the same name, but different modes or
     different types.
   """
-  existing_fields = {}  # type: Dict[str, bigquery.TableFieldSchema]
-  merged_field_schemas = []  # type: List[bigquery.TableFieldSchema]
+  existing_fields = {}  # type: Dict[str, beam_bigquery.TableFieldSchema]
+  merged_field_schemas = []  # type: List[beam_bigquery.TableFieldSchema]
   for field_schema in field_schemas_1:
     existing_fields.update({field_schema.name: field_schema})
     merged_field_schemas.append(field_schema)
@@ -360,3 +375,114 @@ def calculate_optimal_partition_size(total_base_pairs):
 def compose_table_name(base_name, suffix):
   # type: (str, List[str]) -> str
   return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
+
+
+class LoadAvro(object):
+  def __init__(self,
+               avro_root_path,  # type: str
+               table_base_name,  # type: str
+               suffixes,  # type: List[str]
+               total_base_pairs  # type: List[int]
+              ):
+    assert len(suffixes) == len(total_base_pairs)
+
+    self._avro_root_path = avro_root_path
+    self._table_base_name = table_base_name.replace(':', '.')
+    self._suffixes = suffixes
+    self._total_base_pairs = total_base_pairs
+
+    self._num_load_jobs_retries = 0
+    self._suffixes_to_load_jobs = {}  # type: Dict[str, bigquery.job.LoadJob]
+    self._remaining_load_jobs = self._suffixes
+
+    self._client = bigquery.Client()
+
+  def start_loading(self):
+    # We run _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS load jobs in parallel.
+    for _ in range(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS):
+      self._start_one_load_job(self._remaining_load_jobs.pop())
+
+    self._monitor_load_jobs()
+
+  def _start_one_load_job(self, suffix):
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.AVRO)
+    uri = self._avro_root_path + suffix + '-*'
+    table_id = sample_info_table_schema_generator.compose_table_name(
+        self._table_base_name, suffix)
+    load_job = self._client.load_table_from_uri(
+        uri, table_id, job_config=job_config)
+    self._suffixes_to_load_jobs.update({suffix: load_job})
+
+  def _cancel_all_running_load_jobs(self):
+    for load_job in self._suffixes_to_load_jobs.values():
+      load_job.cancel()
+
+  def _handle_failed_load_job(self, suffix, load_job):
+    if self._num_load_jobs_retries < _BQ_LOAD_JOB_NUM_RETRIES:
+      self._num_load_jobs_retries += 1
+      # Retry the failed job after 5 minutes wait.
+      time.sleep(300)
+      self._start_one_load_job(suffix)
+    else:
+      # Jobs have failed more than _BQ_LOAD_JOB_NUM_RETRIES, cancel all jobs.
+      self._cancel_all_running_load_jobs()
+      table_id = sample_info_table_schema_generator.compose_table_name(
+          self._table_base_name, suffix)
+      raise ValueError(
+          'Failed to load AVRO to BigQuery table {} \n state: {} \n '
+          'job_id: {} \n errors: {}.'.format(table_id, load_job.state,
+                                             load_job.path,
+                                             '\n'.join(load_job.errors)))
+  def _monitor_load_jobs(self):
+    # Waits until current jobs are done and then add remaining jobs one by one.
+    while self._suffixes_to_load_jobs:
+      time.sleep(60)
+      processed_suffixes = self._suffixes_to_load_jobs.keys()
+      for suffix in processed_suffixes:
+        load_job = self._suffixes_to_load_jobs.get(suffix)
+        if load_job.done():
+          del self._suffixes_to_load_jobs[suffix]
+          if load_job.state != 'DONE':
+            self._handle_failed_load_job(suffix, load_job)
+          else:
+            if self._remaining_load_jobs:
+              next_suffix = self._remaining_load_jobs.pop()
+              self._start_one_load_job(next_suffix)
+
+
+def create_output_table(full_table_id, total_base_pairs, schema_file_path):
+  # type: (str, int, str) -> None
+  """Creates an integer range partitioned table using `bq mk table...` command.
+
+  Since beam.io.BigQuerySink is unable to create an integer range partition
+  we use `bq mk table...` to achieve this goal. Note that this command runs on
+  the worker that monitors the Dataflow job.
+
+  Args:
+    full_table_id: for example: projet:dataset.table_base_name__chr1
+    total_base_pairs: the maximum expected value of `start_position` column.
+    schema_file_path: a json file that contains the schema of the table.
+  """
+  (partition_size, total_base_pairs_enlarged) = (
+    bigquery_util.calculate_optimal_partition_size(total_base_pairs))
+  bq_command = _BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
+    TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
+    PARTITION_SIZE=partition_size,
+    FULL_TABLE_ID=full_table_id,
+    SCHEMA_FILE_PATH=schema_file_path)
+  result = os.system(bq_command)
+  if result != 0:
+    raise ValueError(
+      'Failed to create a BigQuery table using "{}" command.'.format(
+        bq_command))
+
+
+def delete_table(full_table_id):
+  bq_command = _BQ_DELETE_TABLE_COMMAND.format(FULL_TABLE_ID=full_table_id)
+  return os.system(bq_command)
+
+
+def delete_gcs_files(root_path):
+  gcs_command = _GCS_DELETE_FILES_COMMAND.format(ROOT_PATH=root_path)
+  return os.system(gcs_command)
