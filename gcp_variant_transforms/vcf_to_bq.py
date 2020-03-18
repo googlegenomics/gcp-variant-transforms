@@ -514,8 +514,8 @@ def run(argv=None):
       suffixes.append(sharding.get_output_table_suffix(i))
       total_base_pairs.append(sharding.get_output_table_total_base_pairs(i))
       if not known_args.append:
-        table_name = sample_info_table_schema_generator.compose_table_name(
-            known_args.output_table, suffixes[i])
+        table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                      suffixes[i])
         bigquery_util.create_output_table(
             table_name, total_base_pairs[i], schema_file)
         logging.info('Integer range partitioned table %s was created.',
@@ -535,8 +535,8 @@ def run(argv=None):
           'https://cloud.google.com/bigquery/table-decorators')
     else:
       for suffix in suffixes:
-        table_name = sample_info_table_schema_generator.compose_table_name(
-            known_args.output_table, suffix)
+        table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                      suffix)
         if bigquery_util.delete_table(table_name) == 0:
           logging.info('Table was successfully deleted: %s', table_name)
         else:

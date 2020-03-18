@@ -329,4 +329,3 @@ def generate_unique_name(job_name):
   return '-'.join([job_name,
                    datetime.now().strftime('%Y%m%d-%H%M%S'),
                    str(uuid.uuid4())])
-

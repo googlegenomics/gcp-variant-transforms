@@ -16,8 +16,9 @@
 
 import enum
 import exceptions
-import re
 import math
+import os
+import re
 import time
 from typing import List, Tuple, Union  # pylint: disable=unused-import
 
@@ -28,7 +29,6 @@ from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
-from gcp_variant_transforms.libs import sample_info_table_schema_generator
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
@@ -47,7 +47,7 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 _BQ_LOAD_JOB_NUM_RETRIES = 5
-_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 5
+_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
 _PARTITIONING_FIELD = 'start_position'
 _CLUSTERING_FIELDS = ['start_position', 'end_position']
 
@@ -162,9 +162,9 @@ def parse_table_reference(input_table):
 
 
 def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
-  # type: (beam_beam_bigquery.BigqueryV2, str, str) -> None
+  # type: (beam_bigquery.BigqueryV2, str, str) -> None
   try:
-    client.datasets.Get(beam_beam_bigquery.BigqueryDatasetsGetRequest(
+    client.datasets.Get(beam_bigquery.BigqueryDatasetsGetRequest(
         projectId=project_id, datasetId=dataset_id))
   except exceptions.HttpError as e:
     if e.status_code == 404:
@@ -176,9 +176,9 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
 
 
 def table_exist(client, project_id, dataset_id, table_id):
-  # type: (beam_beam_bigquery.BigqueryV2, str, str, str) -> bool
+  # type: (beam_bigquery.BigqueryV2, str, str, str) -> bool
   try:
-    client.tables.Get(beam_beam_bigquery.BigqueryTablesGetRequest(
+    client.tables.Get(beam_bigquery.BigqueryTablesGetRequest(
         projectId=project_id,
         datasetId=dataset_id,
         tableId=table_id))
@@ -408,8 +408,7 @@ class LoadAvro(object):
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.AVRO)
     uri = self._avro_root_path + suffix + '-*'
-    table_id = sample_info_table_schema_generator.compose_table_name(
-        self._table_base_name, suffix)
+    table_id = compose_table_name(self._table_base_name, suffix)
     load_job = self._client.load_table_from_uri(
         uri, table_id, job_config=job_config)
     self._suffixes_to_load_jobs.update({suffix: load_job})
@@ -427,8 +426,7 @@ class LoadAvro(object):
     else:
       # Jobs have failed more than _BQ_LOAD_JOB_NUM_RETRIES, cancel all jobs.
       self._cancel_all_running_load_jobs()
-      table_id = sample_info_table_schema_generator.compose_table_name(
-          self._table_base_name, suffix)
+      table_id = compose_table_name(self._table_base_name, suffix)
       raise ValueError(
           'Failed to load AVRO to BigQuery table {} \n state: {} \n '
           'job_id: {} \n errors: {}.'.format(table_id, load_job.state,
@@ -465,17 +463,20 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
     schema_file_path: a json file that contains the schema of the table.
   """
   (partition_size, total_base_pairs_enlarged) = (
-    bigquery_util.calculate_optimal_partition_size(total_base_pairs))
+      calculate_optimal_partition_size(total_base_pairs))
   bq_command = _BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
-    TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
-    PARTITION_SIZE=partition_size,
-    FULL_TABLE_ID=full_table_id,
-    SCHEMA_FILE_PATH=schema_file_path)
+      TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
+      PARTITION_SIZE=partition_size,
+      FULL_TABLE_ID=full_table_id,
+      SCHEMA_FILE_PATH=schema_file_path)
   result = os.system(bq_command)
   if result != 0:
-    raise ValueError(
-      'Failed to create a BigQuery table using "{}" command.'.format(
-        bq_command))
+    time.sleep(30)  # In our integration tests sometime we overwhelm BQ server.
+    result_second_attempt = os.system(bq_command)
+    if result_second_attempt != 0:
+      raise ValueError(
+          'Failed to create a BigQuery table using "{}" command.'.format(
+              bq_command))
 
 
 def delete_table(full_table_id):
