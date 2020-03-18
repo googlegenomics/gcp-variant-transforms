@@ -33,6 +33,9 @@ _MAX_BQ_NUM_PARTITIONS = 4000
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
 
+TABLE_SUFFIX = 'sample_info'
+TABLE_SUFFIX_SEPARATOR = '__'
+
 
 class ColumnKeyConstants(object):
   """Constants for column names in the BigQuery schema."""
@@ -352,3 +355,8 @@ def calculate_optimal_partition_size(total_base_pairs):
       math.pow(10, _PARTITION_SIZE_SIG_DIGITS))
   return (partition_size_round_up,
           partition_size_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
+
+
+def compose_table_name(base_name, suffix):
+  # type: (str, List[str]) -> str
+  return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
