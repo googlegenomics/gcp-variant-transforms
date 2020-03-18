@@ -38,9 +38,7 @@ class VariantToAvroFiles(beam.PTransform):
   def __init__(
       self,
       output_path,  # type: str
-      header_fields,  # type: vcf_header_io.VcfHeader
-      proc_var_factory,  # type: processed_variant.ProcessedVariantFactory
-      variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
+      schema,  # type: bigquery.TableSchema
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       null_numeric_value_replacement=None  # type: int
@@ -50,14 +48,7 @@ class VariantToAvroFiles(beam.PTransform):
 
     Args:
       output_path: The path under which output Avro files are generated.
-      header_fields: Representative header fields for all variants. This is
-        needed for dynamically generating the schema.
-      proc_var_factory: The factory class that knows how to convert Variant
-        instances to ProcessedVariant. As a side effect it also knows how to
-        modify BigQuery schema based on the ProcessedVariants that it generates.
-        The latter functionality is what is needed here.
-      variant_merger: The strategy used for merging variants (if any). Some
-        strategies may change the schema, which is why this may be needed here.
+      schema: Schema of the table to be generated.
       allow_incompatible_records: If true, field values are casted to Bigquery
 +       schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
@@ -68,16 +59,11 @@ class VariantToAvroFiles(beam.PTransform):
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
     """
     self._output_path = output_path
-    self._proc_var_factory = proc_var_factory
-    table_schema = (
-        schema_converter.generate_schema_from_header_fields(
-            header_fields, proc_var_factory, variant_merger))
     self._avro_schema = avro.schema.parse(
-        schema_converter.convert_table_schema_to_json_avro_schema(
-            table_schema))
+        schema_converter.convert_table_schema_to_json_avro_schema(schema))
     self._bigquery_row_generator = (
         bigquery_row_generator.VariantCallRowGenerator(
-            bigquery_schema_descriptor.SchemaDescriptor(table_schema),
+            bigquery_schema_descriptor.SchemaDescriptor(schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),
             null_numeric_value_replacement))

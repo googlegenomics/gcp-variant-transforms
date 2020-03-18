@@ -112,21 +112,6 @@ class VcfReadOptions(VariantTransformsOptions):
     _validate_inputs(parsed_args)
 
 
-class AvroWriteOptions(VariantTransformsOptions):
-  """Options for writing Variant records to Avro files."""
-
-  def add_arguments(self, parser):
-    # type: (argparse.ArgumentParser) -> None
-    parser.add_argument('--output_avro_path',
-                        default='',
-                        help='The output path to write Avro files under.')
-
-  def validate(self, parsed_args):
-    # type: (argparse.Namespace) -> None
-    if not parsed_args.output_table and not parsed_args.output_avro_path:
-      raise ValueError('At least one of --output_table or --output_avro_path '
-                       'options should be provided.')
-
 class BigQueryWriteOptions(VariantTransformsOptions):
   """Options for writing Variant records to BigQuery."""
 
@@ -209,9 +194,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
-    if not parsed_args.output_table and parsed_args.output_avro_path:
-      # Writing into BigQuery is not requested; no more BigQuery checks needed.
-      return
     if parsed_args.update_schema_on_append and not parsed_args.append:
       raise ValueError('--update_schema_on_append requires --append to be '
                        'true.')

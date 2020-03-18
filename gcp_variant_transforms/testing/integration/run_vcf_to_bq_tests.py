@@ -124,7 +124,7 @@ class QueryAssertion(object):
     num_retries = 0
     while True:
       try:
-        iterator = query_job.result(timeout=30)
+        iterator = query_job.result(timeout=300)
       except TimeoutError as e:
         print 'WARNING: Time out waiting for query: {}'.format(self._query)
         if num_retries < _NUM_QUERY_RETIRES:

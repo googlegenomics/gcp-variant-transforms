@@ -68,12 +68,10 @@ from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import shard_variants
 from gcp_variant_transforms.transforms import variant_to_avro
-from gcp_variant_transforms.transforms import variant_to_bigquery
 from gcp_variant_transforms.transforms import write_variants_to_shards
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
-    variant_transform_options.AvroWriteOptions,
     variant_transform_options.BigQueryWriteOptions,
     variant_transform_options.AnnotationOptions,
     variant_transform_options.FilterOptions,
@@ -88,6 +86,7 @@ _MERGE_HEADERS_JOB_NAME = 'merge-vcf-headers'
 _ANNOTATE_FILES_JOB_NAME = 'annotate-files'
 _SHARD_VCF_FILES_JOB_NAME = 'shard-files'
 _BQ_SCHEMA_FILE_SUFFIX = 'schema.json'
+_AVRO_FOLDER = 'avro'
 _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 SampleNameEncoding = vcf_parser.SampleNameEncoding
@@ -403,6 +402,14 @@ def _write_schema_to_temp_file(schema):
   return schema_file
 
 
+def _get_avro_root_path(beam_pipeline_options):
+  google_cloud_options = beam_pipeline_options.view_as(
+      pipeline_options.GoogleCloudOptions)
+  return filesystems.FileSystems.join(google_cloud_options.temp_location,
+                                      _AVRO_FOLDER,
+                                      google_cloud_options.job_name, '')
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -448,7 +455,6 @@ def run(argv=None):
 
   schema = schema_converter.generate_schema_from_header_fields(
       header_fields, processed_variant_factory, variant_merger)
-  schema_file = _write_schema_to_temp_file(schema)
 
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   if sharding.should_keep_shard(sharding.get_residual_index()):
@@ -464,6 +470,8 @@ def run(argv=None):
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  avro_root_path = _get_avro_root_path(beam_pipeline_options)
+
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
   if known_args.allow_malformed_records:
@@ -472,61 +480,78 @@ def run(argv=None):
       shard_variants.ShardVariants(sharding), sharding.get_num_shards())
   variants = []
   for i in range(num_shards):
+    suffix = sharding.get_output_table_suffix(i)
     # Convert tuples to list
     variants.append(sharded_variants[i])
     if variant_merger:
-      variants[i] |= ('MergeVariants' + str(i) >>
+      variants[i] |= ('MergeVariants' + suffix >>
                       merge_variants.MergeVariants(variant_merger))
     variants[i] |= (
-        'ProcessVariants' + str(i) >>
-        beam.Map(processed_variant_factory.create_processed_variant).\
-            with_output_types(processed_variant.ProcessedVariant))
-
-  if known_args.output_table:
-    for i in range(num_shards):
-      table_suffix = sharding.get_output_table_suffix(i)
-      table_name = bigquery_util.compose_table_name(known_args.output_table,
-                                                    table_suffix)
-      if not known_args.append:
-        pipeline_common.create_output_table(
-            table_name,
-            sharding.get_output_table_total_base_pairs(i),
-            schema_file)
-      _ = (variants[i] | 'VariantToBigQuery' + table_suffix >>
-           variant_to_bigquery.VariantToBigQuery(
-               table_name,
-               schema,
-               append=known_args.append,
-               allow_incompatible_records=known_args.allow_incompatible_records,
-               omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-               num_bigquery_write_shards=known_args.num_bigquery_write_shards,
-               null_numeric_value_replacement=(
-                   known_args.null_numeric_value_replacement)))
-
-  if known_args.output_avro_path:
-    # TODO(bashir2): Add an integration test that outputs to Avro files and
-    # also imports to BigQuery. Then import those Avro outputs using the bq
-    # tool and verify that the two tables are identical.
-    for i in range(num_shards):
-      avro_path = bigquery_util.compose_table_name(
-          known_args.output_avro_path, sharding.get_output_table_suffix(i))
-      _ = (
-          variants[i] | 'VariantToAvro' >>
-          variant_to_avro.VariantToAvroFiles(
-              avro_path,
-              header_fields,
-              processed_variant_factory,
-              variant_merger=variant_merger,
-              allow_incompatible_records=known_args.allow_incompatible_records,
-              omit_empty_sample_calls=known_args.omit_empty_sample_calls,
-              null_numeric_value_replacement=(
-                  known_args.null_numeric_value_replacement))
-      )
-
+        'ProcessVariants' + suffix >>
+        beam.Map(processed_variant_factory.create_processed_variant). \
+        with_output_types(processed_variant.ProcessedVariant))
+    _ = (
+        variants[i] | 'VariantToAvro' + suffix >>
+        variant_to_avro.VariantToAvroFiles(
+            avro_root_path + suffix,
+            schema,
+            allow_incompatible_records=known_args.allow_incompatible_records,
+            omit_empty_sample_calls=known_args.omit_empty_sample_calls,
+            null_numeric_value_replacement=(
+                known_args.null_numeric_value_replacement))
+    )
   result = pipeline.run()
   result.wait_until_finish()
-
+  logging.info('Dataflow pipeline finished successfully.')
   metrics_util.log_all_counters(result)
+
+  # After pipeline is done, create output tables and load AVRO files into them.
+  schema_file = _write_schema_to_temp_file(schema)
+  suffixes = []
+  total_base_pairs = []
+  try:
+    for i in range(num_shards):
+      suffixes.append(sharding.get_output_table_suffix(i))
+      total_base_pairs.append(sharding.get_output_table_total_base_pairs(i))
+      if not known_args.append:
+        table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                      suffixes[i])
+        bigquery_util.create_output_table(
+            table_name, total_base_pairs[i], schema_file)
+        logging.info('Integer range partitioned table %s was created.',
+                     table_name)
+    load_avro = bigquery_util.LoadAvro(
+        avro_root_path, known_args.output_table, suffixes, total_base_pairs)
+    load_avro.start_loading()
+  except Exception as e:
+    logging.error('Something unexpected happened during the loading of AVRO '
+                  'files to BigQuery: %s', str(e))
+    logging.warning('Trying to revert as much as possible...')
+    if known_args.append:
+      logging.warning(
+          'Since tables were appended, added rows cannot be reverted. You can '
+          'utilize BigQuery snapshot decorators to recover your table up to 7 '
+          'days ago. For more information please refer to: '
+          'https://cloud.google.com/bigquery/table-decorators')
+    else:
+      for suffix in suffixes:
+        table_name = bigquery_util.compose_table_name(known_args.output_table,
+                                                      suffix)
+        if bigquery_util.delete_table(table_name) == 0:
+          logging.info('Table was successfully deleted: %s', table_name)
+        else:
+          logging.error('Failed to delete table: %s', table_name)
+    logging.info('Since the write to BigQuery stage failed, we did not delete '
+                 'AVRO files in your GCS bucket. You can manually import them '
+                 'to BigQuery. To avoid extra storage charges, delete them if '
+                 'you do not need them, AVRO files are located at: %s',
+                 avro_root_path)
+    raise e
+  else:
+    logging.warning('All AVRO files were successfully loaded to BigQuery.')
+    if bigquery_util.delete_gcs_files(avro_root_path) != 0:
+      logging.error('Deletion of intermediate AVRO files located at "%s" has '
+                    'failed.', avro_root_path)
 
 
 if __name__ == '__main__':
