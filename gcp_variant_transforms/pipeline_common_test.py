@@ -40,8 +40,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
                                                      args.input_file)
-    return pipeline_common.get_pipeline_mode(all_patterns,
-                                             args.optimize_for_large_inputs)
+    return pipeline_common.get_pipeline_mode(all_patterns)
 
   def test_validation_failure_for_invalid_input_pattern(self):
     with self.assertRaisesRegexp(
@@ -50,16 +49,14 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
           input_pattern='nonexistent_file.vcf', input_file=None)
 
   def test_get_mode_optimize_set(self):
-    args = self._create_mock_args(
-        input_pattern='**', input_file=None, optimize_for_large_inputs=True)
+    args = self._create_mock_args(input_pattern='**', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
-    args = self._create_mock_args(
-        input_pattern='*', input_file=None, optimize_for_large_inputs=False)
+    args = self._create_mock_args(input_pattern='*', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
 
@@ -67,8 +64,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.SMALL)
 
   def test_get_mode_medium(self):
-    args = self._create_mock_args(
-        input_pattern='*', input_file=None, optimize_for_large_inputs=False)
+    args = self._create_mock_args(input_pattern='*', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(101))
@@ -80,8 +76,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
   def test_get_mode_large(self):
-    args = self._create_mock_args(
-        input_pattern='test', input_file=None, optimize_for_large_inputs=False)
+    args = self._create_mock_args(input_pattern='test', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
     match = match_result(range(50001))
@@ -178,26 +173,19 @@ class PipelineCommonWithFileTest(unittest.TestCase):
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
                                                      args.input_file)
-    return pipeline_common.get_pipeline_mode(all_patterns,
-                                             args.optimize_for_large_inputs)
+    return pipeline_common.get_pipeline_mode(all_patterns)
 
   def test_get_mode_optimize_set(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(lines=self.SAMPLE_LINES)
-      args = self._create_mock_args(
-          input_pattern=None,
-          input_file=filename,
-          optimize_for_large_inputs=True)
+      args = self._create_mock_args(input_pattern=None, input_file=filename)
 
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small_still_large(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(lines=self.SAMPLE_LINES)
-      args = self._create_mock_args(
-          input_pattern=None,
-          input_file=filename,
-          optimize_for_large_inputs=False)
+      args = self._create_mock_args(input_pattern=None, input_file=filename)
       match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
       match = match_result([None for _ in range(100)])
@@ -207,10 +195,7 @@ class PipelineCommonWithFileTest(unittest.TestCase):
   def test_get_mode_large(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(lines=self.SAMPLE_LINES)
-      args = self._create_mock_args(
-          input_pattern=None,
-          input_file=filename,
-          optimize_for_large_inputs=False)
+      args = self._create_mock_args(input_pattern=None, input_file=filename)
       match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
       match = match_result(range(50001))

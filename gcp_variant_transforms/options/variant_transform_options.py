@@ -73,12 +73,6 @@ class VcfReadOptions(VariantTransformsOptions):
         help=('If true, VCF records incompatible with BigQuery schema will not '
               'raise errors, and instead are casted to the schema.'))
     parser.add_argument(
-        '--optimize_for_large_inputs',
-        type='bool', default=False, nargs='?', const=True,
-        help=('If true, the pipeline runs in optimized way for handling large '
-              'inputs. Set this to true if you are loading more than 50,000 '
-              'files.'))
-    parser.add_argument(
         '--representative_header_file',
         default='',
         help=('If provided, header values from the provided file will be used '

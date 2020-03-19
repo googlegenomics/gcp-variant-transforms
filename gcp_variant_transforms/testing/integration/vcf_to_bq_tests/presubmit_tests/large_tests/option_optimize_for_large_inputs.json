@@ -4,7 +4,6 @@
     "table_name": "option_optimize_for_large_inputs",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/large_tests/valid-70000-copies/**.vcf",
     "variant_merge_strategy": "MOVE_TO_CALLS",
-    "optimize_for_large_inputs": true,
     "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-16",
