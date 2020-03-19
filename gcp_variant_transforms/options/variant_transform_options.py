@@ -123,8 +123,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
     parser.add_argument(
         '--sharding_config_path',
-        default='gcp_variant_transforms/data/sharding_configs/'
-                'homo_sapiens_default.yaml',
+        default=('gcp_variant_transforms/data/sharding_configs/'
+                 'homo_sapiens_default.yaml'),
         help=('File containing list of output tables, their name suffixes, and '
               'approximate number of total base pairs which is used to conduct '
               'BigQuery integer range partitioning. Default value is set to a '
@@ -208,8 +208,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       all_output_tables = []
       all_output_tables.append(
           bigquery_util.compose_table_name(
-              table_id,
-              sample_info_table_schema_generator.TABLE_SUFFIX, is_sample=True))
+              table_id, bigquery_util.TABLE_SUFFIX, is_sample=True))
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()
