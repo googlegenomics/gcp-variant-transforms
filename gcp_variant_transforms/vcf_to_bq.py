@@ -541,9 +541,13 @@ def run(argv=None):
     raise e
   else:
     logging.warning('All AVRO files were successfully loaded to BigQuery.')
-    if bigquery_util.delete_gcs_files(avro_root_path) != 0:
-      logging.error('Deletion of intermediate AVRO files located at "%s" has '
-                    'failed.', avro_root_path)
+    if known_args.keep_intermediate_avro_files:
+      logging.info('Since "--keep_intermediate_avro_files" flag is set, the '
+                   'AVRO files are kept and stored at: %s', avro_root_path)
+    else:
+      if bigquery_util.delete_gcs_files(avro_root_path) != 0:
+        logging.error('Deletion of intermediate AVRO files located at "%s" has '
+                      'failed.', avro_root_path)
 
 
 if __name__ == '__main__':
