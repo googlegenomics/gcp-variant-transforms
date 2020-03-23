@@ -15,7 +15,8 @@ Default settings:
   --disk_size_gb <default 250> \
   --worker_disk_type <default PD> \
   --num_bigquery_write_shards <default 1> \
-  --partition_config_path <default None> \
+  --sharding_config_path <default gcp_variant_transforms/data/
+      sharding_configs/homo_sapiens_default.yaml> \
 ```
 
 ### Important notes
@@ -146,4 +147,3 @@ partition).
 As a result, we recommend setting the partition config for very large data
 where possible. Please see the [documentation](sharding.md) for more
 details.
-

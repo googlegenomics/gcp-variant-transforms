@@ -73,7 +73,7 @@ class SampleInfoToBigQuery(beam.PTransform):
         both sample_name and file_name will be used.
     """
     self._output_table = bigquery_util.compose_table_name(
-        output_table_prefix, bigquery_util.TABLE_SUFFIX)
+        output_table_prefix, bigquery_util.TABLE_SUFFIX, is_sample=True)
     self._append = append
     self._sample_name_encoding = sample_name_encoding
     self._schema = sample_info_table_schema_generator.generate_schema()

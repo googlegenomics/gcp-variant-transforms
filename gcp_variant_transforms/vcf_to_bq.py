@@ -331,12 +331,11 @@ def _merge_headers(known_args, pipeline_args,
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
-    if known_args.generate_sample_info_table:
-      _ = (headers | 'SampleInfoToBigQuery' >>
-           sample_info_to_bigquery.SampleInfoToBigQuery(
-               known_args.output_table,
-               SampleNameEncoding[known_args.sample_name_encoding],
-               known_args.append))
+    _ = (headers | 'SampleInfoToBigQuery' >>
+         sample_info_to_bigquery.SampleInfoToBigQuery(
+             known_args.output_table,
+             SampleNameEncoding[known_args.sample_name_encoding],
+             known_args.append))
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
