@@ -24,6 +24,10 @@ from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import variant_sharding
 
+TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
+SAMPLE_TABLE_SUFFIX = bigquery_util.TABLE_SUFFIX
+SAMPLE_TABLE_SUFFIX_SEPARATOR = bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR
+
 
 class VariantTransformsOptions(object):
   """Base class for defining groups of options for Variant Transforms.
@@ -535,23 +539,6 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
         help=('BigQuery table that will be loaded to VCF. It must be in the '
               'format of (PROJECT:DATASET.TABLE).'))
     parser.add_argument(
-        '--genomic_regions',
-        required=True, default=None, nargs='+',
-        help=('A genomic regions (separated by a space) to load from BigQuery. '
-              'The format of the genomic region should be '
-              'REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if '
-              'the full chromosome is requested. Only variants matching at '
-              'this region will be loaded. The chromosome identifier should be '
-              'identical to the one provided in config file when the tables '
-              'were being created. For example, '
-              '`--genomic_regions chr2:1000-2000` will load all variants '
-              '`chr2` with `start_position` in `[1000,2000)` from BigQuery. '
-              'If the table with suffix `my_chrom3` was imported, '
-              '`--genomic_regions my_chrom3` would return all the variants in '
-              'that shard. This flag must be specified to indicate the table '
-              'shard that needs to be exported to VCF file. NOTE:At the moment '
-              'one and only one genomic region must be supplied.'))
-    parser.add_argument(
         '--number_of_bases_per_shard',
         type=int, default=1000000,
         help=('The maximum number of base pairs per chromosome to include in a '
@@ -568,6 +555,18 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'repeated INFO field will have `Number=.`). It is recommended to '
               'provide this file to specify the most accurate and complete '
               'meta-information in the VCF file.'))
+    parser.add_argument(
+        '--genomic_regions',
+        default=None, nargs='+',
+        help=('A list of genomic regions (separated by a space) to load from '
+              'BigQuery. The format of each genomic region should be '
+              'REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if '
+              'the full chromosome is requested. Only variants matching at '
+              'least one of these regions will be loaded. For example, '
+              '`--genomic_regions chr1 chr2:1000-2000` will load all variants '
+              'in `chr1` and all variants in `chr2` with `start_position` in '
+              '`[1000,2000)` from BigQuery. If this flag is not specified, all '
+              'variants will be loaded.'))
     parser.add_argument(
         '--sample_names',
         default=None, nargs='+',
@@ -592,10 +591,32 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
 
-  def validate(self, parsed_args):
-    if len(parsed_args.genomic_regions) > 1:
+  def validate(self, parsed_args, client=None):
+    if not client:
+      credentials = GoogleCredentials.get_application_default().create_scoped(
+          ['https://www.googleapis.com/auth/bigquery'])
+      client = bigquery.BigqueryV2(credentials=credentials)
+
+    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+        parsed_args.input_table)
+    if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
       raise ValueError(
-          'Exactly one genomic region has to be supplied in this release')
+          'Input table {} is malformed - exactly one suffix separator "{}" is '
+          'required'.format(parsed_args.input_table,
+                            TABLE_SUFFIX_SEPARATOR))
+    base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
+    sample_table_id = (
+        base_table_id + SAMPLE_TABLE_SUFFIX_SEPARATOR + SAMPLE_TABLE_SUFFIX)
+    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
+                                                    dataset_id)
+    if not bigquery_util.table_exist(client, project_id, dataset_id, table_id):
+      raise ValueError('Table {}:{}.{} does not exist.'.format(
+          project_id, dataset_id, table_id))
+
+    if not bigquery_util.table_exist(client, project_id, dataset_id,
+                                     sample_table_id):
+      raise ValueError('Sample table {}:{}.{} does not exist.'.format(
+          project_id, dataset_id, sample_table_id))
 
 
 def _validate_inputs(parsed_args):

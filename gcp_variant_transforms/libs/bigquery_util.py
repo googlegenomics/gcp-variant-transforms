@@ -43,15 +43,6 @@ _RANGE_END_SIG_DIGITS = 4
 _RANGE_INTERVAL_SIG_DIGITS = 1
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
-TABLE_SUFFIX_SEPARATOR = '___'
-SAMPLE_TABLE_SUFFIX_SEPARATOR = '__'
-
-
-def compose_table_name(base_name, suffix, is_sample=False):
-  # type: (str, List[str]) -> str
-  separator = (
-      SAMPLE_TABLE_SUFFIX_SEPARATOR if is_sample else TABLE_SUFFIX_SEPARATOR)
-  return separator.join([base_name, suffix])
 
 START_POSITION_COLUMN = 'start_position'
 _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (

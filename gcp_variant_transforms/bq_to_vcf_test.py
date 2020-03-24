@@ -64,23 +64,21 @@ class BqToVcfTest(unittest.TestCase):
   def test_get_bigquery_query_no_region(self):
     args = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
-        genomic_regions=['chr1'])
+        genomic_regions=None)
     schema = bigquery.TableSchema()
     schema.fields.append(bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='Reference name.'))
-    self.assertEqual(
-        bq_to_vcf._get_bigquery_query(args, schema),
-        'SELECT reference_name FROM '
-        '`my_bucket.my_dataset.my_table___chr1` '
-        'WHERE (start_position>=0 AND end_position<=9223372036854775807)')
+    self.assertEqual(bq_to_vcf._get_bigquery_query(args, schema),
+                     'SELECT reference_name FROM '
+                     '`my_bucket.my_dataset.my_table`')
 
   def test_get_bigquery_query_with_regions(self):
     args_1 = self._create_mock_args(
         input_table='my_bucket:my_dataset.my_table',
-        genomic_regions=['c1:1,000-2,000'])
+        genomic_regions=['c1:1,000-2,000', 'c2'])
     schema = bigquery.TableSchema()
     schema.fields.append(bigquery.TableFieldSchema(
         name=bigquery_util.ColumnKeyConstants.REFERENCE_NAME,
@@ -95,8 +93,10 @@ class BqToVcfTest(unittest.TestCase):
                      'of the string of reference bases.')))
     expected_query = (
         'SELECT reference_name, start_position FROM '
-        '`my_bucket.my_dataset.my_table___c1` WHERE '
-        '(start_position>=1000 AND end_position<=2000)'
+        '`my_bucket.my_dataset.my_table` WHERE '
+        '(reference_name="c1" AND start_position>=1000 AND end_position<=2000) '
+        'OR (reference_name="c2" AND start_position>=0 AND '
+        'end_position<=9223372036854775807)'
     )
     self.assertEqual(bq_to_vcf._get_bigquery_query(args_1, schema),
                      expected_query)

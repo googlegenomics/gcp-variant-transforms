@@ -62,9 +62,14 @@ def has_sample_ids(sample_ids):
 def dict_values_equal(expected_dict):
   """Verifies that dictionary is the same as expected."""
   def _items_equal(actual_dict):
-    if expected_dict != actual_dict[0]:
+    actual = actual_dict[0]
+    for k in expected_dict:
+      if k not in actual or set(expected_dict[k]) != set(actual[k]):
+        raise BeamAssertException(
+            'Failed assert: %s == %s' % (expected_dict, actual))
+    if len(expected_dict) != len(actual):
       raise BeamAssertException(
-          'Failed assert: %s == %s' % (expected_dict, actual_dict))
+          'Failed assert: %s == %s' % (expected_dict, actual))
   return _items_equal
 
 

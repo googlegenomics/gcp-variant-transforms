@@ -127,8 +127,6 @@ class GetSampleIds(beam.PTransform):
     return list(set(hash_table[sample_name]))
 
   def print_row(self, row):
-    print('\nFIND ME')
-    print(row)
     return row
 
   def expand(self, pcoll):
