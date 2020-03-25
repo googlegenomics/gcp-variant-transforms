@@ -9,7 +9,6 @@
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-32",
     "max_num_workers": "200",
-    "num_bigquery_write_shards": "2",
     "assertion_configs": [
       {
         "query": ["NUM_ROWS_QUERY"],

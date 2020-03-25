@@ -158,7 +158,11 @@ def _get_file_names(input_file):
 
 def get_pipeline_mode(all_patterns):
   # type: (List[str], bool) -> int
-  """Returns the mode the pipeline should operate in based on input size."""
+  """Returns the mode the pipeline should operate in based on input size.
+
+  Note: len(all_patterns) == 1: when --input_pattern is given as input argument.
+        len(all_patterns) > 1: when --input_file is given as input argument.
+  """
   if len(all_patterns) > 1:
     return PipelineModes.LARGE
 

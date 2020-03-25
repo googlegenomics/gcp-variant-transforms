@@ -48,13 +48,6 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
       pipeline_common._get_all_patterns(
           input_pattern='nonexistent_file.vcf', input_file=None)
 
-  def test_get_mode_optimize_set(self):
-    args = self._create_mock_args(input_pattern='**', input_file=None)
-    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
-    match = match_result([None for _ in range(100)])
-    with mock.patch.object(FileSystems, 'match', return_value=[match]):
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
-
   def test_get_mode_small(self):
     args = self._create_mock_args(input_pattern='*', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
@@ -174,13 +167,6 @@ class PipelineCommonWithFileTest(unittest.TestCase):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
                                                      args.input_file)
     return pipeline_common.get_pipeline_mode(all_patterns)
-
-  def test_get_mode_optimize_set(self):
-    with temp_dir.TempDir() as tempdir:
-      filename = tempdir.create_temp_file(lines=self.SAMPLE_LINES)
-      args = self._create_mock_args(input_pattern=None, input_file=filename)
-
-      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small_still_large(self):
     with temp_dir.TempDir() as tempdir:
