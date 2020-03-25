@@ -118,12 +118,16 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument('--output_table',
                         default='',
                         help='BigQuery table to store the results.')
-
+    parser.add_argument(
+        '--output_avro_path',
+        default='',
+        help=('This flag is deprecated and will be removed in the next '
+              'release, instead use --keep_intermediate_avro_files flag.'))
     parser.add_argument(
         '--keep_intermediate_avro_files',
         type='bool', default=False, nargs='?', const=True,
-        help=('If set to True, the intermediate AVRO files will be kept. They '	
-              'are stored in your temp directory (set by --temp_location) '	
+        help=('If set to True, the intermediate AVRO files will be kept. They '
+              'are stored in your temp directory (set by --temp_location) '
               'under gs://[YOUR-TEMP-DIRECTORY]/avro/JOB_NAME/'))
     parser.add_argument(
         '--sharding_config_path',
