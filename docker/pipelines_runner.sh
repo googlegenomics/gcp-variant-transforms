@@ -78,17 +78,15 @@ function main {
     exit 1
   fi
 
-  pipelines --project "${google_cloud_project}" run \
-    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project} --region ${region}" \
-    --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
-    --wait \
-    --scopes "https://www.googleapis.com/auth/cloud-platform" \
+  operation_info=$( (`gcloud beta lifesciences pipelines run \
+    --command-line "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project} --region ${region}" \
+    --logging "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
+    --service-account-scopes "https://www.googleapis.com/auth/cloud-platform" \
     --regions "${region}" \
-    --image "${vt_docker_image}" \
+    --docker-image "${vt_docker_image}" \
     --machine-type "g1-small" \
-    --pvm-attempts 0 \
-    --attempts 1 \
-    --disk-size 10
+    --disk-size 10`) 2>&1)
+  operation_id="$(echo ${operation_info} | grep -o -P '(?<=operations/).*(?=])')"
 }
 
 main "$@"
