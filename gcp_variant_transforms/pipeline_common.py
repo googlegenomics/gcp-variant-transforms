@@ -156,10 +156,14 @@ def _get_file_names(input_file):
     return contents
 
 
-def get_pipeline_mode(all_patterns, optimize_for_large_inputs=False):
+def get_pipeline_mode(all_patterns):
   # type: (List[str], bool) -> int
-  """Returns the mode the pipeline should operate in based on input size."""
-  if optimize_for_large_inputs or len(all_patterns) > 1:
+  """Returns the mode the pipeline should operate in based on input size.
+
+  Note: len(all_patterns) == 1: when --input_pattern is given as input argument.
+        len(all_patterns) > 1: when --input_file is given as input argument.
+  """
+  if len(all_patterns) > 1:
     return PipelineModes.LARGE
 
   match_results = filesystems.FileSystems.match(all_patterns)

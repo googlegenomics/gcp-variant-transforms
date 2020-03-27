@@ -75,9 +75,7 @@ class VcfReadOptions(VariantTransformsOptions):
     parser.add_argument(
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,
-        help=('If true, the pipeline runs in optimized way for handling large '
-              'inputs. Set this to true if you are loading more than 50,000 '
-              'files.'))
+        help='This flag is deprecated and will be removed in the next release.')
     parser.add_argument(
         '--representative_header_file',
         default='',
@@ -171,12 +169,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--num_bigquery_write_shards',
         type=int, default=1,
-        help=('Before writing the final result to output BigQuery, the data is '
-              'sharded to avoid a known failure for very large inputs (issue '
-              '#199). Setting this flag to 1 will avoid this extra sharding.'
-              'It is recommended to use 20 for loading large inputs without '
-              'merging. Use a smaller value (2 or 3) if both merging and '
-              'optimize_for_large_inputs are enabled.'))
+        help='This flag is deprecated and will be removed in the next release.')
     parser.add_argument(
         '--null_numeric_value_replacement',
         type=int,
