@@ -189,6 +189,11 @@ class BigQueryWriteOptions(VariantTransformsOptions):
           '--sharding_config_path must point to a valid config file.')
     # Ensuring (not) existence of output tables is aligned with --append value.
     if parsed_args.output_table:
+      if (parsed_args.output_table !=
+          bigquery_util.get_table_base_name(parsed_args.output_table)):
+        raise ValueError(('Output table cannot contain "{}" we reserve this  '
+                          'string to mark sharded output tables.').format(
+                              bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR))
       if not client:
         credentials = GoogleCredentials.get_application_default().create_scoped(
             ['https://www.googleapis.com/auth/bigquery'])
@@ -210,6 +215,10 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         num_shards -= 1
       for i in range(num_shards):
         table_suffix = sharding.get_output_table_suffix(i)
+        if table_suffix != bigquery_util.get_table_base_name(table_suffix):
+          raise ValueError(('Table suffix cannot contain "{}" we reserve this  '
+                            'string to mark sharded output tables.').format(
+                                bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR))
         all_output_tables.append(bigquery_util.compose_table_name(table_id,
                                                                   table_suffix))
 
