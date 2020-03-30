@@ -8,7 +8,7 @@ Status](https://coveralls.io/repos/github/googlegenomics/gcp-variant-transforms/
 
 This is a tool for transforming and processing
 [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) files in a scalable
-manner based on [Apache Beam](https://beam.apache.org/) using 
+manner based on [Apache Beam](https://beam.apache.org/) using
 [Dataflow](https://cloud.google.com/dataflow/) on Google Cloud Platform.
 
 It can be used to directly load VCF files to
@@ -24,6 +24,11 @@ Transforms and BigQuery. Please also read the
 [blog post](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery)
 about how a GCP customer used Variant Transforms for breakthrough clinical
 data science with BigQuery.
+
+By default, the tool assumes that the input VCF is for human genome, and shards
+the output tables accordingly. However, sharding can be customized for any other
+genome. For more information, checkout [Sharding](docs/sharding.md)
+documentation.
 
 ### Prerequisites
 
@@ -67,6 +72,7 @@ Run the script below and replace the following parameters:
 * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
+* `SHARDING_
 
 ```bash
 #!/bin/bash
@@ -187,4 +193,3 @@ details.
 
 * [Development Guide](docs/development_guide.md)
 * [Release process](docs/release.md)
- 

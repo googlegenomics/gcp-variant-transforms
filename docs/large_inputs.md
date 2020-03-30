@@ -120,23 +120,6 @@ Set
 `--worker_disk_type compute.googleapis.com/projects//zones//diskTypes/pd-ssd`
 to use SSDs.
 
-### `--num_bigquery_write_shards`
-
-Currently, the write operation to BigQuery in Dataflow is performed as a
-postprocessing step after the main transforms are done. As a workaround for
-BigQuery write limitations (more details
-[here](https://github.com/googlegenomics/gcp-variant-transforms/issues/199)),
-we have added "sharding" when writing to BigQuery. This makes the data load
-to BigQuery significantly faster as it parallelizes the process and enables
-loading large (>5TB) data to BigQuery at once.
-
-As a result, we recommend setting `--num_bigquery_write_shards 20` when loading
-any data that has more than 1 billion rows (after merging) or 1TB of final
-output. You may use a smaller number of write shards (e.g. 5) when using
-[sharded output](#--sharding_config_path) as each partition also acts as a
-"shard". Note that using a larger value (e.g. 50) can cause BigQuery write to
-fail as there is a maximum limit on the number of concurrent writes per table.
-
 ### `--sharding_config_path`
 
 Sharding the output can save significant query costs once the data is in

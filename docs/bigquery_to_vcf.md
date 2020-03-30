@@ -18,7 +18,10 @@ Run the script below and replace the following parameters:
 * `GOOGLE_CLOUD_PROJECT`: This is your Google Cloud project ID where the job
   should run.
 * `INPUT_TABLE`: BigQuery table that will be loaded to VCF. It must be in the
-  format of GOOGLE_CLOUD_PROJECT:DATASET.TABLE.
+  format of GOOGLE_CLOUD_PROJECT:DATASET.TABLE. TABLE needs to be comprised of
+  two parts, seperated by two underscores - BASE_TABLE, that was used as
+  --output_table flag when table was generated, and SUFFIX that was extracted
+  from the sharding config.
 * `OUTPUT_FILE`: The full path of the output VCF file. This can be a local path
   if you use `DirectRunner` (for very small VCF files) but must be a path in
   Google Cloud Storage if using `DataflowRunner`.
@@ -129,3 +132,16 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --setup_file ./setup.py \
   --runner DataflowRunner
 ```
+
+### Constructed VCF header
+Although  inputted BigQuery table will have sample IDs, it will be crossed with
+Sample Info table to extract actual Sample Names. Sample Info table must be in
+the same dataset as the input table, and have the same base table name, but with
+sample_info suffix. Therefore it is the users' responsibility to either not
+modify table names and their locations, or to restore them back prior to running
+this tool, if any such changes were made.
+
+Note that if ```vcf_to_bq``` tool was run with ```WITH_FILE_PATH``` encoding
+strategy, there will be 1 to many mapping between sample names and sample IDs.
+In those cases, sample names in VCF files will be replaced with
+ORIGINAL_FILE_PATH/SAMPLE_NAME.
