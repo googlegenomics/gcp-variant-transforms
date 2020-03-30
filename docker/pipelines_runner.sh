@@ -85,6 +85,7 @@ function main {
     --scopes "https://www.googleapis.com/auth/cloud-platform" \
     --regions "${region}" \
     --image "${vt_docker_image}" \
+    --machine-type "g1-small" \
     --pvm-attempts 0 \
     --attempts 1 \
     --disk-size 10
