@@ -9,20 +9,60 @@
     "runner": "DirectRunner",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 13}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
       },
       {
-        "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 23031929}
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"num_rows": 1}
       },
       {
-        "query": ["SUM_END_QUERY"],
-        "expected_result": {"sum_end": 23033052}
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_start": 14369}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_end": 14370}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"num_rows": 10}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_start": 23000231}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_end": 23001351}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"num_rows": 1}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_start": 17329}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_end": 17330}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"num_rows": 1}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_start": 0}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_end": 1}
       },
       {
         "query": [
-          "SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}` ",
+          "SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY` ",
           "WHERE 100000 IN UNNEST(AF)"
         ],
         "expected_result": {"num_rows": 1}

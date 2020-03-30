@@ -15,43 +15,43 @@
         "expected_result": {"num_tables": 11}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr01"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01`"],
         "expected_result": {"num_rows": 20206691}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr02"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr02`"],
         "expected_result": {"num_rows": 20712382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr03"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr03`"],
         "expected_result": {"num_rows": 16194801}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr04_05"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr04_05`"],
         "expected_result": {"num_rows": 31051681}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr06_07_08_09"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr06_07_08_09`"],
         "expected_result": {"num_rows": 52523434}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr19_10M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_10M`"],
         "expected_result": {"num_rows": 1241683}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chr19_20M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_20M`"],
         "expected_result": {"num_rows": 1077097}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chrX"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
         "expected_result": {"num_rows": 19388563}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___chrY_M"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY_M`"],
         "expected_result": {"num_rows": 2188382}
       },
       {
-        "query": ["SELECT COUNT(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}___all_remaining"],
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__all_remaining`"],
         "expected_result": {"num_rows": 96701092}
       }
     ]

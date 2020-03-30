@@ -14,20 +14,24 @@
     "num_workers": 2,
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
         "expected_result": {"num_rows": 9953}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_annotation_sets": 45770}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
         "expected_result": {"num_annotation_sets": 45770}
       },
@@ -37,7 +41,7 @@
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
-          "  FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
           "  GROUP BY 1, 2, 3",
           ")"
         ],
@@ -49,7 +53,7 @@
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
-          "  FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
           "  GROUP BY 1, 2, 3",
           ")"
         ],
@@ -58,42 +62,42 @@
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
         "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_symbol": 206}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
         "expected_result": {"num_symbol": 206}
       },
       {
         "query": [
           "SELECT SUM(CSQ.MOTIF_POS) AS sum_motif_pos",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"sum_motif_pos": 485}
       },
       {
         "query": [
           "SELECT ROUND(SUM(CSQ_VT.MAX_AF), 5) AS sum_max_af",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
         "expected_result": {"sum_max_af": 26342.50856}
       }

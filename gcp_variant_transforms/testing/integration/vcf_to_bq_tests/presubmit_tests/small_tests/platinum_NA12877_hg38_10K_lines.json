@@ -8,13 +8,17 @@
     "runner": "DataflowRunner",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
         "expected_result": {"num_rows": 9953}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_annotation_sets": 45770}
       },
@@ -24,7 +28,7 @@
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
-          "  FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
           "  GROUP BY 1, 2, 3",
           ")"
         ],
@@ -33,14 +37,14 @@
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_features": 1575}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
         ],
         "expected_result": {"num_symbol": 206}
       }

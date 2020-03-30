@@ -8,15 +8,19 @@
     "runner": "DirectRunner",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
         "expected_result": {"num_rows": 1}
       },
       {
-        "query": ["SELECT SUM(NS) AS sum FROM `{TABLE_NAME}`"],
+        "query": ["SELECT SUM(NS) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
         "expected_result": {"sum": 3}
       },
       {
-        "query": ["SELECT COUNT(DB) AS cnt FROM `{TABLE_NAME}`"],
+        "query": ["SELECT COUNT(DB) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
         "expected_result": {"cnt": 1}
       }
     ]

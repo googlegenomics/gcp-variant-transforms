@@ -13,15 +13,19 @@
     "num_workers": 2,
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 9889}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"num_rows": 9882}
       },
       {
         "query": [
           "SELECT COUNT(0) AS num_annotation_sets ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_annotation_sets": 8449}
+        "expected_result": {"num_annotation_sets": 8424}
       },
       {
         "query": [
@@ -29,25 +33,62 @@
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
-          "  FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 6815596479}
+        "expected_result": {"hash_sum": 6772961996}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_features": 417}
+        "expected_result": {"num_features": 405}
       },
       {
         "query": [
           "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
-          "FROM `{TABLE_NAME}` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_symbol": 92}
+        "expected_result": {"num_symbol": 89}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"num_rows": 7}
+      },
+      {
+        "query": [
+          "SELECT COUNT(0) AS num_annotation_sets ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_annotation_sets": 25}
+      },
+      {
+        "query": [
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "FROM ( ",
+          "  SELECT start_position, reference_bases, A.alt, ",
+          "         COUNT(0) AS number_of_annotations ",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
+          "  GROUP BY 1, 2, 3",
+          ")"
+        ],
+        "expected_result": {"hash_sum": 42634483}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_features": 12}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_symbol": 3}
       }
     ]
   }

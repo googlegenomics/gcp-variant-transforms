@@ -7,20 +7,36 @@
     "runner": "DirectRunner",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 7}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
       },
       {
-        "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 2546857}
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"num_rows": 2}
       },
       {
-        "query": ["SUM_END_QUERY"],
-        "expected_result": {"sum_end": 2546870}
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_start": 2469132}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_end": 2469140}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"num_rows": 5}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_start": 77725}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_end": 77730}
       },
       {
         "query": [
-          "SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}` ",
+          "SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20` ",
           "WHERE start_position = 14369"
         ],
         "expected_result": {"num_rows": 3}

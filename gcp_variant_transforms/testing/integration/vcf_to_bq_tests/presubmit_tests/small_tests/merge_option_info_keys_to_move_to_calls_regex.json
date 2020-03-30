@@ -9,21 +9,37 @@
     "runner": "DirectRunner",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 4}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
       },
       {
-        "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 1283553}
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"num_rows": 1}
       },
       {
-        "query": ["SUM_END_QUERY"],
-        "expected_result": {"sum_end": 1283560}
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_start": 1234566}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_end": 1234570}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"num_rows": 3}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_start": 48987}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_end": 48990}
       },
       {
         "query": [
           "SELECT call.NS AS NS ",
-          "FROM `{TABLE_NAME}` AS t, t.call as call ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
           "AND call.sample_id = 1461155635506253861"
         ],
@@ -32,7 +48,7 @@
       {
         "query": [
           "SELECT call.NS AS NS ",
-          "FROM `{TABLE_NAME}` AS t, t.call as call ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
           "AND call.sample_id = 8469201776453291698"
         ],
@@ -41,7 +57,7 @@
       {
         "query": [
           "SELECT call.NS AS NS ",
-          "FROM `{TABLE_NAME}` AS t, t.call as call ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
           "AND call.sample_id = 2841064610214975654"
         ],
@@ -50,7 +66,7 @@
       {
         "query": [
           "SELECT call.NS AS NS ",
-          "FROM `{TABLE_NAME}` AS t, t.call as call ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
           "WHERE start_position = 14369 ",
           "AND call.sample_id = 7282355041988662653"
         ],
