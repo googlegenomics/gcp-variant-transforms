@@ -19,7 +19,7 @@ FROM golang:1.11
 
 RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
 
-FROM google/cloud-sdk:276.0.0-slim
+FROM google/cloud-sdk:286.0.0-slim
 
 COPY --from=0 /go/bin/pipelines /usr/bin
 
@@ -44,7 +44,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     make \
     perl \
-    zlib1g-dev
+    zlib1g-dev \
+    python-pip
 
 # Install dependencies.
 RUN python -m pip install --upgrade pip && \
