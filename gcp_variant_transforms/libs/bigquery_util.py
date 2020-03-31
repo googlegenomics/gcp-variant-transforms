@@ -379,6 +379,8 @@ def compose_table_name(base_name, suffix, is_sample=False):
       SAMPLE_TABLE_SUFFIX_SEPARATOR if is_sample else TABLE_SUFFIX_SEPARATOR)
   return separator.join([base_name, suffix])
 
+def get_table_base_name(table_name):
+  return table_name.split(TABLE_SUFFIX_SEPARATOR)[0]
 
 class LoadAvro(object):
   def __init__(self,
