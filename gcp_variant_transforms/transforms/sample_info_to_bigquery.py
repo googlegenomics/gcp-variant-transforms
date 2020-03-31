@@ -43,8 +43,8 @@ class ConvertSampleInfoToRow(beam.DoFn):
     current_minute = self._get_now_to_minute()
     for sample in vcf_header.samples:
       if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
-        sample = hashing_util.make_composite_sample_name(sample,
-                                                         vcf_header.file_path)
+        sample = hashing_util.create_composite_sample_name(sample,
+                                                           vcf_header.file_path)
       sample_id = hashing_util.generate_sample_id(sample)
 
       row = {

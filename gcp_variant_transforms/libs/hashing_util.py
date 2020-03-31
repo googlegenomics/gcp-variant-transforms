@@ -38,14 +38,16 @@ def generate_sample_id(sample_name, file_path=''):
   The hash code generated is in the range [0, pow(2, 63)).
   """
   if file_path:
-    strings = [make_composite_sample_name(sample_name, file_path)]
+    strings = [create_composite_sample_name(sample_name, file_path)]
   else:
     strings = [sample_name]
   return _generate_unsigned_hash_code(strings, max_hash_value=pow(2, 63))
 
-def make_composite_sample_name(sample_name, file_path):
+def create_composite_sample_name(sample_name, file_path):
   # type: (str, str) -> str
+  """Replaces special chr in file_path with _ concatenates sample_name to it."""
   if not sample_name or not file_path:
-    raise ValueError('Both input args are expected to be not empty strings,')
-  simplified_file_path = re.sub(r'\W+', '_', file_path)
+    raise ValueError(
+        'Both sample_name and file_path are expected to be not empty strings.')
+  simplified_file_path = re.sub(r'\W', '_', file_path)
   return '_'.join([simplified_file_path, sample_name])

@@ -46,27 +46,27 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
     current_minute = mocked_obj()
 
     expected_rows = [
-        {sample_info_table_schema_generator.SAMPLE_ID: 5752442450131469410,
+        {sample_info_table_schema_generator.SAMPLE_ID: 7715696391291253656,
          sample_info_table_schema_generator.SAMPLE_NAME: (
-             'gs_bucket1_dir1_file1_vcf_Sample1'),
+             'gs___bucket1_dir1_file1_vcf_Sample1'),
          sample_info_table_schema_generator.FILE_PATH: (
              'gs://bucket1/dir1/file1.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 1388221315142578173,
+        {sample_info_table_schema_generator.SAMPLE_ID: 5682150464643626236,
          sample_info_table_schema_generator.SAMPLE_NAME: (
-             'gs_bucket1_dir1_file1_vcf_Sample2'),
+             'gs___bucket1_dir1_file1_vcf_Sample2'),
          sample_info_table_schema_generator.FILE_PATH: (
              'gs://bucket1/dir1/file1.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 5863016777357401414,
+        {sample_info_table_schema_generator.SAMPLE_ID: 668336000922978678,
          sample_info_table_schema_generator.SAMPLE_NAME: (
-             'gs_bucket1_dir1_file2_vcf_Sample1'),
+             'gs___bucket1_dir1_file2_vcf_Sample1'),
          sample_info_table_schema_generator.FILE_PATH: (
              'gs://bucket1/dir1/file2.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 4022774909923525788,
+        {sample_info_table_schema_generator.SAMPLE_ID: 5498327443813165683,
          sample_info_table_schema_generator.SAMPLE_NAME: (
-             'gs_bucket1_dir1_file2_vcf_Sample2'),
+             'gs___bucket1_dir1_file2_vcf_Sample2'),
          sample_info_table_schema_generator.FILE_PATH: (
              'gs://bucket1/dir1/file2.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
