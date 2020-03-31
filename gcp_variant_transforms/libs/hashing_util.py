@@ -15,6 +15,7 @@
 """Generates hashing code for string."""
 
 import json
+import re
 import sys
 from typing import List  # pylint: disable=unused-import
 
@@ -36,5 +37,15 @@ def generate_sample_id(sample_name, file_path=''):
 
   The hash code generated is in the range [0, pow(2, 63)).
   """
-  strings = [file_path, sample_name] if file_path else [sample_name]
+  if file_path:
+    strings = [make_composite_sample_name(sample_name, file_path)]
+  else:
+    strings = [sample_name]
   return _generate_unsigned_hash_code(strings, max_hash_value=pow(2, 63))
+
+def make_composite_sample_name(sample_name, file_path):
+  # type: (str, str) -> str
+  if not sample_name or not file_path:
+    raise ValueError('Both input args are expected to be not empty strings,')
+  simplified_file_path = re.sub(r'\W+', '_', file_path)
+  return '_'.join([simplified_file_path, sample_name])

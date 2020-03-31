@@ -42,11 +42,10 @@ class ConvertSampleInfoToRow(beam.DoFn):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
     current_minute = self._get_now_to_minute()
     for sample in vcf_header.samples:
-      if self._sample_name_encoding == SampleNameEncoding.WITHOUT_FILE_PATH:
-        sample_id = hashing_util.generate_sample_id(sample)
-      else:
-        sample_id = hashing_util.generate_sample_id(
-            sample, vcf_header.file_path)
+      if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
+        sample = hashing_util.make_composite_sample_name(sample,
+                                                         vcf_header.file_path)
+      sample_id = hashing_util.generate_sample_id(sample)
 
       row = {
           sample_info_table_schema_generator.SAMPLE_ID: sample_id,
