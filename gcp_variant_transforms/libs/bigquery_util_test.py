@@ -460,6 +460,28 @@ class BigqueryUtilTest(unittest.TestCase):
                       bigquery_util.raise_error_if_dataset_not_exists,
                       client, 'project', 'dataset')
 
+  def test_get_table_base_name(self):
+    without_suffix1 = 'project_id.dataset_id.table_id'
+    without_suffix2 = 'project_id:dataset_id.table_id'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(without_suffix1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(without_suffix2))
+
+    with_suffix1 = without_suffix1 + '___chr1'
+    with_suffix2 = without_suffix2 + '___chr1'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(with_suffix1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(with_suffix2))
+
+    with_two_suffixes1 = with_suffix1 + '___extra_suffix'
+    with_two_suffixes2 = with_suffix2 + '___extra_suffix'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(with_two_suffixes1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(with_two_suffixes2))
+
   def test_calculate_optimal_partition_size(self):
     total_base_pairs_to_expected_partition_size = {
         39980000: 10000,
