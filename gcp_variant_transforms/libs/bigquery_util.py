@@ -14,6 +14,7 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
+from concurrent.futures import TimeoutError
 import enum
 import exceptions
 import logging
@@ -45,7 +46,6 @@ _RANGE_INTERVAL_SIG_DIGITS = 1
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
 
-START_POSITION_COLUMN = 'start_position'
 _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
     'bq mk --table --range_partitioning='
     '{PARTITION_COLUMN},0,{RANGE_END},{RANGE_INTERVAL} '
@@ -54,10 +54,26 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
 _BQ_CREATE_SAMPLE_INFO_TABLE_COMMAND = (
     'bq mk --table {FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
+_BQ_EXTRACT_SCHEMA_COMMAND = (
+    'bq show --schema --format=prettyjson {FULL_TABLE_ID} > {SCHEMA_FILE_PATH}')
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 _BQ_NUM_RETRIES = 5
 _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
 
+_GET_COLUMN_NAMES_QUERY = (
+    'SELECT column_name '
+    'FROM `{PROJECT_ID}`.{DATASET_ID}.INFORMATION_SCHEMA.COLUMNS '
+    'WHERE table_name = "{TABLE_ID}"')
+_GET_CALL_SUB_FIELDS_QUERY = (
+    'SELECT field_path '
+    'FROM `{PROJECT_ID}`.{DATASET_ID}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS '
+    'WHERE table_name = "{TABLE_ID}" AND column_name="{CALL_COLUMN}"')
+_MAIN_TABLE_ALIAS = 'main_table'
+_CALL_TABLE_ALIAS = 'call_table'
+_FLATTEN_CALL_QUERY = (
+    'SELECT {SELECT_COLUMNS} '
+    'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` as {MAIN_TABLE_ALIAS}, '
+    'UNNEST({CALL_COLUMN}) as {CALL_TABLE_ALIAS}')
 
 class ColumnKeyConstants(object):
   """Constants for column names in the BigQuery schema."""
@@ -74,6 +90,9 @@ class ColumnKeyConstants(object):
   CALLS_SAMPLE_ID = 'sample_id'
   CALLS_GENOTYPE = 'genotype'
   CALLS_PHASESET = 'phaseset'
+
+CALL_SAMPLE_ID_COLUMN = (ColumnKeyConstants.CALLS + '_' +
+                         ColumnKeyConstants.CALLS_SAMPLE_ID)
 
 
 class TableFieldConstants(object):
@@ -507,6 +526,156 @@ def create_sample_info_table(output_table_id):
                                        SAMPLE_INFO_TABLE_SUFFIX),
       SCHEMA_FILE_PATH=SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH)
   _run_table_creation_command(bq_command)
+
+class FlattenCallColumn(object):
+  def __init__(self, base_table_id, suffixes):
+    (self._project_id,
+     self._dataset_id,
+     self._base_table) = parse_table_reference(base_table_id)
+    assert suffixes
+    self._suffixes = suffixes[:]
+
+    # We can use any of the input tables as source of schema, we use index 0
+    self._schema_table_id = compose_table_name(self._base_table,
+                                               suffixes[0])
+    self._column_names = []
+    self._sub_fields = []
+    self._client = bigquery.Client(project=self._project_id)
+
+  def _run_query(self, query):
+    query_job = self._client.query(query)
+    num_retries = 0
+    while True:
+      try:
+        iterator = query_job.result(timeout=300)
+      except TimeoutError as e:
+        logging.warning('Time out waiting for query: %s', query)
+        if num_retries < _BQ_NUM_RETRIES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          raise e
+      else:
+        break
+    result = []
+    for i in iterator:
+      result.append(str(i.values()[0]))
+    return result
+
+  def _get_column_names(self):
+    if not self._column_names:
+      query = _GET_COLUMN_NAMES_QUERY.format(PROJECT_ID=self._project_id,
+                                             DATASET_ID=self._dataset_id,
+                                             TABLE_ID=self._schema_table_id)
+      self._column_names = self._run_query(query)[:]
+      assert self._column_names
+    return self._column_names
+
+  def _get_call_sub_fields(self):
+    if not self._sub_fields:
+      query = _GET_CALL_SUB_FIELDS_QUERY.format(
+          PROJECT_ID=self._project_id, DATASET_ID=self._dataset_id,
+          TABLE_ID=self._schema_table_id, CALL_COLUMN=ColumnKeyConstants.CALLS)
+      # returned list is [call, call.name, call.genotype, call.phaseset, ...]
+      result = self._run_query(query)[1:]  # Drop the first element
+      self._sub_fields = [sub_field.split('.')[1] for sub_field in result]
+      assert self._sub_fields
+    return self._sub_fields
+
+  def _get_flatten_column_names(self):
+    column_names = self._get_column_names()
+    sub_fields = self._get_call_sub_fields()
+    select_list = []
+    for column in column_names:
+      if column != ColumnKeyConstants.CALLS:
+        select_list.append(_MAIN_TABLE_ALIAS + '.' + column + ' AS `'+
+                           column + '`')
+      else:
+        for s_f in sub_fields:
+          select_list.append(_CALL_TABLE_ALIAS + '.' + s_f + ' AS `' +
+                             ColumnKeyConstants.CALLS + '_' + s_f + '`')
+    return ', '.join(select_list)
+
+  def _copy_to_flatten_table(self, output_table_id, cp_query):
+    job_config = bigquery.QueryJobConfig(destination=output_table_id)
+    query_job = self._client.query(cp_query, job_config=job_config)
+    num_retries = 0
+    while True:
+      try:
+        _ = query_job.result(timeout=600)
+      except TimeoutError as e:
+        logging.warning('Time out waiting for query: %s', cp_query)
+        if num_retries < _BQ_NUM_RETRIES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          logging.error('Copy to table query failed: %s', output_table_id)
+          raise e
+      else:
+        break
+    logging.info('Copy to table query was successful: %s', output_table_id)
+
+  def _create_temp_flatten_table(self):
+    temp_suffix = time.strftime('%Y%m%d_%H%M%S')
+    temp_table_id = '{}{}'.format(self._schema_table_id, temp_suffix)
+    full_output_table_id = '{}.{}.{}'.format(
+        self._project_id, self._dataset_id, temp_table_id)
+
+    select_columns = self._get_flatten_column_names()
+    cp_query = _FLATTEN_CALL_QUERY.format(SELECT_COLUMNS=select_columns,
+                                          PROJECT_ID=self._project_id,
+                                          DATASET_ID=self._dataset_id,
+                                          TABLE_ID=self._schema_table_id,
+                                          MAIN_TABLE_ALIAS=_MAIN_TABLE_ALIAS,
+                                          CALL_COLUMN=ColumnKeyConstants.CALLS,
+                                          CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS)
+    cp_query += ' LIMIT 1'  # We need this table only to extract its schema.
+    self._copy_to_flatten_table(full_output_table_id, cp_query)
+    logging.info('A new table with 1 row was crated: %s', full_output_table_id)
+    logging.info('This table is used to extract the schema of flatten table.')
+    return temp_table_id
+
+  def get_flatten_table_schema(self, schema_file_path):
+    temp_table_id = self._create_temp_flatten_table()
+    full_table_id = '{}:{}.{}'.format(
+        self._project_id, self._dataset_id, temp_table_id)
+    bq_command = _BQ_EXTRACT_SCHEMA_COMMAND.format(
+        FULL_TABLE_ID=full_table_id,
+        SCHEMA_FILE_PATH=schema_file_path)
+    result = os.system(bq_command)
+    if result != 0:
+      logging.error('Failed to extract flatten table schema using "%s" command',
+                    bq_command)
+    else:
+      logging.info('Successfully extracted the schema of flatten table.')
+    if _delete_table(full_table_id) == 0:
+      logging.info('Successfully deleted temporary table: %s', full_table_id)
+    else:
+      logging.error('Was not able to delete temporary table: %s', full_table_id)
+    return result
+
+  def copy_to_flatten_table(self, output_base_table_id):
+    # Here we assume all output_table_base + suffices[:] are already created.
+    (output_project_id,
+     output_dataset_id,
+     output_base_table) = parse_table_reference(output_base_table_id)
+    select_columns = self._get_flatten_column_names()
+    for suffix in self._suffixes:
+      input_table_id = compose_table_name(self._base_table, suffix)
+      output_table_id = compose_table_name(output_base_table, suffix)
+
+      full_output_table_id = '{}.{}.{}'.format(
+          output_project_id, output_dataset_id, output_table_id)
+      cp_query = _FLATTEN_CALL_QUERY.format(
+          SELECT_COLUMNS=select_columns, PROJECT_ID=self._project_id,
+          DATASET_ID=self._dataset_id, TABLE_ID=input_table_id,
+          MAIN_TABLE_ALIAS=_MAIN_TABLE_ALIAS,
+          CALL_COLUMN=ColumnKeyConstants.CALLS,
+          CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS)
+
+      self._copy_to_flatten_table(full_output_table_id, cp_query)
+      logging.info('Flatten table is fully loaded: %s', full_output_table_id)
+
 
 def create_output_table(full_table_id,  # type: str
                         partition_column,  # type: str

@@ -516,3 +516,48 @@ class BigqueryUtilTest(unittest.TestCase):
           bigquery_util.calculate_optimal_range_interval(large_range_end))
       self.assertEqual(expected_interval, range_interval)
       self.assertEqual(expected_end, range_end_enlarged)
+
+
+class FlattenCallColumnTest(unittest.TestCase):
+  """Test cases for class `FlattenCallColumn`."""
+
+  def setUp(self):
+    input_base_table = ('gcp-variant-transforms-test:'
+                        'bq_to_vcf_integration_tests.'
+                        'merge_option_move_to_calls')
+    self._flatter = bigquery_util.FlattenCallColumn(input_base_table, ['chr20'])
+
+  def test_get_column_names(self):
+    expected_column_names = ['reference_name', 'start_position', 'end_position',
+                             'reference_bases', 'alternate_bases', 'names',
+                             'quality', 'filter', 'call', 'NS', 'DP', 'AA',
+                             'DB', 'H2']
+    self.assertEqual(expected_column_names, self._flatter._get_column_names())
+
+  def test_get_call_sub_fields(self):
+    expected_sub_fields = \
+      ['sample_id', 'genotype', 'phaseset', 'DP', 'GQ', 'HQ']
+    self.assertEqual(expected_sub_fields, self._flatter._get_call_sub_fields())
+
+  def test_get_flatten_column_names(self):
+    expected_select = (
+        'main_table.reference_name AS `reference_name`, '
+        'main_table.start_position AS `start_position`, '
+        'main_table.end_position AS `end_position`, '
+        'main_table.reference_bases AS `reference_bases`, '
+        'main_table.alternate_bases AS `alternate_bases`, '
+        'main_table.names AS `names`, '
+        'main_table.quality AS `quality`, '
+        'main_table.filter AS `filter`, '
+        'call_table.sample_id AS `call_sample_id`, '
+        'call_table.genotype AS `call_genotype`, '
+        'call_table.phaseset AS `call_phaseset`, '
+        'call_table.DP AS `call_DP`, '
+        'call_table.GQ AS `call_GQ`, '
+        'call_table.HQ AS `call_HQ`, '
+        'main_table.NS AS `NS`, '
+        'main_table.DP AS `DP`, '
+        'main_table.AA AS `AA`, '
+        'main_table.DB AS `DB`, '
+        'main_table.H2 AS `H2`')
+    self.assertEqual(expected_select, self._flatter._get_flatten_column_names())
