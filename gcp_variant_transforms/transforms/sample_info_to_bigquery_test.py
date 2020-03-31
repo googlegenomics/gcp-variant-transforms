@@ -39,28 +39,36 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
               'ConvertSampleInfoToRow._get_now_to_minute',
               side_effect=mocked_get_now)
   def test_convert_sample_info_to_row(self, mocked_obj):
-    vcf_header_1 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
-                                           file_path='file_1')
-    vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
-                                           file_path='file_2')
+    vcf_header_1 = vcf_header_io.VcfHeader(
+        samples=SAMPLE_LINE, file_path='gs://bucket1/dir1/file1.vcf')
+    vcf_header_2 = vcf_header_io.VcfHeader(
+        samples=SAMPLE_LINE, file_path='gs://bucket1/dir1/file2.vcf')
     current_minute = mocked_obj()
 
     expected_rows = [
-        {sample_info_table_schema_generator.SAMPLE_ID: 1603149767211015963,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 7715696391291253656,
+         sample_info_table_schema_generator.SAMPLE_NAME: (
+             'gs___bucket1_dir1_file1_vcf_Sample1'),
+         sample_info_table_schema_generator.FILE_PATH: (
+             'gs://bucket1/dir1/file1.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 7039455832764509387,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_1',
+        {sample_info_table_schema_generator.SAMPLE_ID: 5682150464643626236,
+         sample_info_table_schema_generator.SAMPLE_NAME: (
+             'gs___bucket1_dir1_file1_vcf_Sample2'),
+         sample_info_table_schema_generator.FILE_PATH: (
+             'gs://bucket1/dir1/file1.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 4840534050208649594,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample1',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 668336000922978678,
+         sample_info_table_schema_generator.SAMPLE_NAME: (
+             'gs___bucket1_dir1_file2_vcf_Sample1'),
+         sample_info_table_schema_generator.FILE_PATH: (
+             'gs://bucket1/dir1/file2.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
-        {sample_info_table_schema_generator.SAMPLE_ID: 7113221774487715893,
-         sample_info_table_schema_generator.SAMPLE_NAME: 'Sample2',
-         sample_info_table_schema_generator.FILE_PATH: 'file_2',
+        {sample_info_table_schema_generator.SAMPLE_ID: 5498327443813165683,
+         sample_info_table_schema_generator.SAMPLE_NAME: (
+             'gs___bucket1_dir1_file2_vcf_Sample2'),
+         sample_info_table_schema_generator.FILE_PATH: (
+             'gs://bucket1/dir1/file2.vcf'),
          sample_info_table_schema_generator.INGESTION_DATETIME: current_minute},
     ]
     pipeline = test_pipeline.TestPipeline()
