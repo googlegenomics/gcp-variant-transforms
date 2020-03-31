@@ -193,7 +193,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
           bigquery_util.get_table_base_name(parsed_args.output_table)):
         raise ValueError(('Output table cannot contain "{}" we reserve this  '
                           'string to mark sharded output tables.').format(
-                              bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR))
+                              bigquery_util.TABLE_SUFFIX_SEPARATOR))
       if not client:
         credentials = GoogleCredentials.get_application_default().create_scoped(
             ['https://www.googleapis.com/auth/bigquery'])
@@ -218,7 +218,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         if table_suffix != bigquery_util.get_table_base_name(table_suffix):
           raise ValueError(('Table suffix cannot contain "{}" we reserve this  '
                             'string to mark sharded output tables.').format(
-                                bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR))
+                                bigquery_util.TABLE_SUFFIX_SEPARATOR))
         all_output_tables.append(bigquery_util.compose_table_name(table_id,
                                                                   table_suffix))
 
