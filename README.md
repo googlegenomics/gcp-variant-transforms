@@ -25,9 +25,9 @@ Transforms and BigQuery. Please also read the
 about how a GCP customer used Variant Transforms for breakthrough clinical
 data science with BigQuery.
 
-By default, the tool assumes that the input VCF is for human genome, and shards
-the output tables accordingly. However, sharding can be customized for any other
-genome. For more information, checkout [Sharding](docs/sharding.md)
+By default, Variant Transforms assumes that the input VCF files contain human samples and thus generate
+output tables that are highly optimized for human genome. Sharding config can be customized for any other
+organism to optimized output tables based on its genome's properties. For more information, checkout [Sharding](docs/sharding.md)
 documentation.
 
 ### Prerequisites
