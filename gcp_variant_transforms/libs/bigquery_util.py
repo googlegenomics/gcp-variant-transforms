@@ -32,7 +32,7 @@ from gcp_variant_transforms.beam_io import vcfio
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
-TABLE_SUFFIX = 'sample_info'
+SAMPLE_INFO_TABLE_SUFFIX = 'sample_info'
 TABLE_SUFFIX_SEPARATOR = '__'
 
 _MAX_BQ_NUM_PARTITIONS = 4000
@@ -372,7 +372,7 @@ def calculate_optimal_partition_size(total_base_pairs):
           partition_size_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
 
 
-def compose_table_name(base_name, suffix, is_sample=False):
+def compose_table_name(base_name, suffix):
   # type: (str, List[str]) -> str
   return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
 
