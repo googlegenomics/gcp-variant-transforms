@@ -373,7 +373,7 @@ def calculate_optimal_partition_size(total_base_pairs):
 
 
 def compose_table_name(base_name, suffix):
-  # type: (str, List[str]) -> str
+  # type: (str, str) -> str
   return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
 
 def get_table_base_name(table_name):
