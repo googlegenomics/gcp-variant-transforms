@@ -161,23 +161,15 @@ class QueryFormatter(object):
   """
 
   class _QueryMacros(enum.Enum):
-    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM `{TABLE_NAME}`'
-    SUM_START_QUERY = (
-        'SELECT SUM(start_position) AS sum_start FROM `{TABLE_NAME}`')
-    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM `{TABLE_NAME}`'
     NUM_OUTPUT_TABLES = (
         'SELECT COUNT(0) AS num_tables FROM `{DATASET_ID}.__TABLES_SUMMARY__`'
-        ' WHERE STARTS_WITH(table_id, "{TABLE_ID}")')
+        ' WHERE STARTS_WITH(table_id, "{TABLE_ID}' +
+        bigquery_util.TABLE_SUFFIX_SEPARATOR + '")')
 
   def __init__(self, dataset_id, table_id):
     # type: (str, str) -> None
     self._dataset_id = dataset_id
-    # Due to sharding of output table there will be multiple output tables with
-    # different suffixes, such as: "___chr1", "___chr2", ...and "___residual".
-    # That's why we use the given table_name as table_suffix.
     self._table_id = table_id
-    self._dataset_table_wildcard = '{}.{}{}*'.format(
-        self._dataset_id, self._table_id, bigquery_util.TABLE_SUFFIX_SEPARATOR)
 
   def format_query(self, query):
     # type: (List[str]) -> str
@@ -191,8 +183,7 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    return query.format(TABLE_NAME=self._dataset_table_wildcard,
-                        TABLE_ID=self._table_id,
+    return query.format(TABLE_ID=self._table_id,
                         DATASET_ID=self._dataset_id)
 
   def _replace_macros(self, query):

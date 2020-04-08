@@ -3,23 +3,315 @@
     "test_name": "platinum-no-merge",
     "table_name": "platinum_no_merge",
     "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
-    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_homo_sapiens.yaml",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
     "worker_machine_type": "n1-standard-64",
     "max_num_workers": "20",
     "num_workers": "20",
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 309551691}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
       },
       {
-        "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 24107891293483855}
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"num_rows": 24022171}
       },
       {
-        "query": ["SUM_END_QUERY"],
-        "expected_result": {"sum_end": 24107908471506508}
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"sum_start": 2932144978501378}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"sum_end": 2932146330971299}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"num_rows": 24434660}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"sum_start": 2953428836386527}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"sum_end": 2953430266410272}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"num_rows": 19143450}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"sum_start": 1892873634919601}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"sum_end": 1892874804363736}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr4`"],
+        "expected_result": {"num_rows": 19209936}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr4`"],
+        "expected_result": {"sum_start": 1841968188711083}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr4`"],
+        "expected_result": {"sum_end": 1841969315394982}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr5`"],
+        "expected_result": {"num_rows": 17642205}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr5`"],
+        "expected_result": {"sum_start": 1597274948817229}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr5`"],
+        "expected_result": {"sum_end": 1597276015583800}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr6`"],
+        "expected_result": {"num_rows": 16867498}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr6`"],
+        "expected_result": {"sum_start": 1421397355606423}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr6`"],
+        "expected_result": {"sum_end": 1421398360589305}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr7`"],
+        "expected_result": {"num_rows": 17124514}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr7`"],
+        "expected_result": {"sum_start": 1359514057761287}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr7`"],
+        "expected_result": {"sum_end": 1359514990439580}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr8`"],
+        "expected_result": {"num_rows": 14556963}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr8`"],
+        "expected_result": {"sum_start": 1032634829003931}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr8`"],
+        "expected_result": {"sum_end": 1032635686815938}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr9`"],
+        "expected_result": {"num_rows": 13889548}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr9`"],
+        "expected_result": {"sum_start": 1007539979687173}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr9`"],
+        "expected_result": {"sum_end": 1007540700941970}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr10`"],
+        "expected_result": {"num_rows": 14208669}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr10`"],
+        "expected_result": {"sum_start": 958607933838983}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr10`"],
+        "expected_result": {"sum_end": 958608722216117}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr11`"],
+        "expected_result": {"num_rows": 13632757}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr11`"],
+        "expected_result": {"sum_start": 901295017847295}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr11`"],
+        "expected_result": {"sum_end": 901295805105300}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr12`"],
+        "expected_result": {"num_rows": 13503814}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr12`"],
+        "expected_result": {"sum_start": 918068454957782}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr12`"],
+        "expected_result": {"sum_end": 918069238328170}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr13`"],
+        "expected_result": {"num_rows": 9714633}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr13`"],
+        "expected_result": {"sum_start": 647422630754924}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr13`"],
+        "expected_result": {"sum_end": 647423204681002}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr14`"],
+        "expected_result": {"num_rows": 9294836}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr14`"],
+        "expected_result": {"sum_start": 588412743854822}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr14`"],
+        "expected_result": {"sum_end": 588413273907667}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr15`"],
+        "expected_result": {"num_rows": 9173043}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr15`"],
+        "expected_result": {"sum_start": 541829234130845}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr15`"],
+        "expected_result": {"sum_end": 541829724591175}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr16`"],
+        "expected_result": {"num_rows": 9800447}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr16`"],
+        "expected_result": {"sum_start": 429774335689098}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr16`"],
+        "expected_result": {"sum_end": 429774809278642}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr17`"],
+        "expected_result": {"num_rows": 9239133}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr17`"],
+        "expected_result": {"sum_start": 373432824087028}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr17`"],
+        "expected_result": {"sum_end": 373433291154629}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr18`"],
+        "expected_result": {"num_rows": 7645658}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr18`"],
+        "expected_result": {"sum_start": 303920556751369}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr18`"],
+        "expected_result": {"sum_end": 303921004983554}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"num_rows": 7525786}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_start": 218251555761880}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"sum_end": 218251890860792}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"num_rows": 6484588}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_start": 210431731222379}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"sum_end": 210432088462360}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr21`"],
+        "expected_result": {"num_rows": 4254315}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr21`"],
+        "expected_result": {"sum_start": 121745479055777}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr21`"],
+        "expected_result": {"sum_end": 121745689855617}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr22`"],
+        "expected_result": {"num_rows": 4619467}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr22`"],
+        "expected_result": {"sum_start": 150368399751189}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr22`"],
+        "expected_result": {"sum_end": 150368609251912}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
+        "expected_result": {"num_rows": 21003859}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
+        "expected_result": {"sum_start": 1668790306406867}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
+        "expected_result": {"sum_end": 1668791213303813}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"num_rows": 2558515}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_start": 36763270262322}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_end": 36763424198777}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"num_rows": 1226}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_start": 9716663}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_end": 9816099}
       }
     ]
   }
