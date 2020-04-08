@@ -13,6 +13,10 @@
     "num_workers": 2,
     "assertion_configs": [
       {
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
         "expected_result": {"num_rows": 2337}
       },

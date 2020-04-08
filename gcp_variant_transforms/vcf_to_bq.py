@@ -303,8 +303,6 @@ def _merge_headers(known_args, pipeline_args,
                    pipeline_mode, annotated_vcf_pattern=None):
   # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
-  if known_args.representative_header_file:
-    return
   options = pipeline_options.PipelineOptions(pipeline_args)
 
   # Always run pipeline locally if data is small.
@@ -330,11 +328,14 @@ def _merge_headers(known_args, pipeline_args,
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
-    _ = (headers | 'SampleInfoToBigQuery' >>
-         sample_info_to_bigquery.SampleInfoToBigQuery(
+    _ = (headers
+         | 'SampleInfoToBigQuery'
+         >> sample_info_to_bigquery.SampleInfoToBigQuery(
              known_args.output_table,
              SampleNameEncoding[known_args.sample_name_encoding],
              known_args.append))
+    if known_args.representative_header_file:
+      return
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -407,7 +408,6 @@ def _get_avro_root_path(beam_pipeline_options):
                                       datetime.now().strftime('%Y%m%d_%H%M%S'),
                                       '')
 
-
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
@@ -438,6 +438,8 @@ def run(argv=None):
   # See https://issues.apache.org/jira/browse/BEAM-2801.
   header_fields = vcf_header_parser.get_vcf_headers(
       known_args.representative_header_file)
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+
   counter_factory = metrics_util.CounterFactory()
   processed_variant_factory = processed_variant.ProcessedVariantFactory(
       header_fields,
@@ -464,8 +466,6 @@ def run(argv=None):
       table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                     table_suffix)
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
-
-  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   avro_root_path = _get_avro_root_path(beam_pipeline_options)
 
   pipeline = beam.Pipeline(options=beam_pipeline_options)
