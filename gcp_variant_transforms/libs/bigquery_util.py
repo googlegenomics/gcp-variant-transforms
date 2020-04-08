@@ -16,6 +16,7 @@
 
 import enum
 import exceptions
+import logging
 import math
 import os
 import re
@@ -481,9 +482,36 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
               bq_command))
 
 
-def delete_table(full_table_id):
+def _delete_table(full_table_id):
   bq_command = _BQ_DELETE_TABLE_COMMAND.format(FULL_TABLE_ID=full_table_id)
   return os.system(bq_command)
+
+
+def rollback_newly_created_tables(append, base_table_name, suffixes=None):
+  # Add sample_info table to the list of tables that need to be deleted.
+  if suffixes:
+    suffixes.append(SAMPLE_INFO_TABLE_SUFFIX)
+  else:
+    suffixes = [SAMPLE_INFO_TABLE_SUFFIX]
+
+  if append:
+    logging.warning(
+        'Since tables were appended, added rows cannot be reverted. You can '
+        'utilize BigQuery snapshot decorators to recover your table up to 7 '
+        'days ago. For more information please refer to: '
+        'https://cloud.google.com/bigquery/table-decorators '
+        'Here is the list of tables that you need to manually rollback:')
+    for suffix in suffixes:
+      table_name = compose_table_name(base_table_name, suffix)
+      logging.warning(table_name)
+  else:
+    logging.info('Trying to revert as much as possible...')
+    for suffix in suffixes:
+      table_name = compose_table_name(base_table_name, suffix)
+      if _delete_table(table_name) == 0:
+        logging.info('Table was successfully deleted: %s', table_name)
+      else:
+        logging.error('Failed to delete table: %s', table_name)
 
 
 def delete_gcs_files(root_path):
