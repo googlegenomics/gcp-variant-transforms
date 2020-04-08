@@ -15,6 +15,7 @@
 """Tests for pipeline_common script."""
 
 import collections
+import sys
 import unittest
 
 from apache_beam.io import filesystem
@@ -150,6 +151,26 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
         self.assertEqual(
             pipeline_common._get_splittable_bgzf(['no index file']),
             [])
+
+  def test_extract_supplied_args_from_sys(self):
+    sysargs = ['vcf_to_bq', '--input_file', 'file', '--output_table=output',
+               '--append', '--infer_headers', 'True']
+    known_args = []
+
+    with mock.patch.object(sys, 'argv', sysargs):
+      self.assertItemsEqual(
+          pipeline_common.extract_supplied_args(known_args),
+          ['input_file', 'output_table', 'append', 'infer_headers'])
+
+  def test_extract_supplied_args_from_supplied(self):
+    sysargs = ['vcf_to_bq', '--input_file']
+    known_args = ['vcf_to_bq', '--input_file', 'file', '--output_table=output',
+                  '--append', '--infer_undefined_headers', 'True']
+
+    with mock.patch.object(sys, 'argv', sysargs):
+      self.assertItemsEqual(
+          pipeline_common.extract_supplied_args(known_args),
+          ['input_file', 'output_table', 'append', 'infer_headers'])
 
 
 class PipelineCommonWithFileTest(unittest.TestCase):
