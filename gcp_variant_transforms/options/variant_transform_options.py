@@ -206,7 +206,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       all_output_tables = []
       all_output_tables.append(
           bigquery_util.compose_table_name(
-              table_id, bigquery_util.TABLE_SUFFIX, is_sample=True))
+              table_id, bigquery_util.SAMPLE_INFO_TABLE_SUFFIX))
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()

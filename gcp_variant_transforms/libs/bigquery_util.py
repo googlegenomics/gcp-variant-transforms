@@ -32,9 +32,8 @@ from gcp_variant_transforms.beam_io import vcfio
 
 _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
-TABLE_SUFFIX = 'sample_info'
-TABLE_SUFFIX_SEPARATOR = '___'
-SAMPLE_TABLE_SUFFIX_SEPARATOR = '__'
+SAMPLE_INFO_TABLE_SUFFIX = 'sample_info'
+TABLE_SUFFIX_SEPARATOR = '__'
 
 _MAX_BQ_NUM_PARTITIONS = 4000
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
@@ -373,11 +372,9 @@ def calculate_optimal_partition_size(total_base_pairs):
           partition_size_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
 
 
-def compose_table_name(base_name, suffix, is_sample=False):
-  # type: (str, List[str]) -> str
-  separator = (
-      SAMPLE_TABLE_SUFFIX_SEPARATOR if is_sample else TABLE_SUFFIX_SEPARATOR)
-  return separator.join([base_name, suffix])
+def compose_table_name(base_name, suffix):
+  # type: (str, str) -> str
+  return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
 
 def get_table_base_name(table_name):
   return table_name.split(TABLE_SUFFIX_SEPARATOR)[0]
@@ -463,7 +460,7 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
   the worker that monitors the Dataflow job.
 
   Args:
-    full_table_id: for example: projet:dataset.table_base_name___chr1
+    full_table_id: for example: projet:dataset.table_base_name__chr1
     total_base_pairs: the maximum expected value of `start_position` column.
     schema_file_path: a json file that contains the schema of the table.
   """

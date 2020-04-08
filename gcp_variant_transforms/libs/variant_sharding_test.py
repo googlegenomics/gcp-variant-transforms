@@ -405,7 +405,7 @@ class VariantShardingTest(unittest.TestCase):
   def test_config_failed_missing_fields(self):
     tempdir = temp_dir.TempDir()
     missing_output_table = [
-        '-  missing___output_table:',
+        '-  missing__output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "chr1"',
