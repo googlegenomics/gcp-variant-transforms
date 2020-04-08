@@ -404,23 +404,6 @@ def _get_avro_root_path(beam_pipeline_options):
                                       _AVRO_FOLDER,
                                       google_cloud_options.job_name, '')
 
-def _rollback_newly_created_tables(append, base_table_name, suffixes=None):
-  if append:
-    logging.warning(
-        'Since tables were appended, added rows cannot be reverted. You can '
-        'utilize BigQuery snapshot decorators to recover your table up to 7 '
-        'days ago. For more information please refer to: '
-        'https://cloud.google.com/bigquery/table-decorators')
-  else:
-    logging.warning('Trying to revert as much as possible...')
-    suffixes = (suffixes.append(bigquery_util.SAMPLE_INFO_TABLE_SUFFIX)
-                if suffixes else [bigquery_util.SAMPLE_INFO_TABLE_SUFFIX])
-    for suffix in suffixes:
-      table_name = bigquery_util.compose_table_name(base_table_name, suffix)
-      if bigquery_util.delete_table(table_name) == 0:
-        logging.info('Table was successfully deleted: %s', table_name)
-      else:
-        logging.error('Failed to delete table: %s', table_name)
 
 def run(argv=None):
   # type: (List[str]) -> None
@@ -520,7 +503,8 @@ def run(argv=None):
           'Dataflow pipeline terminated in {} state'.format(state))
   except Exception as e:
     logging.error('Dataflow pipeline failed.')
-    _rollback_newly_created_tables(known_args.append, known_args.output_table)
+    bigquery_util.rollback_newly_created_tables(
+        known_args.append, known_args.output_table)
     raise e
   else:
     logging.info('Dataflow pipeline finished successfully.')
@@ -547,7 +531,7 @@ def run(argv=None):
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
-    _rollback_newly_created_tables(
+    bigquery_util.rollback_newly_created_tables(
         known_args.append, known_args.output_table, suffixes)
     logging.info('Since the write to BigQuery stage failed, we did not delete '
                  'AVRO files in your GCS bucket. You can manually import them '
