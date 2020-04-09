@@ -64,7 +64,7 @@ def dict_values_equal(expected_dict):
   def _items_equal(actual_dict):
     actual = actual_dict[0]
     for k in expected_dict:
-      if k not in actual or set(expected_dict[k]) != set(actual[k]):
+      if k not in actual or expected_dict[k] != actual[k]:
         raise BeamAssertException(
             'Failed assert: %s == %s' % (expected_dict, actual))
     if len(expected_dict) != len(actual):

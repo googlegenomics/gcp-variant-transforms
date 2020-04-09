@@ -1,7 +1,7 @@
 [
   {
     "test_name": "bq-to-vcf-no-options",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0_new_schema",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0__suffix",
     "output_file_name": "bq_to_vcf_no_options.vcf",
     "runner": "DirectRunner",
     "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/no_options_chr20.vcf"

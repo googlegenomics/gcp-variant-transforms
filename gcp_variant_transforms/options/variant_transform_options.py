@@ -25,8 +25,7 @@ from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import variant_sharding
 
 TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
-SAMPLE_TABLE_SUFFIX = bigquery_util.TABLE_SUFFIX
-SAMPLE_TABLE_SUFFIX_SEPARATOR = bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR
+SAMPLE_INFO_TABLE_SUFFIX = bigquery_util.SAMPLE_INFO_TABLE_SUFFIX
 
 
 class VariantTransformsOptions(object):
@@ -219,8 +218,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                                                       dataset_id)
       all_output_tables = []
       all_output_tables.append(
-          bigquery_util.compose_table_name(
-              table_id, bigquery_util.SAMPLE_INFO_TABLE_SUFFIX))
+          bigquery_util.compose_table_name(table_id, SAMPLE_INFO_TABLE_SUFFIX))
       sharding = variant_sharding.VariantSharding(
           parsed_args.sharding_config_path)
       num_shards = sharding.get_num_shards()
@@ -599,6 +597,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
 
     project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
         parsed_args.input_table)
+    if not bigquery_util.table_exist(client, project_id, dataset_id, table_id):
+      raise ValueError('Table {}:{}.{} does not exist.'.format(
+          project_id, dataset_id, table_id))
     if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
       raise ValueError(
           'Input table {} is malformed - exactly one suffix separator "{}" is '
@@ -606,12 +607,7 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
                             TABLE_SUFFIX_SEPARATOR))
     base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
     sample_table_id = (
-        base_table_id + SAMPLE_TABLE_SUFFIX_SEPARATOR + SAMPLE_TABLE_SUFFIX)
-    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
-                                                    dataset_id)
-    if not bigquery_util.table_exist(client, project_id, dataset_id, table_id):
-      raise ValueError('Table {}:{}.{} does not exist.'.format(
-          project_id, dataset_id, table_id))
+        base_table_id + TABLE_SUFFIX_SEPARATOR + SAMPLE_INFO_TABLE_SUFFIX)
 
     if not bigquery_util.table_exist(client, project_id, dataset_id,
                                      sample_table_id):

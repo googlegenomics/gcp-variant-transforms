@@ -75,8 +75,7 @@ _BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
 _BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
-SAMPLE_TABLE_SUFFIX = bigquery_util.TABLE_SUFFIX
-SAMPLE_TABLE_SUFFIX_SEPARATOR = bigquery_util.SAMPLE_TABLE_SUFFIX_SEPARATOR
+SAMPLE_INFO_TABLE_SUFFIX = bigquery_util.SAMPLE_INFO_TABLE_SUFFIX
 _FULL_INPUT_TABLE = '{TABLE}' + TABLE_SUFFIX_SEPARATOR + '{SUFFIX}'
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
@@ -87,7 +86,7 @@ _VCF_VERSION_LINE = '##fileformat=VCFv4.3\n'
 _SAMPLE_INFO_QUERY_TEMPLATE = (
     'SELECT sample_id, sample_name, file_path '
     'FROM `{PROJECT_ID}.{DATASET_ID}.{BASE_TABLE_ID}' +
-    SAMPLE_TABLE_SUFFIX_SEPARATOR + SAMPLE_TABLE_SUFFIX + '`')
+    TABLE_SUFFIX_SEPARATOR + SAMPLE_INFO_TABLE_SUFFIX + '`')
 
 
 def run(argv=None):
@@ -174,14 +173,13 @@ def _bigquery_to_vcf_shards(
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  # TODO(allieychen): Modify the SQL query with the specified sample_ids.
-  query = _get_bigquery_query(known_args, schema)
+  query = _get_variant_query(known_args, schema)
   logging.info('Processing BigQuery query %s:', query)
   project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
       known_args.input_table)
-  bq_source = bigquery.BigQuerySource(query=query,
-                                      validate=True,
-                                      use_standard_sql=True)
+  bq_variant_source = bigquery.BigQuerySource(query=query,
+                                              validate=True,
+                                              use_standard_sql=True)
   annotation_names = _extract_annotation_names(schema)
 
   base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
@@ -193,13 +191,13 @@ def _bigquery_to_vcf_shards(
                                              use_standard_sql=True)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
-                | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
+                | 'ReadFromBigQuery ' >> beam.io.Read(bq_variant_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
     sample_table_rows = (
         p
         | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
     if known_args.sample_names:
-      names_to_ids = (
+      hash_table = (
           sample_table_rows
           | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
       sample_names = (p
@@ -208,21 +206,24 @@ def _bigquery_to_vcf_shards(
       sample_ids = (sample_names
                     | 'GetSampleIds' >>
                     sample_mapping_table.GetSampleIds(
-                        beam.pvalue.AsSingleton(names_to_ids)))
+                        beam.pvalue.AsSingleton(hash_table))
+                    | 'CombineSampleIds' >> beam.combiners.ToList())
+      sample_names = sample_names | beam.combiners.ToList()
     else:
+      hash_table = (
+          sample_table_rows
+          | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
       sample_ids = (variants
                     | 'CombineSampleIds' >>
                     combine_sample_ids.SampleIdsCombiner(
                         known_args.preserve_sample_order))
-    ids_to_names = (
-        sample_table_rows
-        | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
-    sample_names = (sample_ids
-                    | 'GetSampleNames' >>
-                    sample_mapping_table.GetSampleNames(
-                        beam.pvalue.AsSingleton(ids_to_names))
-                    | 'CombineSampleNames' >> beam.combiners.ToList())
-    sample_ids = sample_ids | beam.combiners.ToList()
+      sample_names = (sample_ids
+                      | 'GetSampleNames' >>
+                      sample_mapping_table.GetSampleNames(
+                          beam.pvalue.AsSingleton(hash_table))
+                      | 'CombineSampleNames' >> beam.combiners.ToList())
+      sample_ids = sample_ids | beam.combiners.ToList()
+
     _ = (sample_names
          | 'GenerateVcfDataHeader' >>
          beam.ParDo(_write_vcf_header_with_sample_names,
@@ -251,7 +252,7 @@ def _get_schema(input_table):
   return table.schema
 
 
-def _get_bigquery_query(known_args, schema):
+def _get_variant_query(known_args, schema):
   # type: (argparse.Namespace, bigquery_v2.TableSchema) -> str
   """Returns a BigQuery query for the interested regions."""
   columns = _get_query_columns(schema)

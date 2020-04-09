@@ -1,7 +1,7 @@
 [
   {
     "test_name": "bq-to-vcf-option-customized-export",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0_new_schema",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0__suffix",
     "output_file_name": "bq_to_vcf_option_customized_export.vcf",
     "genomic_regions": "19:1234566-1234570 20:14369-17330",
     "sample_names": "NA00001 NA00003",
