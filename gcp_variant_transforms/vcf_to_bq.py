@@ -34,6 +34,7 @@ python -m gcp_variant_transforms.vcf_to_bq \
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
+from datetime import datetime
 import logging
 import sys
 import tempfile
@@ -402,7 +403,9 @@ def _get_avro_root_path(beam_pipeline_options):
       pipeline_options.GoogleCloudOptions)
   return filesystems.FileSystems.join(google_cloud_options.temp_location,
                                       _AVRO_FOLDER,
-                                      google_cloud_options.job_name, '')
+                                      google_cloud_options.job_name,
+                                      datetime.now().strftime('%Y%m%d_%H%M%S'),
+                                      '')
 
 
 def run(argv=None):
