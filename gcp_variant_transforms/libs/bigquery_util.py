@@ -383,14 +383,15 @@ def get_table_base_name(table_name):
 class LoadAvro(object):
   def __init__(self,
                avro_root_path,  # type: str
-               table_base_name,  # type: str
+               output_table,  # type: str
                suffixes,  # type: List[str]
                total_base_pairs  # type: List[int]
               ):
     assert len(suffixes) == len(total_base_pairs)
 
     self._avro_root_path = avro_root_path
-    self._table_base_name = table_base_name.replace(':', '.')
+    project_id, dataset_id, table_id = parse_table_reference(output_table)
+    self._table_base_name = '{}.{}.{}'.format(project_id, dataset_id, table_id)
     self._suffixes = suffixes
     self._total_base_pairs = total_base_pairs
 
@@ -398,7 +399,7 @@ class LoadAvro(object):
     self._suffixes_to_load_jobs = {}  # type: Dict[str, bigquery.job.LoadJob]
     self._remaining_load_jobs = self._suffixes
 
-    self._client = bigquery.Client()
+    self._client = bigquery.Client(project=project_id)
 
   def start_loading(self):
     # We run _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS load jobs in parallel.
