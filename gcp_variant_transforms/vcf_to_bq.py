@@ -328,6 +328,8 @@ def _merge_headers(known_args, pipeline_args,
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
+    if not known_args.append:
+      bigquery_util.create_sample_info_table(known_args.output_table)
     _ = (headers
          | 'SampleInfoToBigQuery'
          >> sample_info_to_bigquery.SampleInfoToBigQuery(
@@ -438,8 +440,6 @@ def run(argv=None):
   # See https://issues.apache.org/jira/browse/BEAM-2801.
   header_fields = vcf_header_parser.get_vcf_headers(
       known_args.representative_header_file)
-  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
-
   counter_factory = metrics_util.CounterFactory()
   processed_variant_factory = processed_variant.ProcessedVariantFactory(
       header_fields,
@@ -466,6 +466,8 @@ def run(argv=None):
       table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                     table_suffix)
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
+
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   avro_root_path = _get_avro_root_path(beam_pipeline_options)
 
   pipeline = beam.Pipeline(options=beam_pipeline_options)
