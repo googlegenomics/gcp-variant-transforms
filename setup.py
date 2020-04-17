@@ -31,15 +31,15 @@ PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam>=0.15.3']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
-    'apache-beam[gcp]<=2.18.0',
+    'apache-beam[gcp]<=2.20.0',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
     'google-api-python-client>=1.6,<1.7.12',
     'intervaltree>=2.1.0,<2.2.0',
     'mmh3<2.6',
-    # Refer to issue #528
-    'google-cloud-storage<1.23.0',
+    'google-cloud-storage',
+    'google-resumable-media<0.6dev,>=0.5.0',
     'pyfarmhash',
     'pyyaml'
 ]
