@@ -389,11 +389,10 @@ class LoadAvro(object):
     self._avro_root_path = avro_root_path
     project_id, dataset_id, table_id = parse_table_reference(output_table)
     self._table_base_name = '{}.{}.{}'.format(project_id, dataset_id, table_id)
-    self._suffixes = suffixes
 
     self._num_load_jobs_retries = 0
     self._suffixes_to_load_jobs = {}  # type: Dict[str, bigquery.job.LoadJob]
-    self._remaining_load_jobs = self._suffixes
+    self._remaining_load_jobs = suffixes[:]
 
     self._client = bigquery.Client(project=project_id)
 
