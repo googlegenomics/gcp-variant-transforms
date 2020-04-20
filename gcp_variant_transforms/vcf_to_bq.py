@@ -516,20 +516,19 @@ def run(argv=None):
   # After pipeline is done, create output tables and load AVRO files into them.
   schema_file = _write_schema_to_temp_file(schema)
   suffixes = []
-  total_base_pairs = []
   try:
     for i in range(num_shards):
       suffixes.append(sharding.get_output_table_suffix(i))
-      total_base_pairs.append(sharding.get_output_table_total_base_pairs(i))
+      total_base_pairs = sharding.get_output_table_total_base_pairs(i)
       if not known_args.append:
         table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                       suffixes[i])
         bigquery_util.create_output_table(
-            table_name, total_base_pairs[i], schema_file)
+            table_name, total_base_pairs, schema_file)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
     load_avro = bigquery_util.LoadAvro(
-        avro_root_path, known_args.output_table, suffixes, total_base_pairs)
+        avro_root_path, known_args.output_table, suffixes)
     load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
