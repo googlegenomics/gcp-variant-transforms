@@ -323,13 +323,13 @@ def _merge_headers(known_args, pipeline_args,
                                             _MERGE_HEADERS_FILE_NAME])
   temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
+  if not known_args.append:
+    bigquery_util.create_sample_info_table(known_args.output_table)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
-    if not known_args.append:
-      bigquery_util.create_sample_info_table(known_args.output_table)
     _ = (headers
          | 'SampleInfoToBigQuery'
          >> sample_info_to_bigquery.SampleInfoToBigQuery(
