@@ -1,7 +1,7 @@
 [
   {
     "test_name": "bq-to-vcf-option-preserve-call-names-order",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.merge_option_move_to_calls_new_schema",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.merge_option_move_to_calls__suffix",
     "output_file_name": "bq_to_vcf_option_preserve_sample_order.vcf",
     "preserve_sample_order": false,
     "runner": "DirectRunner",
