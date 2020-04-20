@@ -40,17 +40,16 @@ _MAX_BQ_NUM_PARTITIONS = 4000
 _TOTAL_BASE_PAIRS_SIG_DIGITS = 4
 _PARTITION_SIZE_SIG_DIGITS = 1
 
+START_POSITION_COLUMN = 'start_position'
 _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
-    'bq mk --table '
-    '--range_partitioning=start_position,0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
+    'bq mk --table --range_partitioning='
+    '{PARTITION_COLUMN},0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 _BQ_LOAD_JOB_NUM_RETRIES = 5
 _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
-_PARTITIONING_FIELD = 'start_position'
-_CLUSTERING_FIELDS = ['start_position', 'end_position']
 
 
 class ColumnKeyConstants(object):
@@ -448,8 +447,11 @@ class LoadAvro(object):
               self._start_one_load_job(next_suffix)
 
 
-def create_output_table(full_table_id, total_base_pairs, schema_file_path):
-  # type: (str, int, str) -> None
+def create_output_table(full_table_id,  # type: str
+                        partition_column,  # type: str
+                        total_base_pairs,  # type: int
+                        schema_file_path  # type: str
+                       ):
   """Creates an integer range partitioned table using `bq mk table...` command.
 
   Since beam.io.BigQuerySink is unable to create an integer range partition
@@ -458,12 +460,14 @@ def create_output_table(full_table_id, total_base_pairs, schema_file_path):
 
   Args:
     full_table_id: for example: projet:dataset.table_base_name__chr1
-    total_base_pairs: the maximum expected value of `start_position` column.
-    schema_file_path: a json file that contains the schema of the table.
+    partition_column: name of the column intended for integer range partitioning
+    total_base_pairs: the maximum expected value of `start_position` column
+    schema_file_path: a json file that contains the schema of the table
   """
   (partition_size, total_base_pairs_enlarged) = (
       calculate_optimal_partition_size(total_base_pairs))
   bq_command = _BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
+      PARTITION_COLUMN=partition_column,
       TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
       PARTITION_SIZE=partition_size,
       FULL_TABLE_ID=full_table_id,

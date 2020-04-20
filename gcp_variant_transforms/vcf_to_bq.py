@@ -523,8 +523,9 @@ def run(argv=None):
       if not known_args.append:
         table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                       suffixes[i])
-        bigquery_util.create_output_table(
-            table_name, total_base_pairs, schema_file)
+        bigquery_util.create_output_table(table_name,
+                                          bigquery_util.START_POSITION_COLUMN,
+                                          total_base_pairs, schema_file)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
     load_avro = bigquery_util.LoadAvro(
