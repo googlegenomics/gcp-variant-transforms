@@ -155,6 +155,30 @@ def _get_sample_non_variant():
 
   return non_variant
 
+def _get_sample_variant_1_based():
+  """Get first sample variant.
+
+  Features:
+    multiple alternates
+    not phased
+    multiple names
+    utf-8 encoded
+  """
+  variant = vcfio.Variant(
+      reference_name='20', start=1234, end=1234, reference_bases='C',
+      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
+      filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
+  variant.calls.append(
+      vcfio.VariantCall(
+          sample_id=hash_name('Sample1', ''), genotype=[0, 0],
+          info={'GQ': 48}))
+  variant.calls.append(
+      vcfio.VariantCall(
+          sample_id=hash_name('Sample2', ''), genotype=[1, 0],
+          info={'GQ': 20}))
+
+  return variant
+
 
 class VcfSourceTest(unittest.TestCase):
 
@@ -270,6 +294,21 @@ class VcfSourceTest(unittest.TestCase):
     for content in [[''], [' '], ['', ' ', '\n'], ['\n', '\r\n', '\n']]:
       self.assertEqual([], self._create_temp_file_and_read_records(
           content, _SAMPLE_HEADER_LINES))
+
+  def test_single_file_1_based_verify_details(self):
+    variant = _get_sample_variant_1_based()
+    read_data = None
+    with TempDir() as tempdir:
+      file_name = tempdir.create_temp_file(
+          suffix='.vcf', lines=_SAMPLE_HEADER_LINES + [VCF_LINE_1])
+      read_data = source_test_utils.read_from_source(
+          VcfSource(file_name,
+                    representative_header_lines=None,
+                    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
+                    use_1_based_format=True))
+
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant, read_data[0])
 
   def test_single_file_verify_details(self):
     read_data = self._create_temp_file_and_read_records(

@@ -219,7 +219,8 @@ def read_variants(
     allow_malformed_records,  # type: bool
     representative_header_lines=None,  # type: List[str]
     pre_infer_headers=False,  # type: bool
-    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH  # type: int
+    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+    use_1_based_format=False # type: bool
     ):
   # type: (...) -> pvalue.PCollection
   """Returns a PCollection of Variants by reading VCFs."""
@@ -233,7 +234,8 @@ def read_variants(
                                     representative_header_lines,
                                     allow_malformed_records,
                                     pre_infer_headers,
-                                    sample_name_encoding))
+                                    sample_name_encoding.
+                                    use_1_based_format))
 
   if pipeline_mode == PipelineModes.LARGE:
     variants = (pipeline
@@ -243,7 +245,8 @@ def read_variants(
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
                     pre_infer_headers=pre_infer_headers,
-                    sample_name_encoding=sample_name_encoding))
+                    sample_name_encoding=sample_name_encoding,
+                    use_1_based_format=use_1_based_format))
   else:
     variants = pipeline | 'ReadFromVcf' >> vcfio.ReadFromVcf(
         all_patterns[0],
@@ -251,7 +254,8 @@ def read_variants(
         compression_type=compression_type,
         allow_malformed_records=allow_malformed_records,
         pre_infer_headers=pre_infer_headers,
-        sample_name_encoding=sample_name_encoding)
+        sample_name_encoding=sample_name_encoding,
+        use_1_based_format=use_1_based_format)
 
   if compression_type == filesystem.CompressionTypes.GZIP:
     variants |= 'FusionBreak' >> fusion_break.FusionBreak()

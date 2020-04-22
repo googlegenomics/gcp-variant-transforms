@@ -97,7 +97,7 @@ def _read_variants(all_patterns,  # type: List[str]
                    pipeline,  # type: beam.Pipeline
                    known_args,  # type: argparse.Namespace
                    pipeline_mode,  # type: int
-                   pre_infer_headers=False  # type: bool
+                   pre_infer_headers=False,  # type: bool
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -112,7 +112,8 @@ def _read_variants(all_patterns,  # type: List[str]
       known_args.allow_malformed_records,
       representative_header_lines,
       pre_infer_headers=pre_infer_headers,
-      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding])
+      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding],
+      use_1_based_format=known_args.use_1_based_format)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
