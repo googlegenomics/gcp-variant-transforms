@@ -496,7 +496,7 @@ class BigqueryUtilTest(unittest.TestCase):
     for total_base_pairs, expected_partition_size in (
         total_base_pairs_to_expected_partition_size.items()):
       (partition_size, total_base_pairs_enlarged) = (
-          bigquery_util.calculate_optimal_partition_size(
+          bigquery_util.calculate_optimal_range_interval(
               total_base_pairs))
       self.assertEqual(expected_partition_size, partition_size)
       self.assertEqual(expected_partition_size *
