@@ -37,13 +37,13 @@ SAMPLE_INFO_TABLE_SUFFIX = 'sample_info'
 TABLE_SUFFIX_SEPARATOR = '__'
 
 _MAX_BQ_NUM_PARTITIONS = 4000
-_TOTAL_BASE_PAIRS_SIG_DIGITS = 4
-_PARTITION_SIZE_SIG_DIGITS = 1
+_RANGE_END_SIG_DIGITS = 4
+_RANGE_INTERVAL_SIG_DIGITS = 1
 
 START_POSITION_COLUMN = 'start_position'
 _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
     'bq mk --table --range_partitioning='
-    '{PARTITION_COLUMN},0,{TOTAL_BASE_PAIRS},{PARTITION_SIZE} '
+    '{PARTITION_COLUMN},0,{RANGE_END},{RANGE_INTERVAL} '
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
@@ -334,42 +334,42 @@ def _get_merged_field_schemas(
   return merged_field_schemas
 
 
-def calculate_optimal_partition_size(total_base_pairs):
+def calculate_optimal_range_interval(range_end):
   # type: (int) -> Tuple[int, int]
-  """Calculates the optimal partition size given total_base_pairs value.
+  """Calculates the optimal range interval given range end value.
 
   BQ allows up to 4000 integer range partitions. This method divides
-  [0, total_base_pairs] range into 3999 partitions. Every value outside of this
+  [0, range_end] range into 3999 partitions. Every value outside of this
   range will fall into the 4000th partition. Note this partitioning method
   assumes variants are distributed uniformly.
 
-  Since given total_base_pairs might be a lower estimate, we add a little extra
+  Since given range_end might be a lower estimate, we add a little extra
   buffer to the given value to avoid a situation where too many rows fall
   into the 4000th partition. The size of added buffer is controlled by the
   value of two consts:
-    * _TOTAL_BASE_PAIRS_SIG_DIGITS is set to 4 which adds [10^4, 2 * 10^4)
-    * _PARTITION_SIZE_SIG_DIGITS is set to 1 which adds [0, 10i^1 * 3999)
-  In total we add [10^4, 10 * 3999 + 2 * 10^4) buffer to total_base_pairs.
+    * _RANGE_END_SIG_DIGITS is set to 4 which adds [10^4, 2 * 10^4)
+    * _RANGE_INTERVAL_SIG_DIGITS is set to 1 which adds [0, 10^1 * 3999)
+  In total we add [10^4, 10 * 3999 + 2 * 10^4) buffer to range_end.
 
   Args:
-    total_base_paris: The number of total base pairs expected in the BQ table.
+    range_end: the maximum value of the column subject to partitioning
 
   Returns:
     A tuple (partition size, partition size * 3999).
   """
-  # These two operations add [10^4, 2 * 10^4) buffer to total_base_pairs.
-  total_base_pairs += math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS)
-  total_base_pairs = (
-      math.ceil(total_base_pairs / math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS)) *
-      math.pow(10, _TOTAL_BASE_PAIRS_SIG_DIGITS))
+  # These two operations add [10^4, 2 * 10^4) buffer to range_end.
+  range_end += math.pow(10, _RANGE_END_SIG_DIGITS)
+  range_end = (
+      math.ceil(range_end / math.pow(10, _RANGE_END_SIG_DIGITS)) *
+      math.pow(10, _RANGE_END_SIG_DIGITS))
   # We use 4000 - 1 = 3999 partitions just to avoid hitting the BQ limits.
-  partition_size = total_base_pairs / (_MAX_BQ_NUM_PARTITIONS - 1)
-  # This operation adds another [0, 10 * 3999) buffer to the total_base_pairs.
-  partition_size_round_up = int(
-      math.ceil(partition_size / pow(10, _PARTITION_SIZE_SIG_DIGITS)) *
-      math.pow(10, _PARTITION_SIZE_SIG_DIGITS))
-  return (partition_size_round_up,
-          partition_size_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
+  range_interval = range_end / (_MAX_BQ_NUM_PARTITIONS - 1)
+  # This operation adds another [0, 10 * 3999) buffer to the range_end.
+  range_interval_round_up = int(
+      math.ceil(range_interval / pow(10, _RANGE_INTERVAL_SIG_DIGITS)) *
+      math.pow(10, _RANGE_INTERVAL_SIG_DIGITS))
+  return (range_interval_round_up,
+          range_interval_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
 
 
 def compose_table_name(base_name, suffix):
@@ -449,7 +449,7 @@ class LoadAvro(object):
 
 def create_output_table(full_table_id,  # type: str
                         partition_column,  # type: str
-                        total_base_pairs,  # type: int
+                        range_end,  # type: int
                         schema_file_path  # type: str
                        ):
   """Creates an integer range partitioned table using `bq mk table...` command.
@@ -461,15 +461,15 @@ def create_output_table(full_table_id,  # type: str
   Args:
     full_table_id: for example: projet:dataset.table_base_name__chr1
     partition_column: name of the column intended for integer range partitioning
-    total_base_pairs: the maximum expected value of `start_position` column
+    range_end: the maximum value of the column subject to partitioning
     schema_file_path: a json file that contains the schema of the table
   """
-  (partition_size, total_base_pairs_enlarged) = (
-      calculate_optimal_partition_size(total_base_pairs))
+  (range_interval, range_end_enlarged) = (
+      calculate_optimal_range_interval(range_end))
   bq_command = _BQ_CREATE_PARTITIONED_TABLE_COMMAND.format(
       PARTITION_COLUMN=partition_column,
-      TOTAL_BASE_PAIRS=total_base_pairs_enlarged,
-      PARTITION_SIZE=partition_size,
+      RANGE_END=range_end_enlarged,
+      RANGE_INTERVAL=range_interval,
       FULL_TABLE_ID=full_table_id,
       SCHEMA_FILE_PATH=schema_file_path)
   result = os.system(bq_command)
