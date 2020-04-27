@@ -107,7 +107,8 @@ def run(argv=None):
                                                all_patterns,
                                                pipeline_mode,
                                                allow_malformed_records=True,
-                                               pre_infer_headers=True)
+                                               pre_infer_headers=True,
+                                               use_1_based_format=False)
       malformed_records = variants | filter_variants.ExtractMalformedVariants()
       inferred_headers, merged_headers = (_get_inferred_headers(variants,
                                                                 merged_headers))
