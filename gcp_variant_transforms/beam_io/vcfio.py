@@ -254,6 +254,8 @@ class ReadFromBGZF(beam.PTransform):
         exact data for variants and calls, without type matching.
       sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
     """
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
@@ -326,7 +328,9 @@ class ReadFromVcf(PTransform):
       pre_infer_headers: If true, drop headers and make sure PySam return the
         exact data for variants and calls, without type matching.
       sample_name_encoding: specify how we want to encode sample_name mainly
-        to deal with same sample_name used across multiple VCF files
+        to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
 
@@ -402,7 +406,9 @@ class ReadAllFromVcf(PTransform):
       pre_infer_headers: If true, drop headers and make sure PySam return the
         exact data for variants and calls, without type matching.
       sample_name_encoding: specify how we want to encode sample_name mainly
-        to deal with same sample_name used across multiple VCF files
+        to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(

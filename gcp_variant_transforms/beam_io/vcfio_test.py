@@ -72,7 +72,7 @@ VCF_LINE_3 = (
     '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:PS:GQ	0|1:1:45	.:.:.\n')
 GVCF_LINE = '19	1234	.	C	<NON_REF>	50	.	END=1236	GT:GQ	0/0:99\n'
 
-def _get_sample_variant_1(file_name=''):
+def _get_sample_variant_1(file_name='', use_1_based_coordinate=False):
   """Get first sample variant.
 
   Features:
@@ -82,7 +82,8 @@ def _get_sample_variant_1(file_name=''):
     utf-8 encoded
   """
   variant = vcfio.Variant(
-      reference_name='20', start=1233, end=1234, reference_bases='C',
+      reference_name='20', start=1234 if use_1_based_coordinate else 1233,
+      end=1234, reference_bases='C',
       alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
       filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
   variant.calls.append(
@@ -154,30 +155,6 @@ def _get_sample_non_variant():
                         info={'GQ': 99}))
 
   return non_variant
-
-def _get_sample_variant_1_based():
-  """Get first sample variant.
-
-  Features:
-    multiple alternates
-    not phased
-    multiple names
-    utf-8 encoded
-  """
-  variant = vcfio.Variant(
-      reference_name='20', start=1234, end=1234, reference_bases='C',
-      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-      filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
-  variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample1', ''), genotype=[0, 0],
-          info={'GQ': 48}))
-  variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample2', ''), genotype=[1, 0],
-          info={'GQ': 20}))
-
-  return variant
 
 
 class VcfSourceTest(unittest.TestCase):
@@ -296,7 +273,7 @@ class VcfSourceTest(unittest.TestCase):
           content, _SAMPLE_HEADER_LINES))
 
   def test_single_file_1_based_verify_details(self):
-    variant = _get_sample_variant_1_based()
+    variant = _get_sample_variant_1(use_1_based_coordinate=True)
     read_data = None
     with TempDir() as tempdir:
       file_name = tempdir.create_temp_file(
