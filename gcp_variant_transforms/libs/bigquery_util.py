@@ -35,6 +35,8 @@ _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 
 SAMPLE_INFO_TABLE_SUFFIX = 'sample_info'
 TABLE_SUFFIX_SEPARATOR = '__'
+SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH = (
+    'gcp_variant_transforms/data/schema/sample_info.json')
 
 _MAX_BQ_NUM_PARTITIONS = 4000
 _RANGE_END_SIG_DIGITS = 4
@@ -46,6 +48,8 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
     '{PARTITION_COLUMN},0,{RANGE_END},{RANGE_INTERVAL} '
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
+_BQ_CREATE_SAMPLE_INFO_TABLE_COMMAND = (
+    'bq mk --table {FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 _BQ_LOAD_JOB_NUM_RETRIES = 5
@@ -446,6 +450,22 @@ class LoadAvro(object):
               next_suffix = self._remaining_load_jobs.pop()
               self._start_one_load_job(next_suffix)
 
+def _run_table_creation_command(bq_command):
+  result = os.system(bq_command)
+  if result != 0:
+    time.sleep(30)  # In our integration tests sometime we overwhelm BQ server.
+    result_second_attempt = os.system(bq_command)
+    if result_second_attempt != 0:
+      raise ValueError(
+          'Failed to create a BigQuery table using "{}" command.'.format(
+              bq_command))
+
+def create_sample_info_table(output_table_id):
+  bq_command = _BQ_CREATE_SAMPLE_INFO_TABLE_COMMAND.format(
+      FULL_TABLE_ID=compose_table_name(output_table_id,
+                                       SAMPLE_INFO_TABLE_SUFFIX),
+      SCHEMA_FILE_PATH=SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH)
+  _run_table_creation_command(bq_command)
 
 def create_output_table(full_table_id,  # type: str
                         partition_column,  # type: str
@@ -472,14 +492,7 @@ def create_output_table(full_table_id,  # type: str
       RANGE_INTERVAL=range_interval,
       FULL_TABLE_ID=full_table_id,
       SCHEMA_FILE_PATH=schema_file_path)
-  result = os.system(bq_command)
-  if result != 0:
-    time.sleep(30)  # In our integration tests sometime we overwhelm BQ server.
-    result_second_attempt = os.system(bq_command)
-    if result_second_attempt != 0:
-      raise ValueError(
-          'Failed to create a BigQuery table using "{}" command.'.format(
-              bq_command))
+  _run_table_creation_command(bq_command)
 
 
 def _delete_table(full_table_id):

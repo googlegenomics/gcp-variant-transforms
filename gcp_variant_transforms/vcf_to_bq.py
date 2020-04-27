@@ -303,8 +303,6 @@ def _merge_headers(known_args, pipeline_args,
                    pipeline_mode, annotated_vcf_pattern=None):
   # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
-  if known_args.representative_header_file:
-    return
   options = pipeline_options.PipelineOptions(pipeline_args)
 
   # Always run pipeline locally if data is small.
@@ -325,16 +323,21 @@ def _merge_headers(known_args, pipeline_args,
                                             _MERGE_HEADERS_FILE_NAME])
   temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
+  if not known_args.append:
+    bigquery_util.create_sample_info_table(known_args.output_table)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
-    _ = (headers | 'SampleInfoToBigQuery' >>
-         sample_info_to_bigquery.SampleInfoToBigQuery(
+    _ = (headers
+         | 'SampleInfoToBigQuery'
+         >> sample_info_to_bigquery.SampleInfoToBigQuery(
              known_args.output_table,
              SampleNameEncoding[known_args.sample_name_encoding],
              known_args.append))
+    if known_args.representative_header_file:
+      return
     merged_header = pipeline_common.get_merged_headers(
         headers,
         known_args.split_alternate_allele_info_fields,
@@ -406,7 +409,6 @@ def _get_avro_root_path(beam_pipeline_options):
                                       google_cloud_options.job_name,
                                       datetime.now().strftime('%Y%m%d_%H%M%S'),
                                       '')
-
 
 def run(argv=None):
   # type: (List[str]) -> None
