@@ -5,6 +5,6 @@
     "output_file_name": "bq_to_vcf_option_preserve_sample_order.vcf",
     "preserve_sample_order": false,
     "runner": "DirectRunner",
-    "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_preserve_sample_order_chr20.vcf"
+    "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_preserve_sample_order.vcf"
   }
 ]
