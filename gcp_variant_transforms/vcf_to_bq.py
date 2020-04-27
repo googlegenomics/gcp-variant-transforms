@@ -113,7 +113,7 @@ def _read_variants(all_patterns,  # type: List[str]
       representative_header_lines,
       pre_infer_headers=pre_infer_headers,
       sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding],
-      use_1_based_format=known_args.use_1_based_format)
+      use_1_based_coordinate=known_args.use_1_based_coordinate)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace

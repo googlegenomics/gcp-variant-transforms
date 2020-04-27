@@ -305,7 +305,7 @@ class VcfSourceTest(unittest.TestCase):
           VcfSource(file_name,
                     representative_header_lines=None,
                     sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
-                    use_1_based_format=True))
+                    use_1_based_coordinate=True))
 
     self.assertEqual(1, len(read_data))
     self.assertEqual(variant, read_data[0])

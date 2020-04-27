@@ -192,7 +192,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
-      use_1_based_format=False  # type: bool
+      use_1_based_coordinate=False  # type: bool
       ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
@@ -204,7 +204,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
-    self._use_1_based_format = use_1_based_format
+    self._use_1_based_coordinate = use_1_based_coordinate
 
 
   def read_records(self,
@@ -221,7 +221,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         representative_header_lines=self._representative_header_lines,
         pre_infer_headers=self._pre_infer_headers,
         sample_name_encoding=self._sample_name_encoding,
-        use_1_based_format=self._use_1_based_format,
+        use_1_based_coordinate=self._use_1_based_coordinate,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -239,7 +239,7 @@ class ReadFromBGZF(beam.PTransform):
                allow_malformed_records,
                pre_infer_headers,
                sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
-               use_1_based_format=False
+               use_1_based_coordinate=False
               ):
     # type: (List[str], List[str], bool, bool, int, bool) -> None
     """Initializes the transform.
@@ -260,7 +260,7 @@ class ReadFromBGZF(beam.PTransform):
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
-    self._use_1_based_format = use_1_based_format
+    self._use_1_based_coordinate = use_1_based_coordinate
 
   def _read_records(self, (file_path, block)):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
@@ -274,7 +274,7 @@ class ReadFromBGZF(beam.PTransform):
         splittable_bgzf=True,
         pre_infer_headers=self._pre_infer_headers,
         sample_name_encoding=self._sample_name_encoding,
-        use_1_based_format=self._use_1_based_format)
+        use_1_based_coordinate=self._use_1_based_coordinate)
 
     for record in record_iterator:
       yield record
@@ -306,7 +306,7 @@ class ReadFromVcf(PTransform):
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
-      use_1_based_format=False,  # type: bool
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -338,7 +338,7 @@ class ReadFromVcf(PTransform):
         allow_malformed_records=allow_malformed_records,
         pre_infer_headers=pre_infer_headers,
         sample_name_encoding=sample_name_encoding,
-        use_1_based_format=use_1_based_format)
+        use_1_based_coordinate=use_1_based_coordinate)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -348,14 +348,14 @@ def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
     allow_malformed_records=None, pre_infer_headers=False,
     sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
-    use_1_based_format=False):
+    use_1_based_coordinate=False):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
                     pre_infer_headers=pre_infer_headers,
                     sample_name_encoding=sample_name_encoding,
-                    use_1_based_format=use_1_based_format)
+                    use_1_based_coordinate=use_1_based_coordinate)
 
 
 class ReadAllFromVcf(PTransform):
@@ -380,7 +380,7 @@ class ReadAllFromVcf(PTransform):
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
-      use_1_based_format=False,  # type: bool
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -412,7 +412,7 @@ class ReadAllFromVcf(PTransform):
         allow_malformed_records=allow_malformed_records,
         pre_infer_headers=pre_infer_headers,
         sample_name_encoding=sample_name_encoding,
-        use_1_based_format=use_1_based_format)
+        use_1_based_coordinate=use_1_based_coordinate)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

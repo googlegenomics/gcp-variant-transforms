@@ -104,7 +104,7 @@ class VcfReadOptions(VariantTransformsOptions):
               'setting this flag or `--infer_annotation_types` incurs a '
               'performance penalty of an extra pass over all variants.'))
     parser.add_argument(
-        '--use_1_based_format',
+        '--use_1_based_coordinate',
         type='bool', default=False, nargs='?', const=True,
         help=('If true, start position will be 1 based, and end position will '
               'be inclusive. Otherwise, by default the records will stored in '
