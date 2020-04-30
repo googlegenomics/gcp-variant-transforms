@@ -188,7 +188,7 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
     sample_ids = (variants
                   | 'CombineSampleIds' >>
                   combine_sample_ids.SampleIdsCombiner()
-                  | beam.combiners.ToList())
+                  | 'CombineToList' >> beam.combiners.ToList())
     # TODO(tneymanov): Annotation pipeline currently stores sample IDs instead
     # of sample names in the the sharded VCF files, which would lead to double
     # hashing of samples. Needs to be fixed ASAP.

@@ -18,66 +18,67 @@ from typing import Dict, List  # pylint: disable=unused-import
 
 import apache_beam as beam
 
-SAMPLE_ID_COLUMN = 'sample_id'
-SAMPLE_NAME_COLUMN = 'sample_name'
-FILE_PATH_COLUMN = 'file_path'
-WITH_FILE_SAMPLE_TEMPLATE = "{FILE_PATH}/{SAMPLE_NAME}"
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
+
+SAMPLE_ID_COLUMN = sample_info_table_schema_generator.SAMPLE_ID
+SAMPLE_NAME_COLUMN = sample_info_table_schema_generator.SAMPLE_NAME
 
 
 class SampleIdToNameDict(beam.PTransform):
-  """Transforms BigQuery table rows to PCollection of `Variant`."""
+  """Generate Id-to-Name hashing table from sample info table."""
 
-  def _convert_bq_row(self, row):
+  def _extract_id_name(self, row):
     sample_id = row[SAMPLE_ID_COLUMN]
     sample_name = row[SAMPLE_NAME_COLUMN]
     return (sample_id, sample_name)
 
   def expand(self, pcoll):
     return (pcoll
-            | 'BigQueryToMapping' >> beam.Map(self._convert_bq_row)
+            | 'ExtractIdNameTuples' >> beam.Map(self._extract_id_name)
             | 'CombineToDict' >> beam.combiners.ToDict())
 
 
 class SampleNameToIdDict(beam.PTransform):
-  """Transforms BigQuery table rows to PCollection of `Variant`."""
+  """Generate Name-to-ID hashing table from sample info table."""
 
-  def _convert_bq_row(self, row):
+  def _extract_id_name(self, row):
     sample_id = row[SAMPLE_ID_COLUMN]
     sample_name = row[SAMPLE_NAME_COLUMN]
     return (sample_name, sample_id)
 
   def expand(self, pcoll):
     return (pcoll
-            | 'BigQueryToMapping' >> beam.Map(self._convert_bq_row)
+            | 'ExtractNameIdTuples' >> beam.Map(self._extract_id_name)
             | 'CombineToDict' >> beam.combiners.ToDict())
 
 class GetSampleNames(beam.PTransform):
-  """Transforms sample_ids to sample_names"""
+  """Looks up sample_names corresponding to the given sample_ids"""
 
-  def __init__(self, hash_table):
-    # type: (Dict[int, Tuple(str, str)]) -> None
-    self._hash_table = hash_table
+  def __init__(self, id_to_name_dict):
+    # type: (Dict[int, str]) -> None
+    self._id_to_name_dict = id_to_name_dict
 
-  def _get_sample_id(self, sample_id, hash_table):
-    # type: (int, Dict[int, Tuple(str, str)]) -> str
-    sample = hash_table[sample_id]
-    return sample
+  def _get_sample_name(self, sample_id, id_to_name_dict):
+    # type: (int, Dict[int, str]) -> str
+    if sample_id in id_to_name_dict:
+      return id_to_name_dict[sample_id]
+    raise ValueError('Sample ID `{}` was not found.'.format(sample_id))
 
   def expand(self, pcoll):
-    return pcoll | beam.Map(self._get_sample_id, self._hash_table)
+    return pcoll | beam.Map(self._get_sample_name, self._id_to_name_dict)
 
 class GetSampleIds(beam.PTransform):
-  """Transform sample_names to sample_ids"""
+  """Looks up sample_ids corresponding to the given sample_names"""
 
-  def __init__(self, hash_table):
+  def __init__(self, name_to_id_dict):
     # type: (Dict[str, int)]) -> None
-    self._hash_table = hash_table
+    self._name_to_id_dict = name_to_id_dict
 
-  def _get_sample_name(self, sample_name, hash_table):
+  def _get_sample_id(self, sample_name, name_to_id_dict):
     # type: (str, Dict[str, int]) -> int
-    if sample_name in hash_table:
-      return hash_table[sample_name]
+    if sample_name in name_to_id_dict:
+      return name_to_id_dict[sample_name]
     raise ValueError('Sample `{}` was not found.'.format(sample_name))
 
   def expand(self, pcoll):
-    return pcoll | beam.Map(self._get_sample_name, self._hash_table)
+    return pcoll | beam.Map(self._get_sample_id, self._name_to_id_dict)

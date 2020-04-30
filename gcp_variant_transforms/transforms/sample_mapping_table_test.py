@@ -31,18 +31,16 @@ from gcp_variant_transforms.transforms.sample_mapping_table import SAMPLE_ID_COL
 from gcp_variant_transforms.transforms.sample_mapping_table import SAMPLE_NAME_COLUMN
 from gcp_variant_transforms.transforms.sample_mapping_table import SampleIdToNameDict
 from gcp_variant_transforms.transforms.sample_mapping_table import SampleNameToIdDict
-from gcp_variant_transforms.transforms.sample_mapping_table import FILE_PATH_COLUMN
 
 
 
-def _generate_bq_row(sample_id, sample_name, file_path):
+def _generate_bq_row(sample_id, sample_name):
   return {SAMPLE_ID_COLUMN: sample_id,
-          SAMPLE_NAME_COLUMN: sample_name,
-          FILE_PATH_COLUMN: file_path}
+          SAMPLE_NAME_COLUMN: sample_name}
 
-BQ_ROWS = [_generate_bq_row(1, 'N01', 'file1'),
-           _generate_bq_row(2, 'N02', 'file2'),
-           _generate_bq_row(3, 'N03', 'file3')]
+BQ_ROWS = [_generate_bq_row(1, 'N01'),
+           _generate_bq_row(2, 'N02'),
+           _generate_bq_row(3, 'N03')]
 
 class SampleIdToNameDictTest(unittest.TestCase):
   """Test cases for the ``SampleTableToDict`` transform."""

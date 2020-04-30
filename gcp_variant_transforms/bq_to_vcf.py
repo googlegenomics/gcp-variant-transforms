@@ -196,21 +196,15 @@ def _bigquery_to_vcf_shards(
     sample_table_rows = (
         p
         | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
+    name_to_id_hash_table = (
+        sample_table_rows
+        | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
     if known_args.sample_names:
-      name_to_id_hash_table = (
-          sample_table_rows
-          | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
       sample_names = (p
                       | transforms.Create(known_args.sample_names,
                                           reshuffle=False))
-      combined_sample_ids = (
-          sample_names
-          | 'GetSampleIds' >>
-          sample_mapping_table.GetSampleIds(
-              beam.pvalue.AsSingleton(name_to_id_hash_table))
-          | 'CombineSampleIds' >> beam.combiners.ToList())
-      combined_sample_names = sample_names | beam.combiners.ToList()
     else:
+      # Get sample names from sample IDs in the variants and sort.
       id_to_name_hash_table = (
           sample_table_rows
           | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
@@ -218,13 +212,21 @@ def _bigquery_to_vcf_shards(
                     | 'CombineSampleIds' >>
                     combine_sample_ids.SampleIdsCombiner(
                         known_args.preserve_sample_order))
-      combined_sample_names = (
+      sample_names = (
           sample_ids
           | 'GetSampleNames' >>
           sample_mapping_table.GetSampleNames(
               beam.pvalue.AsSingleton(id_to_name_hash_table))
-          | 'CombineSampleNames' >> beam.combiners.ToList())
-      combined_sample_ids = sample_ids | beam.combiners.ToList()
+          | 'CombineToList' >> beam.combiners.ToList()
+          | 'SortSampleNames' >> beam.ParDo(sorted))
+
+    combined_sample_ids = (
+        sample_names
+        | 'GetSampleIds' >>
+        sample_mapping_table.GetSampleIds(
+            beam.pvalue.AsSingleton(name_to_id_hash_table))
+        | 'CombineSortedSampleIds' >> beam.combiners.ToList())
+    combined_sample_names = sample_names | beam.combiners.ToList()
 
     _ = (combined_sample_names
          | 'GenerateVcfDataHeader' >>
