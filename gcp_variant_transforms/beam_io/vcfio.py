@@ -255,7 +255,7 @@ class ReadFromBGZF(beam.PTransform):
       sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
-        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
+        in BQ using 0 based exclusive (default) or 1 based inclusive coordinate.
     """
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
@@ -330,7 +330,7 @@ class ReadFromVcf(PTransform):
       sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
-        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
+        in BQ using 0 based exclusive (default) or 1 based inclusive coordinate.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
 
@@ -408,7 +408,7 @@ class ReadAllFromVcf(PTransform):
       sample_name_encoding: specify how we want to encode sample_name mainly
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
-        in BQ needs on a 0 based exclusive (default) or 1 based inclusive basis.
+        in BQ using 0 based exclusive (default) or 1 based inclusive coordinate.
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(

@@ -97,7 +97,7 @@ def _get_sample_variant_1(file_name='', use_1_based_coordinate=False):
 
   return variant
 
-def _get_sample_variant_2(file_name=''):
+def _get_sample_variant_2(file_name='', use_1_based_coordinate=False):
   """Get second sample variant.
 
   Features:
@@ -108,8 +108,9 @@ def _get_sample_variant_2(file_name=''):
     missing format field
   """
   variant = vcfio.Variant(
-      reference_name='19', start=122, end=125, reference_bases='GTC',
-      alternate_bases=[], names=['rs1234'], quality=40,
+      reference_name='19',
+      start=123 if use_1_based_coordinate else 122, end=125,
+      reference_bases='GTC', alternate_bases=[], names=['rs1234'], quality=40,
       filters=['q10', 's50'], info={'NS': 2})
   variant.calls.append(
       vcfio.VariantCall(
@@ -122,7 +123,7 @@ def _get_sample_variant_2(file_name=''):
   return variant
 
 
-def _get_sample_variant_3(file_name=''):
+def _get_sample_variant_3(file_name='', use_1_based_coordinate=False):
   """Get third sample variant.
 
   Features:
@@ -131,9 +132,9 @@ def _get_sample_variant_3(file_name=''):
     alternate phaseset
   """
   variant = vcfio.Variant(
-      reference_name='19', start=11, end=12, reference_bases='C',
-      alternate_bases=['<SYMBOLIC>'], quality=49, filters=['q10'],
-      info={'AF': [0.5]})
+      reference_name='19', start=12 if use_1_based_coordinate else 11, end=12,
+      reference_bases='C', alternate_bases=['<SYMBOLIC>'], quality=49,
+      filters=['q10'], info={'AF': [0.5]})
   variant.calls.append(
       vcfio.VariantCall(
           sample_id=hash_name('Sample1', file_name), genotype=[0, 1],
@@ -286,6 +287,23 @@ class VcfSourceTest(unittest.TestCase):
 
     self.assertEqual(1, len(read_data))
     self.assertEqual(variant, read_data[0])
+
+  def test_file_pattern_1_based_verify_details(self):
+    variant_1 = _get_sample_variant_1(use_1_based_coordinate=True)
+    variant_2 = _get_sample_variant_2(use_1_based_coordinate=True)
+    variant_3 = _get_sample_variant_3(use_1_based_coordinate=True)
+    with TempDir() as tempdir:
+      _ = tempdir.create_temp_file(
+          suffix='.vcf', lines=_SAMPLE_HEADER_LINES + [VCF_LINE_1])
+      _ = tempdir.create_temp_file(
+          suffix='.vcf', lines=_SAMPLE_HEADER_LINES + [VCF_LINE_2, VCF_LINE_3])
+      read_data = source_test_utils.read_from_source(
+          VcfSource(os.path.join(tempdir.get_path(), '*.vcf'),
+                    representative_header_lines=None,
+                    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
+                    use_1_based_coordinate=True))
+      self.assertEqual(3, len(read_data))
+      self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
   def test_single_file_verify_details(self):
     read_data = self._create_temp_file_and_read_records(
