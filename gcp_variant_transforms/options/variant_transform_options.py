@@ -606,8 +606,8 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
           'required'.format(parsed_args.input_table,
                             TABLE_SUFFIX_SEPARATOR))
     base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
-    sample_table_id = (
-        base_table_id + TABLE_SUFFIX_SEPARATOR + SAMPLE_INFO_TABLE_SUFFIX)
+    sample_table_id = bigquery_util.compose_table_name(base_table_id,
+                                                       SAMPLE_INFO_TABLE_SUFFIX)
 
     if not bigquery_util.table_exist(client, project_id, dataset_id,
                                      sample_table_id):

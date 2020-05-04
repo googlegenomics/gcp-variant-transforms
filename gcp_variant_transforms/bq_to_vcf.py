@@ -84,9 +84,8 @@ _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
 _VCF_VERSION_LINE = (
     vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.3') + '\n')
 _SAMPLE_INFO_QUERY_TEMPLATE = (
-    'SELECT sample_id, sample_name, file_path '
-    'FROM `{PROJECT_ID}.{DATASET_ID}.{BASE_TABLE_ID}' +
-    TABLE_SUFFIX_SEPARATOR + SAMPLE_INFO_TABLE_SUFFIX + '`')
+    'SELECT sample_id, sample_name, file_path FROM '
+    '`{PROJECT_ID}.{DATASET_ID}.{TABLE_NAME}`')
 
 
 def run(argv=None):
@@ -183,9 +182,11 @@ def _bigquery_to_vcf_shards(
   annotation_names = _extract_annotation_names(schema)
 
   base_table_id = bigquery_util.get_table_base_name(table_id)
-  sample_query = _SAMPLE_INFO_QUERY_TEMPLATE.format(PROJECT_ID=project_id,
-                                                    DATASET_ID=dataset_id,
-                                                    BASE_TABLE_ID=base_table_id)
+  sample_query = _SAMPLE_INFO_QUERY_TEMPLATE.format(
+      PROJECT_ID=project_id,
+      DATASET_ID=dataset_id,
+      TABLE_NAME=bigquery_util.compose_table_name(base_table_id,
+                                                  SAMPLE_INFO_TABLE_SUFFIX))
   bq_sample_source = bigquery.BigQuerySource(query=sample_query,
                                              validate=True,
                                              use_standard_sql=True)
@@ -196,39 +197,39 @@ def _bigquery_to_vcf_shards(
     sample_table_rows = (
         p
         | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
-    name_to_id_hash_table = (
-        sample_table_rows
-        | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
     if known_args.sample_names:
-      sample_names = (p
-                      | transforms.Create(known_args.sample_names,
-                                          reshuffle=False))
+      temp_sample_names = (p
+                           | transforms.Create(known_args.sample_names,
+                                               reshuffle=False))
     else:
       # Get sample names from sample IDs in the variants and sort.
       id_to_name_hash_table = (
           sample_table_rows
           | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
-      sample_ids = (variants
-                    | 'CombineSampleIds' >>
-                    combine_sample_ids.SampleIdsCombiner(
-                        known_args.preserve_sample_order))
-      sample_names = (
-          sample_ids
+      temp_sample_ids = (variants
+                         | 'CombineSampleIds' >>
+                         combine_sample_ids.SampleIdsCombiner(
+                             known_args.preserve_sample_order))
+      temp_sample_names = (
+          temp_sample_ids
           | 'GetSampleNames' >>
           sample_mapping_table.GetSampleNames(
               beam.pvalue.AsSingleton(id_to_name_hash_table))
           | 'CombineToList' >> beam.combiners.ToList()
           | 'SortSampleNames' >> beam.ParDo(sorted))
 
-    combined_sample_ids = (
-        sample_names
+    name_to_id_hash_table = (
+        sample_table_rows
+        | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
+    sample_ids = (
+        temp_sample_names
         | 'GetSampleIds' >>
         sample_mapping_table.GetSampleIds(
             beam.pvalue.AsSingleton(name_to_id_hash_table))
         | 'CombineSortedSampleIds' >> beam.combiners.ToList())
-    combined_sample_names = sample_names | beam.combiners.ToList()
+    sample_names = temp_sample_names | beam.combiners.ToList()
 
-    _ = (combined_sample_names
+    _ = (sample_names
          | 'GenerateVcfDataHeader' >>
          beam.ParDo(_write_vcf_header_with_sample_names,
                     _VCF_FIXED_COLUMNS,
@@ -237,7 +238,7 @@ def _bigquery_to_vcf_shards(
 
     _ = (variants
          | densify_variants.DensifyVariants(
-             beam.pvalue.AsSingleton(combined_sample_ids))
+             beam.pvalue.AsSingleton(sample_ids))
          | 'PairVariantWithKey' >>
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()

@@ -65,7 +65,9 @@ class GetSampleNames(beam.PTransform):
     raise ValueError('Sample ID `{}` was not found.'.format(sample_id))
 
   def expand(self, pcoll):
-    return pcoll | beam.Map(self._get_sample_name, self._id_to_name_dict)
+    return (pcoll
+            | 'Generate Name to ID Mapping'
+            >> beam.Map(self._get_sample_name, self._id_to_name_dict))
 
 class GetSampleIds(beam.PTransform):
   """Looks up sample_ids corresponding to the given sample_names"""
@@ -81,4 +83,6 @@ class GetSampleIds(beam.PTransform):
     raise ValueError('Sample `{}` was not found.'.format(sample_name))
 
   def expand(self, pcoll):
-    return pcoll | beam.Map(self._get_sample_id, self._name_to_id_dict)
+    return (pcoll
+            | 'Generate Name to ID Mapping'
+            >> beam.Map(self._get_sample_id, self._name_to_id_dict))
