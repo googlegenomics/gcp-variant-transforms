@@ -104,6 +104,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
       assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
+      time.sleep(5)  # Avoid overwhelming BQ with too many concurrent queries.
 
   def get_name(self):
     return self._name
