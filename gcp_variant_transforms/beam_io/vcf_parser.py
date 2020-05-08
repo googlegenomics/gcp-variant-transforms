@@ -265,6 +265,7 @@ class VcfParser(object):
       splittable_bgzf=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -275,6 +276,7 @@ class VcfParser(object):
     self._allow_malformed_records = allow_malformed_records
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
+    self._use_1_based_coordinate = use_1_based_coordinate
 
     if splittable_bgzf:
       text_source = bgzf.BGZFBlockSource(
@@ -429,6 +431,7 @@ class PySamParser(VcfParser):
       splittable_bgzf=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -441,6 +444,7 @@ class PySamParser(VcfParser):
                                       splittable_bgzf,
                                       pre_infer_headers,
                                       sample_name_encoding,
+                                      use_1_based_coordinate,
                                       **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
@@ -448,7 +452,6 @@ class PySamParser(VcfParser):
     self._original_info_list = None
     self._process_pid = None
     self._encoded_sample_names = {}
-    self._sample_name_encoding = sample_name_encoding
 
   def send_kill_signal_to_child(self):
     self._to_child.write('\n')
@@ -544,7 +547,7 @@ class PySamParser(VcfParser):
     self._verify_start_end(record)
     return Variant(
         reference_name=record.chrom.encode('utf-8'),
-        start=record.start,
+        start=record.pos if self._use_1_based_coordinate else record.start,
         end=record.stop,
         reference_bases=self._convert_field(record.ref),
         alternate_bases=list(record.alts) if record.alts else [],
