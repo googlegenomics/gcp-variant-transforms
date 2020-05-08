@@ -2,13 +2,10 @@
   {
     "test_name": "platinum-partition-with-residual",
     "table_name": "platinum_partition_with_residual",
-    "input_pattern": "gs://genomics-public-data/platinum-genomes/vcf/*.vcf",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_3k_rnd_lines/*.vcf",
     "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
     "runner": "DataflowRunner",
     "variant_merge_strategy": "MOVE_TO_CALLS",
-    "worker_machine_type": "n1-highmem-4",
-    "max_num_workers": "60",
-    "num_workers": "60",
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
@@ -16,43 +13,43 @@
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01`"],
-        "expected_result": {"num_rows": 20206691}
+        "expected_result": {"num_rows": 1376}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr02`"],
-        "expected_result": {"num_rows": 20712382}
+        "expected_result": {"num_rows": 1383}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr03`"],
-        "expected_result": {"num_rows": 16194801}
+        "expected_result": {"num_rows": 1101}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr04_05`"],
-        "expected_result": {"num_rows": 31051681}
+        "expected_result": {"num_rows": 2136}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr06_07_08_09`"],
-        "expected_result": {"num_rows": 52523434}
+        "expected_result": {"num_rows": 3656}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_10M`"],
-        "expected_result": {"num_rows": 1241683}
+        "expected_result": {"num_rows": 94}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_20M`"],
-        "expected_result": {"num_rows": 1077097}
+        "expected_result": {"num_rows": 76}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
-        "expected_result": {"num_rows": 19388563}
+        "expected_result": {"num_rows": 1201}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY_M`"],
-        "expected_result": {"num_rows": 2188382}
+        "expected_result": {"num_rows": 156}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__all_remaining`"],
-        "expected_result": {"num_rows": 96701092}
+        "expected_result": {"num_rows": 6821}
       }
     ]
   }
