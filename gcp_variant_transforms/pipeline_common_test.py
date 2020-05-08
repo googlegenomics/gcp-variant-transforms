@@ -240,22 +240,13 @@ class CommonPipelineTest(unittest.TestCase):
     assert_that(variants, asserts.count_equals_to(5))
     pipeline.run()
 
-  def test_read_variants_pysam(self):
+  def test_read_variants_use_1_based_coordinate(self):
     pipeline = test_pipeline.TestPipeline()
     all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
     variants = pipeline_common.read_variants(pipeline,
                                              all_patterns,
                                              PipelineModes.SMALL,
-                                             False)
-    assert_that(variants, asserts.count_equals_to(5))
-    pipeline.run()
-
-  def test_read_variants_large_mode_pysam(self):
-    pipeline = test_pipeline.TestPipeline()
-    all_patterns = [testdata_util.get_full_file_path('valid-4.0.vcf')]
-    variants = pipeline_common.read_variants(pipeline,
-                                             all_patterns,
-                                             PipelineModes.LARGE,
-                                             False)
+                                             False,
+                                             use_1_based_coordinate=True)
     assert_that(variants, asserts.count_equals_to(5))
     pipeline.run()
