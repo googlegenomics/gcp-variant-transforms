@@ -70,12 +70,10 @@ class SampleIdsCombiner(beam.PTransform):
               | 'RemoveDuplicates' >> beam.RemoveDuplicates()
               | 'Combine' >> beam.combiners.ToList()
               | 'ExtractUniqueSampleIds'
-              >> beam.ParDo(self._extract_unique_sample_ids)
-              | beam.combiners.ToList())
+              >> beam.ParDo(self._extract_unique_sample_ids))
     else:
       return (pcoll
               | 'GetSampleIds' >> beam.FlatMap(self._get_sample_ids)
               | 'RemoveDuplicates' >> beam.RemoveDuplicates()
               | 'Combine' >> beam.combiners.ToList()
-              | 'SortSampleIds' >> beam.ParDo(sorted)
-              | beam.combiners.ToList())
+              | 'SortSampleIds' >> beam.ParDo(sorted))

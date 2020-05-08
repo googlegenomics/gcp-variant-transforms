@@ -6,8 +6,8 @@
 ##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129">
 ##INFO=<ID=H2,Number=0,Type=Flag,Description="HapMap2 membership">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant (with unïcodé)">
-##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 ##FORMAT=<ID=HQ,Number=.,Type=Integer,Description="Haplotype Quality">
 ##FORMAT=<ID=GL,Number=.,Type=Integer,Description="Genotype Likelihood">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA00001	NA00002	NA00003

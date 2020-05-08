@@ -41,6 +41,8 @@ SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH = (
 _MAX_BQ_NUM_PARTITIONS = 4000
 _RANGE_END_SIG_DIGITS = 4
 _RANGE_INTERVAL_SIG_DIGITS = 1
+_TOTAL_BASE_PAIRS_SIG_DIGITS = 4
+_PARTITION_SIZE_SIG_DIGITS = 1
 
 START_POSITION_COLUMN = 'start_position'
 _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
@@ -401,7 +403,8 @@ class LoadAvro(object):
 
   def start_loading(self):
     # We run _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS load jobs in parallel.
-    for _ in range(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS):
+    for _ in range(min(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS,
+                       len(self._remaining_load_jobs))):
       self._start_one_load_job(self._remaining_load_jobs.pop())
 
     self._monitor_load_jobs()

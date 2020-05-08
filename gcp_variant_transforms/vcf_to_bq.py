@@ -112,7 +112,8 @@ def _read_variants(all_patterns,  # type: List[str]
       known_args.allow_malformed_records,
       representative_header_lines,
       pre_infer_headers=pre_infer_headers,
-      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding])
+      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding],
+      use_1_based_coordinate=known_args.use_1_based_coordinate)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -187,7 +188,8 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
         known_args.all_patterns, p, known_args, pipeline_mode)
     sample_ids = (variants
                   | 'CombineSampleIds' >>
-                  combine_sample_ids.SampleIdsCombiner())
+                  combine_sample_ids.SampleIdsCombiner()
+                  | 'CombineToList' >> beam.combiners.ToList())
     # TODO(tneymanov): Annotation pipeline currently stores sample IDs instead
     # of sample names in the the sharded VCF files, which would lead to double
     # hashing of samples. Needs to be fixed ASAP.

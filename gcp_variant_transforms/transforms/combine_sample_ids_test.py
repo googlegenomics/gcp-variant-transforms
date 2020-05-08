@@ -16,6 +16,7 @@
 
 import unittest
 
+from apache_beam import combiners
 from apache_beam import transforms
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
@@ -48,8 +49,8 @@ class GetSampleIdsTest(unittest.TestCase):
         pipeline
         | transforms.Create(variants)
         | 'CombineSampleIds' >>
-        combine_sample_ids.SampleIdsCombiner(
-            preserve_sample_order=True))
+        combine_sample_ids.SampleIdsCombiner(preserve_sample_order=True)
+        | combiners.ToList())
     with self.assertRaises(ValueError):
       pipeline.run()
 
@@ -76,8 +77,8 @@ class GetSampleIdsTest(unittest.TestCase):
         pipeline
         | transforms.Create(variants)
         | 'CombineSampleIds' >>
-        combine_sample_ids.SampleIdsCombiner(
-            preserve_sample_order=True))
+        combine_sample_ids.SampleIdsCombiner(preserve_sample_order=True)
+        | combiners.ToList())
     assert_that(combined_sample_ids, equal_to([sample_ids]))
     pipeline.run()
 
@@ -99,8 +100,8 @@ class GetSampleIdsTest(unittest.TestCase):
     combined_sample_ids = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineSampleIds' >>
-        combine_sample_ids.SampleIdsCombiner())
+        | 'CombineSampleIds' >> combine_sample_ids.SampleIdsCombiner()
+        | combiners.ToList())
     assert_that(combined_sample_ids, equal_to([sample_ids]))
     pipeline.run()
 
@@ -112,7 +113,7 @@ class GetSampleIdsTest(unittest.TestCase):
     _ = (
         pipeline
         | transforms.Create(variants)
-        | 'CombineSampleIds' >>
-        combine_sample_ids.SampleIdsCombiner())
+        | 'CombineSampleIds' >> combine_sample_ids.SampleIdsCombiner()
+        | combiners.ToList())
     with self.assertRaises(ValueError):
       pipeline.run()
