@@ -1,7 +1,7 @@
 [
   {
     "test_name": "bq-to-vcf-option-allow-incompatible-schema",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_2_new_schema",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_2__suffix",
     "output_file_name": "bq_to_vcf_option_allow_incompatible_schema.vcf",
     "allow_incompatible_schema": true,
     "runner": "DirectRunner",

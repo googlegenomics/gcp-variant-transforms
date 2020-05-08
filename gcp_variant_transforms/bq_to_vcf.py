@@ -67,17 +67,25 @@ from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
+from gcp_variant_transforms.transforms import sample_mapping_table
+
 
 
 _BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
 _BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
+TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
+SAMPLE_INFO_TABLE_SUFFIX = bigquery_util.SAMPLE_INFO_TABLE_SUFFIX
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
-_VCF_VERSION_LINE = '##fileformat=VCFv4.3\n'
+_VCF_VERSION_LINE = (
+    vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.3') + '\n')
+_SAMPLE_INFO_QUERY_TEMPLATE = (
+    'SELECT sample_id, sample_name, file_path FROM '
+    '`{PROJECT_ID}.{DATASET_ID}.{TABLE_NAME}`')
 
 
 def run(argv=None):
@@ -164,30 +172,63 @@ def _bigquery_to_vcf_shards(
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  # TODO(allieychen): Modify the SQL query with the specified sample_ids.
-  query = _get_bigquery_query(known_args, schema)
-  logging.info('Processing BigQuery query %s:', query)
-  bq_source = bigquery.BigQuerySource(query=query,
-                                      validate=True,
-                                      use_standard_sql=True)
+  variant_query = _get_variant_query(known_args, schema)
+  logging.info('Processing BigQuery query %s:', variant_query)
+  project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+      known_args.input_table)
+  bq_variant_source = bigquery.BigQuerySource(query=variant_query,
+                                              validate=True,
+                                              use_standard_sql=True)
   annotation_names = _extract_annotation_names(schema)
+
+  base_table_id = bigquery_util.get_table_base_name(table_id)
+  sample_query = _SAMPLE_INFO_QUERY_TEMPLATE.format(
+      PROJECT_ID=project_id,
+      DATASET_ID=dataset_id,
+      TABLE_NAME=bigquery_util.compose_table_name(base_table_id,
+                                                  SAMPLE_INFO_TABLE_SUFFIX))
+  bq_sample_source = bigquery.BigQuerySource(query=sample_query,
+                                             validate=True,
+                                             use_standard_sql=True)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
-                | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
+                | 'ReadFromBigQuery ' >> beam.io.Read(bq_variant_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
+    sample_table_rows = (
+        p
+        | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
     if known_args.sample_names:
-      sample_ids = (p
-                    | transforms.Create(known_args.sample_names,
-                                        reshuffle=False)
-                    | beam.combiners.ToList())
+      temp_sample_names = (p
+                           | transforms.Create(known_args.sample_names,
+                                               reshuffle=False))
     else:
-      sample_ids = (variants
-                    | 'CombineSampleIds' >>
-                    combine_sample_ids.SampleIdsCombiner(
-                        known_args.preserve_sample_order))
-    # TODO(tneymanov): Add logic to extract sample names from sample IDs by
-    # joining with sample id-name mapping table, once that code is implemented.
-    sample_names = sample_ids
+      # Get sample names from sample IDs in the variants and sort.
+      id_to_name_hash_table = (
+          sample_table_rows
+          | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
+      temp_sample_ids = (variants
+                         | 'CombineSampleIds' >>
+                         combine_sample_ids.SampleIdsCombiner(
+                             known_args.preserve_sample_order))
+      temp_sample_names = (
+          temp_sample_ids
+          | 'GetSampleNames' >>
+          sample_mapping_table.GetSampleNames(
+              beam.pvalue.AsSingleton(id_to_name_hash_table))
+          | 'CombineToList' >> beam.combiners.ToList()
+          | 'SortSampleNames' >> beam.ParDo(sorted))
+
+    name_to_id_hash_table = (
+        sample_table_rows
+        | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
+    sample_ids = (
+        temp_sample_names
+        | 'GetSampleIds' >>
+        sample_mapping_table.GetSampleIds(
+            beam.pvalue.AsSingleton(name_to_id_hash_table))
+        | 'CombineSortedSampleIds' >> beam.combiners.ToList())
+    sample_names = temp_sample_names | beam.combiners.ToList()
+
     _ = (sample_names
          | 'GenerateVcfDataHeader' >>
          beam.ParDo(_write_vcf_header_with_sample_names,
@@ -196,7 +237,8 @@ def _bigquery_to_vcf_shards(
                     header_file_path))
 
     _ = (variants
-         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(sample_ids))
+         | densify_variants.DensifyVariants(
+             beam.pvalue.AsSingleton(sample_ids))
          | 'PairVariantWithKey' >>
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
@@ -216,7 +258,7 @@ def _get_schema(input_table):
   return table.schema
 
 
-def _get_bigquery_query(known_args, schema):
+def _get_variant_query(known_args, schema):
   # type: (argparse.Namespace, bigquery_v2.TableSchema) -> str
   """Returns a BigQuery query for the interested regions."""
   columns = _get_query_columns(schema)
