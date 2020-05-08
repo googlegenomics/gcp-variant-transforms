@@ -403,7 +403,8 @@ class LoadAvro(object):
 
   def start_loading(self):
     # We run _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS load jobs in parallel.
-    for _ in range(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS):
+    for _ in range(min(_MAX_NUM_CONCURRENT_BQ_LOAD_JOBS,
+                       len(self._remaining_load_jobs))):
       self._start_one_load_job(self._remaining_load_jobs.pop())
 
     self._monitor_load_jobs()
