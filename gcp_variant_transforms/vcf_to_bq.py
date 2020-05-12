@@ -556,7 +556,15 @@ def run(argv=None):
       if bigquery_util.delete_gcs_files(avro_root_path) != 0:
         logging.error('Deletion of intermediate AVRO files located at "%s" has '
                       'failed.', avro_root_path)
-
+  for suffix in suffixes:
+    output_table = bigquery_util.compose_table_name(known_args.output_table,
+                                                    suffix)
+    if bigquery_util.table_empty(
+          *bigquery_util.parse_table_reference(output_table)):
+      if bigquery_util.delete_table(output_table) == 0:
+        logging.info('Empty table was successfully deleted: %s', output_table)
+      else:
+        logging.warning('Was not able to delete empty table: %s', output_table)
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)

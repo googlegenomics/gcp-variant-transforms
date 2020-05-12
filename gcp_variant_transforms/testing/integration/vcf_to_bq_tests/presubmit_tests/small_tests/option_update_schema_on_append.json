@@ -2,13 +2,13 @@
   {
     "test_name": "option-update-schema-on-append-step-1",
     "table_name": "option_update_schema_on_append",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
     "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
-        "expected_result": {"num_tables": 26}
+        "expected_result": {"num_tables": 5}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
@@ -16,30 +16,54 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
-        "expected_result": {"sum_start": 1234566}
+        "expected_result": {"sum_start": 14369}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
-        "expected_result": {"sum_end": 1234570}
+        "expected_result": {"sum_end": 14370}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"num_rows": 4}
+        "expected_result": {"num_rows": 10}
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"sum_start": 2372629}
+        "expected_result": {"sum_start": 23000231}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"sum_end": 2372633}
+        "expected_result": {"sum_end": 23001351}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"num_rows": 1}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_start": 17329}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
+        "expected_result": {"sum_end": 17330}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"num_rows": 1}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_start": 0}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_end": 1}
       }
     ]
   },
   {
     "test_name": "option-update-schema-on-append-step-2",
     "table_name": "option_update_schema_on_append",
-    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
     "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
     "append": true,
@@ -47,7 +71,7 @@
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
-        "expected_result": {"num_tables": 26}
+        "expected_result": {"num_tables": 5}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],

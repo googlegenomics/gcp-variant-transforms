@@ -55,7 +55,7 @@ _BQ_CREATE_SAMPLE_INFO_TABLE_COMMAND = (
     'bq mk --table {FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
-_BQ_LOAD_JOB_NUM_RETRIES = 5
+_BQ_NUM_RETIRES = 5
 _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
 
 
@@ -195,6 +195,37 @@ def table_exist(client, project_id, dataset_id, table_id):
     else:
       raise
   return True
+
+def table_empty(project_id, dataset_id, table_id):
+  client = bigquery.Client(project=project_id)
+  query = 'SELECT count(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}'.format(
+      DATASET_ID=dataset_id, TABLE_ID=table_id)
+  query_job = client.query(query)
+  num_retries = 0
+  while True:
+    try:
+      iterator = query_job.result(timeout=300)
+    except TimeoutError as e:
+      logging.warning('Time out waiting for query: %s', query)
+      if num_retries < _BQ_NUM_RETIRES:
+        num_retries += 1
+        time.sleep(90)
+      else:
+        raise e
+    else:
+      break
+
+  rows = list(iterator)
+  if len(rows) != 1:
+    logging.error('Query did not returned expected # of rows: {}'.format(query))
+    raise ValueError('Expected 1 row in query result, got {}'.format(len(rows)))
+
+  col = rows[0]
+  if len(col) != 1:
+    logging.error('Query did not returned expected # of cols: {}'.format(query))
+    raise ValueError('Expected 1 col in query result, got {}'.format(len(col)))
+
+  return col.get('num_rows') == 0
 
 def get_bigquery_type_from_vcf_type(vcf_type):
   # type: (str) -> str
@@ -435,7 +466,7 @@ class LoadAvro(object):
       load_job.cancel()
 
   def _handle_failed_load_job(self, suffix, load_job):
-    if self._num_load_jobs_retries < _BQ_LOAD_JOB_NUM_RETRIES:
+    if self._num_load_jobs_retries < _BQ_NUM_RETIRES:
       self._num_load_jobs_retries += 1
       # Retry the failed job after 5 minutes wait.
       time.sleep(300)
@@ -510,7 +541,7 @@ def create_output_table(full_table_id,  # type: str
   _run_table_creation_command(bq_command)
 
 
-def _delete_table(full_table_id):
+def delete_table(full_table_id):
   bq_command = _BQ_DELETE_TABLE_COMMAND.format(FULL_TABLE_ID=full_table_id)
   return os.system(bq_command)
 
@@ -536,7 +567,7 @@ def rollback_newly_created_tables(append, base_table_name, suffixes=None):
     logging.info('Trying to revert as much as possible...')
     for suffix in suffixes:
       table_name = compose_table_name(base_table_name, suffix)
-      if _delete_table(table_name) == 0:
+      if delete_table(table_name) == 0:
         logging.info('Table was successfully deleted: %s', table_name)
       else:
         logging.error('Failed to delete table: %s', table_name)

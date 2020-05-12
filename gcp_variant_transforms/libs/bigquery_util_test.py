@@ -418,7 +418,7 @@ class BigqueryUtilTest(unittest.TestCase):
         expected_merged_field_schemas)
 
 
-  def test_does_table_exist(self):
+  def test_table_exist(self):
     client = mock.Mock()
     client.tables.Get.return_value = bigquery.Table(
         tableReference=bigquery.TableReference(
@@ -438,6 +438,17 @@ class BigqueryUtilTest(unittest.TestCase):
     self.assertRaises(exceptions.HttpError,
                       bigquery_util.table_exist,
                       client, 'project', 'dataset', 'table')
+
+  def test_table_empty(self):
+    project_id = 'gcp-variant-transforms-test'
+    dataset_id = 'bq_to_vcf_integration_tests'
+    table_with_3_rows = 'merge_option_move_to_calls___chr20'
+    self.assertFalse(bigquery_util.table_empty(project_id, dataset_id,
+                                               table_with_3_rows))
+
+    table_with_0_rows = 'merge_option_move_to_calls___chr21'
+    self.assertTrue(bigquery_util.table_empty(project_id, dataset_id,
+                                              table_with_0_rows))
 
   def test_raise_error_if_dataset_not_exists(self):
     client = mock.Mock()

@@ -9,7 +9,7 @@
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
-        "expected_result": {"num_tables": 26}
+        "expected_result": {"num_tables": 2}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
