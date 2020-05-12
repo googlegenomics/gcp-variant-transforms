@@ -41,7 +41,6 @@ steps:
       - '--skip_build'
       - '--project ${PROJECT_ID}'
       - '--image_tag ${COMMIT_SHA}'
-      - '--run_unit_tests'
       - '--run_presubmit_tests'
       - '--test_name_prefix cloud-ci-'
     id: 'test-gcp-variant-transforms-docker'
