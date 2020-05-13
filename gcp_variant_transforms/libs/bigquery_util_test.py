@@ -482,8 +482,8 @@ class BigqueryUtilTest(unittest.TestCase):
     self.assertEqual(without_suffix2,
                      bigquery_util.get_table_base_name(with_two_suffixes2))
 
-  def test_calculate_optimal_partition_size(self):
-    total_base_pairs_to_expected_partition_size = {
+  def test_calculate_optimal_range_interval(self):
+    range_end_to_expected_range_interval = {
         39980000: 10000,
         (39980000 - 1): 10000,
         (39980000 - 9999): 10000,
@@ -493,12 +493,26 @@ class BigqueryUtilTest(unittest.TestCase):
         40020000: 10020,
         40030000: 10020,
     }
-    for total_base_pairs, expected_partition_size in (
-        total_base_pairs_to_expected_partition_size.items()):
-      (partition_size, total_base_pairs_enlarged) = (
-          bigquery_util.calculate_optimal_range_interval(
-              total_base_pairs))
-      self.assertEqual(expected_partition_size, partition_size)
-      self.assertEqual(expected_partition_size *
-                       (bigquery_util._MAX_BQ_NUM_PARTITIONS - 1),
-                       total_base_pairs_enlarged)
+    for range_end, expected_range_interval in (
+        range_end_to_expected_range_interval.items()):
+      (range_interval, range_end_enlarged) = (
+          bigquery_util.calculate_optimal_range_interval(range_end))
+      expected_range_end = (
+          expected_range_interval * (bigquery_util._MAX_BQ_NUM_PARTITIONS - 1))
+      self.assertEqual(expected_range_interval, range_interval)
+      self.assertEqual(expected_range_end, range_end_enlarged)
+
+  def test_calculate_optimal_range_interval_large(self):
+    large_range_ends = [bigquery_util.MAX_RANGE_END,
+                        bigquery_util.MAX_RANGE_END + 1,
+                        bigquery_util.MAX_RANGE_END - 1,
+                        bigquery_util.MAX_RANGE_END - 2 * pow(10, 4)]
+
+    expected_interval = int(bigquery_util.MAX_RANGE_END /
+                            float(bigquery_util._MAX_BQ_NUM_PARTITIONS))
+    expected_end = bigquery_util.MAX_RANGE_END
+    for large_range_end in large_range_ends:
+      (range_interval, range_end_enlarged) = (
+          bigquery_util.calculate_optimal_range_interval(large_range_end))
+      self.assertEqual(expected_interval, range_interval)
+      self.assertEqual(expected_end, range_end_enlarged)
