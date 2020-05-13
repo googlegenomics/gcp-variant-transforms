@@ -38,6 +38,7 @@ TABLE_SUFFIX_SEPARATOR = '__'
 SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH = (
     'gcp_variant_transforms/data/schema/sample_info.json')
 
+MAX_RANGE_END = pow(2, 63) - 1
 _MAX_BQ_NUM_PARTITIONS = 4000
 _RANGE_END_SIG_DIGITS = 4
 _RANGE_INTERVAL_SIG_DIGITS = 1
@@ -357,12 +358,18 @@ def calculate_optimal_range_interval(range_end):
     * _RANGE_INTERVAL_SIG_DIGITS is set to 1 which adds [0, 10^1 * 3999)
   In total we add [10^4, 10 * 3999 + 2 * 10^4) buffer to range_end.
 
+  range_end must be capped at MAX_RANGE_END = pow(2, 63) - 1 which is required
+  by BigQuery integer range partitioning.
+
   Args:
     range_end: the maximum value of the column subject to partitioning
 
   Returns:
     A tuple (partition size, partition size * 3999).
   """
+  if range_end >= MAX_RANGE_END:
+    return(int(MAX_RANGE_END / float(_MAX_BQ_NUM_PARTITIONS)),
+           MAX_RANGE_END)
   # These two operations add [10^4, 2 * 10^4) buffer to range_end.
   range_end += math.pow(10, _RANGE_END_SIG_DIGITS)
   range_end = (
@@ -374,8 +381,13 @@ def calculate_optimal_range_interval(range_end):
   range_interval_round_up = int(
       math.ceil(range_interval / pow(10, _RANGE_INTERVAL_SIG_DIGITS)) *
       math.pow(10, _RANGE_INTERVAL_SIG_DIGITS))
-  return (range_interval_round_up,
-          range_interval_round_up * (_MAX_BQ_NUM_PARTITIONS - 1))
+  range_end_round_up = range_interval_round_up * (_MAX_BQ_NUM_PARTITIONS - 1)
+
+  if  range_end_round_up < MAX_RANGE_END:
+    return (range_interval_round_up, range_end_round_up)
+  else:
+    return(int(MAX_RANGE_END / float(_MAX_BQ_NUM_PARTITIONS)),
+           MAX_RANGE_END)
 
 
 def compose_table_name(base_name, suffix):
