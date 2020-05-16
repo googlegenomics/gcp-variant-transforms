@@ -535,8 +535,8 @@ def run(argv=None):
                      table_name)
     load_avro = bigquery_util.LoadAvro(avro_root_path,
                                        known_args.output_table,
-                                       suffixes, not(known_args.append))
-    not_empty_suffixes = load_avro.start_loading()
+                                       suffixes, not known_args.append)
+    _ = load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
@@ -557,20 +557,7 @@ def run(argv=None):
       if bigquery_util.delete_gcs_files(avro_root_path) != 0:
         logging.error('Deletion of intermediate AVRO files located at "%s" has '
                       'failed.', avro_root_path)
-  logging.info('List of not empty suffixes:')
-  for suffix in not_empty_suffixes:
-    logging.info(suffix)
-  """
-  for suffix in suffixes:
-    output_table = bigquery_util.compose_table_name(known_args.output_table,
-                                                    suffix)
-    if bigquery_util.table_empty(
-        *bigquery_util.parse_table_reference(output_table)):
-      if bigquery_util.delete_table(output_table) == 0:
-        logging.info('Empty table was successfully deleted: %s', output_table)
-      else:
-        logging.warning('Was not able to delete empty table: %s', output_table)
-  """
+
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)

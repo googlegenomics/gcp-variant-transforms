@@ -14,7 +14,6 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
-from concurrent.futures import TimeoutError
 import enum
 import exceptions
 import logging
@@ -197,37 +196,6 @@ def table_exist(client, project_id, dataset_id, table_id):
       raise
   return True
 
-def table_empty(project_id, dataset_id, table_id):
-  client = bigquery.Client(project=project_id)
-  query = 'SELECT count(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}'.format(
-      DATASET_ID=dataset_id, TABLE_ID=table_id)
-  query_job = client.query(query)
-  num_retries = 0
-  while True:
-    try:
-      results = query_job.result(timeout=300)
-    except TimeoutError as e:
-      logging.warning('Time out waiting for query: %s', query)
-      if num_retries < _BQ_NUM_RETRIES:
-        num_retries += 1
-        time.sleep(90)
-      else:
-        raise e
-    else:
-      break
-
-  if results.total_rows != 1:
-    logging.error('Query did not returned expected # of rows: %s', query)
-    raise ValueError(
-        'Expected 1 row in query result, got {}'.format(results.total_rows))
-
-  row = list(results)[0]
-  cols = row.keys()
-  if len(cols) != 1 or next(cols) != 'num_rows':
-    logging.error('Query %s did not return expected `num_rows` column.', query)
-    raise ValueError('Expected `num_rows` col is missing in the query result.')
-
-  return row.get('num_rows') == 0
 
 def get_bigquery_type_from_vcf_type(vcf_type):
   # type: (str) -> str
