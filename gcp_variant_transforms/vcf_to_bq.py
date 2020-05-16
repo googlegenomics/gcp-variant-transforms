@@ -564,7 +564,7 @@ def run(argv=None):
         known_args.output_table, suffixes)
     try:
       flatten_schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
-      if flatten_call_column.get_flatten_table_schema(flatten_schema_file) != 0:
+      if not flatten_call_column.get_flatten_table_schema(flatten_schema_file):
         raise ValueError('Failed to extract schema of flatten table')
       # Create output flatten tables if needed
       if not known_args.append:

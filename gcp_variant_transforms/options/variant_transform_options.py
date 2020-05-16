@@ -141,10 +141,14 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         '--sample_lookup_optimized_output_table',
         default='',
         help=('In addition to the default output tables (which are optimized '
-              'for variant look up queries), you can store a second copy of '
+              'for variant lookup queries), you can store a second copy of '
               'your data in BigQuery tables that are optimized for sample '
-              'look up queries. Note that setting this option will double your '
-              'BigQuery storage costs.'))
+              'lookup queries using this flag.'
+              'Note that setting this flag will *at least* double your '
+              'BigQuery storage costs. If your input VCF files are joint '
+              'genotyped (say with n sample) then sample lookup tables will '
+              'have n * the number of rows of their corresponding variant '
+              'lookup table.'))
     parser.add_argument(
         '--output_avro_path',
         default='',
@@ -236,6 +240,10 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         parsed_args.sharding_config_path, parsed_args.append)
 
     if parsed_args.sample_lookup_optimized_output_table:
+      if (parsed_args.output_table ==
+          parsed_args.sample_lookup_optimized_output_table):
+        raise ValueError('sample_lookup_optimized_output_table cannot be the '
+                         'same as output_table.')
       self._validate_output_tables(
           client, parsed_args.sample_lookup_optimized_output_table,
           parsed_args.sharding_config_path, parsed_args.append)
@@ -245,7 +253,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                               sharding_config_path, append):
     if (output_table_base_name !=
         bigquery_util.get_table_base_name(output_table_base_name)):
-      raise ValueError(('Output table cannot contain "{}" we reserve this  '
+      raise ValueError(('Output table cannot contain "{}". we reserve this '
                         'string to mark sharded output tables.').format(
                             bigquery_util.TABLE_SUFFIX_SEPARATOR))
 

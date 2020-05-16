@@ -522,24 +522,26 @@ class FlattenCallColumnTest(unittest.TestCase):
   """Test cases for class `FlattenCallColumn`."""
 
   def setUp(self):
+    # We never query this table for running the following test, however, the
+    # mock values are based on this table's schema. In other words:
+    #   mock_columns.return_value = self._flatter._get_column_names()
+    #   mock_sub_fields.return_value = self._flatter._get_call_sub_fields()
     input_base_table = ('gcp-variant-transforms-test:'
                         'bq_to_vcf_integration_tests.'
                         'merge_option_move_to_calls')
     self._flatter = bigquery_util.FlattenCallColumn(input_base_table, ['chr20'])
 
-  def test_get_column_names(self):
-    expected_column_names = ['reference_name', 'start_position', 'end_position',
-                             'reference_bases', 'alternate_bases', 'names',
-                             'quality', 'filter', 'call', 'NS', 'DP', 'AA',
-                             'DB', 'H2']
-    self.assertEqual(expected_column_names, self._flatter._get_column_names())
-
-  def test_get_call_sub_fields(self):
-    expected_sub_fields = \
-      ['sample_id', 'genotype', 'phaseset', 'DP', 'GQ', 'HQ']
-    self.assertEqual(expected_sub_fields, self._flatter._get_call_sub_fields())
-
-  def test_get_flatten_column_names(self):
+  @mock.patch('gcp_variant_transforms.libs.bigquery_util_test.bigquery_util.'
+              'FlattenCallColumn._get_column_names')
+  @mock.patch('gcp_variant_transforms.libs.bigquery_util_test.bigquery_util.'
+              'FlattenCallColumn._get_call_sub_fields')
+  def test_get_flatten_column_names(self, mock_sub_fields, mock_columns):
+    mock_columns.return_value = (
+        ['reference_name', 'start_position', 'end_position', 'reference_bases',
+         'alternate_bases', 'names', 'quality', 'filter', 'call', 'NS', 'DP',
+         'AA', 'DB', 'H2'])
+    mock_sub_fields.return_value = (
+        ['sample_id', 'genotype', 'phaseset', 'DP', 'GQ', 'HQ'])
     expected_select = (
         'main_table.reference_name AS `reference_name`, '
         'main_table.start_position AS `start_position`, '

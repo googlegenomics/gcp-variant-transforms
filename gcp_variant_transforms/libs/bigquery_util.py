@@ -528,7 +528,21 @@ def create_sample_info_table(output_table_id):
   _run_table_creation_command(bq_command)
 
 class FlattenCallColumn(object):
+  """Flattens call column to convert varinat opt tables to sample opt tables."""
+
   def __init__(self, base_table_id, suffixes):
+    # type (str, List[str]) -> None
+    """Initialize `FlattenCallColumn` object.
+
+    In preparation to convert variant lookup optimized tables to sample lookup
+    optimized tables, we initiate this class with the base table name of variant
+    opt table (set using --output_table flag) and the list of suffixes (which
+    are extracted from sharding config file).
+
+    Args:
+      base_table_id: Base name of variant opt outputs (set by --output_table).
+      suffixes: List of suffixes (extracted from sharding config file).
+    """
     (self._project_id,
      self._dataset_id,
      self._base_table) = parse_table_reference(base_table_id)
@@ -615,7 +629,7 @@ class FlattenCallColumn(object):
         break
     logging.info('Copy to table query was successful: %s', output_table_id)
 
-  def _create_temp_flatten_table(self):
+  def _create_temp_flatten_table_with_1_row(self):
     temp_suffix = time.strftime('%Y%m%d_%H%M%S')
     temp_table_id = '{}{}'.format(self._schema_table_id, temp_suffix)
     full_output_table_id = '{}.{}.{}'.format(
@@ -636,7 +650,21 @@ class FlattenCallColumn(object):
     return temp_table_id
 
   def get_flatten_table_schema(self, schema_file_path):
-    temp_table_id = self._create_temp_flatten_table()
+    # type: (str) -> bool
+    """Write the flatten table's schema to the given json file.
+
+    This method basically performs the following tasks:
+      * Composes a 'flattening query' based on _schema_table_id table's schema.
+      * Runs the 'flattening query' to read 1 row and writes it to a temp table.
+      * Extracts the schema of the temp table using _BQ_EXTRACT_SCHEMA_COMMAND.
+
+    Args:
+      schema_file_path: The json schema will be written to this file.
+
+    Returns;
+      A bool value indicating if the schema was successfully extracted.
+    """
+    temp_table_id = self._create_temp_flatten_table_with_1_row()
     full_table_id = '{}:{}.{}'.format(
         self._project_id, self._dataset_id, temp_table_id)
     bq_command = _BQ_EXTRACT_SCHEMA_COMMAND.format(
@@ -652,9 +680,24 @@ class FlattenCallColumn(object):
       logging.info('Successfully deleted temporary table: %s', full_table_id)
     else:
       logging.error('Was not able to delete temporary table: %s', full_table_id)
-    return result
+    return result == 0
 
   def copy_to_flatten_table(self, output_base_table_id):
+    # type: (str) -> None
+    """Copies data from variant lookup optimized tables to sample lookup tables.
+
+    Copies rows from _base_table_id__* to output_base_table_id__* for each value
+    in _suffixes. Here we assume destination tables are already created and are
+    partitioned based on call_sample_id column. The copying process is done via
+    a flattening query similar to the one used in get_flatten_table_schema().
+
+    Note that if source tables have repeated sample_ids then output table will
+    have more rows than input table. Essentially:
+    Number of output rows = Number of input rows * Number of repeated sample_ids
+
+    Args:
+      output_base_table_id: Base table name of output tables.
+    """
     # Here we assume all output_table_base + suffices[:] are already created.
     (output_project_id,
      output_dataset_id,
