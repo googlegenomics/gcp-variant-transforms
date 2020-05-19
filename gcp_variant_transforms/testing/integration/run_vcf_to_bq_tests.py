@@ -87,7 +87,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       value = v
       if isinstance(v, basestring):
-        value = v.format(TABLE_NAME=dataset_table)
+        value = v.format(TABLE_NAME=full_table_id)
       args.append('--{} {}'.format(k, value))
     self.run_test_command = run_tests_common.form_command(
         context.project,
@@ -168,8 +168,10 @@ class QueryFormatter(object):
 
   class _QueryMacros(enum.Enum):
     NUM_OUTPUT_TABLES = (
-        'SELECT COUNT(0) AS num_tables FROM `{DATASET_ID}.__TABLES_SUMMARY__`'
-        ' WHERE STARTS_WITH(table_id, "{TABLE_ID}' +
+        'SELECT COUNT(0) AS num_tables FROM `{DATASET_ID}.__TABLES_SUMMARY__` '
+        'WHERE STARTS_WITH(table_id, "{TABLE_ID}' +
+        bigquery_util.TABLE_SUFFIX_SEPARATOR + '") '
+        'OR STARTS_WITH(table_id, "{TABLE_ID}_samples' +
         bigquery_util.TABLE_SUFFIX_SEPARATOR + '")')
 
   def __init__(self, dataset_id, table_id):
