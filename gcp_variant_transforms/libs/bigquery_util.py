@@ -55,7 +55,7 @@ _BQ_CREATE_SAMPLE_INFO_TABLE_COMMAND = (
     'bq mk --table {FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
 _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
-_BQ_LOAD_JOB_NUM_RETRIES = 5
+_BQ_NUM_RETRIES = 5
 _MAX_NUM_CONCURRENT_BQ_LOAD_JOBS = 4
 
 
@@ -195,6 +195,7 @@ def table_exist(client, project_id, dataset_id, table_id):
     else:
       raise
   return True
+
 
 def get_bigquery_type_from_vcf_type(vcf_type):
   # type: (str) -> str
@@ -401,7 +402,8 @@ class LoadAvro(object):
   def __init__(self,
                avro_root_path,  # type: str
                output_table,  # type: str
-               suffixes  # type: List[str]
+               suffixes,  # type: List[str]
+               delete_empty_tables  # type: bool
               ):
     self._avro_root_path = avro_root_path
     project_id, dataset_id, table_id = parse_table_reference(output_table)
@@ -410,6 +412,9 @@ class LoadAvro(object):
     self._num_load_jobs_retries = 0
     self._suffixes_to_load_jobs = {}  # type: Dict[str, bigquery.job.LoadJob]
     self._remaining_load_jobs = suffixes[:]
+
+    self._delete_empty_tables = delete_empty_tables
+    self._not_empty_suffixes = []
 
     self._client = bigquery.Client(project=project_id)
 
@@ -420,6 +425,7 @@ class LoadAvro(object):
       self._start_one_load_job(self._remaining_load_jobs.pop())
 
     self._monitor_load_jobs()
+    return self._not_empty_suffixes
 
   def _start_one_load_job(self, suffix):
     job_config = bigquery.LoadJobConfig(
@@ -435,7 +441,7 @@ class LoadAvro(object):
       load_job.cancel()
 
   def _handle_failed_load_job(self, suffix, load_job):
-    if self._num_load_jobs_retries < _BQ_LOAD_JOB_NUM_RETRIES:
+    if self._num_load_jobs_retries < _BQ_NUM_RETRIES:
       self._num_load_jobs_retries += 1
       # Retry the failed job after 5 minutes wait.
       time.sleep(300)
@@ -461,9 +467,29 @@ class LoadAvro(object):
           if load_job.state != 'DONE':
             self._handle_failed_load_job(suffix, load_job)
           else:
+            self._delete_empty_table(suffix, load_job)
             if self._remaining_load_jobs:
               next_suffix = self._remaining_load_jobs.pop()
               self._start_one_load_job(next_suffix)
+
+  def _delete_empty_table(self, suffix, load_job):
+    api_repr_dic = load_job.destination.to_api_repr()
+    output_table = '{}:{}.{}'.format(api_repr_dic['projectId'],
+                                     api_repr_dic['datasetId'],
+                                     api_repr_dic['tableId'])
+    logging.info('%s rows was loaded to table: `%s`',
+                 load_job.output_rows, output_table)
+    if load_job.output_rows == 0:
+      if self._delete_empty_tables:
+        if delete_table(output_table) == 0:
+          logging.info('Table with 0 row was deleted: %s', output_table)
+        else:
+          logging.error('Not able to delete table with 0 row: %s', output_table)
+      else:
+        logging.info('Table with 0 added row is preserved: %s', output_table)
+    else:
+      self._not_empty_suffixes.append(suffix)
+
 
 def _run_table_creation_command(bq_command):
   result = os.system(bq_command)
@@ -510,7 +536,7 @@ def create_output_table(full_table_id,  # type: str
   _run_table_creation_command(bq_command)
 
 
-def _delete_table(full_table_id):
+def delete_table(full_table_id):
   bq_command = _BQ_DELETE_TABLE_COMMAND.format(FULL_TABLE_ID=full_table_id)
   return os.system(bq_command)
 
@@ -536,7 +562,7 @@ def rollback_newly_created_tables(append, base_table_name, suffixes=None):
     logging.info('Trying to revert as much as possible...')
     for suffix in suffixes:
       table_name = compose_table_name(base_table_name, suffix)
-      if _delete_table(table_name) == 0:
+      if delete_table(table_name) == 0:
         logging.info('Table was successfully deleted: %s', table_name)
       else:
         logging.error('Failed to delete table: %s', table_name)
