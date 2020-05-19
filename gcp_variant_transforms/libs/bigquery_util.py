@@ -68,8 +68,10 @@ _GET_CALL_SUB_FIELDS_QUERY = (
     'SELECT field_path '
     'FROM `{PROJECT_ID}`.{DATASET_ID}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS '
     'WHERE table_name = "{TABLE_ID}" AND column_name="{CALL_COLUMN}"')
+
 _MAIN_TABLE_ALIAS = 'main_table'
 _CALL_TABLE_ALIAS = 'call_table'
+_COLUMN_AS = '{TABLE_ALIAS}.{COL} AS `{COL_NAME}`'
 _FLATTEN_CALL_QUERY = (
     'SELECT {SELECT_COLUMNS} '
     'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` as {MAIN_TABLE_ALIAS}, '
@@ -528,7 +530,7 @@ def create_sample_info_table(output_table_id):
   _run_table_creation_command(bq_command)
 
 class FlattenCallColumn(object):
-  """Flattens call column to convert varinat opt tables to sample opt tables."""
+  """Flattens call column to convert variant opt tables to sample opt tables."""
 
   def __init__(self, base_table_id, suffixes):
     # type (str, List[str]) -> None
@@ -602,12 +604,14 @@ class FlattenCallColumn(object):
     select_list = []
     for column in column_names:
       if column != ColumnKeyConstants.CALLS:
-        select_list.append(_MAIN_TABLE_ALIAS + '.' + column + ' AS `'+
-                           column + '`')
+        select_list.append(
+            _COLUMN_AS.format(TABLE_ALIAS=_MAIN_TABLE_ALIAS, COL=column,
+                              COL_NAME=column))
       else:
         for s_f in sub_fields:
-          select_list.append(_CALL_TABLE_ALIAS + '.' + s_f + ' AS `' +
-                             ColumnKeyConstants.CALLS + '_' + s_f + '`')
+          select_list.append(
+              _COLUMN_AS.format(TABLE_ALIAS=_CALL_TABLE_ALIAS, COL=s_f,
+                                COL_NAME=ColumnKeyConstants.CALLS + '_' + s_f))
     return ', '.join(select_list)
 
   def _copy_to_flatten_table(self, output_table_id, cp_query):
@@ -645,7 +649,7 @@ class FlattenCallColumn(object):
                                           CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS)
     cp_query += ' LIMIT 1'  # We need this table only to extract its schema.
     self._copy_to_flatten_table(full_output_table_id, cp_query)
-    logging.info('A new table with 1 row was crated: %s', full_output_table_id)
+    logging.info('A new table with 1 row was created: %s', full_output_table_id)
     logging.info('This table is used to extract the schema of flatten table.')
     return temp_table_id
 
