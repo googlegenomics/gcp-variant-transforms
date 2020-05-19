@@ -536,7 +536,7 @@ def run(argv=None):
     load_avro = bigquery_util.LoadAvro(avro_root_path,
                                        known_args.output_table,
                                        suffixes, not known_args.append)
-    _ = load_avro.start_loading()
+    not_empty_variant_suffixes = load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
@@ -561,14 +561,14 @@ def run(argv=None):
 
   if known_args.sample_lookup_optimized_output_table:
     flatten_call_column = bigquery_util.FlattenCallColumn(
-        known_args.output_table, suffixes)
+        known_args.output_table, not_empty_variant_suffixes)
     try:
       flatten_schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
       if not flatten_call_column.get_flatten_table_schema(flatten_schema_file):
         raise ValueError('Failed to extract schema of flatten table')
       # Create output flatten tables if needed
       if not known_args.append:
-        for suffix in suffixes:
+        for suffix in not_empty_variant_suffixes:
           output_table_id = bigquery_util.compose_table_name(
               known_args.sample_lookup_optimized_output_table, suffix)
           bigquery_util.create_output_table(output_table_id,

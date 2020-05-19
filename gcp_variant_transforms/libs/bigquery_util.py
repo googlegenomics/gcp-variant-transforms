@@ -676,7 +676,7 @@ class FlattenCallColumn(object):
                     bq_command)
     else:
       logging.info('Successfully extracted the schema of flatten table.')
-    if _delete_table(full_table_id) == 0:
+    if delete_table(full_table_id) == 0:
       logging.info('Successfully deleted temporary table: %s', full_table_id)
     else:
       logging.error('Was not able to delete temporary table: %s', full_table_id)
