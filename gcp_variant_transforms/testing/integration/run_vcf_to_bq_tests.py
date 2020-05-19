@@ -125,7 +125,7 @@ class QueryAssertion(object):
     num_retries = 0
     while True:
       try:
-        iterator = query_job.result(timeout=300)
+        results = query_job.result(timeout=300)
       except TimeoutError as e:
         print 'WARNING: Time out waiting for query: {}'.format(self._query)
         if num_retries < _NUM_QUERY_RETIRES:
@@ -134,22 +134,27 @@ class QueryAssertion(object):
         else:
           raise e
       else:
-        break
+        if results.total_rows == 1:
+          break
+        else:
+          print 'ERROR: Query `{}` did not return expected num rows: {}'.format(
+              self._query, results.total_rows)
+          if num_retries < _NUM_QUERY_RETIRES:
+            num_retries += 1
+            time.sleep(90)
+          else:
+            raise run_tests_common.TestCaseFailure(
+                'Expected 1 row query results instead got {} in test {}'.format(
+                    results.total_rows, self._test_name))
 
-    rows = list(iterator)
-    if len(rows) != 1:
-      print 'ERROR: Query did not returned expected results: {}'.format(
-          self._query)
-      raise run_tests_common.TestCaseFailure(
-          'Expected one row in query result, got {} in test {}'.format(
-              len(rows), self._test_name))
-    row = rows[0]
-    if len(self._expected_result) != len(row):
+    row = list(results)[0]
+    col_names = row.keys()
+    if set(self._expected_result.keys()) != set(col_names):
       raise run_tests_common.TestCaseFailure(
           'Expected {} columns in the query result, got {} in test {}'.format(
-              len(self._expected_result), len(row), self._test_name))
+              self._expected_result.keys(), col_names, self._test_name))
     for key in self._expected_result.keys():
-      if self._expected_result[key] != row.get(key):
+      if self._expected_result.get(key) != row.get(key):
         raise run_tests_common.TestCaseFailure(
             'Column {} mismatch: expected {}, got {} in test {}'.format(
                 key, self._expected_result[key], row.get(key), self._test_name))
