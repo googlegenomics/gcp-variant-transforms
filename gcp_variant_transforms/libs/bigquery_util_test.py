@@ -418,7 +418,7 @@ class BigqueryUtilTest(unittest.TestCase):
         expected_merged_field_schemas)
 
 
-  def test_does_table_exist(self):
+  def test_table_exist(self):
     client = mock.Mock()
     client.tables.Get.return_value = bigquery.Table(
         tableReference=bigquery.TableReference(

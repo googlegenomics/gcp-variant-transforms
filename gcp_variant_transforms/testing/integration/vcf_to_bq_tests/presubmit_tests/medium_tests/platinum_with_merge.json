@@ -11,7 +11,7 @@
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
-        "expected_result": {"num_tables": 26}
+        "expected_result": {"num_tables": 5}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
@@ -48,90 +48,6 @@
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
         "expected_result": {"sum_end": 1605675559044616}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr4`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr5`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr6`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr7`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr8`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr9`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr10`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr11`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr12`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr13`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr14`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr15`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr16`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr17`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr18`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr21`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr22`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
-        "expected_result": {"num_rows": 0}
-      },
-      {
-        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY`"],
-        "expected_result": {"num_rows": 0}
       },
       {
         "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__residual`"],

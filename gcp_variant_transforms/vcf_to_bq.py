@@ -533,9 +533,10 @@ def run(argv=None):
             total_base_pairs, schema_file)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    load_avro = bigquery_util.LoadAvro(
-        avro_root_path, known_args.output_table, suffixes)
-    load_avro.start_loading()
+    load_avro = bigquery_util.LoadAvro(avro_root_path,
+                                       known_args.output_table,
+                                       suffixes, not known_args.append)
+    _ = load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
