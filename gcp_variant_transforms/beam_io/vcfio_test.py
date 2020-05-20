@@ -72,7 +72,13 @@ VCF_LINE_3 = (
     '19	12	.	C	<SYMBOLIC>	49	q10	AF=0.5	GT:PS:GQ	0|1:1:45	.:.:.\n')
 GVCF_LINE = '19	1234	.	C	<NON_REF>	50	.	END=1236	GT:GQ	0/0:99\n'
 
-def _get_sample_variant_1(file_name='', use_1_based_coordinate=False):
+def _get_hashing_function(file_name, use_hashing):
+  def _hash_name_method(sample_name):
+    return sample_name if not use_hashing else hash_name(sample_name, file_name)
+  return _hash_name_method
+
+def _get_sample_variant_1(file_name='', use_1_based_coordinate=False,
+                          use_hashing=True):
   """Get first sample variant.
 
   Features:
@@ -81,23 +87,23 @@ def _get_sample_variant_1(file_name='', use_1_based_coordinate=False):
     multiple names
     utf-8 encoded
   """
+  hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
       reference_name='20', start=1234 if use_1_based_coordinate else 1233,
       end=1234, reference_bases='C',
       alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
       filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
   variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample1', file_name), genotype=[0, 0],
-          info={'GQ': 48}))
+      vcfio.VariantCall(sample_id=hash_name_method('Sample1'), genotype=[0, 0],
+                        info={'GQ': 48}))
   variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample2', file_name), genotype=[1, 0],
-          info={'GQ': 20}))
+      vcfio.VariantCall(sample_id=hash_name_method('Sample2'), genotype=[1, 0],
+                        info={'GQ': 20}))
 
   return variant
 
-def _get_sample_variant_2(file_name='', use_1_based_coordinate=False):
+def _get_sample_variant_2(file_name='', use_1_based_coordinate=False,
+                          use_hashing=True):
   """Get second sample variant.
 
   Features:
@@ -107,23 +113,23 @@ def _get_sample_variant_2(file_name='', use_1_based_coordinate=False):
     multiple filters
     missing format field
   """
+  hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
       reference_name='19',
       start=123 if use_1_based_coordinate else 122, end=125,
       reference_bases='GTC', alternate_bases=[], names=['rs1234'], quality=40,
       filters=['q10', 's50'], info={'NS': 2})
   variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample1', file_name), genotype=[-1, 0],
-          phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48}))
+      vcfio.VariantCall(sample_id=hash_name_method('Sample1'), genotype=[-1, 0],
+                        phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48}))
   variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample2', file_name), genotype=[0, -1],
-          info={'GQ': None}))
+      vcfio.VariantCall(sample_id=hash_name_method('Sample2'), genotype=[0, -1],
+                        info={'GQ': None}))
   return variant
 
 
-def _get_sample_variant_3(file_name='', use_1_based_coordinate=False):
+def _get_sample_variant_3(file_name='', use_1_based_coordinate=False,
+                          use_hashing=True):
   """Get third sample variant.
 
   Features:
@@ -131,16 +137,16 @@ def _get_sample_variant_3(file_name='', use_1_based_coordinate=False):
     no calls for sample 2
     alternate phaseset
   """
+  hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
       reference_name='19', start=12 if use_1_based_coordinate else 11, end=12,
       reference_bases='C', alternate_bases=['<SYMBOLIC>'], quality=49,
       filters=['q10'], info={'AF': [0.5]})
   variant.calls.append(
-      vcfio.VariantCall(
-          sample_id=hash_name('Sample1', file_name), genotype=[0, 1],
-          phaseset='1', info={'GQ': 45}))
+      vcfio.VariantCall(sample_id=hash_name_method('Sample1'), genotype=[0, 1],
+                        phaseset='1', info={'GQ': 45}))
   variant.calls.append(
-      vcfio.VariantCall(sample_id=hash_name('Sample2', file_name),
+      vcfio.VariantCall(sample_id=hash_name_method('Sample2'),
                         genotype=[vcfio.MISSING_GENOTYPE_VALUE],
                         info={'GQ': None}))
   return variant
@@ -367,6 +373,27 @@ class VcfSourceTest(unittest.TestCase):
     variant_1 = _get_sample_variant_1(file_name)
     variant_2 = _get_sample_variant_2(file_name)
     variant_3 = _get_sample_variant_3(file_name)
+
+    self.assertEqual(3, len(read_data))
+    self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
+
+  def test_single_file_verify_details_without_encoding(self):
+    read_data, file_name = (
+        self._create_temp_file_and_return_records_with_file_name(
+            _SAMPLE_HEADER_LINES + [VCF_LINE_1],
+            sample_name_encoding=SampleNameEncoding.NONE))
+
+    variant_1 = _get_sample_variant_1(file_name='', use_hashing=False)
+    self.assertEqual(1, len(read_data))
+    self.assertEqual(variant_1, read_data[0])
+    read_data, file_name = (
+        self._create_temp_file_and_return_records_with_file_name(
+            _SAMPLE_HEADER_LINES + [VCF_LINE_1, VCF_LINE_2, VCF_LINE_3],
+            sample_name_encoding=SampleNameEncoding.NONE))
+
+    variant_1 = _get_sample_variant_1(file_name='', use_hashing=False)
+    variant_2 = _get_sample_variant_2(file_name='Name1', use_hashing=False)
+    variant_3 = _get_sample_variant_3(file_name=file_name, use_hashing=False)
 
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)

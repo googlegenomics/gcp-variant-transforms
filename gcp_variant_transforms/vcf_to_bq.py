@@ -97,7 +97,8 @@ def _read_variants(all_patterns,  # type: List[str]
                    pipeline,  # type: beam.Pipeline
                    known_args,  # type: argparse.Namespace
                    pipeline_mode,  # type: int
-                   pre_infer_headers=False  # type: bool
+                   pre_infer_headers=False,  # type: bool
+                   keep_raw_sample_names=False
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -112,7 +113,9 @@ def _read_variants(all_patterns,  # type: List[str]
       known_args.allow_malformed_records,
       representative_header_lines,
       pre_infer_headers=pre_infer_headers,
-      sample_name_encoding=SampleNameEncoding[known_args.sample_name_encoding],
+      sample_name_encoding=(
+          SampleNameEncoding.NONE if keep_raw_sample_names else
+          SampleNameEncoding[known_args.sample_name_encoding]),
       use_1_based_coordinate=known_args.use_1_based_coordinate)
 
 
@@ -152,7 +155,7 @@ def _add_inferred_headers(all_patterns,  # type: List[str]
                      pipeline,
                      known_args,
                      pipeline_mode,
-                     known_args.infer_headers)
+                     pre_infer_headers=known_args.infer_headers)
       | 'FilterVariants' >> filter_variants.FilterVariants(
           reference_names=known_args.reference_names)
       | 'InferHeaderFields' >> infer_headers.InferHeaderFields(
@@ -184,8 +187,12 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
   vcf_shards_output_dir = filesystems.FileSystems.join(
       known_args.annotation_output_dir, _SHARDS_FOLDER)
   with beam.Pipeline(options=options) as p:
-    variants = _read_variants(
-        known_args.all_patterns, p, known_args, pipeline_mode)
+    variants = _read_variants(known_args.all_patterns,
+                              p,
+                              known_args,
+                              pipeline_mode,
+                              pre_infer_headers=False,
+                              keep_raw_sample_names=True)
     sample_ids = (variants
                   | 'CombineSampleIds' >>
                   combine_sample_ids.SampleIdsCombiner()

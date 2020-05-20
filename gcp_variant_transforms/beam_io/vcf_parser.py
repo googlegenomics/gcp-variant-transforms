@@ -62,6 +62,7 @@ class SampleNameEncoding(enum.Enum):
   """An Enum specifying the way we encode sample_name."""
   WITHOUT_FILE_PATH = 0
   WITH_FILE_PATH = 1
+  NONE = 2
 
 
 class Variant(object):
@@ -619,8 +620,13 @@ class PySamParser(VcfParser):
       if self._sample_name_encoding == SampleNameEncoding.WITH_FILE_PATH:
         sample_id = hashing_util.generate_sample_id(sample_name,
                                                     self._file_name)
-      else:
+      elif self._sample_name_encoding == SampleNameEncoding.WITHOUT_FILE_PATH:
         sample_id = hashing_util.generate_sample_id(sample_name)
+      elif self._sample_name_encoding == SampleNameEncoding.NONE:
+        sample_id = sample_name
+      else:
+        raise ValueError('Unknown Sample Name Encoding supplied: {}'.format(
+            self._sample_name_encoding))
       self._encoded_sample_names[sample_name] = sample_id
     return sample_id
 
