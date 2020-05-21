@@ -63,7 +63,7 @@
 -  output_table:
      table_name_suffix: "empty"
      regions:
-       - "does not match to any reference_name value"
+       - "nonexistence_chromosome"
      total_base_pairs: 249,240,615
 -  output_table:
      table_name_suffix: "all_remaining"
