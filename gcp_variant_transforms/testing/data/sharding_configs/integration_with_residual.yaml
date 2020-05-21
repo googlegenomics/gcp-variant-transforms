@@ -61,6 +61,11 @@
        - "m"
      total_base_pairs: 57,227,415
 -  output_table:
+     table_name_suffix: "empty"
+     regions:
+       - "nonexistence_chromosome"
+     total_base_pairs: 249,240,615
+-  output_table:
      table_name_suffix: "all_remaining"
      regions:
        - "residual"
