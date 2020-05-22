@@ -47,9 +47,12 @@ from apache_beam.options import pipeline_options
 
 from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_parser
+from gcp_variant_transforms.libs import avro_util
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import metrics_util
+from gcp_variant_transforms.libs import partitioning
 from gcp_variant_transforms.libs import processed_variant
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.libs import variant_sharding
@@ -333,7 +336,8 @@ def _merge_headers(known_args, pipeline_args,
   temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
   if not known_args.append:
-    bigquery_util.create_sample_info_table(known_args.output_table)
+    sample_info_table_schema_generator.create_sample_info_table(
+        known_args.output_table)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
@@ -539,15 +543,13 @@ def run(argv=None):
       if not known_args.append:
         table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                       suffixes[i])
-        bigquery_util.create_output_table(
-            table_name,
-            bigquery_util.ColumnKeyConstants.START_POSITION,
-            total_base_pairs, schema_file)
+        partitioning.create_bq_table(
+            table_name, schema_file,
+            bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    load_avro = bigquery_util.LoadAvro(avro_root_path,
-                                       known_args.output_table,
-                                       suffixes, not known_args.append)
+    load_avro = avro_util.LoadAvro(avro_root_path, known_args.output_table,
+                                   suffixes, not known_args.append)
     not_empty_variant_suffixes = load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
@@ -572,7 +574,7 @@ def run(argv=None):
 
 
   if known_args.sample_lookup_optimized_output_table:
-    flatten_call_column = bigquery_util.FlattenCallColumn(
+    flatten_call_column = partitioning.FlattenCallColumn(
         known_args.output_table, not_empty_variant_suffixes)
     try:
       flatten_schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
@@ -583,10 +585,9 @@ def run(argv=None):
         for suffix in not_empty_variant_suffixes:
           output_table_id = bigquery_util.compose_table_name(
               known_args.sample_lookup_optimized_output_table, suffix)
-          bigquery_util.create_output_table(output_table_id,
-                                            bigquery_util.CALL_SAMPLE_ID_COLUMN,
-                                            bigquery_util.MAX_RANGE_END,
-                                            flatten_schema_file)
+          partitioning.create_bq_table(
+              output_table_id, flatten_schema_file,
+              bigquery_util.CALL_SAMPLE_ID_COLUMN, partitioning.MAX_RANGE_END)
           logging.info('Sample lookup optimized table %s was created.',
                        output_table_id)
       # Copy to flatten sample lookup tables from the variant lookup tables.

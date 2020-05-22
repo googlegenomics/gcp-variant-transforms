@@ -17,12 +17,16 @@
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import partitioning
 
 SAMPLE_ID = 'sample_id'
 SAMPLE_NAME = 'sample_name'
 FILE_PATH = 'file_path'
 INGESTION_DATETIME = 'ingestion_datetime'
 
+SAMPLE_INFO_TABLE_SUFFIX = 'sample_info'
+SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH = (
+    'gcp_variant_transforms/data/schema/sample_info.json')
 
 def generate_schema():
   # type: () -> bigquery.TableSchema
@@ -49,3 +53,11 @@ def generate_schema():
       description=('Ingestion datetime (up to current minute) of samples.')))
 
   return schema
+
+
+def create_sample_info_table(output_table):
+  full_table_id = bigquery_util.compose_table_name(output_table,
+                                                   SAMPLE_INFO_TABLE_SUFFIX)
+  partitioning.create_bq_table(full_table_id,
+                               SAMPLE_INFO_TABLE_SCHEMA_FILE_PATH)
+  return full_table_id
