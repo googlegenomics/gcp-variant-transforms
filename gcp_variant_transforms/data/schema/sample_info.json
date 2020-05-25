@@ -21,6 +21,6 @@
     "description": "Ingestion datetime (up to current minute) of samples.",
     "mode": "NULLABLE",
     "name": "ingestion_datetime",
-    "type": "DATETIME"
+    "type": "TIMESTAMP"
   }
 ]

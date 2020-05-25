@@ -14,15 +14,16 @@
 
 from typing import Dict, Union  # pylint: disable=unused-import
 
-from datetime import datetime
+import time
 
 import apache_beam as beam
+import avro
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_parser
-from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import hashing_util
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import schema_converter
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
 _DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
@@ -36,7 +37,7 @@ class ConvertSampleInfoToRow(beam.DoFn):
     self._sample_name_encoding = sample_name_encoding
 
   def _get_now_to_minute(self):
-    return datetime.now().strftime(_DATETIME_FORMAT)
+    return int(time.time()) / 60 * 60000000
 
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
@@ -71,23 +72,16 @@ class SampleInfoToBigQuery(beam.PTransform):
         sample_id would only use sample_name in to get a hashed name; otherwise
         both sample_name and file_name will be used.
     """
-    self._output_table = bigquery_util.compose_table_name(
-        output_table_prefix,
-        sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+    self._output_path = output_table_prefix
     self._append = append
     self._sample_name_encoding = sample_name_encoding
-    self._schema = sample_info_table_schema_generator.generate_schema()
+    self._avro_schema = avro.schema.parse(
+        schema_converter.convert_table_schema_to_json_avro_schema(
+            sample_info_table_schema_generator.generate_schema()))
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
                 ConvertSampleInfoToRow(self._sample_name_encoding))
-            | 'WriteSampleInfoToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
-                self._output_table,
-                schema=self._schema,
-                create_disposition=(
-                    beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_APPEND
-                    if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+            | 'WriteToAvroFiles' >> beam.io.WriteToAvro(
+                self._output_path, self._avro_schema))

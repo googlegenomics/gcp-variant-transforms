@@ -312,7 +312,7 @@ def _update_google_cloud_job_name(google_cloud_options, job_name):
 
 
 def _merge_headers(known_args, pipeline_args,
-                   pipeline_mode, annotated_vcf_pattern=None):
+                   pipeline_mode, avro_root_path, annotated_vcf_pattern=None):
   # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
   options = pipeline_options.PipelineOptions(pipeline_args)
@@ -346,7 +346,8 @@ def _merge_headers(known_args, pipeline_args,
     _ = (headers
          | 'SampleInfoToBigQuery'
          >> sample_info_to_bigquery.SampleInfoToBigQuery(
-             known_args.output_table,
+             avro_root_path +
+                sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX,
              SampleNameEncoding[known_args.sample_name_encoding],
              known_args.append))
     if known_args.representative_header_file:
@@ -447,10 +448,13 @@ def run(argv=None):
   variant_merger = _get_variant_merge_strategy(known_args)
 
   pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns)
+
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  avro_root_path = _get_avro_root_path(beam_pipeline_options)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
   _merge_headers(known_args, pipeline_args,
-                 pipeline_mode, annotated_vcf_pattern)
+                 pipeline_mode, avro_root_path, annotated_vcf_pattern)
 
 
   # Retrieve merged headers prior to launching the pipeline. This is needed
@@ -485,9 +489,6 @@ def run(argv=None):
       table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                     table_suffix)
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
-
-  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
-  avro_root_path = _get_avro_root_path(beam_pipeline_options)
 
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
@@ -549,6 +550,7 @@ def run(argv=None):
             bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
+    suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     load_avro = avro_util.LoadAvro(
         avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
