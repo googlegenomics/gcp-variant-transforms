@@ -403,6 +403,8 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 
 
 def _write_schema_to_temp_file(schema, path):
+  if not path or not path.startswith('gs://'):
+    raise ValueError('Schema must be stored on a GS bucket.')
   schema_json = schema_converter.convert_table_schema_to_json_bq_schema(schema)
   schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
   with filesystems.FileSystems.create(schema_file) as file_to_write:
