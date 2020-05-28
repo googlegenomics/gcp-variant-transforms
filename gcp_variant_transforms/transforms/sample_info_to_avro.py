@@ -27,6 +27,8 @@ from gcp_variant_transforms.libs import schema_converter
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
 _DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
+_SECS_IN_MIN = 60
+_MICROS_IN_SEC = 1000000
 
 
 class ConvertSampleInfoToRow(beam.DoFn):
@@ -37,7 +39,7 @@ class ConvertSampleInfoToRow(beam.DoFn):
     self._sample_name_encoding = sample_name_encoding
 
   def _get_now_to_minute(self):
-    return int(time.time()) / 60 * 60000000
+    return int(time.time()) / _SECS_IN_MIN * _SECS_IN_MIN * _MICROS_IN_SEC
 
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
@@ -57,31 +59,30 @@ class ConvertSampleInfoToRow(beam.DoFn):
       yield row
 
 
-class SampleInfoToBigQuery(beam.PTransform):
+class SampleInfoToAvro(beam.PTransform):
   """Writes sample info to BigQuery."""
 
-  def __init__(self, output_table_prefix, sample_name_encoding, append=False):
+  def __init__(self, output_path, sample_name_encoding):
     # type: (str, Dict[str, str], bool, int) -> None
     """Initializes the transform.
 
     Args:
-      output_table_prefix: The prefix of the output BigQuery table.
+      output_path: The prefix of the output BigQuery table.
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
       sample_name_encoding: If SampleNameEncoding.WITHOUT_FILE_PATH is supplied,
         sample_id would only use sample_name in to get a hashed name; otherwise
         both sample_name and file_name will be used.
     """
-    self._output_path = output_table_prefix
-    self._append = append
+    self._output_path = output_path
     self._sample_name_encoding = sample_name_encoding
+    bq_schema = sample_info_table_schema_generator.generate_schema()
     self._avro_schema = avro.schema.parse(
-        schema_converter.convert_table_schema_to_json_avro_schema(
-            sample_info_table_schema_generator.generate_schema()))
+        schema_converter.convert_table_schema_to_json_avro_schema(bq_schema))
 
   def expand(self, pcoll):
     return (pcoll
-            | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
+            | 'ConvertSampleInfoToAvroTableRow' >> beam.ParDo(
                 ConvertSampleInfoToRow(self._sample_name_encoding))
             | 'WriteToAvroFiles' >> beam.io.WriteToAvro(
                 self._output_path, self._avro_schema))

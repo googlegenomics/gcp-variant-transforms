@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for `sample_info_to_bigquery` module."""
+"""Tests for `sample_info_to_avro` module."""
 
 import unittest
 
@@ -25,7 +25,7 @@ import mock
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io.vcf_parser import SampleNameEncoding
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
-from gcp_variant_transforms.transforms import sample_info_to_bigquery
+from gcp_variant_transforms.transforms import sample_info_to_avro
 
 SAMPLE_LINE = (
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tSAMPLES\tSample1\tSample2')
@@ -35,7 +35,7 @@ def mocked_get_now():
 
 class ConvertSampleInfoToRowTest(unittest.TestCase):
 
-  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_bigquery.'
+  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
               'ConvertSampleInfoToRow._get_now_to_minute',
               side_effect=mocked_get_now)
   def test_convert_sample_info_to_row(self, mocked_obj):
@@ -76,13 +76,13 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         pipeline
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
-        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
+        >> transforms.ParDo(sample_info_to_avro.ConvertSampleInfoToRow(
             SampleNameEncoding.WITH_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
 
-  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_bigquery.'
+  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
               'ConvertSampleInfoToRow._get_now_to_minute',
               side_effect=mocked_get_now)
   def test_convert_sample_info_to_row_without_file_in_hash(self, mocked_obj):
@@ -115,7 +115,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         pipeline
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
-        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
+        >> transforms.ParDo(sample_info_to_avro.ConvertSampleInfoToRow(
             SampleNameEncoding.WITHOUT_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))

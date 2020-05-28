@@ -62,7 +62,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
-from gcp_variant_transforms.transforms import sample_info_to_bigquery
+from gcp_variant_transforms.transforms import sample_info_to_avro
 from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
@@ -344,12 +344,11 @@ def _merge_headers(known_args, pipeline_args,
         p, pipeline_mode,
         known_args.all_patterns)
     _ = (headers
-         | 'SampleInfoToBigQuery'
-         >> sample_info_to_bigquery.SampleInfoToBigQuery(
+         | 'SampleInfoToAvro'
+         >> sample_info_to_avro.SampleInfoToAvro(
              avro_root_path +
                 sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX,
-             SampleNameEncoding[known_args.sample_name_encoding],
-             known_args.append))
+             SampleNameEncoding[known_args.sample_name_encoding]))
     if known_args.representative_header_file:
       return
     merged_header = pipeline_common.get_merged_headers(
