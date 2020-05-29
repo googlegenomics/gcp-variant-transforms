@@ -62,6 +62,7 @@ from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import genomic_region_parser
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
@@ -75,7 +76,8 @@ _BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
 _BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
 TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
-SAMPLE_INFO_TABLE_SUFFIX = bigquery_util.SAMPLE_INFO_TABLE_SUFFIX
+SAMPLE_INFO_TABLE_SUFFIX = (
+    sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')

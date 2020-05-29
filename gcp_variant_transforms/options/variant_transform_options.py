@@ -22,10 +22,12 @@ from oauth2client.client import GoogleCredentials
 from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_sanitizer
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import variant_sharding
 
 TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
-SAMPLE_INFO_TABLE_SUFFIX = bigquery_util.SAMPLE_INFO_TABLE_SUFFIX
+SAMPLE_INFO_TABLE_SUFFIX = (
+    sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
 
 
 class VariantTransformsOptions(object):
