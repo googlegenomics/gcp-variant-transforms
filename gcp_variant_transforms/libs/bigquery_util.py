@@ -183,8 +183,9 @@ def table_exist(client, project_id, dataset_id, table_id):
 
 def table_empty(project_id, dataset_id, table_id):
   client = bigquery.Client(project=project_id)
-  query = 'SELECT count(0) AS num_rows FROM {DATASET_ID}.{TABLE_ID}'.format(
-      DATASET_ID=dataset_id, TABLE_ID=table_id)
+  num_rows = 'num_rows'
+  query = 'SELECT count(0) AS {COL_NAME} FROM {DATASET_ID}.{TABLE_ID}'.format(
+      COL_NAME=num_rows, DATASET_ID=dataset_id, TABLE_ID=table_id)
   query_job = client.query(query)
   num_retries = 0
   while True:
@@ -206,15 +207,18 @@ def table_empty(project_id, dataset_id, table_id):
           num_retries += 1
           time.sleep(90)
         else:
-          raise ValueError(
-            'Expected 1 row in query result, got {}'.format(results.total_rows))
+          raise ValueError('Expected 1 row in query result, got {}'.format(
+              results.total_rows))
 
   row = list(results)[0]
   col_names = row.keys()
-  if set(col_names) != {'num_rows'}:
-    logging.error('Query %s did not return expected `num_rows` column.', query)
-    raise ValueError('Expected `num_rows` col is missing in the query result.')
-  return row.get('num_rows') == 0
+  if set(col_names) != {num_rows}:
+    logging.error('Query `%s` did not return expected `%s` column.',
+                  query, num_rows)
+    raise ValueError(
+        'Expected `{COL_NAME}` column is missing in the query result.'.format(
+            COL_NAME=num_rows))
+  return row.get(num_rows) == 0
 
 
 def get_bigquery_type_from_vcf_type(vcf_type):
