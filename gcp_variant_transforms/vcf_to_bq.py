@@ -548,8 +548,8 @@ def run(argv=None):
             bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    load_avro = avro_util.LoadAvro(avro_root_path, known_args.output_table,
-                                   suffixes, not known_args.append)
+    load_avro = avro_util.LoadAvro(
+        avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '

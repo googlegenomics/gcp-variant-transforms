@@ -58,7 +58,9 @@ class PartitioningTest(unittest.TestCase):
 class FlattenCallColumnTest(unittest.TestCase):
   """Test cases for class `FlattenCallColumn`."""
 
-  def setUp(self):
+  @mock.patch('gcp_variant_transforms.libs.partitioning_test.partitioning.'
+              'FlattenCallColumn._find_one_non_empty_table')
+  def setUp(self, mock_find_non_empty):
     # We never query this table for running the following test, however, the
     # mock values are based on this table's schema. In other words:
     #   mock_columns.return_value = self._flatter._get_column_names()
@@ -67,6 +69,9 @@ class FlattenCallColumnTest(unittest.TestCase):
                         'bq_to_vcf_integration_tests.'
                         'merge_option_move_to_calls')
     self._flatter = partitioning.FlattenCallColumn(input_base_table, ['chr20'])
+    # Set in mock_find_non_empty, ie mock of _find_one_non_empty_table()
+    mock_find_non_empty.return_value = None
+    self._flatter._schema_table_id = 'merge_option_move_to_calls__chr20'
 
   @mock.patch('gcp_variant_transforms.libs.partitioning_test.partitioning.'
               'FlattenCallColumn._get_column_names')
