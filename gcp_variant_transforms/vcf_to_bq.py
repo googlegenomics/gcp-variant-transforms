@@ -549,9 +549,12 @@ def run(argv=None):
             bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
+    if not known_args.append:
+      bigquery_util.create_sample_info_table(known_args.output_table)
     suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    load_avro = avro_util.LoadAvro(
-        avro_root_path, known_args.output_table, suffixes, False)
+    load_avro = bigquery_util.LoadAvro(avro_root_path,
+                                       known_args.output_table,
+                                       suffixes, not known_args.append)
     not_empty_variant_suffixes = load_avro.start_loading()
     logging.info('Following tables were loaded with at least 1 row:')
     for suffix in not_empty_variant_suffixes:

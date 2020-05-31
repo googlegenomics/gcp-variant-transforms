@@ -26,7 +26,6 @@ from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import schema_converter
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
-_DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
 _SECS_IN_MIN = 60
 _MICROS_IN_SEC = 1000000
 
@@ -67,9 +66,7 @@ class SampleInfoToAvro(beam.PTransform):
     """Initializes the transform.
 
     Args:
-      output_path: The prefix of the output BigQuery table.
-      append: If true, existing records in output_table will not be
-        overwritten. New records will be appended to those that already exist.
+      output_path: The output path of the sample file in the avro directory.
       sample_name_encoding: If SampleNameEncoding.WITHOUT_FILE_PATH is supplied,
         sample_id would only use sample_name in to get a hashed name; otherwise
         both sample_name and file_name will be used.

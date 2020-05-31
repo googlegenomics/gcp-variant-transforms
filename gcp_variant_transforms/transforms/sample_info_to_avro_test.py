@@ -30,7 +30,7 @@ from gcp_variant_transforms.transforms import sample_info_to_avro
 SAMPLE_LINE = (
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tSAMPLES\tSample1\tSample2')
 def mocked_get_now():
-  return '2019-04-05 1:11'
+  return 1554426660000000
 
 
 class ConvertSampleInfoToRowTest(unittest.TestCase):
