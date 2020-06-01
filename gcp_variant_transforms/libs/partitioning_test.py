@@ -68,7 +68,8 @@ class FlattenCallColumnTest(unittest.TestCase):
     input_base_table = ('gcp-variant-transforms-test:'
                         'bq_to_vcf_integration_tests.'
                         'merge_option_move_to_calls')
-    self._flatter = partitioning.FlattenCallColumn(input_base_table, ['chr20'])
+    self._flatter = partitioning.FlattenCallColumn(
+        input_base_table, ['chr20'], False)
     # Set in mock_find_non_empty, ie mock of _find_one_non_empty_table()
     mock_find_non_empty.return_value = None
     self._flatter._schema_table_id = 'merge_option_move_to_calls__chr20'

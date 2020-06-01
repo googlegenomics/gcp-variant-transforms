@@ -239,7 +239,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
       raise ValueError('--output_table must have a value.')
     self._validate_output_tables(
         client, parsed_args.output_table,
-        parsed_args.sharding_config_path, parsed_args.append)
+        parsed_args.sharding_config_path, parsed_args.append, True)
 
     if parsed_args.sample_lookup_optimized_output_table:
       if (parsed_args.output_table ==
@@ -248,11 +248,11 @@ class BigQueryWriteOptions(VariantTransformsOptions):
                          'same as output_table.')
       self._validate_output_tables(
           client, parsed_args.sample_lookup_optimized_output_table,
-          parsed_args.sharding_config_path, parsed_args.append)
+          parsed_args.sharding_config_path, parsed_args.append, False)
 
   def _validate_output_tables(self, client,
                               output_table_base_name,
-                              sharding_config_path, append):
+                              sharding_config_path, append, is_main_output):
     if (output_table_base_name !=
         bigquery_util.get_table_base_name(output_table_base_name)):
       raise ValueError(('Output table cannot contain "{}". we reserve this '
@@ -264,8 +264,9 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
                                                     dataset_id)
     all_output_tables = []
-    all_output_tables.append(
-        bigquery_util.compose_table_name(table_id, SAMPLE_INFO_TABLE_SUFFIX))
+    if is_main_output:
+      all_output_tables.append(
+          bigquery_util.compose_table_name(table_id, SAMPLE_INFO_TABLE_SUFFIX))
     sharding = variant_sharding.VariantSharding(sharding_config_path)
     num_shards = sharding.get_num_shards()
     # In case there is no residual in config we will ignore the last shard.

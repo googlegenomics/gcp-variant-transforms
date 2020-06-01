@@ -579,7 +579,7 @@ def run(argv=None):
 
   if known_args.sample_lookup_optimized_output_table:
     flatten_call_column = partitioning.FlattenCallColumn(
-        known_args.output_table, not_empty_variant_suffixes)
+        known_args.output_table, not_empty_variant_suffixes, known_args.append)
     try:
       flatten_schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
       if not flatten_call_column.get_flatten_table_schema(flatten_schema_file):
