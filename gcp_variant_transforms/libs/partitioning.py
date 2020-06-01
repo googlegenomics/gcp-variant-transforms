@@ -60,7 +60,7 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
 class FlattenCallColumn(object):
   """Flattens call column to convert variant opt tables to sample opt tables."""
 
-  def __init__(self, base_table_id, suffixes):
+  def __init__(self, base_table_id, suffixes, append):
     # type (str, List[str]) -> None
     """Initialize `FlattenCallColumn` object.
 
@@ -72,6 +72,7 @@ class FlattenCallColumn(object):
     Args:
       base_table_id: Base name of variant opt outputs (set by --output_table).
       suffixes: List of suffixes (extracted from sharding config file).
+      append: Whether or not we are appending to the destination tables.
     """
     (self._project_id,
      self._dataset_id,
@@ -81,8 +82,11 @@ class FlattenCallColumn(object):
 
     self._column_names = []
     self._sub_fields = []
-    self._client = bigquery.Client(project=self._project_id)
 
+    job_config = bigquery.job.QueryJobConfig(
+        write_disposition='WRITE_TRUNCATE' if append else 'WRITE_EMPTY')
+    self._client = bigquery.Client(project=self._project_id,
+                                   default_query_job_config=job_config)
     self._find_one_non_empty_table()
 
   def _find_one_non_empty_table(self):
@@ -155,7 +159,7 @@ class FlattenCallColumn(object):
     return ', '.join(select_list)
 
   def _copy_to_flatten_table(self, output_table_id, cp_query):
-    job_config = bigquery.QueryJobConfig(destination=output_table_id)
+    job_config = bigquery.job.QueryJobConfig(destination=output_table_id)
     query_job = self._client.query(cp_query, job_config=job_config)
     num_retries = 0
     while True:
