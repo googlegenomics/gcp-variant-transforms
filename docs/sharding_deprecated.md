@@ -6,23 +6,62 @@ For example, if you want to process only variants of chromosome 1 in a table
 containing entire genome variants, you would write a query like:
 
 ```
-SELECT ...
-FROM imported_table
-WHERE reference_name = 'chr1' AND ...
+SELECT refence_name, refernce_bases, quality
+FROM imported_table__chr1
+WHERE start_position > 1,000,000 AND start_position < 2,000,000
 ```
 
-In this example BigQuery processes all variants even though the query is
-limited to the variants on chromosome 1. This query will cost the entire size
-of the columns being accessed in the SELECT clause, regardless of the `WHERE`
-clause. This extra cost can add up to a significant amount, specially if a few
-*hot spots* in the genome are being queried regularly.
+In this example BigQuery processes all rows of the table even though the query is
+limited to the variants in `[1,000,000, 2,000,000]` range. This query will cost the entire size
+of the 3 columns being accessed in the SELECT clause, regardless of the `WHERE`
+clause. Following figure shows this fact schematically:
+[Image here]
 
-We are offering three solutions for situations like this: one solution is using
-BigQuery [clustering](https://cloud.google.com/bigquery/docs/clustered-tables),
-another solution is using Variant Transforms' native sharding, and a third
-hybrid solution.
+This extra cost can add up to a significant amount, specially if a few
+*hot spots* in the genome are being queried frquently. We are offering three techniques to reduce the cost of queries like this. In the following sections we breifly explain each cost reduction technique:
 
-## Solution 1: BigQuery clustering
+
+## Technique 1: Sharding per chromosome
+
+The first technique for reducing the cost of queries is to split variants between multiple smaller output tables, we call this technique *sharding*.
+Variant transforms shards its output into multiple tables, each containing variants of a specific region of a
+genome, according to a [sharding config file](link_to_sharding_doc). Our default [config file](gcp-variant-transforms/gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml) results in one output table per chromosome. 
+
+By splitting output tables based on the `reference_name` you are
+guaranteed that per-chromosome queries will only process variants of the
+chromosome under study. 
+
+As a concrete example, during the process of publishing [gnomAD on GCP marketplace](https://console.cloud.google.com/marketplace/details/broad-institute/gnomad) we imported [gnomAD v3](https://gnomad.broadinstitute.org/) VCF files into a single BigQuery table with 707,950,943 rows which accupied 1.1 TB storage. After spliting by chromosome, we ended up with smaller tables for each chromosome, here are some of their sizes:
+ * chr1: 55,215,812 rows, 88.31 GB
+ * chr2: 58,605,556 rows, 94.01 GB
+ * chr3: 47,688,920 rows, 77.78 GB
+ * chr21: 10,248,793 rows, 15.62 GB
+ * chr22: 10,882,958 rows, 17.78 GB
+ * chrY: 1,344,278 rows, 1.64 GB
+ * chrX: 28,156,663 rows, 40.51 GB
+
+Other than making each table smaller and more manageable, sharding per chromosome is a prerequisite for the next technique.
+
+## Technique 2: Partitioing of `start_position` column
+
+BigQuery [partitioning](https://cloud.google.com/bigquery/docs/partitioned-tables) is a technique that divides a large table into segments, called partitions, this makes it easier to manage and query your data. By dividing a large table into smaller partitions, you can improve query performance, and you can control costs by reducing the number of bytes read by a query.
+
+As we mentioned earlier, since BigQuery uses a columnar data structure, prices of a query is set according to the total data processed in the columns you select. For large tables, such as gnomAD, this cost will be very significant, especially if we are querying a small region of genome. Partitioning is the perfect solution here: BigQuery analyzes the `WHERE` clause and based on that it only processes the set of partitioning that contain rows that are relevant to the query. Following figure demonestrates this schematically:
+
+[Image here]
+
+Partitioning is a very effective way to reduce the cost of queries, specially in the genomics applications where most of the queries are analyzing a small genomic region.
+
+```
+SELECT * from `1000genomes_chr17`
+WHERE start_position >= 41197694
+  AND end_position <= 41276113
+```
+
+[more explanation here]
+
+## Technique 3: BigQuery clustering
+[Updated up to here]
 [BigQuery clustering](https://cloud.google.com/bigquery/docs/clustered-tables)
 is a technique for automatically organizing a table  based on the
 contents of one or more columns in the table’s schema. Clustered columns
@@ -116,39 +155,7 @@ it has a few limitations:
  * If you append data to an existing clustered table it will become partially
  sorted. So you need to regularly re-cluster your table.
 
-## Solution 2: Sharding output table
 
-The second solution for reducing the cost of queries is to use Variant
-Transforms' native sharding. Variant transforms is able to split the output
-table into several smaller tables, each containing variants of a specific region of a
-genome. For example, you can have one output table per chromosome, in that
-case the above query can be written as:
-
-```
-SELECT * from `1000genomes_chr17`
-WHERE start_position >= 41197694
-  AND end_position <= 41276113
-```
-
-Note that condition on the `reference_name` is removed since we know this table,
-as its name suggests, only contains the variants of 17th chromosome.
-
-By splitting output tables based on the `reference_name` you are
-guaranteed that per-chromosome queries will only process variants of the
-chromosome under study. Also, appending new rows to existing tables does not
-impact this guarantee on the cost, unlike the BigQuery clustering solution.
-
-This solution has some limitations comparing to clustering. For example, you
-will be charged for processing of a whole chromosome's table even if only a
-small region is being processed. As an example, the previous query, will cost
-152 GB or $0.74. This is significantly less than the original cost without
-sharding but it's more than clustering cost.
-
-You could define your shards to be more fine grained and have multiple
-tables per chromosome. However, you need to anticipate how your future queries
-are going to be in order to optimize your output shards. Since in many
-use cases it not obvious to anticipate future queries, we offer the
-third solution as the most practical and cost effective solution.
 
 ## Solution 3: Hybrid Solution
 
