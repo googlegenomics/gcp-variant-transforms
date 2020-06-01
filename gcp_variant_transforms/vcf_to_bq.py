@@ -548,9 +548,13 @@ def run(argv=None):
             bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
-    load_avro = avro_util.LoadAvro(avro_root_path, known_args.output_table,
-                                   suffixes, not known_args.append)
+    load_avro = avro_util.LoadAvro(
+        avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
+    logging.info('Following tables were loaded with at least 1 row:')
+    for suffix in not_empty_variant_suffixes:
+      logging.info(bigquery_util.compose_table_name(known_args.output_table,
+                                                    suffix))
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
@@ -582,7 +586,8 @@ def run(argv=None):
         raise ValueError('Failed to extract schema of flatten table')
       # Create output flatten tables if needed
       if not known_args.append:
-        for suffix in not_empty_variant_suffixes:
+        # Create all sample optimized tables including those that will be empty.
+        for suffix in suffixes:
           output_table_id = bigquery_util.compose_table_name(
               known_args.sample_lookup_optimized_output_table, suffix)
           partitioning.create_bq_table(

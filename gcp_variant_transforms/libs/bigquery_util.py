@@ -14,15 +14,18 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
+from concurrent.futures import TimeoutError
 import enum
 import exceptions
 import logging
 import os
 import re
+import time
 from typing import List, Tuple, Union  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery as beam_bigquery
 from apitools.base.py import exceptions
+from google.cloud import bigquery
 from oauth2client.client import GoogleCredentials
 
 from gcp_variant_transforms.beam_io import vcf_header_io
@@ -176,6 +179,46 @@ def table_exist(client, project_id, dataset_id, table_id):
     else:
       raise
   return True
+
+
+def table_empty(project_id, dataset_id, table_id):
+  client = bigquery.Client(project=project_id)
+  num_rows = 'num_rows'
+  query = 'SELECT count(0) AS {COL_NAME} FROM {DATASET_ID}.{TABLE_ID}'.format(
+      COL_NAME=num_rows, DATASET_ID=dataset_id, TABLE_ID=table_id)
+  query_job = client.query(query)
+  num_retries = 0
+  while True:
+    try:
+      results = query_job.result(timeout=300)
+    except TimeoutError as e:
+      logging.warning('Time out waiting for query: %s', query)
+      if num_retries < BQ_NUM_RETRIES:
+        num_retries += 1
+        time.sleep(90)
+      else:
+        raise e
+    else:
+      if results.total_rows == 1:
+        break
+      else:
+        logging.error('Query did not returned expected # of rows: %s', query)
+        if num_retries < BQ_NUM_RETRIES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          raise ValueError('Expected 1 row in query result, got {}'.format(
+              results.total_rows))
+
+  row = list(results)[0]
+  col_names = row.keys()
+  if set(col_names) != {num_rows}:
+    logging.error('Query `%s` did not return expected `%s` column.',
+                  query, num_rows)
+    raise ValueError(
+        'Expected `{COL_NAME}` column is missing in the query result.'.format(
+            COL_NAME=num_rows))
+  return row.get(num_rows) == 0
 
 
 def get_bigquery_type_from_vcf_type(vcf_type):

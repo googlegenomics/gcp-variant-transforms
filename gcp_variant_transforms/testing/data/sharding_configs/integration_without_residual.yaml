@@ -1,4 +1,9 @@
 -  output_table:
+     table_name_suffix: "empty"
+     regions:
+       - "nonexistence_chromosome"
+     total_base_pairs: 249,240,615
+-  output_table:
      table_name_suffix: "chr19_1M"
      regions:
        - "chr19:0-1,000,000"
@@ -27,9 +32,4 @@
      table_name_suffix: "chr01_remaining"
      regions:
        - "chr1:200,000,000-999,999,999"
-     total_base_pairs: 249,240,615
--  output_table:
-     table_name_suffix: "empty"
-     regions:
-       - "nonexistence_chromosome"
      total_base_pairs: 249,240,615

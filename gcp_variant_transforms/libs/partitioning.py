@@ -79,12 +79,21 @@ class FlattenCallColumn(object):
     assert suffixes
     self._suffixes = suffixes[:]
 
-    # We can use any of the input tables as source of schema, we use index 0
-    self._schema_table_id = bigquery_util.compose_table_name(
-        self._base_table, suffixes[0])
     self._column_names = []
     self._sub_fields = []
     self._client = bigquery.Client(project=self._project_id)
+
+    self._find_one_non_empty_table()
+
+  def _find_one_non_empty_table(self):
+    # Any non empty input table can be used as the source for schema extraction.
+    for suffix in self._suffixes:
+      table_id = bigquery_util.compose_table_name(self._base_table, suffix)
+      if not bigquery_util.table_empty(
+          self._project_id, self._dataset_id, table_id):
+        self._schema_table_id = table_id
+        return
+    raise ValueError('All of the variant optimized tables are empty!')
 
   def _run_query(self, query):
     query_job = self._client.query(query)
