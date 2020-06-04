@@ -22,6 +22,7 @@ from typing import List  # pylint: disable=unused-import
 import argparse
 import enum
 import os
+import re
 import uuid
 from datetime import datetime
 
@@ -319,10 +320,17 @@ def _raise_error_on_invalid_flags(pipeline_args):
   known_pipeline_args, unknown = parser.parse_known_args(pipeline_args)
   if unknown:
     raise ValueError('Unrecognized flag(s): {}'.format(unknown))
+  job_name_re = r'^[a-z][-a-z\d]*[a-z\d]+$'
+  if (not known_pipeline_args.job_name or
+      not re.match(job_name_re, known_pipeline_args.job_name)):
+    raise ValueError(
+        '--job_name must consist of only the characters [-a-z0-9] starting '
+        'with a letter and ending with a letter or number')
   if (known_pipeline_args.runner == _DATAFLOW_RUNNER_ARG_VALUE and
       not known_pipeline_args.setup_file):
     raise ValueError('The --setup_file flag is required for DataflowRunner. '
                      'Please provide a path to the setup.py file.')
+
 
 
 def is_pipeline_direct_runner(pipeline):
