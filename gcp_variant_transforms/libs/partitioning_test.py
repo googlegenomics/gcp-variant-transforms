@@ -106,3 +106,79 @@ class FlattenCallColumnTest(unittest.TestCase):
         'main_table.DB AS `DB`, '
         'main_table.H2 AS `H2`')
     self.assertEqual(expected_select, self._flatter._get_flatten_column_names())
+
+class ParseTableSchemaTest(unittest.TestCase):
+  """Test cases for class `ParseTableSchema`."""
+
+  def setUp(self):
+    # First test input schema, not flatten: similar to variant optimized tables.
+    item1 = {u'type': u'STRING',
+             u'name': u'reference_name',
+             u'mode': u'NULLABLE'}
+    item2 = {u'type': u'INTEGER',
+             u'name': u'start_position',
+             u'mode': u'NULLABLE'}
+    sub_item1 = {u'type': u'INTEGER',
+                 u'name': u'sample_id',
+                 u'mode': u'NULLABLE'}
+    sub_item2 = {u'type': u'INTEGER',
+                 u'name': u'genotype',
+                 u'mode': u'REPEATED'}
+    item3 = {u'fields': [sub_item1, sub_item2],
+             u'type': u'RECORD',
+             u'name': u'call',
+             u'mode': u'REPEATED'}
+    self._input_schema = [item1, item2, item3]
+
+    # Second test input schema, flattened: similar to sample optimized tables.
+    flatten_item1 = {u'type': u'STRING',
+                     u'name': u'reference_name',
+                     u'mode': u'NULLABLE'}
+    flatten_item2 = {u'type': u'INTEGER',
+                     u'name': u'start_position',
+                     u'mode': u'NULLABLE'}
+    flatten_sub_item1 = {u'type': u'INTEGER',
+                         u'name': u'call_sample_id',
+                         u'mode': u'NULLABLE'}
+    flatten_sub_item2 = {u'type': u'INTEGER',
+                         u'name': u'call_genotype',
+                         u'mode': u'REPEATED'}
+    self._input_flatten_schema = [flatten_item1, flatten_item2,
+                                  flatten_sub_item1, flatten_sub_item2]
+
+    self._description_dict = {
+        u'reference_name': u'Reference name.',
+        u'start_position': u'Start position (0-based). Corresponds to the ...',
+        u'call': u'One record for each call.',
+        u'call.sample_id': u'Name of the call.',
+        u'call.genotype': u'Genotype of the call. "-1" is used in cases ...'
+    }
+
+  def test_schema_parser(self):
+    schema_parser = partitioning.ParseTableSchema(self._input_schema,
+                                                  self._description_dict)
+    schema_parser.add_descriptions()
+    self.assertEqual(self._input_schema[0]['description'],
+                     self._description_dict['reference_name'])
+    self.assertEqual(self._input_schema[1]['description'],
+                     self._description_dict['start_position'])
+    self.assertEqual(self._input_schema[2]['description'],
+                     self._description_dict['call'])
+    self.assertEqual(self._input_schema[2]['fields'][0]['description'],
+                     self._description_dict['call.sample_id'])
+    self.assertEqual(self._input_schema[2]['fields'][1]['description'],
+                     self._description_dict['call.genotype'])
+
+  def test_schema_parser_flatten(self):
+    schema_parser = partitioning.ParseTableSchema(self._input_flatten_schema,
+                                                  self._description_dict,
+                                                  'call')
+    schema_parser.add_descriptions()
+    self.assertEqual(self._input_flatten_schema[0]['description'],
+                     self._description_dict['reference_name'])
+    self.assertEqual(self._input_flatten_schema[1]['description'],
+                     self._description_dict['start_position'])
+    self.assertEqual(self._input_flatten_schema[2]['description'],
+                     self._description_dict['call.sample_id'])
+    self.assertEqual(self._input_flatten_schema[3]['description'],
+                     self._description_dict['call.genotype'])

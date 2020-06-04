@@ -15,6 +15,7 @@
 """Utilities to create integer range partitioned BigQuery tables."""
 
 from concurrent.futures import TimeoutError
+import json
 import logging
 import math
 import os
@@ -32,6 +33,10 @@ _GET_CALL_SUB_FIELDS_QUERY = (
     'SELECT field_path '
     'FROM `{PROJECT_ID}`.{DATASET_ID}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS '
     'WHERE table_name = "{TABLE_ID}" AND column_name="{CALL_COLUMN}"')
+_GET_COLUMNS_DESCRIPTION_QUERY = (
+    'SELECT field_path, description '
+    'FROM `{PROJECT_ID}`.{DATASET_ID}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS '
+    'WHERE table_name = "{TABLE_ID}"')
 _MAIN_TABLE_ALIAS = 'main_table'
 _CALL_TABLE_ALIAS = 'call_table'
 _COLUMN_AS = '{TABLE_ALIAS}.{COL} AS `{COL_NAME}`'
@@ -104,7 +109,7 @@ class FlattenCallColumn(object):
     num_retries = 0
     while True:
       try:
-        iterator = query_job.result(timeout=300)
+        result = query_job.result(timeout=300)
       except TimeoutError as e:
         logging.warning('Time out waiting for query: %s', query)
         if num_retries < bigquery_util.BQ_NUM_RETRIES:
@@ -113,11 +118,28 @@ class FlattenCallColumn(object):
         else:
           raise e
       else:
-        break
-    result = []
-    for i in iterator:
-      result.append(str(i.values()[0]))
-    return result
+        if result.total_rows > 0:
+          break
+        else:
+          if num_retries < bigquery_util.BQ_NUM_RETRIES:
+            num_retries += 1
+            time.sleep(90)
+          else:
+            raise ValueError('Query `{}` returned 0 rows.'.format(query))
+
+    if len(result.schema) == 1:
+      result_list = []
+      for row in result:
+        result_list.append(str(row.values()[0]))
+      return result_list
+    elif len(result.schema) == 2:
+      result_dict = {}
+      for row in result:
+        result_dict[row.values()[0]] = row.values()[1]
+      return result_dict
+    else:
+      ValueError('This function can only handle queries with 1 or 2 columns '
+                 'in the `SELECT` statement.')
 
   def _get_column_names(self):
     if not self._column_names:
@@ -141,6 +163,14 @@ class FlattenCallColumn(object):
       assert self._sub_fields
     return self._sub_fields
 
+  def _get_columns_description(self):
+    query = _GET_COLUMNS_DESCRIPTION_QUERY.format(
+        PROJECT_ID=self._project_id,
+        DATASET_ID=self._dataset_id,
+        TABLE_ID=self._schema_table_id)
+    # returned value is a dictionary of {column_name : description}.
+    return self._run_query(query)
+
   def _get_flatten_column_names(self):
     column_names = self._get_column_names()
     sub_fields = self._get_call_sub_fields()
@@ -157,6 +187,17 @@ class FlattenCallColumn(object):
                   TABLE_ALIAS=_CALL_TABLE_ALIAS, COL=s_f,
                   COL_NAME=bigquery_util.ColumnKeyConstants.CALLS + '_' + s_f))
     return ', '.join(select_list)
+
+  def _add_description_to_schema(self, schema_file_path):
+    with open(schema_file_path) as infile:
+      schema_dict = json.load(infile)
+    description_dict = self._get_columns_description()
+
+    schema_parser = ParseTableSchema(schema_dict, description_dict,
+                                     bigquery_util.ColumnKeyConstants.CALLS)
+    schema_parser.add_descriptions()
+    with open(schema_file_path, 'w') as outfile:
+      json.dump(schema_dict, outfile, sort_keys=True, indent=2)
 
   def _copy_to_flatten_table(self, output_table_id, cp_query):
     job_config = bigquery.job.QueryJobConfig(destination=output_table_id)
@@ -223,12 +264,16 @@ class FlattenCallColumn(object):
     if result != 0:
       logging.error('Failed to extract flatten table schema using "%s" command',
                     bq_command)
-    else:
-      logging.info('Successfully extracted the schema of flatten table.')
+      return False
+
+    logging.info('Successfully extracted the schema of flatten table.')
     if bigquery_util.delete_table(full_table_id) == 0:
       logging.info('Successfully deleted temporary table: %s', full_table_id)
     else:
       logging.error('Was not able to delete temporary table: %s', full_table_id)
+
+    self._add_description_to_schema(schema_file_path)
+    logging.info('Column description was copied to sample opt tables schema.')
     return result == 0
 
   def copy_to_flatten_table(self, output_base_table_id):
@@ -269,6 +314,64 @@ class FlattenCallColumn(object):
       self._copy_to_flatten_table(full_output_table_id, cp_query)
       logging.info('Flatten table is fully loaded: %s', full_output_table_id)
 
+
+class ParseTableSchema(object):
+  """Parses json file containing BigQuery table schema adds description to it"""
+
+  def __init__(self, schema_dict, description_dict, flattened_col=''):
+    # type: (dict, dict, str) -> None
+    """Copies column descriptions from variant table to sample table schema.
+
+    Because of the way we create schema of sample optimized tables:
+      * Compose a query to flatten call column.
+      * Write the output of the query (LIMIT 1) to a temporary table.
+      * Extract the temporary table's schema into a json file.
+    column descriptions are absent in the json schema file.
+
+    This class enables us to add `description` fields to the json schema file.
+    Description values are given via `description_dict` that is build by
+    querying INFORMATION_SCHEMA.COLUMN_FIELD_PATHS meta-table.
+
+    Args:
+      schema_dict: A dict that is output of json.load() of schema file.
+      description_dict: {field_name : description} dictionary.
+      flattened_col: A string to identify the flatten column. For example, we
+                     must know `call_sample_id` is the same as `call.sample_ld`.
+
+    Returns:
+      None, modifies the input `schema_dict` and add `description` fields to it.
+    """
+    self._schema_dict = schema_dict
+    self._description_dict = description_dict
+    if flattened_col:
+      self._is_schema_flatten = True
+      self._flattened_col_prefix = flattened_col + '_'
+      self._flattened_col_path = flattened_col + '.'
+    else:
+      self._is_schema_flatten = False
+
+  def _get_name(self, item):
+    field_name = item.get('name')
+    if self._is_schema_flatten:
+      field_name = field_name.replace(self._flattened_col_prefix,
+                                      self._flattened_col_path, 1)
+    return field_name
+
+  def _parse_schema(self, path, schema_dict):
+    for item in schema_dict:
+      field_name = self._get_name(item)
+      if path:
+        field_path = '.'.join([path, field_name])
+      else:
+        field_path = field_name
+      description = self._description_dict.get(field_path, '')
+
+      item['description'] = description
+      if item.get('type') == bigquery_util.TableFieldConstants.TYPE_RECORD:
+        self._parse_schema(field_path, item.get('fields'))
+
+  def add_descriptions(self):
+    self._parse_schema('', self._schema_dict)
 
 
 def calculate_optimal_range_interval(range_end):
