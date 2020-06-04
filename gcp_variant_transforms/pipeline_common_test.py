@@ -82,6 +82,10 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
                      'gcp-variant-transforms-test',
                      '--staging_location',
                      'gs://integration_test_runs/staging']
+    with self.assertRaisesRegexp(ValueError, 'job_name'):
+      pipeline_common._raise_error_on_invalid_flags(pipeline_args)
+    # Add job_name (required for Variant Transforms run). This is now valid.
+    pipeline_args.extend(['--job_name', 'correct-01-job-name-02'])
     pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
     # Add Dataflow runner (requires --setup_file).
