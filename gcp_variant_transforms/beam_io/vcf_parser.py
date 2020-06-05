@@ -89,9 +89,10 @@ class Variant(object):
     Args:
       reference_name: The reference on which this variant occurs (such as
         `chr20` or `X`).
-      start: The position at which this variant occurs (0-based). Corresponds to
-        the first base of the string of reference bases.
-      end: The end position (0-based) of this variant. Corresponds to the first
+      start: The position at which this variant occurs. Corresponds to the
+        first base of the string of reference bases. Depending on
+        `use_1_based_coordinate` underling coordinate is 0-based or 1-based.
+      end: The end position of this variant. Corresponds to the first
         base after the last base in the reference allele.
       reference_bases: The reference bases for this variant.
       alternate_bases: The bases that appear instead of the reference bases.

@@ -23,7 +23,7 @@ from gcp_variant_transforms.libs import bigquery_util
 
 def get_sample_table_schema(with_annotation_fields=False):
   # type: () -> bigquery.TableSchema
-  """Creates a sample BigQuery table schema.
+  """Creates a sample BigQuery table schema for multiple unit tests.
 
   The schema contains the fixed schema fields for VCF. Besides that, it also
   has:
@@ -47,7 +47,7 @@ def get_sample_table_schema(with_annotation_fields=False):
       name=bigquery_util.ColumnKeyConstants.END_POSITION,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('End position (0-based). Corresponds to the first base '
+      description=('End position. Corresponds to the first base '
                    'after the last base in the reference allele.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.REFERENCE_BASES,

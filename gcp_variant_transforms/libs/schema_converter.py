@@ -60,7 +60,8 @@ _CONSTANT_ALTERNATE_BASES_FIELDS = [
 def generate_schema_from_header_fields(
     header_fields,  # type: vcf_header_io.VcfHeader
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
-    variant_merger=None  # type: variant_merge_strategy.VariantMergeStrategy
+    variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
+    use_1_based_coordinate=False  # type: bool
     ):
   # type: (...) -> bigquery.TableSchema
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
@@ -73,6 +74,7 @@ def generate_schema_from_header_fields(
       The latter functionality is what is needed here.
     variant_merger: The strategy used for merging variants (if any). Some
       strategies may change the schema, which is why this may be needed here.
+    use_1_based_coordinate: If True use 1-based coordinate, otherwise 0-based.
   """
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
@@ -80,17 +82,19 @@ def generate_schema_from_header_fields(
       type=bigquery_util.TableFieldConstants.TYPE_STRING,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description='Reference name.'))
+
+  coordinate = '1-based' if use_1_based_coordinate else '0-based'
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.START_POSITION,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('Start position (0-based). Corresponds to the first base '
-                   'of the string of reference bases.')))
+      description=('Start position ({}). Corresponds to the first base '
+                   'of the string of reference bases.'.format(coordinate))))
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.END_POSITION,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description=('End position (0-based). Corresponds to the first base '
+      description=('End position. Corresponds to the first base '
                    'after the last base in the reference allele.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.REFERENCE_BASES,
@@ -127,7 +131,9 @@ def generate_schema_from_header_fields(
       name=bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-      description='Name of the call.'))
+      description='Unique ID (type INT64) assigned to each sample. Table with '
+                  '`__sample_info` suffix contains the mapping of sample names '
+                  '(as read from VCF header) to these assigned IDs.'))
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,

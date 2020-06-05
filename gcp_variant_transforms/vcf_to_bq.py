@@ -470,7 +470,8 @@ def run(argv=None):
       counter_factory)
 
   schema = schema_converter.generate_schema_from_header_fields(
-      header_fields, processed_variant_factory, variant_merger)
+      header_fields, processed_variant_factory, variant_merger,
+      known_args.use_1_based_coordinate)
 
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   if sharding.should_keep_shard(sharding.get_residual_index()):
