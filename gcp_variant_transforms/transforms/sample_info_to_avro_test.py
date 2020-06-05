@@ -29,8 +29,8 @@ from gcp_variant_transforms.transforms import sample_info_to_avro
 
 SAMPLE_LINE = (
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tSAMPLES\tSample1\tSample2')
-TIME_MOCK=1554426661.234567
-EXPECTED_TIMESTAMP=1554426660000000
+TIME_MOCK = 1554426661.234567
+EXPECTED_TIMESTAMP = 1554426660000000
 def mocked_get_now():
   return TIME_MOCK
 
@@ -40,7 +40,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
   @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
               'time.time',
               side_effect=mocked_get_now)
-  def test_convert_sample_info_to_row(self, mocked_obj):
+  def test_convert_sample_info_to_row(self, _):
     vcf_header_1 = vcf_header_io.VcfHeader(
         samples=SAMPLE_LINE, file_path='gs://bucket1/dir1/file1.vcf')
     vcf_header_2 = vcf_header_io.VcfHeader(
@@ -87,7 +87,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
   @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
               'time.time',
               side_effect=mocked_get_now)
-  def test_convert_sample_info_to_row_without_file_in_hash(self, mocked_obj):
+  def test_convert_sample_info_to_row_without_file_in_hash(self, _):
     vcf_header_1 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,

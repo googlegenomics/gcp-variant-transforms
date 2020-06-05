@@ -335,9 +335,6 @@ def _merge_headers(known_args, pipeline_args,
                                             _MERGE_HEADERS_FILE_NAME])
   temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
-  if not known_args.append:
-    sample_info_table_schema_generator.create_sample_info_table(
-        known_args.output_table)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
@@ -347,7 +344,7 @@ def _merge_headers(known_args, pipeline_args,
          | 'SampleInfoToAvro'
          >> sample_info_to_avro.SampleInfoToAvro(
              avro_root_path +
-                sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX,
+             sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX,
              SampleNameEncoding[known_args.sample_name_encoding]))
     if known_args.representative_header_file:
       return
@@ -550,12 +547,17 @@ def run(argv=None):
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
     if not known_args.append:
-      bigquery_util.create_sample_info_table(known_args.output_table)
+      sample_info_table_schema_generator.create_sample_info_table(
+          known_args.output_table)
     suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    load_avro = bigquery_util.LoadAvro(avro_root_path,
-                                       known_args.output_table,
-                                       suffixes, not known_args.append)
+    load_avro = avro_util.LoadAvro(
+        avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
+    if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
+        not_empty_variant_suffixes:
+      not_empty_variant_suffixes.remove(
+          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+    suffixes.remove(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     logging.info('Following tables were loaded with at least 1 row:')
     for suffix in not_empty_variant_suffixes:
       logging.info(bigquery_util.compose_table_name(known_args.output_table,
