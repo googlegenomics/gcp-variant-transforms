@@ -27,7 +27,7 @@ PYSAM_DEPENDENCY_COMMANDS = [
      'zlib1g-dev']
 ]
 
-PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam>=0.15.3']
+PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam<0.16.0']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
