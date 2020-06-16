@@ -56,9 +56,6 @@ class ColumnKeyConstants(object):
   CALLS_GENOTYPE = 'genotype'
   CALLS_PHASESET = 'phaseset'
 
-CALL_SAMPLE_ID_COLUMN = (ColumnKeyConstants.CALLS + '_' +
-                         ColumnKeyConstants.CALLS_SAMPLE_ID)
-
 
 class TableFieldConstants(object):
   """Constants for field modes/types in the BigQuery schema."""

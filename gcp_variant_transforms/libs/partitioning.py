@@ -151,11 +151,16 @@ class FlattenCallColumn(object):
             _COLUMN_AS.format(TABLE_ALIAS=_MAIN_TABLE_ALIAS, COL=column,
                               COL_NAME=column))
       else:
+        sub_list = []
         for s_f in sub_fields:
-          select_list.append(
-              _COLUMN_AS.format(
-                  TABLE_ALIAS=_CALL_TABLE_ALIAS, COL=s_f,
-                  COL_NAME=bigquery_util.ColumnKeyConstants.CALLS + '_' + s_f))
+          sub_list.append(
+              _COLUMN_AS.format(TABLE_ALIAS=_CALL_TABLE_ALIAS, COL=s_f,
+                                COL_NAME=s_f))
+          if s_f == bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID:
+            select_list.append(sub_list[-1])
+        call_column = ('STRUCT(' + ', '.join(sub_list) + ') AS ' +
+                       bigquery_util.ColumnKeyConstants.CALLS)
+        select_list.append(call_column)
     return ', '.join(select_list)
 
   def _copy_to_flatten_table(self, output_table_id, cp_query):

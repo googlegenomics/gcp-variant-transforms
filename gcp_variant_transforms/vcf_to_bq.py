@@ -599,7 +599,8 @@ def run(argv=None):
               known_args.sample_lookup_optimized_output_table, suffix)
           partitioning.create_bq_table(
               output_table_id, flatten_schema_file,
-              bigquery_util.CALL_SAMPLE_ID_COLUMN, partitioning.MAX_RANGE_END)
+              bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
+              partitioning.MAX_RANGE_END)
           logging.info('Sample lookup optimized table %s was created.',
                        output_table_id)
       # Copy to flatten sample lookup tables from the variant lookup tables.
