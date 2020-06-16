@@ -62,7 +62,7 @@ from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy  # pylint: disable=unused-import
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import annotate_files
-from gcp_variant_transforms.transforms import sample_info_to_bigquery
+from gcp_variant_transforms.transforms import sample_info_to_avro
 from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
 from gcp_variant_transforms.transforms import extract_input_size
@@ -312,7 +312,7 @@ def _update_google_cloud_job_name(google_cloud_options, job_name):
 
 
 def _merge_headers(known_args, pipeline_args,
-                   pipeline_mode, annotated_vcf_pattern=None):
+                   pipeline_mode, avro_root_path, annotated_vcf_pattern=None):
   # type: (str, argparse.Namespace, List[str], int, str) -> None
   """Merges VCF headers using beam based on pipeline_mode."""
   options = pipeline_options.PipelineOptions(pipeline_args)
@@ -335,20 +335,17 @@ def _merge_headers(known_args, pipeline_args,
                                             _MERGE_HEADERS_FILE_NAME])
   temp_merged_headers_file_path = filesystems.FileSystems.join(
       temp_directory, temp_merged_headers_file_name)
-  if not known_args.append:
-    sample_info_table_schema_generator.create_sample_info_table(
-        known_args.output_table)
 
   with beam.Pipeline(options=options) as p:
     headers = pipeline_common.read_headers(
         p, pipeline_mode,
         known_args.all_patterns)
     _ = (headers
-         | 'SampleInfoToBigQuery'
-         >> sample_info_to_bigquery.SampleInfoToBigQuery(
-             known_args.output_table,
-             SampleNameEncoding[known_args.sample_name_encoding],
-             known_args.append))
+         | 'SampleInfoToAvro'
+         >> sample_info_to_avro.SampleInfoToAvro(
+             avro_root_path +
+             sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX,
+             SampleNameEncoding[known_args.sample_name_encoding]))
     if known_args.representative_header_file:
       return
     merged_header = pipeline_common.get_merged_headers(
@@ -447,10 +444,13 @@ def run(argv=None):
   variant_merger = _get_variant_merge_strategy(known_args)
 
   pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns)
+
+  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
+  avro_root_path = _get_avro_root_path(beam_pipeline_options)
   # Starts a pipeline to merge VCF headers in beam if the total files that
   # match the input pattern exceeds _SMALL_DATA_THRESHOLD
   _merge_headers(known_args, pipeline_args,
-                 pipeline_mode, annotated_vcf_pattern)
+                 pipeline_mode, avro_root_path, annotated_vcf_pattern)
 
 
   # Retrieve merged headers prior to launching the pipeline. This is needed
@@ -485,9 +485,6 @@ def run(argv=None):
       table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                     table_suffix)
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
-
-  beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
-  avro_root_path = _get_avro_root_path(beam_pipeline_options)
 
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
@@ -549,9 +546,18 @@ def run(argv=None):
             bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
+    if not known_args.append:
+      sample_info_table_schema_generator.create_sample_info_table(
+          known_args.output_table)
+    suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     load_avro = avro_util.LoadAvro(
         avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
+    if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
+        not_empty_variant_suffixes:
+      not_empty_variant_suffixes.remove(
+          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+    suffixes.remove(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     logging.info('Following tables were loaded with at least 1 row:')
     for suffix in not_empty_variant_suffixes:
       logging.info(bigquery_util.compose_table_name(known_args.output_table,

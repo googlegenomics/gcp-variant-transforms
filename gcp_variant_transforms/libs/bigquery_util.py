@@ -67,7 +67,7 @@ class TableFieldConstants(object):
   TYPE_RECORD = 'RECORD'
   TYPE_FLOAT = 'FLOAT'
   TYPE_BOOLEAN = 'BOOLEAN'
-  TYPE_DATETIME = 'DATETIME'
+  TYPE_TIMESTAMP = 'TIMESTAMP'
   MODE_NULLABLE = 'NULLABLE'
   MODE_REPEATED = 'REPEATED'
 
@@ -119,7 +119,8 @@ _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP = {
     TableFieldConstants.TYPE_STRING: 'string',
     TableFieldConstants.TYPE_FLOAT: 'double',
     TableFieldConstants.TYPE_BOOLEAN: 'boolean',
-    TableFieldConstants.TYPE_RECORD: 'record'
+    TableFieldConstants.TYPE_RECORD: 'record',
+    TableFieldConstants.TYPE_TIMESTAMP: 'long'
 }
 
 # A map to convert from BigQuery types to Python types.

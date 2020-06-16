@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC.
+# Copyright 2020 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@
 
 from typing import Dict, Union  # pylint: disable=unused-import
 
-from datetime import datetime
+import time
 
 import apache_beam as beam
+import avro
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_parser
-from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.libs import hashing_util
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import schema_converter
 
 SampleNameEncoding = vcf_parser.SampleNameEncoding
-_DATETIME_FORMAT = "%Y-%m-%d %H:%M:00.0"
+_SECS_IN_MIN = 60
+_MICROS_IN_SEC = 1000000
 
 
 class ConvertSampleInfoToRow(beam.DoFn):
@@ -36,7 +38,7 @@ class ConvertSampleInfoToRow(beam.DoFn):
     self._sample_name_encoding = sample_name_encoding
 
   def _get_now_to_minute(self):
-    return datetime.now().strftime(_DATETIME_FORMAT)
+    return int(time.time()) / _SECS_IN_MIN * _SECS_IN_MIN * _MICROS_IN_SEC
 
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
@@ -56,38 +58,28 @@ class ConvertSampleInfoToRow(beam.DoFn):
       yield row
 
 
-class SampleInfoToBigQuery(beam.PTransform):
+class SampleInfoToAvro(beam.PTransform):
   """Writes sample info to BigQuery."""
 
-  def __init__(self, output_table_prefix, sample_name_encoding, append=False):
+  def __init__(self, output_path, sample_name_encoding):
     # type: (str, Dict[str, str], bool, int) -> None
     """Initializes the transform.
 
     Args:
-      output_table_prefix: The prefix of the output BigQuery table.
-      append: If true, existing records in output_table will not be
-        overwritten. New records will be appended to those that already exist.
+      output_path: The output path of the sample file in the avro directory.
       sample_name_encoding: If SampleNameEncoding.WITHOUT_FILE_PATH is supplied,
         sample_id would only use sample_name in to get a hashed name; otherwise
         both sample_name and file_name will be used.
     """
-    self._output_table = bigquery_util.compose_table_name(
-        output_table_prefix,
-        sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    self._append = append
+    self._output_path = output_path
     self._sample_name_encoding = sample_name_encoding
-    self._schema = sample_info_table_schema_generator.generate_schema()
+    bq_schema = sample_info_table_schema_generator.generate_schema()
+    self._avro_schema = avro.schema.parse(
+        schema_converter.convert_table_schema_to_json_avro_schema(bq_schema))
 
   def expand(self, pcoll):
     return (pcoll
-            | 'ConvertSampleInfoToBigQueryTableRow' >> beam.ParDo(
+            | 'ConvertSampleInfoToAvroTableRow' >> beam.ParDo(
                 ConvertSampleInfoToRow(self._sample_name_encoding))
-            | 'WriteSampleInfoToBigQuery' >> beam.io.Write(beam.io.BigQuerySink(
-                self._output_table,
-                schema=self._schema,
-                create_disposition=(
-                    beam.io.BigQueryDisposition.CREATE_IF_NEEDED),
-                write_disposition=(
-                    beam.io.BigQueryDisposition.WRITE_APPEND
-                    if self._append
-                    else beam.io.BigQueryDisposition.WRITE_TRUNCATE))))
+            | 'WriteToAvroFiles' >> beam.io.WriteToAvro(
+                self._output_path, self._avro_schema))

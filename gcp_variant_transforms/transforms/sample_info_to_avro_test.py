@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC.
+# Copyright 2020 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for `sample_info_to_bigquery` module."""
+"""Tests for `sample_info_to_avro` module."""
 
 import unittest
 
@@ -25,25 +25,27 @@ import mock
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io.vcf_parser import SampleNameEncoding
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
-from gcp_variant_transforms.transforms import sample_info_to_bigquery
+from gcp_variant_transforms.transforms import sample_info_to_avro
 
 SAMPLE_LINE = (
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tSAMPLES\tSample1\tSample2')
+TIME_MOCK = 1554426661.234567
+EXPECTED_TIMESTAMP = 1554426660000000
 def mocked_get_now():
-  return '2019-04-05 1:11'
+  return TIME_MOCK
 
 
 class ConvertSampleInfoToRowTest(unittest.TestCase):
 
-  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_bigquery.'
-              'ConvertSampleInfoToRow._get_now_to_minute',
+  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
+              'time.time',
               side_effect=mocked_get_now)
-  def test_convert_sample_info_to_row(self, mocked_obj):
+  def test_convert_sample_info_to_row(self, _):
     vcf_header_1 = vcf_header_io.VcfHeader(
         samples=SAMPLE_LINE, file_path='gs://bucket1/dir1/file1.vcf')
     vcf_header_2 = vcf_header_io.VcfHeader(
         samples=SAMPLE_LINE, file_path='gs://bucket1/dir1/file2.vcf')
-    current_minute = mocked_obj()
+    current_minute = EXPECTED_TIMESTAMP
 
     expected_rows = [
         {sample_info_table_schema_generator.SAMPLE_ID: 7715696391291253656,
@@ -76,21 +78,21 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         pipeline
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
-        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
+        >> transforms.ParDo(sample_info_to_avro.ConvertSampleInfoToRow(
             SampleNameEncoding.WITH_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))
     pipeline.run()
 
-  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_bigquery.'
-              'ConvertSampleInfoToRow._get_now_to_minute',
+  @mock.patch('gcp_variant_transforms.transforms.sample_info_to_avro.'
+              'time.time',
               side_effect=mocked_get_now)
-  def test_convert_sample_info_to_row_without_file_in_hash(self, mocked_obj):
+  def test_convert_sample_info_to_row_without_file_in_hash(self, _):
     vcf_header_1 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_1')
     vcf_header_2 = vcf_header_io.VcfHeader(samples=SAMPLE_LINE,
                                            file_path='file_2')
-    current_minute = mocked_obj()
+    current_minute = EXPECTED_TIMESTAMP
 
     expected_rows = [
         {sample_info_table_schema_generator.SAMPLE_ID: 6365297890523177914,
@@ -115,7 +117,7 @@ class ConvertSampleInfoToRowTest(unittest.TestCase):
         pipeline
         | transforms.Create([vcf_header_1, vcf_header_2])
         | 'ConvertToRow'
-        >> transforms.ParDo(sample_info_to_bigquery.ConvertSampleInfoToRow(
+        >> transforms.ParDo(sample_info_to_avro.ConvertSampleInfoToRow(
             SampleNameEncoding.WITHOUT_FILE_PATH), ))
 
     assert_that(bigquery_rows, equal_to(expected_rows))

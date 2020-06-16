@@ -33,6 +33,25 @@
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
         "expected_result": {"sum_end": 2372633}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__sample_info`"],
+        "expected_result": {"num_rows": 3}
+      },
+      {
+        "query": [
+          "SELECT sample_id FROM `{DATASET_ID}.{TABLE_ID}__sample_info` ",
+          "WHERE sample_name='NA00001'"
+        ],
+        "expected_result": {"sample_id": 1461155635506253861}
+      },
+      {
+        "query": [
+          "SELECT data_type FROM `{DATASET_ID}.INFORMATION_SCHEMA.COLUMNS` ",
+          "WHERE table_name = '{TABLE_ID}__sample_info' AND ",
+          "column_name='ingestion_datetime'"
+        ],
+        "expected_result": {"data_type": "TIMESTAMP"}
       }
     ]
   }

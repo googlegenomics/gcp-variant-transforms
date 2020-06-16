@@ -48,7 +48,7 @@ def generate_schema():
       description=('Full file path on GCS of the sample.')))
   schema.fields.append(bigquery.TableFieldSchema(
       name=INGESTION_DATETIME,
-      type=bigquery_util.TableFieldConstants.TYPE_DATETIME,
+      type=bigquery_util.TableFieldConstants.TYPE_TIMESTAMP,
       mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
       description=('Ingestion datetime (up to current minute) of samples.')))
 
