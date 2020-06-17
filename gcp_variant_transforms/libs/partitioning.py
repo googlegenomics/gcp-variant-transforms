@@ -15,6 +15,7 @@
 """Utilities to create integer range partitioned BigQuery tables."""
 
 from concurrent.futures import TimeoutError
+import json
 import logging
 import math
 import os
@@ -39,8 +40,6 @@ _FLATTEN_CALL_QUERY = (
     'SELECT {SELECT_COLUMNS} '
     'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` as {MAIN_TABLE_ALIAS}, '
     'UNNEST({CALL_COLUMN}) as {CALL_TABLE_ALIAS}')
-_BQ_EXTRACT_SCHEMA_COMMAND = (
-    'bq show --schema --format=prettyjson {FULL_TABLE_ID} > {SCHEMA_FILE_PATH}')
 
 MAX_RANGE_END = pow(2, 63) - 1
 _MAX_BQ_NUM_PARTITIONS = 4000
@@ -182,35 +181,43 @@ class FlattenCallColumn(object):
         break
     logging.info('Copy to table query was successful: %s', output_table_id)
 
-  def _create_temp_flatten_table_with_1_row(self):
-    temp_suffix = time.strftime('%Y%m%d_%H%M%S')
-    temp_table_id = '{}{}'.format(self._schema_table_id, temp_suffix)
-    full_output_table_id = '{}.{}.{}'.format(
-        self._project_id, self._dataset_id, temp_table_id)
-
-    select_columns = self._get_flatten_column_names()
-    cp_query = _FLATTEN_CALL_QUERY.format(
-        SELECT_COLUMNS=select_columns,
-        PROJECT_ID=self._project_id,
-        DATASET_ID=self._dataset_id,
-        TABLE_ID=self._schema_table_id,
-        MAIN_TABLE_ALIAS=_MAIN_TABLE_ALIAS,
-        CALL_COLUMN=bigquery_util.ColumnKeyConstants.CALLS,
-        CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS)
-    cp_query += ' LIMIT 1'  # We need this table only to extract its schema.
-    self._copy_to_flatten_table(full_output_table_id, cp_query)
-    logging.info('A new table with 1 row was created: %s', full_output_table_id)
-    logging.info('This table is used to extract the schema of flatten table.')
-    return temp_table_id
+  def _convert_variant_schema_to_sample_schema(self, variant_schema):
+    schema_json = []
+    for schema_field in variant_schema:
+      schema_item = schema_field.to_api_repr()
+      if schema_item.get('name') == bigquery_util.ColumnKeyConstants.CALLS:
+        # (1) Modify its type from REPEATED to NULLABLE
+        call_mode = schema_item.get('mode')
+        if call_mode != bigquery_util.TableFieldConstants.MODE_REPEATED:
+          logging.error('Expected REPEATED mode for column `call` but got: %s',
+                        call_mode)
+          raise ValueError('Wrong mode for column `call`: {}'.format(call_mode))
+        schema_item['mode'] = bigquery_util.TableFieldConstants.MODE_NULLABLE
+        # (2) Duplicate sample_id as an independent column to the table
+        sub_items = schema_item.get('fields')
+        sample_id_found = False
+        for sub_item in sub_items:
+          if (sub_item.get('name') ==
+              bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID):
+            schema_json.append(sub_item)
+            sample_id_found = True
+            break
+        if not sample_id_found:
+          logging.info('`sample_id` column under `call` column was not found.')
+          raise ValueError(
+              '`sample_id` column under `call` column was not found.')
+      schema_json.append(schema_item)
+    return schema_json
 
   def get_flatten_table_schema(self, schema_file_path):
     # type: (str) -> bool
     """Write the flatten table's schema to the given json file.
 
     This method basically performs the following tasks:
-      * Composes a 'flattening query' based on _schema_table_id table's schema.
-      * Runs the 'flattening query' to read 1 row and writes it to a temp table.
-      * Extracts the schema of the temp table using _BQ_EXTRACT_SCHEMA_COMMAND.
+      * Extract variant table schema using BigQuery API.
+      * Copy all columns without any change except `call` column:
+        * Modify mode from REPEATED TO NULLABLE
+        * Duplicate call.sample_id column as sample_id column (for partitioning)
 
     Args:
       schema_file_path: The json schema will be written to this file.
@@ -218,23 +225,20 @@ class FlattenCallColumn(object):
     Returns;
       A bool value indicating if the schema was successfully extracted.
     """
-    temp_table_id = self._create_temp_flatten_table_with_1_row()
-    full_table_id = '{}:{}.{}'.format(
-        self._project_id, self._dataset_id, temp_table_id)
-    bq_command = _BQ_EXTRACT_SCHEMA_COMMAND.format(
-        FULL_TABLE_ID=full_table_id,
-        SCHEMA_FILE_PATH=schema_file_path)
-    result = os.system(bq_command)
-    if result != 0:
-      logging.error('Failed to extract flatten table schema using "%s" command',
-                    bq_command)
-    else:
-      logging.info('Successfully extracted the schema of flatten table.')
-    if bigquery_util.delete_table(full_table_id) == 0:
-      logging.info('Successfully deleted temporary table: %s', full_table_id)
-    else:
-      logging.error('Was not able to delete temporary table: %s', full_table_id)
-    return result == 0
+    full_table_id = '{}.{}.{}'.format(
+        self._project_id, self._dataset_id, self._schema_table_id)
+    try:
+      variant_table = self._client.get_table(full_table_id)
+    except TimeoutError as e:
+      logging.error('Failed to get table using its id: "%s"', full_table_id)
+      raise e
+    variant_schema = variant_table.schema
+    sample_schema = self._convert_variant_schema_to_sample_schema(
+        variant_schema)
+    with open(schema_file_path, 'w') as outfile:
+      json.dump(sample_schema, outfile, sort_keys=True, indent=2)
+    logging.info('Successfully extracted the schema of flatten table.')
+    return True
 
   def copy_to_flatten_table(self, output_base_table_id):
     # type: (str) -> None
