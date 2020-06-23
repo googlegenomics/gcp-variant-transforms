@@ -537,13 +537,14 @@ def run(argv=None):
   try:
     for i in range(num_shards):
       suffixes.append(sharding.get_output_table_suffix(i))
-      total_base_pairs = sharding.get_output_table_total_base_pairs(i)
+      partition_range_end = sharding.get_output_table_partition_range_end(i)
       if not known_args.append:
         table_name = bigquery_util.compose_table_name(known_args.output_table,
                                                       suffixes[i])
         partitioning.create_bq_table(
             table_name, schema_file,
-            bigquery_util.ColumnKeyConstants.START_POSITION, total_base_pairs)
+            bigquery_util.ColumnKeyConstants.START_POSITION,
+            partition_range_end)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
     if not known_args.append:

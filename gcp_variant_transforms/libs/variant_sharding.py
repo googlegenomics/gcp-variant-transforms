@@ -49,7 +49,7 @@ _TABLE_NAME_REGEXP = re.compile(r'^[a-zA-Z0-9_]*$')
 _OUTPUT_TABLE = 'output_table'
 _TABLE_NAME_SUFFIX = 'table_name_suffix'
 _REGIONS = 'regions'
-_TOTAL_BASE_PAIRS = 'total_base_pairs'
+_PARTITION_RANGE_END = 'partition_range_end'
 
 
 class _ChromosomeSharder(object):
@@ -114,10 +114,10 @@ class VariantSharding(object):
       self._region_to_shard = {}
 
     self._table_name_suffixes = []
-    self._total_base_pairs = []
+    self._partition_range_end = []
 
     self._parse_config(config_file_path)
-    assert len(self._table_name_suffixes) == len(self._total_base_pairs)
+    assert len(self._table_name_suffixes) == len(self._partition_range_end)
 
   def _is_residual_shard(self, regions):
     # type: (List[str]) -> bool
@@ -203,21 +203,21 @@ class VariantSharding(object):
                                'unique in config file: {}'.format(ref_name))
             existing_ref_names.add(ref_name)
 
-      # Validate total_base_pairs
-      total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS, None)
-      if not total_base_pairs:
+      # Validate partition_range_end
+      partition_range_end = output_table.get(_PARTITION_RANGE_END, None)
+      if not partition_range_end:
         raise ValueError('Wrong sharding config file, {} field missing.'.format(
-            _TOTAL_BASE_PAIRS))
-      if not isinstance(total_base_pairs, int):
+            _PARTITION_RANGE_END))
+      if not isinstance(partition_range_end, int):
         try:
-          total_base_pairs = genomic_region_parser.parse_comma_sep_int(
-              total_base_pairs)
+          partition_range_end = genomic_region_parser.parse_comma_sep_int(
+              partition_range_end)
         except:
           raise ValueError('Wrong sharding config file, each output table '
-                           'needs an integer for total_base_pairs > 0.')
-      if total_base_pairs <= 0:
+                           'needs an integer for partition_range_end > 0.')
+      if partition_range_end <= 0:
         raise ValueError('Wrong sharding config file, each output table '
-                         'needs an integer for total_base_pairs > 0.')
+                         'needs an integer for partition_range_end > 0.')
     return has_any_interval
 
   def _parse_config(self, config_file_path):
@@ -250,12 +250,12 @@ class VariantSharding(object):
             self._region_to_shard[ref_name].add_region(start, end, shard_index)
           else:
             self._region_to_shard[ref_name] = shard_index
-      # Store num_base_pairs
-      total_base_pairs = output_table.get(_TOTAL_BASE_PAIRS)
-      if not isinstance(total_base_pairs, int):
-        total_base_pairs = genomic_region_parser.parse_comma_sep_int(
-            total_base_pairs)
-      self._total_base_pairs.insert(shard_index, total_base_pairs)
+      # Store partition_range_end
+      partition_range_end = output_table.get(_PARTITION_RANGE_END)
+      if not isinstance(partition_range_end, int):
+        partition_range_end = genomic_region_parser.parse_comma_sep_int(
+            partition_range_end)
+      self._partition_range_end.insert(shard_index, partition_range_end)
 
     if self._residual_index == _UNDEFINED_SHARD_INDEX:
       # We add an extra dummy partition for residuals.
@@ -315,13 +315,13 @@ class VariantSharding(object):
           '[0, {})'.format(shard_index, self._num_shards))
     return self._table_name_suffixes[shard_index]
 
-  def get_output_table_total_base_pairs(self, shard_index):
+  def get_output_table_partition_range_end(self, shard_index):
     # type: (int) -> Optional[int]
     if not self._is_index_in_the_range(shard_index):
       raise ValueError(
           'Given shard index {} is outside of expected range: '
           '[0, {})'.format(shard_index, self._num_shards))
-    return self._total_base_pairs[shard_index]
+    return self._partition_range_end[shard_index]
 
   def get_num_shards(self):
     # type: (None) -> int
