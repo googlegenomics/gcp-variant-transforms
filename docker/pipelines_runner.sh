@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,region:,zone:,network:,subnetwork:,privateAddress: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,privateAddress: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -39,14 +39,6 @@ function parse_args {
 
       --region)
         region="$2"
-        ;;
-
-      --zone)
-        zone="$2"
-        ;;
-
-      --network)
-        network="$2"
         ;;
 
       --subnetwork)
@@ -76,8 +68,6 @@ function main {
   vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms}"
   region="${region:-$(gcloud config get-value compute/region)}"
   temp_location="${temp_location:-''}"
-  zone="${zone:-}"
-  network="${network:-}"
   subnetwork="${subnetwork:-}"
   privateAddress="${privateAddress:-}"
   extra_args=""
@@ -94,30 +84,20 @@ function main {
     exit 1
   fi
 
-  if [[ ! -v command ]]; then
-    echo "Please specify a command to run Variant Transforms."
-    exit 1
-  fi
-
   # Build up the extra args is they are provided
-  if [[ ! -z "${zone}" ]]; then
-    echo "Adding --zone=${zone} to extra_args"
-    extra_args="${extra_args} --zone=${zone}"
-  fi
-
-  if [[ ! -z "${network}" ]]; then
-    echo "Adding --network=${network} to extra_args"
-    extra_args="${extra_args} --network=${network}"
-  fi
-
   if [[ ! -z "${subnetwork}" ]]; then
-    echo "Adding --subnetwork=${subnetwork} to extra_args"
-    extra_args="${extra_args} --subnetwork=${subnetwork}"
+    echo "Adding --subnetwork ${subnetwork} to extra_args"
+    extra_args="${extra_args} --subnetwork ${subnetwork}"
   fi
 
   if [[ ! -z "${privateAddress}"  && "${privateAddress}" == "true" ]]; then
     echo "Adding --private-address to extra_args"
     extra_args="${extra_args} --private-address"
+  fi
+
+  if [[ ! -v command ]]; then
+    echo "Please specify a command to run Variant Transforms."
+    exit 1
   fi
 
   pipelines --project "${google_cloud_project}" run \
