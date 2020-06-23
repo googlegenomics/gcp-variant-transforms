@@ -95,6 +95,11 @@ _SHARDS_FOLDER = 'shards'
 _GCS_RECURSIVE_WILDCARD = '**'
 SampleNameEncoding = vcf_parser.SampleNameEncoding
 
+_newly_created_tables = []
+def _record_newly_created_table(full_table_id):
+  global _newly_created_tables  # pylint: disable=global-statement
+  _newly_created_tables.append(full_table_id)
+
 
 def _read_variants(all_patterns,  # type: List[str]
                    pipeline,  # type: beam.Pipeline
@@ -524,8 +529,6 @@ def run(argv=None):
           'Dataflow pipeline terminated in {} state'.format(state))
   except Exception as e:
     logging.error('Dataflow pipeline failed.')
-    bigquery_util.rollback_newly_created_tables(
-        known_args.append, known_args.output_table)
     raise e
   else:
     logging.info('Dataflow pipeline finished successfully.')
@@ -545,29 +548,32 @@ def run(argv=None):
             table_name, schema_file,
             bigquery_util.ColumnKeyConstants.START_POSITION,
             partition_range_end)
+        _record_newly_created_table(table_name)
         logging.info('Integer range partitioned table %s was created.',
                      table_name)
     if not known_args.append:
-      sample_info_table_schema_generator.create_sample_info_table(
-          known_args.output_table)
+      _record_newly_created_table(
+          sample_info_table_schema_generator.create_sample_info_table(
+              known_args.output_table))
+
     suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     load_avro = avro_util.LoadAvro(
         avro_root_path, known_args.output_table, suffixes, False)
     not_empty_variant_suffixes = load_avro.start_loading()
-    if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
-        not_empty_variant_suffixes:
-      not_empty_variant_suffixes.remove(
-          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    suffixes.remove(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
     logging.info('Following tables were loaded with at least 1 row:')
     for suffix in not_empty_variant_suffixes:
       logging.info(bigquery_util.compose_table_name(known_args.output_table,
                                                     suffix))
+    # Remove sample_info table from both lists to avoid duplicating it when
+    # --sample_lookup_optimized_output_table flag is set
+    suffixes.remove(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+    if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
+        not_empty_variant_suffixes:
+      not_empty_variant_suffixes.remove(
+          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
-    bigquery_util.rollback_newly_created_tables(
-        known_args.append, known_args.output_table, suffixes)
     logging.info('Since the write to BigQuery stage failed, we did not delete '
                  'AVRO files in your GCS bucket. You can manually import them '
                  'to BigQuery. To avoid extra storage charges, delete them if '
@@ -602,9 +608,11 @@ def run(argv=None):
               output_table_id, flatten_schema_file,
               bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
               partitioning.MAX_RANGE_END)
+          _record_newly_created_table(output_table_id)
           logging.info('Sample lookup optimized table %s was created.',
                        output_table_id)
       # Copy to flatten sample lookup tables from the variant lookup tables.
+      # Note: uses WRITE_TRUNCATE to overwrite the existing tables (issue #607).
       flatten_call_column.copy_to_flatten_table(
           known_args.sample_lookup_optimized_output_table)
       logging.info('All sample lookup optimized tables are fully loaded.')
@@ -615,4 +623,17 @@ def run(argv=None):
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
-  run()
+  try:
+    run()
+  except Exception as e:
+    if _newly_created_tables:
+      logging.info('Trying to delete all newly created tables.')
+      bigquery_util.rollback_newly_created_tables(_newly_created_tables)
+    else:
+      logging.warning(
+          'Since tables were appended, added rows cannot be reverted. You can '
+          'utilize BigQuery snapshot decorators to recover your table up to 7 '
+          'days ago. For more information please refer to: '
+          'https://cloud.google.com/bigquery/table-decorators '
+          'Here is the list of tables that you need to manually rollback:')
+    raise e
