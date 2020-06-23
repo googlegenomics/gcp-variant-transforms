@@ -108,7 +108,7 @@ class VariantShardingTest(unittest.TestCase):
     self.assertEqual(sharder.get_output_table_suffix(6), 'chr3_02')
     self.assertEqual(sharder.get_output_table_suffix(7), 'all_remaining')
 
-  def test_config_get_total_base_pairs(self):
+  def test_config_get_partition_range_end(self):
     sharder = variant_sharding.VariantSharding(
         'gcp_variant_transforms/testing/data/sharding_configs/'
         'residual_at_end.yaml')
@@ -116,14 +116,14 @@ class VariantShardingTest(unittest.TestCase):
     for i in range(sharder.get_num_shards()):
       self.assertTrue(sharder.should_keep_shard(i))
 
-    self.assertEqual(sharder.get_output_table_total_base_pairs(0), 1000000)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(1), 2000000)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(2), 249240615)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(3), 243189284)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(4), 191044274)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(5), 500000)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(6), 1000000)
-    self.assertEqual(sharder.get_output_table_total_base_pairs(7), 249240615)
+    self.assertEqual(sharder.get_output_table_partition_range_end(0), 1000000)
+    self.assertEqual(sharder.get_output_table_partition_range_end(1), 2000000)
+    self.assertEqual(sharder.get_output_table_partition_range_end(2), 249240615)
+    self.assertEqual(sharder.get_output_table_partition_range_end(3), 243189284)
+    self.assertEqual(sharder.get_output_table_partition_range_end(4), 191044274)
+    self.assertEqual(sharder.get_output_table_partition_range_end(5), 500000)
+    self.assertEqual(sharder.get_output_table_partition_range_end(6), 1000000)
+    self.assertEqual(sharder.get_output_table_partition_range_end(7), 249240615)
 
   def test_config_non_existent_shard_name(self):
     sharder = variant_sharding.VariantSharding(
@@ -225,16 +225,16 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr01_part1"',
         '     regions:',
         '       - "chr1:0-1,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "all_remaining"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "missing_region"',
         '     regions:',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -249,7 +249,7 @@ class VariantShardingTest(unittest.TestCase):
         '-  output_table:',
         '     regions:',
         '       - "chr1:0-1,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -262,7 +262,7 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "          "',
         '     regions:',
         '       - "chr1:0-1,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -278,17 +278,17 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "all_remaining"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr01"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "all_remaining_2"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -304,12 +304,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr01_part1"',
         '     regions:',
         '       - "chr1:0-1,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr01_part2_overlapping"',
         '     regions:',
         '       - "chr1:999,999-2,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
@@ -322,12 +322,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr01_full"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr01_part_overlapping"',
         '     regions:',
         '       - "chr1:1,000,000-2,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
@@ -340,12 +340,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr01_part"',
         '     regions:',
         '       - "chr1:1,000,000-2,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr01_full_overlapping"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
@@ -358,17 +358,17 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr01_full"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr02_part"',
         '     regions:',
         '       - "chr2:1,000,000-2,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "chr01_full_redundant"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
@@ -383,17 +383,17 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "duplicate_name"',
         '     regions:',
         '       - "chr1:0-1,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "all_remaining"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
         '-  output_table:',
         '     table_name_suffix: "duplicate_name"',
         '     regions:',
         '       - "chr1:1,000,000-2,000,000"',
-        '     total_base_pairs: 999999999',
+        '     partition_range_end: 999999999',
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -410,7 +410,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -424,7 +424,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -436,7 +436,7 @@ class VariantShardingTest(unittest.TestCase):
     missing_chrom_values = [
         '-  output_table:',
         '     table_name_suffix: "chr1"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -449,7 +449,7 @@ class VariantShardingTest(unittest.TestCase):
         '-  output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -458,7 +458,7 @@ class VariantShardingTest(unittest.TestCase):
           tempdir.create_temp_file(suffix='.yaml',
                                    lines='\n'.join(missing_filters)))
 
-    missing_total_base_pairs = [
+    missing_partition_range_end = [
         '-  output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
@@ -467,10 +467,10 @@ class VariantShardingTest(unittest.TestCase):
     ]
     with self.assertRaisesRegexp(
         ValueError,
-        'Wrong sharding config file, total_base_pairs field missing.'):
+        'Wrong sharding config file, partition_range_end field missing.'):
       _ = variant_sharding.VariantSharding(
-          tempdir.create_temp_file(suffix='.yaml',
-                                   lines='\n'.join(missing_total_base_pairs)))
+          tempdir.create_temp_file(
+              suffix='.yaml', lines='\n'.join(missing_partition_range_end)))
 
   def test_config_failed_wrong_fields(self):
     tempdir = temp_dir.TempDir()
@@ -480,7 +480,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -496,7 +496,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -511,12 +511,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "chr1"',
-        '     total_base_pairs: 249240615',
+        '     partition_range_end: 249240615',
         '-  output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "chr2"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -532,7 +532,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "chr1"',
         '       - " "',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -548,7 +548,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '       - "dup_value"',
         '       - "dup_value"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -562,12 +562,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "dup_value"',
-        '     total_base_pairs: 249240615',
+        '     partition_range_end: 249240615',
         '-  output_table:',
         '     table_name_suffix: "chr2"',
         '     regions:',
         '       - "dup_value"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -581,12 +581,12 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "residual1"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 249240615',
+        '     partition_range_end: 249240615',
         '-  output_table:',
         '     table_name_suffix: "residual2"',
         '     regions:',
         '       - "residual"',
-        '     total_base_pairs: 249240615'
+        '     partition_range_end: 249240615'
     ]
     with self.assertRaisesRegexp(
         ValueError,
@@ -595,32 +595,32 @@ class VariantShardingTest(unittest.TestCase):
           tempdir.create_temp_file(suffix='.yaml',
                                    lines='\n'.join(duplicate_residual)))
 
-    not_int_total_base_pairs = [
+    not_int_partition_range_end = [
         '-  output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: "not int"'
+        '     partition_range_end: "not int"'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(
-          tempdir.create_temp_file(suffix='.yaml',
-                                   lines='\n'.join(not_int_total_base_pairs)))
+          tempdir.create_temp_file(
+              suffix='.yaml', lines='\n'.join(not_int_partition_range_end)))
 
-    not_pos_total_base_pairs = [
+    not_pos_partition_range_end = [
         '-  output_table:',
         '     table_name_suffix: "chr1"',
         '     regions:',
         '       - "chr1"',
         '       - "1"',
-        '     total_base_pairs: -10'
+        '     partition_range_end: -10'
     ]
     with self.assertRaisesRegexp(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(
-          tempdir.create_temp_file(suffix='.yaml',
-                                   lines='\n'.join(not_pos_total_base_pairs)))
+          tempdir.create_temp_file(
+              suffix='.yaml', lines='\n'.join(not_pos_partition_range_end)))

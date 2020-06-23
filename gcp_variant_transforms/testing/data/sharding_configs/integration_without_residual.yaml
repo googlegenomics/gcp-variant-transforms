@@ -2,34 +2,34 @@
      table_name_suffix: "empty"
      regions:
        - "nonexistence_chromosome"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr19_1M"
      regions:
        - "chr19:0-1,000,000"
-     total_base_pairs: 1,000,000
+     partition_range_end: 1,000,000
 -  output_table:
      table_name_suffix: "chr05_1M"
      regions:
        - "chr5:0-1,000,000"
-     total_base_pairs: 1,000,000
+     partition_range_end: 1,000,000
 -  output_table:
      table_name_suffix: "chr07_1M"
      regions:
        - "chr7:0-1,000,000"
-     total_base_pairs: 1,000,000
+     partition_range_end: 1,000,000
 -  output_table:
      table_name_suffix: "chr01_100M"
      regions:
        - "chr1:0-100,000,000"
-     total_base_pairs: 100,000,000
+     partition_range_end: 100,000,000
 -  output_table:
      table_name_suffix: "chr01_200M"
      regions:
        - "chr1:100,000,000-200,000,000"
-     total_base_pairs: 200,000,000
+     partition_range_end: 200,000,000
 -  output_table:
      table_name_suffix: "chr01_remaining"
      regions:
        - "chr1:200,000,000-999,999,999"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615

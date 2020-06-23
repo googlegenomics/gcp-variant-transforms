@@ -3,133 +3,133 @@
      regions:
        - "chr1"
        - "1"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr2"
      regions:
        - "chr2"
        - "2"
-     total_base_pairs: 243,189,284
+     partition_range_end: 243,189,284
 -  output_table:
      table_name_suffix: "chr3"
      regions:
        - "chr3"
        - "3"
-     total_base_pairs: 198,233,091
+     partition_range_end: 198,233,091
 -  output_table:
      table_name_suffix: "chr4"
      regions:
        - "chr4"
        - "4"
-     total_base_pairs: 191,044,274
+     partition_range_end: 191,044,274
 -  output_table:
      table_name_suffix: "chr5"
      regions:
        - "chr5"
        - "5"
-     total_base_pairs: 181,478,212
+     partition_range_end: 181,478,212
 -  output_table:
      table_name_suffix: "chr6"
      regions:
        - "chr6"
        - "6"
-     total_base_pairs: 171,053,767
+     partition_range_end: 171,053,767
 -  output_table:
      table_name_suffix: "chr7"
      regions:
        - "chr7"
        - "7"
-     total_base_pairs: 159,335,971
+     partition_range_end: 159,335,971
 -  output_table:
      table_name_suffix: "chr8"
      regions:
        - "chr8"
        - "8"
-     total_base_pairs: 146,303,973
+     partition_range_end: 146,303,973
 -  output_table:
      table_name_suffix: "chr9"
      regions:
        - "chr9"
        - "9"
-     total_base_pairs: 141,149,922
+     partition_range_end: 141,149,922
 -  output_table:
      table_name_suffix: "chr10"
      regions:
        - "chr10"
        - "10"
-     total_base_pairs: 135,524,745
+     partition_range_end: 135,524,745
 -  output_table:
      table_name_suffix: "chr11"
      regions:
        - "chr11"
        - "11"
-     total_base_pairs: 135,076,620
+     partition_range_end: 135,076,620
 -  output_table:
      table_name_suffix: "chr12"
      regions:
        - "chr12"
        - "12"
-     total_base_pairs: 133,841,700
+     partition_range_end: 133,841,700
 -  output_table:
      table_name_suffix: "chr13"
      regions:
        - "chr13"
        - "13"
-     total_base_pairs: 115,109,876
+     partition_range_end: 115,109,876
 -  output_table:
      table_name_suffix: "chr14"
      regions:
        - "chr14"
        - "14"
-     total_base_pairs: 107,289,538
+     partition_range_end: 107,289,538
 -  output_table:
      table_name_suffix: "chr15"
      regions:
        - "chr15"
        - "15"
-     total_base_pairs: 102,521,390
+     partition_range_end: 102,521,390
 -  output_table:
      table_name_suffix: "chr16"
      regions:
        - "chr16"
        - "16"
-     total_base_pairs: 90,294,745
+     partition_range_end: 90,294,745
 -  output_table:
      table_name_suffix: "chr17"
      regions:
        - "chr17"
        - "17"
-     total_base_pairs: 83,247,376
+     partition_range_end: 83,247,376
 -  output_table:
      table_name_suffix: "chr18"
      regions:
        - "chr18"
        - "18"
-     total_base_pairs: 80,263,277
+     partition_range_end: 80,263,277
 -  output_table:
      table_name_suffix: "chr19"
      regions:
        - "chr19"
        - "19"
-     total_base_pairs: 59,118,975
+     partition_range_end: 59,118,975
 -  output_table:
      table_name_suffix: "chr20"
      regions:
        - "chr20"
        - "20"
-     total_base_pairs: 64,334,162
+     partition_range_end: 64,334,162
 -  output_table:
      table_name_suffix: "chr21"
      regions:
        - "chr21"
        - "21"
-     total_base_pairs: 48,119,890
+     partition_range_end: 48,119,890
 -  output_table:
      table_name_suffix: "chr22"
      regions:
        - "chr22"
        - "22"
-     total_base_pairs: 51,244,528
+     partition_range_end: 51,244,528
 -  output_table:
      table_name_suffix: "chrX"
      regions:
@@ -137,7 +137,7 @@
        - "chrx"
        - "X"
        - "x"
-     total_base_pairs: 156,030,808
+     partition_range_end: 156,030,808
 -  output_table:
      table_name_suffix: "chrY"
      regions:
@@ -145,10 +145,10 @@
        - "chry"
        - "Y"
        - "y"
-     total_base_pairs: 57,227,415
+     partition_range_end: 57,227,415
 -  output_table:
      table_name_suffix: "residual"
      regions:
        - "residual"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615
 
