@@ -73,7 +73,7 @@ function main {
   parse_args "$@"
 
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
-  vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}}"
+  vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms}"
   region="${region:-$(gcloud config get-value compute/region)}"
   temp_location="${temp_location:-''}"
   zone="${zone:-}"
@@ -130,7 +130,7 @@ function main {
     --machine-type "g1-small" \
     --pvm-attempts 0 \
     --attempts 1 \
-    --disk-size 10 "${extra_args}"
+    --disk-size 10 ${extra_args}
 }
 
 main "$@"
