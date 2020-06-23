@@ -81,8 +81,10 @@ class LoadAvro(object):
     return self._not_empty_suffixes
 
   def _start_one_load_job(self, suffix):
+    # After issue #582 is resolved we can remove the create_disposition flag.
     job_config = bigquery.LoadJobConfig(
-        source_format=bigquery.SourceFormat.AVRO)
+        source_format=bigquery.SourceFormat.AVRO,
+        create_disposition='CREATE_NEVER')
     uri = self._avro_root_path + suffix + '-*'
     table_id = bigquery_util.compose_table_name(self._table_base_name, suffix)
     load_job = self._client.load_table_from_uri(
@@ -94,20 +96,24 @@ class LoadAvro(object):
       load_job.cancel()
 
   def _handle_failed_load_job(self, suffix, load_job):
+    table_id = bigquery_util.compose_table_name(self._table_base_name, suffix)
+    logging.warning('Failed to load AVRO to BigQuery table: %s', table_id)
+    exception_str = ''
+    if load_job.exception():
+      exception_str = str(load_job.exception())
+      logging.warning('Load job exception: %s', exception_str)
     if self._num_load_jobs_retries < bigquery_util.BQ_NUM_RETRIES:
+      logging.warning('Retrying the failed job...')
       self._num_load_jobs_retries += 1
-      # Retry the failed job after 5 minutes wait.
       time.sleep(300)
       self._start_one_load_job(suffix)
     else:
-      # Jobs have failed more than _BQ_LOAD_JOB_NUM_RETRIES, cancel all jobs.
+      logging.error('AVRO load jobs have failed more than BQ_NUM_RETRIES.')
       self._cancel_all_running_load_jobs()
-      table_id = bigquery_util.compose_table_name(self._table_base_name, suffix)
       raise ValueError(
           'Failed to load AVRO to BigQuery table {} \n state: {} \n '
-          'job_id: {} \n errors: {}.'.format(table_id, load_job.state,
-                                             load_job.path,
-                                             '\n'.join(load_job.errors)))
+          'job_id: {} \n exception: {}.'.format(table_id, load_job.state,
+                                                load_job.path, exception_str))
   def _monitor_load_jobs(self):
     # Waits until current jobs are done and then add remaining jobs one by one.
     while self._suffixes_to_load_jobs:
@@ -117,7 +123,7 @@ class LoadAvro(object):
         load_job = self._suffixes_to_load_jobs.get(suffix)
         if load_job.done():
           del self._suffixes_to_load_jobs[suffix]
-          if load_job.state != 'DONE':
+          if load_job.state != 'DONE' or load_job.exception() is not None:
             self._handle_failed_load_job(suffix, load_job)
           else:
             self._delete_empty_table(suffix, load_job)
