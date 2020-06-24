@@ -377,25 +377,12 @@ def delete_table(full_table_id):
   return os.system(bq_command)
 
 
-def rollback_newly_created_tables(append, base_table_name, suffixes=None):
-  if append:
-    logging.warning(
-        'Since tables were appended, added rows cannot be reverted. You can '
-        'utilize BigQuery snapshot decorators to recover your table up to 7 '
-        'days ago. For more information please refer to: '
-        'https://cloud.google.com/bigquery/table-decorators '
-        'Here is the list of tables that you need to manually rollback:')
-    for suffix in suffixes:
-      table_name = compose_table_name(base_table_name, suffix)
-      logging.warning(table_name)
-  else:
-    logging.info('Trying to revert as much as possible...')
-    for suffix in suffixes:
-      table_name = compose_table_name(base_table_name, suffix)
-      if delete_table(table_name) == 0:
-        logging.info('Table was successfully deleted: %s', table_name)
-      else:
-        logging.error('Failed to delete table: %s', table_name)
+def rollback_newly_created_tables(newly_created_tables):
+  for full_table_id in newly_created_tables:
+    if delete_table(full_table_id) == 0:
+      logging.info('Table was successfully deleted: %s', full_table_id)
+    else:
+      logging.error('Failed to delete table: %s', full_table_id)
 
 
 def delete_gcs_files(root_path):
