@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,privateAddress: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -45,8 +45,8 @@ function parse_args {
         subnetwork="$2"
         ;;
 
-      --privateAddress)
-        privateAddress="$2"
+      --use_public_ips)
+        use_public_ips="$2"
         ;;
 
       *)
@@ -69,8 +69,9 @@ function main {
   region="${region:-$(gcloud config get-value compute/region)}"
   temp_location="${temp_location:-''}"
   subnetwork="${subnetwork:-}"
-  privateAddress="${privateAddress:-}"
-  extra_args=""
+  use_public_ips="${use_public_ips:-}"
+  pt_optional_args=""
+  df_optional_args=""
 
   if [[ -z "${google_cloud_project}" ]]; then
     echo "Please set the google cloud project using flag --project PROJECT."
@@ -86,13 +87,15 @@ function main {
 
   # Build up the extra args is they are provided
   if [[ ! -z "${subnetwork}" ]]; then
-    echo "Adding --subnetwork ${subnetwork} to extra_args"
-    extra_args="${extra_args} --subnetwork ${subnetwork}"
+    echo "Adding --subnetwork ${subnetwork} to optional_args"
+    pt_optional_args="${pt_optional_args} --subnetwork projects/${project}/regions/${region}/subnetworks/${subnetwork}"
+    df_optional_args="${df_optional_args} --subnetwork https://www.googleapis.com/compute/v1/projects/${project}/regions/${region}/subnetworks/${subnetwork}"
   fi
 
-  if [[ ! -z "${privateAddress}"  && "${privateAddress}" == "true" ]]; then
-    echo "Adding --private-address to extra_args"
-    extra_args="${extra_args} --private-address"
+  if [[ ! -z "${use_public_ips}"  && "${use_public_ips}" == "true" ]]; then
+    echo "Adding --private-address and --no_use_public_ips to optional_args"
+    pt_optional_args="${pt_optional_args} --private-address"
+    df_optional_args="${df_optional_args} --no_use_public_ips"
   fi
 
   if [[ ! -v command ]]; then
@@ -101,7 +104,7 @@ function main {
   fi
 
   pipelines --project "${google_cloud_project}" run \
-    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project} --region ${region}" \
+    --command "/opt/gcp_variant_transforms/bin/${command} --project ${google_cloud_project} --region ${region} ${df_optional_args}" \
     --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
     --wait \
     --scopes "https://www.googleapis.com/auth/cloud-platform" \
@@ -110,7 +113,7 @@ function main {
     --machine-type "g1-small" \
     --pvm-attempts 0 \
     --attempts 1 \
-    --disk-size 10 ${extra_args}
+    --disk-size 10 ${pt_optional_args}
 }
 
 main "$@"
