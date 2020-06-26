@@ -88,8 +88,8 @@ function main {
   # Build up the optional args if they are provided
   if [[ ! -z "${subnetwork}" ]]; then
     echo "Adding --subnetwork ${subnetwork} to optional_args"
-    pt_optional_args="${pt_optional_args} --subnetwork projects/${project}/regions/${region}/subnetworks/${subnetwork}"
-    df_optional_args="${df_optional_args} --subnetwork https://www.googleapis.com/compute/v1/projects/${project}/regions/${region}/subnetworks/${subnetwork}"
+    pt_optional_args="${pt_optional_args} --subnetwork projects/${google_cloud_project}/regions/${region}/subnetworks/${subnetwork}"
+    df_optional_args="${df_optional_args} --subnetwork https://www.googleapis.com/compute/v1/projects/${google_cloud_project}/regions/${region}/subnetworks/${subnetwork}"
   fi
 
   if [[ ! -z "${use_public_ips}"  && "${use_public_ips}" == "false" ]]; then
