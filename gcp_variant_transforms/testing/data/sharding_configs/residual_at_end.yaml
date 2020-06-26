@@ -2,17 +2,17 @@
      table_name_suffix: "chr01_part1"
      regions:
        - "chr1:0-1,000,000"
-     total_base_pairs: 1,000,000
+     partition_range_end: 1,000,000
 -  output_table:
      table_name_suffix: "chr01_part2"
      regions:
        - "chr1:1,000,000-2,000,000"
-     total_base_pairs: 2,000,000
+     partition_range_end: 2,000,000
 -  output_table:
      table_name_suffix: "chr01_part3"
      regions:
        - "chr1:2,000,000-999,999,999"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chrom02"
      regions:
@@ -20,26 +20,26 @@
        - "chr2_alternate_name1"
        - "chr2_ALteRNate_NAME2"
        - "2"
-     total_base_pairs: 243,189,284
+     partition_range_end: 243,189,284
 -  output_table:
      table_name_suffix: "chrom04_05_part_06"
      regions:
        - "chr4"
        - "chr5"
        - "chr6:1,000,000-2,000,000"
-     total_base_pairs: 191,044,274
+     partition_range_end: 191,044,274
 -  output_table:
      table_name_suffix: "chr3_01"
      regions:
        - "3:0-500,000"
-     total_base_pairs: 500,000
+     partition_range_end: 500,000
 -  output_table:
      table_name_suffix: "chr3_02"
      regions:
        - "3:500,000-1,000,000"
-     total_base_pairs: 1,000,000
+     partition_range_end: 1,000,000
 -  output_table:
      table_name_suffix: "all_remaining"
      regions:
        - "residual"
-     total_base_pairs: 249,240,615
+     partition_range_end: 249,240,615

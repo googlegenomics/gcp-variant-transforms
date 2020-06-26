@@ -9,127 +9,127 @@
      regions:
        - "chr2"
        - "2"
-     partition_range_end: 243,189,284
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr3"
      regions:
        - "chr3"
        - "3"
-     partition_range_end: 198,233,091
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr4"
      regions:
        - "chr4"
        - "4"
-     partition_range_end: 191,044,274
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr5"
      regions:
        - "chr5"
        - "5"
-     partition_range_end: 181,478,212
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr6"
      regions:
        - "chr6"
        - "6"
-     partition_range_end: 171,053,767
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr7"
      regions:
        - "chr7"
        - "7"
-     partition_range_end: 159,335,971
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr8"
      regions:
        - "chr8"
        - "8"
-     partition_range_end: 146,303,973
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr9"
      regions:
        - "chr9"
        - "9"
-     partition_range_end: 141,149,922
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr10"
      regions:
        - "chr10"
        - "10"
-     partition_range_end: 135,524,745
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr11"
      regions:
        - "chr11"
        - "11"
-     partition_range_end: 135,076,620
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr12"
      regions:
        - "chr12"
        - "12"
-     partition_range_end: 133,841,700
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr13"
      regions:
        - "chr13"
        - "13"
-     partition_range_end: 115,109,876
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr14"
      regions:
        - "chr14"
        - "14"
-     partition_range_end: 107,289,538
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr15"
      regions:
        - "chr15"
        - "15"
-     partition_range_end: 102,521,390
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr16"
      regions:
        - "chr16"
        - "16"
-     partition_range_end: 90,294,745
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr17"
      regions:
        - "chr17"
        - "17"
-     partition_range_end: 83,247,376
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr18"
      regions:
        - "chr18"
        - "18"
-     partition_range_end: 80,263,277
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr19"
      regions:
        - "chr19"
        - "19"
-     partition_range_end: 59,118,975
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr20"
      regions:
        - "chr20"
        - "20"
-     partition_range_end: 64,334,162
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr21"
      regions:
        - "chr21"
        - "21"
-     partition_range_end: 48,119,890
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chr22"
      regions:
        - "chr22"
        - "22"
-     partition_range_end: 51,244,528
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chrX"
      regions:
@@ -137,7 +137,7 @@
        - "chrx"
        - "X"
        - "x"
-     partition_range_end: 156,030,808
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "chrY"
      regions:
@@ -145,7 +145,7 @@
        - "chry"
        - "Y"
        - "y"
-     partition_range_end: 57,227,415
+     partition_range_end: 249,240,615
 -  output_table:
      table_name_suffix: "residual"
      regions:
