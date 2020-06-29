@@ -50,7 +50,7 @@ here are some of their sizes:
 | ChrX       | 28,156,663      | 40.51      |
 
 
-Other than making each table smaller and more manageable, sharding per chromosome
+In addition to making each table smaller and more manageable, sharding per chromosome
 is a prerequisite for the next cost reduction technique.
 
 ## (II) BigQuery Partitioning
@@ -73,10 +73,10 @@ query on a table which is partitioned based on of `start_position` column :
 
 ![query cost unpartitioned table](images/query_cost_partitioned_table.svg)
 
-Partitioning is a very effective technique to reduce the cost of queries, specially
-for the genomics data where majority of the queries are analyzing a small genomic region.
-Table partitioning comes at no cost, and allows to divide a table up to 4000
-segments. Appending to a paritioned table will not degrade the performance and all newly
+Partitioning is a very effective technique to reduce the cost of queries, especially
+for genomics data where majority of the queries are analyzing a small genomic region.
+Table partitioning comes at no cost, and allows a table to be divided into up to 4000
+partitions. Appending to a paritioned table will not degrade the performance and all newly
 added rows will be stored in the right partition. Also you can know query cost before
 running your query. Because partition pruning is done before the query runs, 
 you can get the query cost through a [dry run](https://cloud.google.com/bigquery/docs/dry-run-queries). 

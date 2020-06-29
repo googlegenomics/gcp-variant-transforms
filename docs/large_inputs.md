@@ -75,14 +75,16 @@ Set
 `--worker_disk_type compute.googleapis.com/projects//zones//diskTypes/pd-ssd`
 to use SSDs.
 
-### Adjusting Quotas
+### Adjusting Quotas and Limits 
 
-Compute Engine enforces quota on maximum amount of resources that can be used
+Compute Engine enforces quota on the maximum amount of resources that can be used
 at any time for variety of reasons. Please see
-https://cloud.google.com/compute/quotas for more details. As a result, you may
-need to adjust the quota to satisfy the job requirements. All flags mentioned
-above would be ineffective if you do not have enough quota. In other words, Dataflow
-autoscaling would not be able to raised the number of workers to reach target workers number.
+[this page](https://cloud.google.com/compute/quotas) for more details. 
+As a result, you may
+need to adjust your quota to satisfy the job requirements. All flags mentioned
+above are not effective if you do not have enough quota. In other words, Dataflow
+autoscaling is not able to raised the number of workers to reach the target number
+if you don't have enough quota for one of the required resources.
 One way to confirm this is to check the *current usage* of your quotas.
 Following image shows a situation where `Persistent Disk SSD` in `us-central1` region has
 reached its maximum value: 
@@ -91,14 +93,17 @@ reached its maximum value:
 
 To resolve situations like this, you need to increase the following
 Compute Engine quotas accordingly:
-* `In-use IP addresses`: One per worker.
+* `In-use IP addresses`: One per worker. If you set `--use_public_ips false` then 
+Dataflow workers use private IP addresses for all communication.  
 * `CPUs`: At least one per worker. More if larger machine type is used.
-* `Persistent Disk Standard (GB)`: At least 250GB per worker. More if larger
+* `Persistent Disk Standard (GB)`: At least 250GB per worker. More if a larger
   disk is used.
 * `Persistent Disk SSD (GB)`: Only needed if `--worker_disk_type` is set to SSD.
   Required quota size is the same as `Persistent Disk Standard`.
 
-Value assigned to these quotas will be the upper limit of
+For more information please refer to
+[Dataflow quotas guidelines](https://cloud.google.com/dataflow/quotas#compute-engine-quotas). 
+Value assigned to these quotas are the upper limit of
 available resources for your job. For example, if the quota for
 `In-use IP addresses` is 10, but you try to run with `--max_num_workers 20`,
 your job will be running with at most 10 workers because that's all your GCP
@@ -114,7 +119,7 @@ For more information related to regions please refer to our
 
 Since processing large inputs can take a long time and can be costly, we highly
 recommend running the [preprocessor/validator tool](vcf_files_preprocessor.md)
-prior to loading the full VCF to BigQuery pipeline to find out about any
+prior to loading the full VCF to BigQuery pipeline to check for any
 invalid/inconsistent records. This can avoid failures due to invalid records
 and can save time/cost. Depending on the quality of the input files, you may
 consider running with `--report_all_conflicts` to get the full report (it takes
