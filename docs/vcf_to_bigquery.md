@@ -1,131 +1,121 @@
 # VCF to BigQuery
 
-The VCF to BigQuery pipeline is the main  for loading a BigQuery table to one VCF
-file. You may also customize the pipeline to load a subset of samples and/or
-genomic regions.
+The VCF to BigQuery pipeline performs the main application of Variant Trasforms:
+parsing input VCF files and loading them into BigQuery tables. We perform this task
+through 3 intermediate stages. Following image schematically shows these stages:
 
-## Running BQ to VCF
+![VCF to BigQuery stages](images/vcf_to_bq_stages.svg)
 
-Similar to running the
-[VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery), the
-BigQuery to VCF pipeline can also be run using docker or directly from the
-source.
+## **Stage1** Run Dataflow pipeline
+In this stage Variant Transforms reads input VCF files from the input
+[Google Cloud Storage](https://cloud.google.com/storage/docs/how-to)
+bucket, shards the variants, and write the output [Avro](http://avro.apache.org/)
+files back  to Google Cloud Storage. Following image shows an example of 
+a Dataflow job:
 
-### Using docker
+![VCF to BigQuery Dataflow pipeline](images/vcf_to_bq_dataflow_pipeline.png)
 
-Run the script below and replace the following parameters:
+The main goal of this stage is to convert raw text formatted VCF files into 
+a compact, fast, binary data format. During this process we check for any
+inconsistency in VCF records and we will make sure all records in the output
+Avro files are correct.
 
-* `GOOGLE_CLOUD_PROJECT`: This is your Google Cloud project ID where the job
-  should run.
-* `INPUT_TABLE`: BigQuery table that will be loaded to VCF. It must be in the
-  format of GOOGLE_CLOUD_PROJECT:DATASET.TABLE.
-* `OUTPUT_FILE`: The full path of the output VCF file. This can be a local path
-  if you use `DirectRunner` (for very small VCF files) but must be a path in
-  Google Cloud Storage if using `DataflowRunner`.
-* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
-  project has write access to. It's used to store temporary files and logs
-  from the pipeline.
+Because of all the benefits of Avro format we believe it can be used as an alternative
+to storing raw VCF files for archival purposes. Our empirical results show, Avro
+files are more compressed than VCF files. For example,
+[Illumina Platinum Genomes](https://www.illumina.com/platinumgenomes.html),
+are `30.66 GiB` in VCF format (located at 
+[`gs://genomics-public-data/platinum-genomes`](https://console.cloud.google.com/storage/genomics-public-data/platinum-genomes/))
+while in Avro format they are compressed to `5.34 GiB`. This make Avro files a
+viable option for long term storage of variant data. 
 
-```bash
-#!/bin/bash
-# Parameters to replace:
-GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
-INPUT_TABLE=GOOGLE_CLOUD_PROJECT:DATASET.TABLE
-OUTPUT_FILE=gs://BUCKET/loaded_file.vcf
-TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="bq_to_vcf \
-  --input_table ${INPUT_TABLE} \
-  --output_file ${OUTPUT_FILE} \
-  --temp_location ${TEMP_LOCATION} \
-  --job_name bq-to-vcf \
-  --runner DataflowRunner"
+## **Stage2** Load Avro to BigQuery
+After Dataflow pipeline finishes successfully, we start
+[loading Avro files](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-avro)
+into BigQiery. Avro files have [many advantages](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-avro#advantages_of_avro)
+for this purpose. From our perspective the main advantage is
+[free loading of Avro files](https://cloud.google.com/bigquery/pricing#free).
+You can follow progress of this stage from Google Cloud console page:
+![Avro to BigQuery](images/vcf_to_bq_load_avro.png)
 
-docker run -v ~/.config:/root/.config \
-  gcr.io/cloud-lifesciences/gcp-variant-transforms \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region us-west1 \
-  "${COMMAND}"
+
+BigQuery tables generated at this stage are optimized to answer *variant lookup*
+queries such as:
+
+```
+Find all variants in a genomic region
+``` 
+
+That's because we partition these tables based on `start_position` column. For this reason,
+we call this set of tables *variant optimized tables*. Some users, as a part of their workflow,
+you need to run *sample lookup* queries similar to this:
+
+```
+Find all variant of sample X
 ```
 
-In addition, the following optional flags can be specified in the `COMMAND`
-argument in the above script:
-* `--representative_header_file`: If provided, meta-information from the
-  provided file (e.g., INFO, FORMAT, FILTER, etc) will be added into the
-  `output_file`. Otherwise, the meta-information is inferred from the BigQuery
-  schema on a "best effort" basis (e.g., any repeated INFO field will have
-  `Number=.`). It is recommended to provide this file to specify the most
-  accurate and complete meta-information in the VCF file.
-* `--genomic_regions`: A list of genomic regions (separated by a space) to load
-  from BigQuery. The format of each genomic region should be
-  REFERENCE_NAME:START_POSITION-END_POSITION or REFERENCE_NAME if the full
-  chromosome is requested. Only variants matching at least one of these regions
-  will be loaded. For example, `--genomic_regions chr1 chr2:1000-2000` will load
-  all variants in `chr1` and all variants in `chr2` with `start_position` in
-  `[1000,2000)` from BigQuery. If this flag is not specified, all variants will
-  be loaded.
-* `--sample_names`: A list of sample names (separated by a space). Only
-  variants for these calls will be loaded from BigQuery. If this parameter is
-  not specified, all calls will be loaded.
-* `--allow_incompatible_schema`: If `representative_header_file` is not
-  provided, the meta-information is inferred from the BigQuery schema. There are
-  some reserved fields based on
-  [VCF 4.3 spec](http://samtools.github.io/hts-specs/VCFv4.3.pdf). If the
-  inferred definition is not the same as the reserved definition, an error will
-  be raised and the pipeline will fail. By setting this flag to true, the
-  incompatibilities between BigQuery schema and the reserved fields will not
-  raise errors. Instead, the VCF meta-information are inferred from the schema
-  without validation.
-* `--preserve_sample_order`: By default, samples names in the output VCF file
-  are generated in ascending order. If set to true, the order of sample names
-  will be the same as the BigQuery table, but it requires all extracted variants
-  to have the same sample ordering (usually true for tables from single VCF file
-  import).
-* `--number_of_bases_per_shard`: The maximum number of base pairs per
-  chromosome to include in a shard. A shard is a collection of data within a
-  contiguous region of the genome that can be efficiently sorted in memory.
-  This flag is set to 1,000,000 by default, which should work for most datasets.
-  You may change this flag if you have a dataset that is very dense and variants
-  in each shard cannot be sorted in memory.
+Executing this type of queries on variant optimized tables is very costly, because 
+all rows needs to be processed. The cost of such queries can be very
+significant especially if sample lookup queries are executed frequently. For cases like this
+we offer another set of tables called *sample optimized* tables. As their name suggests,
+they are optimized for answering the later type of queries. Sample optimized tables are
+generated in stage 3 of VCF to BigQuery. Note these tables are not generated by default;
+users need to set a special flag to enable this functionality.  
 
-The pipeline can be optimized depending on the size of the output VCF file:
-* For small VCF files (e.g. a few megabytes), you may use
-  `--runner DirectRunner` to speed up the pipeline as it avoids creating a
-  Dataflow pipeline.
-* For large VCF files (e.g. >100GB), using
-  [Cloud Dataflow Shuffle](https://cloud.google.com/dataflow/service/dataflow-service-desc#cloud-dataflow-shuffle)
-  can speed up the pipeline, by adding the parameter
-  `--experiments shuffle_mode=service` to the `COMMAND` argument.
-* For medium sized VCF files, you can use the above script as is.
+## **Stage3** Create Sample Optimized Tables
 
-### Running from github
-
-In addition to using the docker image, you may run the pipeline directly from
-source.
-
-Example command for DirectRunner:
-
-```bash
-python -m gcp_variant_transforms.bq_to_vcf \
-  --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
-  --output_file gs://BUCKET/loaded_file.vcf \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --genomic_regions 1:124852-124853 \
-  --sample_names HG00099 HG00105
+Users can store a sample optimized table by setting their base name using the following flag:
 ```
-
-Example command for DataflowRunner:
-
-```bash
-python -m gcp_variant_transforms.bq_to_vcf \
-  --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
-  --output_file gs://BUCKET/loaded_file.vcf \
-  --representative_header_file gs://BUCKET/representative_header_file.vcf \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --temp_location gs://BUCKET/temp \
-  --genomic_regions 1:124852-124853 \
-  --sample_names HG00099 HG00105 \
-  --job_name bq-to-vcf \
-  --setup_file ./setup.py \
-  --runner DataflowRunner
+--sample_lookup_optimized_output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.SAMPLE_OPT_TABLE
 ```
+Setting this flag will cause a second set of tables to be generated. This will increase
+your BigQuery [storage costs](https://cloud.google.com/bigquery/pricing#pricing_summary),
+however, this extra cost will be quickly recovered through *significant* saving of reduced
+sample lookup query costs.
+
+Sample optimized tables have a schema which is very similar to the original variant optimized
+tables. There are only two differences:
+* Repeated call column is flatten, so each call ends up in a separate row.
+* A new `sample_id` column is added which has the same value as `call.sample_id` column.
+
+Let's consider a concrete example. Our [phase 3 1000Genome](https://www.internationalgenome.org/data/)
+tables, has `6,468,094` rows in its `__chr1` variant optimized table. We know phase 3
+includes `2504` individuals. This means each row of this table has 2504 repeated `call` fields. 
+If we execute sample lookup query on this table it will process the whole table which 
+is `408.13 GB`. According to the current [BigQuery pricing model](https://cloud.google.com/bigquery/pricing#queries),
+this costs about `$2`. 
+
+The corresponding sample optimized table for `__chr1` has `6,468,094 x 2504 = 16,196,107,376` 
+rows and is about `2.6 TB` in size. [Long-term storage cost](https://cloud.google.com/bigquery/pricing#pricing_summary)
+of this table is about `$27`. Our empirical results shows running sample lookup query on this table
+processes `1052 MB` which costs `$0.005`. This means if you run at least 14 sample lookup queries
+a month then your overall cost will be lower if you store sample optimized tables.
+
+# Sample Info table
+Variant Transforms replaces `call.name` with `call.sample_id`, where `sample_id` is
+the [hash value](https://github.com/google/farmhash/commits/master) of the call name.
+We had to make this change for one main reason: to be able to apply BigQuery integer 
+range partitioning to this column an therefor be able to perform sample lookup queries
+efficiently. For more information about partitioning please refer to [our docs](sharding.md).
+
+In order to allow users to retrieve the original `sample_names`, we store a table that
+contains the mapping between our id and original names. This table is stored with the
+same base table name as variant optimized tables and with `__sample_info` suffix. Following
+image shows an example of this table:
+
+![Sampe Info Table](images/sample_info_table.png)
+
+In addition to the mapping of ineteger ID to the string names, this table includes
+`vcf_file_path` and `ingestion_datetime` to record for each sample the ingestion datetime
+and the location of VCF file on Google Storage bucket. BigQuery allows to easily join this table
+to the variant table (perhaps using a [view](https://cloud.google.com/bigquery/docs/views)) so
+replacing `sample_name` with `sample_id` will be transparent from user's perspective. If you need
+help with this please reach out to us.
+  
+In cases where multiple VCF files use the same `sample_names` for different underlying samples
+and you'd like to import them into BigQuery under different IDs, you can
+include the file path in the hashing value to distinguish between samples. In that case `sample_id`
+will be the hash value of `[sample_name, file_path]`. You can activate this feature by setting
+`--sample_name_encoding WITH_FILE_PATH`.
+
