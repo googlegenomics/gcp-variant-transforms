@@ -51,11 +51,15 @@ docker pull gcr.io/cloud-lifesciences/gcp-variant-transforms
 
 Run the script below and replace the following parameters:
 
-* `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
+* Dataflow's [required inputs](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service):
+  * `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
   dataset.
-* `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
-  to process your data, for example: `us-west1`. For more info about regions
-  please refer to [Setting Regions](docs/setting_region.md).
+  * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
+  to process your data, for example: `us-west1`. For more information please refer to
+  [Setting Regions](docs/setting_region.md).
+  * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
@@ -64,23 +68,19 @@ Run the script below and replace the following parameters:
   uncompressed VCF formats. However, it runs slower for compressed files as they
   cannot be sharded.
 * `OUTPUT_TABLE`: The full path to a BigQuery table to store the output.
-* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
-  project has write access to. It's used to store temporary files and logs
-  from the pipeline.
 
 ```bash
 #!/bin/bash
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
 GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+TEMP_LOCATION=gs://BUCKET/temp
 INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
-TEMP_LOCATION=gs://BUCKET/temp
 
 COMMAND="vcf_to_bq \
   --input_pattern ${INPUT_PATTERN} \
   --output_table ${OUTPUT_TABLE} \
-  --temp_location ${TEMP_LOCATION} \
   --job_name vcf-to-bigquery \
   --runner DataflowRunner"
 
@@ -88,9 +88,10 @@ docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
   --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}" \
   "${COMMAND}"
 ```
-Both `--project` and `--region` flags are needed unless their default values
+`--project`, `--region`, and `--temp_location` are required inputs. You must set all of them, unless your project and region default values
 are set in your local `gcloud` configuration. You may set the default project
 and region using the following commands:
 ```bash
@@ -137,7 +138,9 @@ Example command for DirectRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
+  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
+  --job_name vcf-to-bigquery-direct-runner \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 Example command for DataflowRunner:
@@ -146,12 +149,12 @@ Example command for DataflowRunner:
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gs://BUCKET/*.vcf \
   --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region "${GOOGLE_CLOUD_REGION}" \
-  --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery \
   --setup_file ./setup.py \
-  --runner DataflowRunner
+  --runner DataflowRunner \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 ## Running VCF files preprocessor
