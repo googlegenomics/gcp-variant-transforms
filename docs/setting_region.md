@@ -15,41 +15,50 @@ are located in the same region:
 * Your Dataflow pipeline set by `--region` flag.
 
 ## Running jobs in a particular region
-The Dataflow API [requires](https://beam.apache.org/blog/2019/08/22/beam-2.15.0.html)
+The Dataflow API [requires](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service)
 setting a [GCP
 region](https://cloud.google.com/compute/docs/regions-zones/#available) via
 `--region` flag to run. In addition to this requirment you might also
 choose to run Variant Transforms in a specific region following your project’s
 security and compliance requirements. For example, in order
-to restrict your processing job to Europe, update the region as follows:
+to restrict your processing job to Europe west, set the region as follows:
 
 ```bash
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region "${GOOGLE_CLOUD_REGION}" \
+  --region europe-west1 \
+  --temp_location "${TEMP_LOCATION}" \
   "${COMMAND}"
 ```
 
-Note that values of `--project` and `--region` flags will be automatically
-passed as `COMMAND` args in [`piplines_runner.sh`](docker/pipelines_runner.sh).
-Alternatively, you can set your default region using the following command:
+Note that values of `--project`, `--region`, and `--temp_location` flags will be automatically
+passed as `COMMAND` inputs in [`piplines_runner.sh`](docker/pipelines_runner.sh).
+
+Instead of setting `--region` flag for each run, you can set your default region
+using the following command. In that case, you will not need to set the `--region`
+flag any more. For more information, please refer to
+[cloud SDK page](https://cloud.google.com/sdk/gcloud/reference/config/set).
 
 ```bash
 gcloud config set compute/region "europe-west1"
 ```
 
-In this case you do not need to set the `--region` flag any more. For more
-information please refer to this [cloud SDK page](https://cloud.google.com/sdk/gcloud/reference/config/set).
-
-If you are running Variant Transforms from GitHub, you just need to specify
-region for the Dataflow API as below.
+Similarly, you can set the default project using the following commands:
+```bash
+gcloud config set project GOOGLE_CLOUD_PROJECT
+```
+If you are running Variant Transforms from GitHub, you need to specify all three
+[required Dataflow inputs](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service)
+as below.
 
 ```bash
-python -m gcp_variant_transforms.vcf_to_bq ... \
+python -m gcp_variant_transforms.vcf_to_bq \
+  ... \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region "${GOOGLE_CLOUD_REGION}" \
+  --region europe-west1 \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 ## Setting Google Cloud Storage bucket region
