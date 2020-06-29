@@ -7,6 +7,7 @@
     "runner": "DataflowRunner",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "worker_machine_type": "n1-standard-16",
+    "worker_disk_type": "compute.googleapis.com/projects//zones//diskTypes/pd-ssd",
     "max_num_workers": "20",
     "assertion_configs": [
       {
