@@ -1,10 +1,10 @@
 [
   {
-    "test_name": "merge-option-one-based",
-    "table_name": "merge_option_one_based",
+    "test_name": "merge-option-zero-based",
+    "table_name": "merge_option_zero_based",
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/merge/*.vcf",
     "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
-    "use_1_based_coordinate": false,
+    "use_1_based_coordinate": "False",
     "runner": "DirectRunner",
     "variant_merge_strategy": "MOVE_TO_CALLS",
     "assertion_configs": [
@@ -18,7 +18,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
-        "expected_result": {"sum_start": 1234567}
+        "expected_result": {"sum_start": 1234566}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
@@ -30,7 +30,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"sum_start": 48990}
+        "expected_result": {"sum_start": 48987}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
@@ -39,7 +39,7 @@
       {
         "query": [
           "SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr20` ",
-          "WHERE start_position = 14370"
+          "WHERE start_position = 14369"
         ],
         "expected_result": {"num_rows": 1}
       }

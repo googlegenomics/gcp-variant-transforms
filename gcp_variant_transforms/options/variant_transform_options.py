@@ -110,7 +110,8 @@ class VcfReadOptions(VariantTransformsOptions):
         type='bool', default=True, nargs='?', const=True,
         help=('If true, start position will be 1-based, and end position will '
               'be inclusive. Otherwise, the records will be stored in 0-based '
-              'coordinates, with exclusive end position.'))
+              'coordinates, with exclusive end position. For more information '
+              'please refer to www.biostars.org/p/84686/'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None

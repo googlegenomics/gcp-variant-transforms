@@ -12,7 +12,7 @@
       },
       {
         "query": ["SUM_START_QUERY"],
-        "expected_result": {"sum_start": 32190612292607}
+        "expected_result": {"sum_start": 32190612702539}
       },
       {
         "query": ["SUM_END_QUERY"],
