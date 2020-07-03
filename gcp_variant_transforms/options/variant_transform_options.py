@@ -615,9 +615,9 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     parser.add_argument(
         '--sample_names',
         default=None, nargs='+',
-        help=('A list of sample ids (separated by a space). Only variants '
-              'for these calls will be loaded from BigQuery. If this parameter '
-              'is not specified, all calls will be loaded.'))
+        help=('A list of sample names (separated by a space). Only variants '
+              'for these samples will be loaded from BigQuery. If this flag '
+              'is not specified, all existing samples will be loaded.'))
     parser.add_argument(
         '--allow_incompatible_schema',
         type='bool', default=False, nargs='?', const=True,
