@@ -106,7 +106,8 @@ def _read_variants(all_patterns,  # type: List[str]
                    known_args,  # type: argparse.Namespace
                    pipeline_mode,  # type: int
                    pre_infer_headers=False,  # type: bool
-                   keep_raw_sample_names=False
+                   keep_raw_sample_names=False,  # type: bool
+                   use_1_based_coordinate=True  # type: bool
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -124,7 +125,7 @@ def _read_variants(all_patterns,  # type: List[str]
       sample_name_encoding=(
           SampleNameEncoding.NONE if keep_raw_sample_names else
           SampleNameEncoding[known_args.sample_name_encoding]),
-      use_1_based_coordinate=known_args.use_1_based_coordinate)
+      use_1_based_coordinate=use_1_based_coordinate)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -200,7 +201,8 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
                               known_args,
                               pipeline_mode,
                               pre_infer_headers=False,
-                              keep_raw_sample_names=True)
+                              keep_raw_sample_names=True,
+                              use_1_based_coordinate=False)
     sample_ids = (variants
                   | 'CombineSampleIds' >>
                   combine_sample_ids.SampleIdsCombiner()
@@ -492,7 +494,9 @@ def run(argv=None):
       bigquery_util.update_bigquery_schema_on_append(schema.fields, table_name)
 
   pipeline = beam.Pipeline(options=beam_pipeline_options)
-  variants = _read_variants(all_patterns, pipeline, known_args, pipeline_mode)
+  variants = _read_variants(
+      all_patterns, pipeline, known_args, pipeline_mode,
+      use_1_based_coordinate=known_args.use_1_based_coordinate)
   if known_args.allow_malformed_records:
     variants |= 'DropMalformedRecords' >> filter_variants.FilterVariants()
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
