@@ -1,7 +1,7 @@
 [
   {
-    "test_name": "test-annotation-pipeline-from-file-with-sharding",
-    "table_name": "test_annotation_pipeline_from_file_with_sharding",
+    "test_name": "test-annotation-pipeline-from-file-with-sharding-1-based",
+    "table_name": "test_annotation_pipeline_from_file_with_sharding_1_based",
     "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
     "use_1_based_coordinate": "True",
     "vep_assembly": "GRCh37",
