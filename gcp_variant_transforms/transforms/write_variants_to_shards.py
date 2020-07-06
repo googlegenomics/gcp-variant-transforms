@@ -37,7 +37,8 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     """
     self._vcf_shards_output_dir = vcf_shards_output_dir
     self._number_of_variants_per_shard = number_of_variants_per_shard
-    self._coder = vcfio._ToVcfRecordCoder()
+    # Write shards as is.
+    self._coder = vcfio._ToVcfRecordCoder(use_1_based_coordinate=False)
     self._sample_names = []
     self._variant_lines = []
     self._counter = 0

@@ -53,6 +53,16 @@ SampleNameEncoding = vcf_parser.SampleNameEncoding
 class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
 
+  def __init__(self, use_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize _ToVcfRecordCoder PTransform.
+
+    Args:
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 1 based inclusive (default) or 0 based exclusive coordinate.
+    """
+    self.use_1_based_coordinate = use_1_based_coordinate
+
   def encode(self, variant):
     # type: (Variant) -> str
     """Converts a :class:`Variant` object back to a VCF line."""
@@ -61,7 +71,8 @@ class _ToVcfRecordCoder(coders.Coder):
     encoded_calls = self._encode_variant_calls(variant, format_keys)
     columns = [
         variant.reference_name,
-        None if variant.start is None else variant.start + 1,
+        None if variant.start is None else (
+            variant.start + (not self.use_1_based_coordinate)),
         ';'.join(variant.names),
         variant.reference_bases,
         ','.join(variant.alternate_bases),
@@ -90,10 +101,12 @@ class _ToVcfRecordCoder(coders.Coder):
     encoded_infos = []
     # Set END in info if it doesn't match start+len(reference_bases). This is
     # usually the case for non-variant regions.
+
     if (variant.start is not None
         and variant.reference_bases
         and variant.end
-        and variant.start + len(variant.reference_bases) != variant.end):
+        and (variant.start + len(variant.reference_bases) !=
+             variant.end + self.use_1_based_coordinate)):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
     for k, v in variant.info.iteritems():
@@ -436,7 +449,8 @@ class WriteToVcf(PTransform):
                file_path,
                num_shards=1,
                compression_type=CompressionTypes.AUTO,
-               headers=None):
+               headers=None,
+               use_1_based_coordinate=True):
     # type: (str, int, str, List[str]) -> None
     """Initialize a WriteToVcf PTransform.
 
@@ -457,18 +471,21 @@ class WriteToVcf(PTransform):
       headers: A list of VCF meta-information lines describing the at least the
         INFO and FORMAT entries in each record and a header line describing the
         column names. These lines will be written at the beginning of the file.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 1 based inclusive (default) or 0 based exclusive coordinate.
     """
     self._file_path = file_path
     self._num_shards = num_shards
     self._compression_type = compression_type
     self._header = headers and '\n'.join([h.strip() for h in headers]) + '\n'
+    self.use_1_based_coordinate = use_1_based_coordinate
 
   def expand(self, pcoll):
     return pcoll | 'WriteToVCF' >> textio.WriteToText(
         self._file_path,
         append_trailing_newlines=False,
         num_shards=self._num_shards,
-        coder=_ToVcfRecordCoder(),
+        coder=_ToVcfRecordCoder(self.use_1_based_coordinate),
         compression_type=self._compression_type,
         header=self._header)
 
@@ -476,8 +493,15 @@ class WriteToVcf(PTransform):
 class _WriteVcfDataLinesFn(beam.DoFn):
   """A function that writes variants to one VCF file."""
 
-  def __init__(self):
-    self._coder = _ToVcfRecordCoder()
+  def __init__(self, use_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize _WriteVcfDataLinesFn DoFn function.
+
+    Args:
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 1 based inclusive (default) or 0 based exclusive coordinate.
+    """
+    self._coder = _ToVcfRecordCoder(use_1_based_coordinate)
 
   def process(self, (file_path, variants), *args, **kwargs):
     # type: (Tuple[str, List[Variant]]) -> None
@@ -493,5 +517,16 @@ class WriteVcfDataLines(PTransform):
   writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
   PCollection<`Variant`> as input, and writes all variants to the same file.
   """
+  def __init__(self, use_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize WriteVcfDataLines PTransform.
+
+    Args:
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 1 based inclusive (default) or 0 based exclusive coordinate.
+    """
+    self.use_1_based_coordinate = use_1_based_coordinate
+
   def expand(self, pcoll):
-    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())
+    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn(
+        self.use_1_based_coordinate))

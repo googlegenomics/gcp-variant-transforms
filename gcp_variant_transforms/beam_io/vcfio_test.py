@@ -89,10 +89,10 @@ def _get_sample_variant_1(file_name='', use_1_based_coordinate=False,
   """
   hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
-      reference_name='20', start=1234 if use_1_based_coordinate else 1233,
-      end=1234, reference_bases='C',
-      alternate_bases=['A', 'T'], names=['rs123', 'rs2'], quality=50,
-      filters=['PASS'], info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
+      reference_name='20', start=1233 + use_1_based_coordinate, end=1234,
+      reference_bases='C', alternate_bases=['A', 'T'], names=['rs123', 'rs2'],
+      quality=50, filters=['PASS'],
+      info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
   variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name_method('Sample1'), genotype=[0, 0],
                         info={'GQ': 48}))
@@ -116,8 +116,8 @@ def _get_sample_variant_2(file_name='', use_1_based_coordinate=False,
   hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
       reference_name='19',
-      start=123 if use_1_based_coordinate else 122, end=125,
-      reference_bases='GTC', alternate_bases=[], names=['rs1234'], quality=40,
+      start=122 + use_1_based_coordinate, end=125, reference_bases='GTC',
+      alternate_bases=[], names=['rs1234'], quality=40,
       filters=['q10', 's50'], info={'NS': 2})
   variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name_method('Sample1'), genotype=[-1, 0],
@@ -139,7 +139,7 @@ def _get_sample_variant_3(file_name='', use_1_based_coordinate=False,
   """
   hash_name_method = _get_hashing_function(file_name, use_hashing)
   variant = vcfio.Variant(
-      reference_name='19', start=12 if use_1_based_coordinate else 11, end=12,
+      reference_name='19', start=11 + use_1_based_coordinate, end=12,
       reference_bases='C', alternate_bases=['<SYMBOLIC>'], quality=49,
       filters=['q10'], info={'AF': [0.5]})
   variant.calls.append(
@@ -152,11 +152,11 @@ def _get_sample_variant_3(file_name='', use_1_based_coordinate=False,
   return variant
 
 
-def _get_sample_non_variant():
+def _get_sample_non_variant(use_1_based_coordinate=False):
   """Get sample non variant."""
   non_variant = vcfio.Variant(
-      reference_name='19', start=1233, end=1236, reference_bases='C',
-      alternate_bases=['<NON_REF>'], quality=50)
+      reference_name='19', start=1233 + use_1_based_coordinate, end=1236,
+      reference_bases='C', alternate_bases=['<NON_REF>'], quality=50)
   non_variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 0],
                         info={'GQ': 99}))
@@ -859,12 +859,27 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_coder(self):
-    return vcfio._ToVcfRecordCoder()
+  def _get_coder(self, use_1_based_coordinate=False):
+    return vcfio._ToVcfRecordCoder(use_1_based_coordinate)
 
-  def test_to_vcf_line(self):
+  def test_to_vcf_line_0_based(self):
     coder = self._get_coder()
     for variant, line in zip(self.variants, self.variant_lines):
+      self._assert_variant_lines_equal(
+          coder.encode(variant), line)
+    empty_variant = vcfio.Variant()
+    empty_line = '\t'.join(['.' for _ in range(9)])
+    self._assert_variant_lines_equal(
+        coder.encode(empty_variant), empty_line)
+
+  def test_to_vcf_line_1_based(self):
+    coder = self._get_coder(use_1_based_coordinate=True)
+    variants = [
+        _get_sample_variant_1(use_1_based_coordinate=True),
+        _get_sample_variant_2(use_1_based_coordinate=True),
+        _get_sample_variant_3(use_1_based_coordinate=True),
+        _get_sample_non_variant(use_1_based_coordinate=True)]
+    for variant, line in zip(variants, self.variant_lines):
       self._assert_variant_lines_equal(
           coder.encode(variant), line)
     empty_variant = vcfio.Variant()
@@ -935,9 +950,29 @@ class VcfSinkTest(unittest.TestCase):
 
     self._assert_variant_lines_equal(coder.encode(variant), expected)
 
-  def test_write_dataflow(self):
+  def test_write_dataflow_0_based(self):
     pipeline = TestPipeline()
     pcoll = pipeline | beam.Create(self.variants, reshuffle=False)
+    _ = pcoll | 'Write' >> vcfio.WriteToVcf(
+        self.path, use_1_based_coordinate=False)
+    pipeline.run()
+
+    read_result = []
+    for file_name in glob.glob(self.path + '*'):
+      with open(file_name, 'r') as f:
+        read_result.extend(f.read().splitlines())
+
+    for actual, expected in zip(read_result, self.variant_lines):
+      self._assert_variant_lines_equal(actual, expected)
+
+  def test_write_dataflow_1_based(self):
+    variants = [
+        _get_sample_variant_1(use_1_based_coordinate=True),
+        _get_sample_variant_2(use_1_based_coordinate=True),
+        _get_sample_variant_3(use_1_based_coordinate=True),
+        _get_sample_non_variant(use_1_based_coordinate=True)]
+    pipeline = TestPipeline()
+    pcoll = pipeline | beam.Create(variants, reshuffle=False)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(self.path)
     pipeline.run()
 
@@ -954,7 +989,8 @@ class VcfSinkTest(unittest.TestCase):
     pcoll = pipeline | beam.Create(self.variants, reshuffle=False)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
-        compression_type=CompressionTypes.AUTO)
+        compression_type=CompressionTypes.AUTO,
+        use_1_based_coordinate=False)
     pipeline.run()
 
     read_result = []
@@ -972,7 +1008,8 @@ class VcfSinkTest(unittest.TestCase):
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
         compression_type=CompressionTypes.AUTO,
-        headers=headers)
+        headers=headers,
+        use_1_based_coordinate=False)
     pipeline.run()
 
     read_result = []
