@@ -16,7 +16,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
-        "expected_result": {"sum_start": 2932144978501378}
+        "expected_result": {"sum_start": 2932145002523549}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
@@ -28,7 +28,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
-        "expected_result": {"sum_start": 2953428836386527}
+        "expected_result": {"sum_start": 2953428860821187}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
@@ -40,7 +40,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
-        "expected_result": {"sum_start": 1892873634919601}
+        "expected_result": {"sum_start": 1892873654063051}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
@@ -52,7 +52,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
-        "expected_result": {"sum_start": 9716663}
+        "expected_result": {"sum_start": 9717889}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
