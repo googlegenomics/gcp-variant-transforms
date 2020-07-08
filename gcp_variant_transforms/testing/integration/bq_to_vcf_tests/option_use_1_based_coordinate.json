@@ -3,7 +3,7 @@
     "test_name": "bq-to-vcf-option-use-1-based-coordinate",
     "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0__suffix",
     "output_file_name": "bq_to_vcf_option_use_1_based_coordinate.vcf",
-    "use_1_based_coordinate": true,
+    "bq_uses_1_based_coordinate": true,
     "runner": "DirectRunner",
     "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_use_1_based_coordinate.vcf"
   }

@@ -549,6 +549,7 @@ class PySamParser(VcfParser):
     self._verify_start_end(record)
     return Variant(
         reference_name=record.chrom.encode('utf-8'),
+        # record.pos is 1-based version of record.start (ie. record.start + 1).
         start=record.pos if self._use_1_based_coordinate else record.start,
         end=record.stop,
         reference_bases=self._convert_field(record.ref),

@@ -859,8 +859,8 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the rest of the items ignoring order
       self.assertItemsEqual(actual_split[1:], expected_split[1:])
 
-  def _get_coder(self, use_1_based_coordinate=False):
-    return vcfio._ToVcfRecordCoder(use_1_based_coordinate)
+  def _get_coder(self, bq_uses_1_based_coordinate=False):
+    return vcfio._ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
   def test_to_vcf_line_0_based(self):
     coder = self._get_coder()
@@ -873,7 +873,7 @@ class VcfSinkTest(unittest.TestCase):
         coder.encode(empty_variant), empty_line)
 
   def test_to_vcf_line_1_based(self):
-    coder = self._get_coder(use_1_based_coordinate=True)
+    coder = self._get_coder(bq_uses_1_based_coordinate=True)
     variants = [
         _get_sample_variant_1(use_1_based_coordinate=True),
         _get_sample_variant_2(use_1_based_coordinate=True),
@@ -954,7 +954,7 @@ class VcfSinkTest(unittest.TestCase):
     pipeline = TestPipeline()
     pcoll = pipeline | beam.Create(self.variants, reshuffle=False)
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
-        self.path, use_1_based_coordinate=False)
+        self.path, bq_uses_1_based_coordinate=False)
     pipeline.run()
 
     read_result = []
@@ -990,7 +990,7 @@ class VcfSinkTest(unittest.TestCase):
     _ = pcoll | 'Write' >> vcfio.WriteToVcf(
         self.path + '.gz',
         compression_type=CompressionTypes.AUTO,
-        use_1_based_coordinate=False)
+        bq_uses_1_based_coordinate=False)
     pipeline.run()
 
     read_result = []
@@ -1009,7 +1009,7 @@ class VcfSinkTest(unittest.TestCase):
         self.path + '.gz',
         compression_type=CompressionTypes.AUTO,
         headers=headers,
-        use_1_based_coordinate=False)
+        bq_uses_1_based_coordinate=False)
     pipeline.run()
 
     read_result = []
