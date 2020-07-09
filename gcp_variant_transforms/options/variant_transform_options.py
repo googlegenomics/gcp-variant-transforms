@@ -637,6 +637,18 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
 
+    parser.add_argument(
+        '--bq_uses_1_based_coordinate',
+        type='bool', default=True, nargs='?', const=True,
+        help=('Set to False, if --use_1_based_coordinate was set to False when '
+              'generating the BQ tables, and hence, start positions are '
+              '0-based. By default, imported BQ tables use 1-based coordinate. '
+              'Please examine your table''s start_position column description '
+              'to find out whether your variant tables uses 0-based or 1-based '
+              'coordinate.'))
+
+
+
   def validate(self, parsed_args, client=None):
     if not client:
       credentials = GoogleCredentials.get_application_default().create_scoped(

@@ -245,7 +245,7 @@ def _bigquery_to_vcf_shards(
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
-         | vcfio.WriteVcfDataLines())
+         | vcfio.WriteVcfDataLines(known_args.bq_uses_1_based_coordinate))
 
 
 def _get_schema(input_table):

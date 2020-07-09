@@ -37,7 +37,12 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     """
     self._vcf_shards_output_dir = vcf_shards_output_dir
     self._number_of_variants_per_shard = number_of_variants_per_shard
-    self._coder = vcfio._ToVcfRecordCoder()
+    # Write shards as is.
+    # This piece of code is triggered from vcf_to_bq._shard_variants() which
+    # reads variants with the --use_1_based_coordinate=False option, regardless
+    # if the flag was passed with that value or not. Therefore, write the shards
+    # into BQ with 0-based coordinate assumption.
+    self._coder = vcfio._ToVcfRecordCoder(bq_uses_1_based_coordinate=False)
     self._sample_names = []
     self._variant_lines = []
     self._counter = 0

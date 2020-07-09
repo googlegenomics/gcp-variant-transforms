@@ -5,6 +5,7 @@
     "representative_header_file": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf",
     "preserve_sample_order": true,
     "output_file_name": "bq_to_vcf_option_representative_header_file.vcf",
+    "bq_uses_1_based_coordinate": false,
     "runner": "DirectRunner",
     "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_representative_header_file.vcf"
   }
