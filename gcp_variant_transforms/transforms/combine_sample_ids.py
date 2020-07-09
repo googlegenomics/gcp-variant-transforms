@@ -67,13 +67,13 @@ class SampleIdsCombiner(beam.PTransform):
     if self._preserve_sample_order:
       return (pcoll
               | 'GetSampleIds' >> beam.Map(self._get_sample_ids)
-              | 'RemoveDuplicates' >> beam.RemoveDuplicates()
+              | 'RemoveDuplicates' >> beam.Distinct()
               | 'Combine' >> beam.combiners.ToList()
               | 'ExtractUniqueSampleIds'
               >> beam.ParDo(self._extract_unique_sample_ids))
     else:
       return (pcoll
               | 'GetSampleIds' >> beam.FlatMap(self._get_sample_ids)
-              | 'RemoveDuplicates' >> beam.RemoveDuplicates()
+              | 'RemoveDuplicates' >> beam.Distinct()
               | 'Combine' >> beam.combiners.ToList()
               | 'SortSampleIds' >> beam.ParDo(sorted))
