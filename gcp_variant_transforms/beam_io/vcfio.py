@@ -58,9 +58,9 @@ class _ToVcfRecordCoder(coders.Coder):
     """Initialize _ToVcfRecordCoder PTransform.
 
     Args:
-      bq_uses_1_based_coordinate: specify whether the coordinates should be
-        stored in BQ using 1-based inclusive (default) or 0-based exclusive
-        coordinate.
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
     """
     self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
@@ -474,9 +474,9 @@ class WriteToVcf(PTransform):
       headers: A list of VCF meta-information lines describing the at least the
         INFO and FORMAT entries in each record and a header line describing the
         column names. These lines will be written at the beginning of the file.
-      bq_uses_1_based_coordinate: specify whether the coordinates should be
-        stored in BQ using 1-based inclusive (default) or 0-based exclusive
-        coordinate.
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
     """
     self._file_path = file_path
     self._num_shards = num_shards
@@ -502,9 +502,9 @@ class _WriteVcfDataLinesFn(beam.DoFn):
     """Initialize _WriteVcfDataLinesFn DoFn function.
 
     Args:
-      bq_uses_1_based_coordinate: specify whether the coordinates should be
-        stored in BQ using 1-based inclusive (default) or 0-based exclusive
-        coordinate.
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
     """
     self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
@@ -527,9 +527,9 @@ class WriteVcfDataLines(PTransform):
     """Initialize WriteVcfDataLines PTransform.
 
     Args:
-      bq_uses_1_based_coordinate: specify whether the coordinates should be
-        stored in BQ using 1-based inclusive (default) or 0-based exclusive
-        coordinate.
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
     """
     self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
