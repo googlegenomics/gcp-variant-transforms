@@ -16,13 +16,12 @@
 
 import json
 import re
-import sys
 from typing import List  # pylint: disable=unused-import
 
 import farmhash
 
 
-def _generate_unsigned_hash_code(strings, max_hash_value=sys.maxint):
+def _generate_unsigned_hash_code(strings, max_hash_value):
   # type: (List[str], int) -> int
   """Generates a forever-fixed hash code for `strings`.
 

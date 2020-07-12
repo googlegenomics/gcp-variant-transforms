@@ -115,7 +115,7 @@ def _read(index_file):
       line = file_to_read.readline()
       if not line:
         break
-      lines.append(line)
+      lines.append(str(line))
   return ''.join(lines)
 
 

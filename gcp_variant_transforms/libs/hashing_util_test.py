@@ -21,7 +21,8 @@ class HashingUtilTest(unittest.TestCase):
 
   def test_generate_unsigned_hash_code(self):
     hash_code = (
-        hashing_util._generate_unsigned_hash_code(['str1', 'str2', 'str3']))
+        hashing_util._generate_unsigned_hash_code(['str1', 'str2', 'str3'],
+                                                  pow(2, 63) - 1))
     self.assertEqual(hash_code, 7972645828447426528)
 
     hash_code = (
