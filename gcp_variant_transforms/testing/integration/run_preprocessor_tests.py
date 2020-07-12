@@ -33,6 +33,7 @@ It runs all integration tests inside
 `gcp_variant_transforms/testing/integration/preprocessor_tests`.
 """
 
+from __future__ import print_function
 import argparse
 import os
 import sys
@@ -169,7 +170,7 @@ def main():
 
 
 if __name__ == '__main__':
-  print 'Starting preprocessor tests...'
+  print('Starting preprocessor tests...')
   ret_code = main()
-  print 'Finished all preprocessor tests successfully.'
+  print('Finished all preprocessor tests successfully.')
   sys.exit(ret_code)

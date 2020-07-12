@@ -31,6 +31,7 @@ It runs all integration tests inside
 `gcp_variant_transforms/testing/integration/bq_to_vcf_tests`.
 """
 
+from __future__ import print_function
 import argparse
 import os
 import sys
@@ -140,7 +141,7 @@ def main():
 
 
 if __name__ == '__main__':
-  print 'Starting bq_to_vcf tests...'
+  print('Starting bq_to_vcf tests...')
   ret_code = main()
-  print 'Finished all bq_to_vcf tests successfully.'
+  print('Finished all bq_to_vcf tests successfully.')
   sys.exit(ret_code)

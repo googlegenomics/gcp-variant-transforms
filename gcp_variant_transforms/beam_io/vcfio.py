@@ -280,9 +280,10 @@ class ReadFromBGZF(beam.PTransform):
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
 
-  def _read_records(self, (file_path, block)):
+  def _read_records(self, xxx_todo_changeme):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
+    (file_path, block) = xxx_todo_changeme
     record_iterator = vcf_parser.PySamParser(
         file_path,
         block,
@@ -508,8 +509,9 @@ class _WriteVcfDataLinesFn(beam.DoFn):
     """
     self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
-  def process(self, (file_path, variants), *args, **kwargs):
+  def process(self, xxx_todo_changeme1, *args, **kwargs):
     # type: (Tuple[str, List[Variant]]) -> None
+    (file_path, variants) = xxx_todo_changeme1
     with filesystems.FileSystems.create(file_path) as file_to_write:
       for variant in variants:
         file_to_write.write(self._coder.encode(variant))

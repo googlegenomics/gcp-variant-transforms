@@ -14,6 +14,7 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
+from __future__ import print_function
 import subprocess
 from distutils.command.build import build as _build
 
@@ -57,7 +58,7 @@ class CustomCommands(setuptools.Command):
     pass
 
   def RunCustomCommand(self, command_list):
-    print 'Running command: %s' % command_list
+    print('Running command: %s' % command_list)
     try:
       subprocess.call(command_list)
     except Exception as e:

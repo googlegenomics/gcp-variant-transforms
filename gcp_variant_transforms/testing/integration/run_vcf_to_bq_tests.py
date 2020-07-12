@@ -39,6 +39,7 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 --revalidation_dataset_id integration_tests_20180117_151528
 """
 
+from __future__ import print_function
 import argparse
 from concurrent.futures import TimeoutError
 import enum
@@ -127,7 +128,7 @@ class QueryAssertion(object):
       try:
         results = query_job.result(timeout=300)
       except TimeoutError as e:
-        print 'WARNING: Time out waiting for query: {}'.format(self._query)
+        print('WARNING: Time out waiting for query: {}'.format(self._query))
         if num_retries < _NUM_QUERY_RETIRES:
           num_retries += 1
           time.sleep(90)
@@ -137,8 +138,8 @@ class QueryAssertion(object):
         if results.total_rows == 1:
           break
         else:
-          print 'ERROR: Query `{}` did not return expected num rows: {}'.format(
-              self._query, results.total_rows)
+          print('ERROR: Query `{}` did not return expected num rows: {}'.format(
+              self._query, results.total_rows))
           if num_retries < _NUM_QUERY_RETIRES:
             num_retries += 1
             time.sleep(90)
@@ -335,7 +336,7 @@ def main():
 
 
 if __name__ == '__main__':
-  print 'Starting vcf_to_bq tests...'
+  print('Starting vcf_to_bq tests...')
   ret_code = main()
-  print 'Finished all vcf_to_bq tests successfully.'
+  print('Finished all vcf_to_bq tests successfully.')
   sys.exit(ret_code)
