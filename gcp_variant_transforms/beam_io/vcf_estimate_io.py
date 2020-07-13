@@ -15,7 +15,7 @@
 
 """A source for reading VCF files and extracting signals about input size."""
 
-from __future__ import absolute_import
+
 
 from functools import partial
 from typing import Dict, Iterable  # pylint: disable=unused-import

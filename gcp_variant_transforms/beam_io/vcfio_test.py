@@ -15,7 +15,7 @@
 
 """Tests for vcfio module."""
 
-from __future__ import absolute_import
+
 
 import glob
 import gzip
@@ -824,11 +824,11 @@ class VcfSinkTest(unittest.TestCase):
   def setUp(self):
     super(VcfSinkTest, self).setUp()
     self.path = tempfile.NamedTemporaryFile(suffix='.vcf').name
-    self.variants, self.variant_lines = zip(
+    self.variants, self.variant_lines = list(zip(
         (_get_sample_variant_1(), VCF_LINE_1),
         (_get_sample_variant_2(), VCF_LINE_2),
         (_get_sample_variant_3(), VCF_LINE_3),
-        (_get_sample_non_variant(), GVCF_LINE))
+        (_get_sample_non_variant(), GVCF_LINE)))
 
   def _assert_variant_lines_equal(self, actual, expected):
     actual_fields = actual.strip().split('\t')

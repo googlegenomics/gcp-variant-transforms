@@ -126,11 +126,11 @@ class VcfHeaderSourceTest(unittest.TestCase):
         '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	GS000016676-ASM\n',
     ]
     header = self._create_file_and_read_headers()
-    self.assertItemsEqual(header.contigs.keys(), ['M', 'P'])
-    self.assertItemsEqual(header.alts.keys(), ['CGA_CNVWIN', 'INS:ME:MER'])
-    self.assertItemsEqual(header.filters.keys(), ['MPCBT'])
-    self.assertItemsEqual(header.infos.keys(), ['CGA_MIRB'])
-    self.assertItemsEqual(header.formats.keys(), ['FT'])
+    self.assertItemsEqual(list(header.contigs.keys()), ['M', 'P'])
+    self.assertItemsEqual(list(header.alts.keys()), ['CGA_CNVWIN', 'INS:ME:MER'])
+    self.assertItemsEqual(list(header.filters.keys()), ['MPCBT'])
+    self.assertItemsEqual(list(header.infos.keys()), ['CGA_MIRB'])
+    self.assertItemsEqual(list(header.formats.keys()), ['FT'])
 
   def test_empty_header_raises_error(self):
     self.lines = testdata_util.get_sample_vcf_record_lines()
@@ -285,7 +285,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     ]
     header = _get_vcf_header_from_lines(self.lines)
     header_fn = WriteVcfHeaderFn('')
-    actual = header_fn._to_vcf_header_line('INFO', header.infos.values()[0])
+    actual = header_fn._to_vcf_header_line('INFO', list(header.infos.values())[0])
     expected = self.lines[0]
     self.assertEqual(actual, expected)
 
@@ -296,7 +296,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     ]
     header = _get_vcf_header_from_lines(self.lines)
     header_fn = WriteVcfHeaderFn('')
-    actual = header_fn._to_vcf_header_line('contig', header.contigs.values()[0])
+    actual = header_fn._to_vcf_header_line('contig', list(header.contigs.values())[0])
     expected = '##contig=<ID=M,length=16>\n'
     self.assertEqual(actual, expected)
 
@@ -311,7 +311,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
     header = _get_vcf_header_from_lines(self.lines)
     header_fn = WriteVcfHeaderFn('')
     actual = []
-    for info in header.infos.values():
+    for info in list(header.infos.values()):
       actual.append(header_fn._to_vcf_header_line('INFO', info))
     expected = self.lines[:-1]
     self.assertItemsEqual(actual, expected)

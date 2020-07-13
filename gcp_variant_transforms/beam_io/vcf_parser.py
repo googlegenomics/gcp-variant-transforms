@@ -17,7 +17,7 @@
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
-from __future__ import absolute_import
+
 
 from collections import namedtuple
 import enum
@@ -370,7 +370,7 @@ class VcfParser(object):
 
     self._init_with_header(parsed_header_lines)
 
-  def next(self):
+  def __next__(self):
     try:
       text_line = self._next_non_empty_line(self._text_lines)
     except StopIteration as e:
@@ -466,7 +466,7 @@ class PySamParser(VcfParser):
     from_child = os.fdopen(return_pipe_read)
     self._to_child = os.fdopen(send_pipe_write, 'w')
     self._vcf_reader = libcbcf.VariantFile(from_child, 'r')
-    self._original_info_list = self._vcf_reader.header.info.keys()
+    self._original_info_list = list(self._vcf_reader.header.info.keys())
 
   def _init_child_process(
       self, send_pipe_read, return_pipe_write, header_lines, pre_infer_headers):
@@ -612,7 +612,7 @@ class PySamParser(VcfParser):
     if isinstance(value, float):
       return self._parse_float(value)
     # Sometimes PySam returns unicode strings, encode them as strings instead.
-    elif isinstance(value, unicode):
+    elif isinstance(value, str):
       value = value.encode('utf-8')
     return str(value)
 
