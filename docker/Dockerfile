@@ -45,30 +45,31 @@ RUN apt-get update && apt-get install -y \
     make \
     perl \
     zlib1g-dev \
-    python-pip
+    python3-pip \
+    python3-venv
 
 # Install dependencies.
-RUN python -m pip install --upgrade pip && \
-    python -m pip install --upgrade virtualenv && \
-    virtualenv /opt/gcp_variant_transforms/venv && \
-    . /opt/gcp_variant_transforms/venv/bin/activate && \
+RUN 
+RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
+    . /opt/gcp_variant_transforms/venv3/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
+    python -m pip install --upgrade wheel \
     python -m pip install --upgrade .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
-      ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
+      ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \
       'python -m gcp_variant_transforms.vcf_to_bq --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/vcf_to_bq && \
     chmod +x /opt/gcp_variant_transforms/bin/vcf_to_bq
 
 RUN printf '#!/bin/bash\n%s\n%s' \
-      ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
+      ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \
       'python -m gcp_variant_transforms.vcf_to_bq_preprocess --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess && \
     chmod +x /opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess
 
 RUN printf '#!/bin/bash\n%s\n%s' \
-      ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
+      ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \
       'python -m gcp_variant_transforms.bq_to_vcf --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/bq_to_vcf && \
     chmod +x /opt/gcp_variant_transforms/bin/bq_to_vcf

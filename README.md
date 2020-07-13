@@ -1,3 +1,8 @@
+# This branch is under development and is not in working condition.
+## Please rely solely on master branch for the initiation of the tool.
+
+# ------------------------------------------------
+
 # GCP Variant Transforms
 
 [![Build Status](https://travis-ci.org/googlegenomics/gcp-variant-transforms.svg?branch=master)](https://travis-ci.org/googlegenomics/gcp-variant-transforms)

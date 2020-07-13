@@ -22,11 +22,17 @@ if [[ -z `which coverage` ]];then
   echo "coverage is not installed. Installing ..."
   python -m pip install coverage
 fi
-coverage run --source=gcp_variant_transforms setup.py test
+# coverage run --source=gcp_variant_transforms setup.py test
+# Add individual files and packages as they are migrated to Python 3. Once all
+# of the files are migrated, delete this code and uncomment the above line.
+coverage run --source=gcp_variant_transforms setup.py test -s setup.py
 
 echo ========== Running pylint.
 if [[ -z `which pylint` ]];then
   echo "pylint is not installed. Installing ..."
   python -m pip install pylint
 fi
-python -m pylint gcp_variant_transforms
+# python -m pylint gcp_variant_transforms
+# Add individual files and packages as they are migrated to Python 3. Once all
+# of the files are migrated, delete this code and uncomment the above line.
+python -m pylint setup.py
