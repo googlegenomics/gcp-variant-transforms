@@ -181,7 +181,7 @@ class BGZFBlock(BGZF):
     decompressed = self._decompressor.decompress(buf)
     del buf
     # Discards all data before first `\n`.
-    while '\n' not in decompressed:
+    while b'\n' not in decompressed:
       if self._decompressor.unused_data != b'':
         buf = self._decompressor.unused_data
         self._decompressor = zlib.decompressobj(self._gzip_mask)
@@ -191,12 +191,12 @@ class BGZFBlock(BGZF):
         raise ValueError('Read failed. The block {} does not contain any '
                          'valid record.'.format(self._block))
 
-    lines = decompressed.split('\n')
-    self._read_buffer.write('\n'.join(lines[1:]))
+    lines = decompressed.split(b'\n')
+    self._read_buffer.write(b'\n'.join(lines[1:]))
 
   def _read_data_from_source(self):
     if self._start_offset == self._block.end:
-      return ''
+      return b''
     buf = self._file.raw._downloader.get_range(self._start_offset,
                                                self._block.end)
     self._start_offset += len(buf)
@@ -212,7 +212,7 @@ class BGZFBlock(BGZF):
     if not decompressed:
       return
     # Writes all data to the buffer until the first `\n` is reached.
-    while '\n' not in decompressed:
+    while b'\n' not in decompressed:
       if self._decompressor.unused_data != b'':
         self._read_buffer.write(decompressed)
         buf = self._decompressor.unused_data
@@ -222,4 +222,4 @@ class BGZFBlock(BGZF):
       else:
         raise ValueError('Read failed. The record is longer than {} '
                          'bytes.'.format(self._read_size))
-    self._read_buffer.write(decompressed.split('\n')[0] + '\n')
+    self._read_buffer.write(decompressed.split(b'\n')[0] + b'\n')

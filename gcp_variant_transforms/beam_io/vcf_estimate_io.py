@@ -84,13 +84,13 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     # type: (str, str) -> (int, str)
     """Returns the header size and sample names."""
     header_size = 0
-    header_line = file_to_read.readline()
+    header_line = file_to_read.readline().decode('utf-8')
     # Read and skip all header lines starting with ##. Make sure to calculate
     # their total size, to marginally better approximate the line count.
     while (header_line.startswith('##') or not header_line or
            not header_line.strip()):
       header_size += len(header_line)
-      header_line = file_to_read.readline()
+      header_line = file_to_read.readline().decode('utf-8')
     if not header_line.startswith('#'):
       raise ValueError(('No column-defining header line was found in file {}.'
                         .format(file_name)))

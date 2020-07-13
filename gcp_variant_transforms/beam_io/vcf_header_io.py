@@ -334,9 +334,9 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
     with self.open_file(file_path) as file_to_read:
       record = None
       while True:
-        record = file_to_read.readline()
+        record = file_to_read.readline().decode('utf-8')
         while record and not record.strip():  # Skip empty lines.
-          record = file_to_read.readline()
+          record = file_to_read.readline().decode('utf-8')
         if record and record.startswith('#'):
           yield record.strip()
         else:
@@ -460,7 +460,7 @@ class WriteVcfHeaderFn(beam.DoFn):
   """A DoFn for writing VCF headers to a file."""
 
   HEADER_TEMPLATE = '##{}=<{}>\n'
-  FINAL_HEADER_LINE = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
+  FINAL_HEADER_LINE = b'#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
 
   def __init__(self, file_path):
     # type: (str) -> None
@@ -471,7 +471,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     # type: (VcfHeader, str) -> None
     with FileSystems.create(self._file_path) as self._file_to_write:
       if vcf_version_line:
-        self._file_to_write.write(vcf_version_line)
+        self._file_to_write.write(vcf_version_line.encode('utf-8'))
       self._write_headers_by_type(HeaderTypeConstants.INFO, header.infos)
       self._write_headers_by_type(HeaderTypeConstants.FILTER, header.filters)
       self._write_headers_by_type(HeaderTypeConstants.ALT, header.alts)
@@ -490,7 +490,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     """
     for header in list(headers.values()):
       self._file_to_write.write(
-          self._to_vcf_header_line(header_type, header))
+          self._to_vcf_header_line(header_type, header).encode('utf-8'))
 
   def _to_vcf_header_line(self, header_type, header):
     # type: (str, Dict[str, Union[str, int]]) -> str
@@ -590,8 +590,8 @@ class WriteVcfHeaderFn(beam.DoFn):
 
   def _format_string_value(self, value):
     # type: (str, unicode) -> str
-    if isinstance(value, str):
-      return '"{}"'.format(value.encode('utf-8'))
+    if isinstance(value, bytes):
+      return '"{}"'.format(value.decode('utf-8'))
     return '"{}"'.format(value)
 
 

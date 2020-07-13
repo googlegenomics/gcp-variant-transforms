@@ -152,7 +152,8 @@ class Variant(object):
     other_vars = vars(other)
     for key in sorted(self_vars):
       if self_vars[key] != other_vars[key]:
-        return self_vars[key] < other_vars[key]
+        return (other_vars[key] is not None and
+                (self_vars[key] is None or self_vars[key] < other_vars[key]))
 
     return False
 
@@ -361,12 +362,12 @@ class VcfParser(object):
       parsed_line = (line.strip().replace('Number=G', 'Number=.') if
                      line.startswith(INFO_HEADER_TAG) else line.strip())
       # Tests provide lines in unicode.
-      if isinstance(parsed_line, str):
+      if isinstance(parsed_line, bytes):
         parsed_line = parsed_line.decode('utf-8')
       if parsed_line:
         # For str cases, decode then re-encode lines in utf-8, to not use ascii
         # encoding.
-        parsed_header_lines.append(parsed_line.encode('utf-8'))
+        parsed_header_lines.append(parsed_line)
 
     self._init_with_header(parsed_header_lines)
 
@@ -467,6 +468,7 @@ class PySamParser(VcfParser):
     self._to_child = os.fdopen(send_pipe_write, 'w')
     self._vcf_reader = libcbcf.VariantFile(from_child, 'r')
     self._original_info_list = list(self._vcf_reader.header.info.keys())
+    
 
   def _init_child_process(
       self, send_pipe_read, return_pipe_write, header_lines, pre_infer_headers):
@@ -516,7 +518,7 @@ class PySamParser(VcfParser):
 
   def _get_variant(self, data_line):
     try:
-      self._to_child.write(data_line.encode('utf-8') + '\n')
+      self._to_child.write(data_line + '\n')
       self._to_child.flush()
       return self._convert_to_variant(next(self._vcf_reader))
     except (ValueError, StopIteration, TypeError) as e:
@@ -548,7 +550,7 @@ class PySamParser(VcfParser):
     """
     self._verify_start_end(record)
     return Variant(
-        reference_name=record.chrom.encode('utf-8'),
+        reference_name=record.chrom,
         # record.pos is 1-based version of record.start (ie. record.start + 1).
         start=record.pos if self._use_1_based_coordinate else record.start,
         end=record.stop,
@@ -612,8 +614,8 @@ class PySamParser(VcfParser):
     if isinstance(value, float):
       return self._parse_float(value)
     # Sometimes PySam returns unicode strings, encode them as strings instead.
-    elif isinstance(value, str):
-      value = value.encode('utf-8')
+    elif isinstance(value, bytes):
+      value = value.decode('utf-8')
     return str(value)
 
   def _lookup_encoded_sample_name(self, sample_name):
