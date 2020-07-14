@@ -18,7 +18,7 @@ NOTE(bashir2): Most of the real unit-tests for annotation_parser module are
 through unit-testing of processed_variant module.
 """
 
-from __future__ import absolute_import
+
 
 import unittest
 
@@ -40,7 +40,7 @@ class AnnotationParserTest(unittest.TestCase):
 
   def test_extract_annotation_names_error(self):
     annotation_str = 'some desc-Consequence-IMPACT-SYMBOL-Gene'
-    with self.assertRaisesRegexp(ValueError, 'Expected at least one.*'):
+    with self.assertRaisesRegex(ValueError, 'Expected at least one.*'):
       annotation_parser.extract_annotation_names(annotation_str)
 
 
@@ -51,14 +51,14 @@ class AnnotationStrBuilderTest(unittest.TestCase):
     str_builder = annotation_parser.AnnotationStrBuilder({
         'CSQ': ['allele', 'Consequence', 'AF', 'IMPACT'],
         'CSQ_2': ['allele', 'Consequence', 'IMPACT']})
-    annotation_maps = [{u'allele': u'G',
-                        u'Consequence': u'upstream_gene_variant',
-                        u'AF': u'',
-                        u'IMPACT': u'MODIFIER'},
-                       {u'allele': u'G',
-                        u'Consequence': u'upstream_gene_variant',
-                        u'AF': u'0.1',
-                        u'IMPACT': u''}]
+    annotation_maps = [{'allele': 'G',
+                        'Consequence': 'upstream_gene_variant',
+                        'AF': '',
+                        'IMPACT': 'MODIFIER'},
+                       {'allele': 'G',
+                        'Consequence': 'upstream_gene_variant',
+                        'AF': '0.1',
+                        'IMPACT': ''}]
 
     expected_annotation_strs = ['G|upstream_gene_variant||MODIFIER',
                                 'G|upstream_gene_variant|0.1|']
@@ -69,13 +69,13 @@ class AnnotationStrBuilderTest(unittest.TestCase):
 
   def test_reconstruct_annotation_str_missing_annotation_names(self):
     str_builder = annotation_parser.AnnotationStrBuilder(None)
-    annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
+    annotation_maps = [{'Consequence': 'upstream_gene_variant'}]
     with self.assertRaises(ValueError):
       list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
 
     str_builder = annotation_parser.AnnotationStrBuilder(
         {'CSQ2': ['Consequence', 'AF']})
-    annotation_maps = [{u'Consequence': u'upstream_gene_variant'}]
+    annotation_maps = [{'Consequence': 'upstream_gene_variant'}]
     with self.assertRaises(ValueError):
       list(str_builder.reconstruct_annotation_str('CSQ', annotation_maps))
 

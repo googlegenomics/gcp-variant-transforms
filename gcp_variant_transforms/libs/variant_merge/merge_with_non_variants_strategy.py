@@ -14,7 +14,7 @@
 
 """Variant merge stategy that can handle both Variants and Non-variants."""
 
-from __future__ import absolute_import
+
 
 import collections
 import copy
@@ -147,7 +147,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
   def _merge_variants(self, grouped_variants):
     merged_variants = []
-    for merge_key, variants in grouped_variants.iteritems():
+    for merge_key, variants in list(grouped_variants.items()):
       merged_variants.extend(
           self._move_to_calls.get_merged_variants(variants, merge_key))
     return merged_variants

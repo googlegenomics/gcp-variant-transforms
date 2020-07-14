@@ -14,7 +14,7 @@
 
 """Implements a variant merge stategy that moves fields to calls."""
 
-from __future__ import absolute_import
+
 
 import hashlib
 import re
@@ -81,7 +81,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     if self._should_copy_quality_to_calls():
       additional_call_info[
           bigquery_util.ColumnKeyConstants.QUALITY] = variant.quality
-    for info_key, info_value in variant.info.iteritems():
+    for info_key, info_value in list(variant.info.items()):
       if self._should_move_info_key_to_calls(info_key):
         additional_call_info[info_key] = info_value
     for call in variant.calls:
@@ -97,7 +97,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
       merged_variant: The variant who will receive the info items of `variant`
         if specified.
     """
-    for info_key, info_value in variant.info.iteritems():
+    for info_key, info_value in list(variant.info.items()):
       if not self._should_move_info_key_to_calls(info_key):
         merged_variant.info[info_key] = info_value
 

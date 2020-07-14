@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
+
 
 import unittest
 
@@ -97,7 +97,7 @@ class VepRunnerTest(unittest.TestCase):
 
   def test_instantiation_bad_pipeline_options(self):
     """This is to test object construction fails with incomplete arguments."""
-    with self.assertRaisesRegexp(ValueError, '.*project.*'):
+    with self.assertRaisesRegex(ValueError, '.*project.*'):
       self._create_test_instance(pipeline_args=['no_arguments'])
 
   def test_make_vep_cache_path(self):
@@ -162,7 +162,7 @@ class VepRunnerTest(unittest.TestCase):
     test_instance = self._create_test_instance()
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
-      with self.assertRaisesRegexp(AssertionError, '.*already.*running.*'):
+      with self.assertRaisesRegex(AssertionError, '.*already.*running.*'):
         # Since there are running operations, the next call raises an exception.
         test_instance.run_on_all_files()
       test_instance.wait_until_done()
@@ -182,7 +182,7 @@ class VepRunnerTest(unittest.TestCase):
     test_instance = self._create_test_instance()
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
-      with self.assertRaisesRegexp(RuntimeError, '.*failed.*retries.*'):
+      with self.assertRaisesRegex(RuntimeError, '.*failed.*retries.*'):
         test_instance.wait_until_done()
 
 
