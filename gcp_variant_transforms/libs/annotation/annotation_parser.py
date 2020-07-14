@@ -366,7 +366,7 @@ class AnnotationStrBuilder():
     names are given such that the annotation string can be reconstructed.
     """
     return (self._annotation_id_to_annotation_names and
-            key in self._annotation_id_to_annotation_names.keys())
+            key in list(self._annotation_id_to_annotation_names.keys()))
 
 
 def extract_annotation_list_with_alt(annotation_str):
