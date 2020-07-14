@@ -126,7 +126,13 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
       merged_variant.names.extend(variant.names)
       merged_variant.filters.extend(variant.filters)
-      merged_variant.quality = max(merged_variant.quality, variant.quality)
+      if (merged_variant.quality is not None and
+          variant.quality is not None):
+        merged_variant.quality = max(merged_variant.quality, variant.quality)
+      elif merged_variant.quality is not None:
+        merged_variant.quality = variant.quality
+      else:
+        merged_variant.quality = variant.quality
 
       self.move_data_to_calls(variant)
       self.move_data_to_merged(variant, merged_variant)
@@ -188,7 +194,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     schema.fields = updated_fields
 
   def _get_hash(self, value):
-    return hashlib.md5(value).hexdigest()
+    return hashlib.md5(value.encode('utf-8')).hexdigest()
 
   def _should_move_info_key_to_calls(self, info_key):
     return bool(self._info_keys_to_move_to_calls_re and

@@ -133,8 +133,14 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
       for non_variant in overlapping_variants[1:]:
         merged_non_variant.names.extend(non_variant.names)
         merged_non_variant.filters.extend(non_variant.filters)
-        merged_non_variant.quality = min(merged_non_variant.quality,
-                                         non_variant.quality)
+        if (merged_non_variant.quality is not None and
+            non_variant.quality is not None):
+          merged_non_variant.quality = min(merged_non_variant.quality,
+                                           non_variant.quality)
+        elif merged_non_variant.quality is not None:
+          merged_non_variant.quality = merged_non_variant.quality
+        else:
+          merged_non_variant.quality = non_variant.quality
         merged_non_variant.calls.extend(non_variant.calls)
 
       merged_non_variant.names = sorted(set(merged_non_variant.names))

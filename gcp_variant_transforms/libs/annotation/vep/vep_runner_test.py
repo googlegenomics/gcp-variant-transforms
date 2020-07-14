@@ -133,7 +133,7 @@ class VepRunnerTest(unittest.TestCase):
     self._pipelines_spy.validate_calls([f[0] for f in _INPUT_FILES_WITH_SIZE])
 
   def test_run_on_all_files(self):
-    num_workers = len(_INPUT_FILES_WITH_SIZE) / 2 + 1
+    num_workers = len(_INPUT_FILES_WITH_SIZE) // 2 + 1
     test_instance = self._create_test_instance(
         self._get_pipeline_args(num_workers))
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):

@@ -84,7 +84,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
          vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20})],
         merged_variant.calls)
-    self.assertItemsEqual(['A1', 'A2', 'A3'], list(merged_variant.info.keys()))
+    self.assertCountEqual(['A1', 'A2', 'A3'], list(merged_variant.info.keys()))
     self.assertTrue(
         merged_variant.info['A1'] in ('some data', 'some data2'))
     self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
@@ -130,7 +130,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                                  ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']})],
         merged_variant.calls)
-    self.assertItemsEqual(['A1', 'A2', 'A3'], list(merged_variant.info.keys()))
+    self.assertCountEqual(['A1', 'A2', 'A3'], list(merged_variant.info.keys()))
     self.assertTrue(
         merged_variant.info['A1'] in ('some data', 'some data2'))
     self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
@@ -165,7 +165,7 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
          vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20, 'A1': 'some data2'})],
         merged_variant.calls)
-    self.assertItemsEqual(['A2', 'A3'], list(merged_variant.info.keys()))
+    self.assertCountEqual(['A2', 'A3'], list(merged_variant.info.keys()))
     self.assertEqual(['data1', 'data2'], merged_variant.info['A2'])
     self.assertEqual(['data3', 'data4'], merged_variant.info['A3'])
 
