@@ -164,7 +164,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     if not calls_record:
       raise ValueError('calls record must exist in the schema.')
 
-    existing_calls_keys = set([field.name for field in calls_record.fields])
+    existing_calls_keys = {field.name for field in calls_record.fields}
     updated_fields = []
     for field in schema.fields:
       if (self._should_copy_filter_to_calls() and

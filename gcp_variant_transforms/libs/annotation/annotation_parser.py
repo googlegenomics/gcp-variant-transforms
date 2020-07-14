@@ -64,7 +64,7 @@ class AnnotationAltNotFound(AnnotationParserException):
   pass
 
 
-class Parser(object):
+class Parser():
   """The main class for parsing annotation fields of a single variant record.
 
   The expected usage is to pass information about one variant record, namely the
@@ -301,7 +301,7 @@ class Parser(object):
       raise InvalidAlleleNumValue(e)
 
 
-class AnnotationStrBuilder(object):
+class AnnotationStrBuilder():
   """The class for reconstructing annotation str."""
 
   def __init__(self, annotation_id_to_annotation_names):

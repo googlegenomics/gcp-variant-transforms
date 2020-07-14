@@ -52,7 +52,7 @@ _GZ_FACTOR = 10
 _MIN_NUM_OF_VARIANT = 50 * 1000
 
 
-class WorkerIOInfo(object):
+class WorkerIOInfo():
   """Holds information about input/output on a virtual machine.
 
   This is a pure data object and attributes can be accessed directly but the

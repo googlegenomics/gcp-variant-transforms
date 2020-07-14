@@ -95,7 +95,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
   return runner
 
 
-class VepRunner(object):
+class VepRunner():
   """A class for running vep through Pipelines API on a set of input files."""
 
   _VEP_CACHE_BASE = ('gs://cloud-lifesciences/vep/'

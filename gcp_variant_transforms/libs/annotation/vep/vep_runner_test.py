@@ -186,7 +186,7 @@ class VepRunnerTest(unittest.TestCase):
         test_instance.wait_until_done()
 
 
-class PipelinesSpy(object):
+class PipelinesSpy():
   """A class to intercept calls to the run() function of Pipelines API."""
 
   def __init__(self, mock_request):
