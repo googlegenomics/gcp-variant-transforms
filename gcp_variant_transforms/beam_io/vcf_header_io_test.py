@@ -56,8 +56,7 @@ def _get_vcf_header_from_lines(lines, file_name=None):
       if line.startswith(LAST_HEADER_LINE_PREFIX):
         sample_line = line.strip()
         break
-      else:
-        header.add_line(line.strip())
+      header.add_line(line.strip())
     else:
       break
   return VcfHeader(infos=header.info,

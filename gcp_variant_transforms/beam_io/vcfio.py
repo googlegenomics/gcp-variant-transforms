@@ -130,7 +130,7 @@ class _ToVcfRecordCoder(coders.Coder):
       # the key will be added to the format field.
       if self._is_alternate_phaseset(call.phaseset):
         format_keys.append(PHASESET_FORMAT_KEY)
-      format_keys.extend([k for k in call.info])
+      format_keys.extend(list(k for k in call.info))
 
     # Sort all keys and remove duplicates after GENOTYPE_FORMAT_KEY
     format_keys[1:] = sorted(list(set(format_keys[1:])))

@@ -44,7 +44,7 @@ HEADER_SPECIAL_NUMBERS = [vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 
-class VcfHeaderFieldTypeConstants(object):
+class VcfHeaderFieldTypeConstants():
   """Constants for types from VCF header."""
   FLOAT = 'Float'
   INTEGER = 'Integer'
@@ -53,7 +53,7 @@ class VcfHeaderFieldTypeConstants(object):
   CHARACTER = 'Character'
 
 
-class VcfParserHeaderKeyConstants(object):
+class VcfParserHeaderKeyConstants():
   """Constants for header fields from the parser."""
   ID = 'id'
   NUM = 'num'
@@ -64,7 +64,7 @@ class VcfParserHeaderKeyConstants(object):
   LENGTH = 'length'
 
 
-class PysamHeaderKeyConstants(object):
+class PysamHeaderKeyConstants():
   """Constants for header fields from the parser."""
   NUM = 'Number'
   TYPE = 'Type'
@@ -104,7 +104,7 @@ def CreateFormatField(info_id, number, info_type, description=''):
 VariantHeaderMetadataMock = collections.namedtuple(
     'VariantHeaderMetadata', ['id', 'record'])
 
-class VcfHeader(object):
+class VcfHeader():
   """Container for header data."""
 
   def __init__(self,
@@ -271,8 +271,8 @@ class VcfHeader(object):
       # Number can only be a number or one of 'A', 'R', 'G' and '.'.
       if PysamHeaderKeyConstants.NUM not in field.record:
         raise ValueError('No number for header line {}.'.format(field.id))
-      elif (field.record[PysamHeaderKeyConstants.NUM] not in
-            HEADER_SPECIAL_NUMBERS):
+      if (field.record[PysamHeaderKeyConstants.NUM] not in
+          HEADER_SPECIAL_NUMBERS):
         try:
           int(field.record[PysamHeaderKeyConstants.NUM])
         except ValueError:
@@ -438,7 +438,7 @@ class ReadAllVcfHeaders(PTransform):
     return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
-class HeaderTypeConstants(object):
+class HeaderTypeConstants():
   INFO = 'INFO'
   FILTER = 'FILTER'
   ALT = 'ALT'
@@ -446,7 +446,7 @@ class HeaderTypeConstants(object):
   CONTIG = 'contig'
 
 
-class _HeaderFieldKeyConstants(object):
+class _HeaderFieldKeyConstants():
   ID = 'ID'
   NUMBER = 'Number'
   TYPE = 'Type'
@@ -525,7 +525,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     return ','.join(formatted_values)
 
   def _should_include_key_value(self, key, value):
-    return value is not None or (key != 'source' and key != 'version')
+    return value is not None or (key not in ('source', 'version'))
 
   def _format_header_key_value(self, key, value):
     # type: (str, Union[str, int]) -> str
@@ -544,9 +544,9 @@ class WriteVcfHeaderFn(beam.DoFn):
       value = vcfio.MISSING_FIELD_VALUE
     elif key == _HeaderFieldKeyConstants.NUMBER:
       value = self._format_number(value)
-    elif (key == _HeaderFieldKeyConstants.DESCRIPTION
-          or key == _HeaderFieldKeyConstants.SOURCE
-          or key == _HeaderFieldKeyConstants.VERSION):
+    elif (key in (_HeaderFieldKeyConstants.DESCRIPTION,
+                  _HeaderFieldKeyConstants.SOURCE,
+                  _HeaderFieldKeyConstants.VERSION)):
       value = self._format_string_value(value)
     return '{}={}'.format(key, value)
 

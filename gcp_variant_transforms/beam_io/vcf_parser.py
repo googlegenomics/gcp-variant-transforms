@@ -65,7 +65,7 @@ class SampleNameEncoding(enum.Enum):
   NONE = 2
 
 
-class Variant(object):
+class Variant():
   """A class to store info about a genomic variant.
 
   Each object corresponds to a single record in a VCF file.
@@ -179,7 +179,7 @@ class Variant(object):
     return other <= self
 
 
-class VariantCall(object):
+class VariantCall():
   """A class to store info about a variant call.
 
   A call represents the determination of genotype with respect to a particular
@@ -243,7 +243,7 @@ class VariantCall(object):
             self.sample_id, self.genotype, self.phaseset, self.info]])
 
 
-class VcfParser(object):
+class VcfParser():
   """Base abstract class for defining a VCF file parser.
 
   Derived classes must implement two methods:
@@ -461,14 +461,12 @@ class PySamParser(VcfParser):
     self._to_child.flush()
     self._to_child.close()
     os.waitpid(self._process_pid, 0)
-    return
 
   def _init_parent_process(self, return_pipe_read, send_pipe_write):
     from_child = os.fdopen(return_pipe_read)
     self._to_child = os.fdopen(send_pipe_write, 'w')
     self._vcf_reader = libcbcf.VariantFile(from_child, 'r')
-    self._original_info_list = list(self._vcf_reader.header.info.keys())
-    
+    self._original_info_list = self._vcf_reader.header.info.keys()
 
   def _init_child_process(
       self, send_pipe_read, return_pipe_write, header_lines, pre_infer_headers):

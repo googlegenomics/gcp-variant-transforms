@@ -28,7 +28,7 @@ from apache_beam.io import iobase
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 
 
-class VcfEstimate(object):
+class VcfEstimate():
   """Container for estimation data about the VCF file."""
 
   def __init__(self,

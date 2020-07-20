@@ -402,7 +402,7 @@ class VcfSourceTest(unittest.TestCase):
   def test_read_after_splitting(self):
     file_name = testdata_util.get_full_file_path('valid-4.1-large.vcf')
     source = VcfSource(file_name)
-    splits = [p for p in source.split(desired_bundle_size=500)]
+    splits = list(p for p in source.split(desired_bundle_size=500))
     self.assertGreater(len(splits), 1)
     sources_info = ([
         (split.source, split.start_position, split.stop_position) for
@@ -802,7 +802,7 @@ class VcfSourceTest(unittest.TestCase):
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
+      splits = list(split for split in source.split(desired_bundle_size=100000))
       assert len(splits) == 1
       source_test_utils.assert_reentrant_reads_succeed(
           (splits[0].source, splits[0].start_position, splits[0].stop_position))
@@ -812,7 +812,7 @@ class VcfSourceTest(unittest.TestCase):
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
+      splits = list(split for split in source.split(desired_bundle_size=100000))
       assert len(splits) == 1
       source_test_utils.assert_split_at_fraction_exhaustive(
           splits[0].source, splits[0].start_position, splits[0].stop_position)
