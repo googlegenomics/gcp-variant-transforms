@@ -25,9 +25,9 @@ _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 class BigQuerySanitizerTest(unittest.TestCase):
 
   def test_decode_utf8_string(self):
-    self.assertEqual(u'BÑD',
+    self.assertEqual('BÑD',
                      bigquery_sanitizer._decode_utf8_string('BÑD'))
-    self.assertEqual(u'BD',
+    self.assertEqual('BD',
                      bigquery_sanitizer._decode_utf8_string('BD'))
 
   def test_get_sanitized_field_name(self):
@@ -40,7 +40,7 @@ class BigQuerySanitizerTest(unittest.TestCase):
 
   def test_get_sanitized_field(self):
     sanitizer = bigquery_sanitizer.FieldSanitizer(None)
-    self.assertEqual(u'valid',
+    self.assertEqual('valid',
                      sanitizer.get_sanitized_field('valid'))
     self.assertRaises(ValueError,
                       sanitizer.get_sanitized_field, '\x81DUMMY')

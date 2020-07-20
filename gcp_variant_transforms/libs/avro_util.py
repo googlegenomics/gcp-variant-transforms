@@ -92,7 +92,7 @@ class LoadAvro(object):
     self._suffixes_to_load_jobs.update({suffix: load_job})
 
   def _cancel_all_running_load_jobs(self):
-    for load_job in self._suffixes_to_load_jobs.values():
+    for load_job in list(self._suffixes_to_load_jobs.values()):
       load_job.cancel()
 
   def _handle_failed_load_job(self, suffix, load_job):
@@ -118,7 +118,7 @@ class LoadAvro(object):
     # Waits until current jobs are done and then add remaining jobs one by one.
     while self._suffixes_to_load_jobs:
       time.sleep(60)
-      processed_suffixes = self._suffixes_to_load_jobs.keys()
+      processed_suffixes = list(self._suffixes_to_load_jobs.keys())
       for suffix in processed_suffixes:
         load_job = self._suffixes_to_load_jobs.get(suffix)
         if load_job.done():

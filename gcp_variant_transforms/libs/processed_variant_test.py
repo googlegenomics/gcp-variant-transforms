@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
+
 from typing import Dict  # pylint: disable=unused-import
 from collections import OrderedDict
 
@@ -107,7 +107,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {'A2': 'data2'}
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+    self.assertFalse('A2' in proc_var.non_alt_info)
 
   def test_create_processed_variant_move_alt_info_extra_values(self):
     header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
@@ -133,7 +133,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt2 = processed_variant.AlternateBaseData('TT')
     alt2._info = {'A2': 'data2'}
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+    self.assertFalse('A2' in proc_var.non_alt_info)
 
   def test_create_processed_variant_move_alt_info_insufficient_values(self):
     header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
@@ -158,7 +158,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     alt1._info = {'A2': 'data1'}
     alt2 = processed_variant.AlternateBaseData('TT')
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+    self.assertFalse('A2' in proc_var.non_alt_info)
 
   def _get_sample_variant_and_header_with_csq(self, additional_infos=None):
     """Provides a simple `Variant` and `VcfHeader` with info fields
@@ -211,8 +211,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('A2' in proc_var.non_alt_info)
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -252,8 +252,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('A2' in proc_var.non_alt_info)
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -299,7 +299,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -343,7 +343,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -387,7 +387,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I3', 'SYMBOL': 'S3', 'Gene': 'G3'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -425,7 +425,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -466,7 +466,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'Consequence': 'C2', 'IMPACT': 'I2', 'SYMBOL': 'S2', 'Gene': 'G2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2, alt3])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -517,7 +517,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              'Consequence': 'C2', 'IMPACT': 'I2', 'ALLELE_NUM': '2'}]
     }
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
-    self.assertFalse(proc_var.non_alt_info.has_key('CSQ'))
+    self.assertFalse('CSQ' in proc_var.non_alt_info)
     self.assertEqual(counter_factory.counter_map[
         CEnum.VARIANT.value].get_value(), 1)
     self.assertEqual(counter_factory.counter_map[
@@ -534,7 +534,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_alt_bases_field_schema_descriptions(self):
     _, header_fields = self._get_sample_variant_and_header_with_csq()
-    for hfi in header_fields.infos.values():
+    for hfi in list(header_fields.infos.values()):
       hfi['type'] = 'string'
 
     factory = processed_variant.ProcessedVariantFactory(
@@ -563,7 +563,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              for i, t in zip(ids, types)]
     _, header_fields = self._get_sample_variant_and_header_with_csq(
         additional_infos=infos)
-    for hfi in header_fields.infos.values():
+    for hfi in list(header_fields.infos.values()):
       if hfi['type'] == '.':
         hfi['type'] = 'String'
     factory = processed_variant.ProcessedVariantFactory(

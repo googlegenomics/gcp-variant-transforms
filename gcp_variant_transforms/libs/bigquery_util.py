@@ -208,7 +208,7 @@ def table_empty(project_id, dataset_id, table_id):
               results.total_rows))
 
   row = list(results)[0]
-  col_names = row.keys()
+  col_names = list(row.keys())
   if set(col_names) != {num_rows}:
     logging.error('Query `%s` did not return expected `%s` column.',
                   query, num_rows)
@@ -341,7 +341,7 @@ def _get_merged_field_schemas(
     merged_field_schemas.append(field_schema)
 
   for field_schema in field_schemas_2:
-    if field_schema.name not in existing_fields.keys():
+    if field_schema.name not in list(existing_fields.keys()):
       merged_field_schemas.append(field_schema)
     else:
       existing_field_schema = existing_fields.get(field_schema.name)

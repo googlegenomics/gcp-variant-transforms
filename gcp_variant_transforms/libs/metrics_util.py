@@ -29,7 +29,7 @@ my_counter.inc(4)
 
 """
 
-from __future__ import absolute_import
+
 
 import logging
 

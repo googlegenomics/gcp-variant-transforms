@@ -70,16 +70,16 @@ class HeaderMerger(object):
       ValueError: If the header fields are incompatible (e.g. same key with
         different types or numbers).
     """
-    for second_key, second_value in second.iteritems():
+    for second_key, second_value in list(second.items()):
       if second_key not in first:
         first[second_key] = second_value
         continue
       first_value = first[second_key]
-      if first_value.keys() != second_value.keys():
+      if list(first_value.keys()) != list(second_value.keys()):
         raise ValueError('Incompatible header fields: {}, {}'.format(
             first_value, second_value))
       merged_value = OrderedDict()
-      for first_field_key, first_field_value in first_value.iteritems():
+      for first_field_key, first_field_value in list(first_value.items()):
         second_field_value = second_value[first_field_key]
         try:
           resolution_field_value = self._resolver.resolve_attribute_conflict(

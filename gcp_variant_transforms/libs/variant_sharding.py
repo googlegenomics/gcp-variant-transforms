@@ -24,7 +24,7 @@ This class has 2 main operating modes:
      available at gcp_variant_transforms/testing/data/misc/*.yaml
 """
 
-from __future__ import absolute_import
+
 
 from collections import defaultdict
 import re

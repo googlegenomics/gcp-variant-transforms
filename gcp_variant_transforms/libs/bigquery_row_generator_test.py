@@ -140,35 +140,35 @@ def _get_table_schema():
 def _get_big_query_row():
   # type: (...) -> Dict[unicode, Any]
   """Returns one sample BigQuery row for testing."""
-  return {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
-          unicode(ColumnKeyConstants.START_POSITION): 11,
-          unicode(ColumnKeyConstants.END_POSITION): 12,
-          unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
-          unicode(ColumnKeyConstants.NAMES): [unicode('rs1'), unicode('rs2')],
-          unicode(ColumnKeyConstants.QUALITY): 2,
-          unicode(ColumnKeyConstants.FILTER): [unicode('PASS')],
-          unicode(ColumnKeyConstants.CALLS): [
-              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                  unicode(hash_name('Sample1'))),
-               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
-               unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
-               unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-              {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                  unicode(hash_name('Sample2'))),
-               unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
-               unicode(ColumnKeyConstants.CALLS_PHASESET): None,
-               unicode('GQ'): 10, unicode('FB'): True}
+  return {str(ColumnKeyConstants.REFERENCE_NAME): str('chr19'),
+          str(ColumnKeyConstants.START_POSITION): 11,
+          str(ColumnKeyConstants.END_POSITION): 12,
+          str(ColumnKeyConstants.REFERENCE_BASES): 'C',
+          str(ColumnKeyConstants.NAMES): [str('rs1'), str('rs2')],
+          str(ColumnKeyConstants.QUALITY): 2,
+          str(ColumnKeyConstants.FILTER): [str('PASS')],
+          str(ColumnKeyConstants.CALLS): [
+              {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  str(hash_name('Sample1'))),
+               str(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
+               str(ColumnKeyConstants.CALLS_PHASESET): str('*'),
+               str('GQ'): 20, str('FIR'): [10, 20]},
+              {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                  str(hash_name('Sample2'))),
+               str(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+               str(ColumnKeyConstants.CALLS_PHASESET): None,
+               str('GQ'): 10, str('FB'): True}
           ],
-          unicode(ColumnKeyConstants.ALTERNATE_BASES): [
-              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
-               unicode('IFR'): 1,
-               unicode('IFR2'): 0.2},
-              {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
-               unicode('IFR'): 0.2,
-               unicode('IFR2'): 0.3}
+          str(ColumnKeyConstants.ALTERNATE_BASES): [
+              {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('A'),
+               str('IFR'): 1,
+               str('IFR2'): 0.2},
+              {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('TT'),
+               str('IFR'): 0.2,
+               str('IFR2'): 0.3}
           ],
-          unicode('IS'): unicode('some data'),
-          unicode('ISR'): [unicode('data1'), unicode('data2')]}
+          str('IS'): str('some data'),
+          str('ISR'): [str('data1'), str('data2')]}
 
 
 class VariantCallRowGeneratorTest(unittest.TestCase):
@@ -316,7 +316,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
                      list(self._row_generator.get_rows(proc_variant)))
 
   def test_unicode_fields(self):
-    sample_unicode_str = u'\xc3\xb6'
+    sample_unicode_str = '\xc3\xb6'
     sample_utf8_str = sample_unicode_str.encode('utf-8')
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',

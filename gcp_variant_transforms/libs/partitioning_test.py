@@ -30,7 +30,7 @@ class PartitioningTest(unittest.TestCase):
         40030000: 10020,
     }
     for range_end, expected_range_interval in (
-        range_end_to_expected_range_interval.items()):
+        list(range_end_to_expected_range_interval.items())):
       (range_interval, range_end_enlarged) = (
           partitioning.calculate_optimal_range_interval(range_end))
       expected_range_end = (

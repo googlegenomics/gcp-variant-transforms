@@ -115,7 +115,7 @@ class FlattenCallColumn(object):
         break
     result = []
     for i in iterator:
-      result.append(str(i.values()[0]))
+      result.append(str(list(i.values())[0]))
     return result
 
   def _get_column_names(self):

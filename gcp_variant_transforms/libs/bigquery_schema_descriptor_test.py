@@ -15,7 +15,7 @@
 """Tests for bigquery_schema_descriptor module."""
 
 
-from __future__ import absolute_import
+
 
 import unittest
 

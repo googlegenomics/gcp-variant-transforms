@@ -14,7 +14,7 @@
 
 """A helper module for header inference operations."""
 
-from __future__ import absolute_import
+
 
 import logging
 from typing import Any, Dict, List, Optional, Union  # pylint: disable=unused-import
@@ -109,7 +109,7 @@ def infer_format_fields(
   """
   formats = {}
   if defined_headers and defined_headers.formats:
-    for format_key, format_value in defined_headers.formats.items():
+    for format_key, format_value in list(defined_headers.formats.items()):
       formats[format_key] = vcf_header_io.CreateFormatField(
           format_key,
           format_value[_HeaderKeyConstants.NUM],
@@ -118,7 +118,7 @@ def infer_format_fields(
       )
   updated_formats = {}
   for call in variant.calls:
-    for format_key, format_value in call.info.iteritems():
+    for format_key, format_value in list(call.info.items()):
       if format_key not in formats:
         logging.warning('Undefined FORMAT field "%s" in variant "%s"',
                         format_key, str(variant))
@@ -342,7 +342,7 @@ def _infer_non_annotation_info_fields(
       the field values.
     defined_headers: header fields defined in header section of VCF files.
   """
-  for info_field_key, info_field_value in variant.info.iteritems():
+  for info_field_key, info_field_value in list(variant.info.items()):
     if not defined_headers or info_field_key not in defined_headers.infos:
       if info_field_key in infos:
         raise ValueError(
@@ -413,7 +413,7 @@ def _infer_annotation_type_info_fields(
     annotation_values = [annotation_parser.extract_annotation_list_with_alt(
         annotation)[1:] for annotation in variant.info[field]]
     _check_annotation_lists_lengths(annotation_names, annotation_values)
-    annotation_values = zip(*annotation_values)
+    annotation_values = list(zip(*annotation_values))
     for name, values in zip(annotation_names, annotation_values):
       variant_merged_type = '.'
       for v in values:

@@ -115,7 +115,7 @@ def _extract_conflicts(
     which maps `Definition` to a list of file names.
   """
   # len(v) > 1 means there are conflicting definitions for this field.
-  return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
+  return dict([(k, v) for k, v in list(definitions.items()) if len(v) > 1])
 
 
 def _append_conflicting_headers_to_report(
