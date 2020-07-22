@@ -655,7 +655,7 @@ def _get_fields_from_avro_type(field_or_schema, prefix):
   name = field_or_schema.name
   if name and name not in fields and name != 'TBD':
     fields.extend([prefix + field_or_schema.name])
-  if field_or_schema.get_prop('fields'):
+  if 'fields' in field_or_schema.props:
     child_prefix = prefix
     if name != 'TBD':
       child_prefix = prefix + field_or_schema.name + '.'

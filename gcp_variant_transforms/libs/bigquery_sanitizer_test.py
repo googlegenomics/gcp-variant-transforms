@@ -43,7 +43,7 @@ class BigQuerySanitizerTest(unittest.TestCase):
     self.assertEqual('valid',
                      sanitizer.get_sanitized_field('valid'))
     self.assertRaises(ValueError,
-                      sanitizer.get_sanitized_field, '\x81DUMMY')
+                      sanitizer.get_sanitized_field, b'\x81DUMMY')
     self.assertEqual([1, 2],
                      sanitizer.get_sanitized_field([1, 2]))
     self.assertEqual(

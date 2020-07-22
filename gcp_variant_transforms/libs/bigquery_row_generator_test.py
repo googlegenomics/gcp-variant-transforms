@@ -316,7 +316,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
                      list(self._row_generator.get_rows(proc_variant)))
 
   def test_unicode_fields(self):
-    sample_unicode_str = '\xc3\xb6'
+    sample_unicode_str = u'\xc3\xb6'
     sample_utf8_str = sample_unicode_str.encode('utf-8')
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='CT',

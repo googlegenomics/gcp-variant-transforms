@@ -107,7 +107,7 @@ class FieldSanitizer(object):
     """
     if not field:
       return field
-    if isinstance(field, str):
+    if isinstance(field, str) or isinstance(field, bytes):
       return self._get_sanitized_string(field)
     elif isinstance(field, float):
       return self._get_sanitized_float(field)
@@ -157,7 +157,7 @@ class FieldSanitizer(object):
     for i in input_list:
       if i is None:
         i = null_replacement_value
-      elif isinstance(i, str):
+      elif isinstance(i, str) or isinstance(i, bytes):
         i = self._get_sanitized_string(i)
       elif isinstance(i, float):
         sanitized_float = self._get_sanitized_float(i)

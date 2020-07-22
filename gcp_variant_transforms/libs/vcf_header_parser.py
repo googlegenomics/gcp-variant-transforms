@@ -89,9 +89,9 @@ def _header_line_generator(file_name):
   with FileSystems.open(file_name) as f:
     record = None
     while True:
-      record = f.readline()
+      record = f.readline().decode('utf-8')
       while record and not record.strip():  # Skip empty lines.
-        record = f.readline()
+        record = f.readline().decode('utf-8')
       if record and record.startswith('#'):
         yield record
       else:
