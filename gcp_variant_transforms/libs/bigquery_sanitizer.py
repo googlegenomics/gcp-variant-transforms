@@ -31,7 +31,7 @@ _INF_FLOAT_VALUE = sys.float_info.max / 10
 _DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -2 ^ 31
 
 
-class SchemaSanitizer(object):
+class SchemaSanitizer():
   """Class to sanitize BigQuery schema according to BigQuery restrictions."""
 
   @staticmethod
@@ -63,7 +63,7 @@ class SchemaSanitizer(object):
     return re.sub('[^a-zA-Z0-9_]', '_', field_name)
 
 
-class FieldSanitizer(object):
+class FieldSanitizer():
   """Class to sanitize field values according to BigQuery restrictions."""
 
   def __init__(self, null_numeric_value_replacement):
@@ -107,7 +107,7 @@ class FieldSanitizer(object):
     """
     if not field:
       return field
-    if isinstance(field, str) or isinstance(field, bytes):
+    if isinstance(field, (str, bytes)):
       return self._get_sanitized_string(field)
     elif isinstance(field, float):
       return self._get_sanitized_float(field)
@@ -157,7 +157,7 @@ class FieldSanitizer(object):
     for i in input_list:
       if i is None:
         i = null_replacement_value
-      elif isinstance(i, str) or isinstance(i, bytes):
+      elif isinstance(i, (str, bytes)):
         i = self._get_sanitized_string(i)
       elif isinstance(i, float):
         sanitized_float = self._get_sanitized_float(i)

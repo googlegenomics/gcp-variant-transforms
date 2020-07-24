@@ -23,7 +23,7 @@ from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unus
 FieldDescriptor = NamedTuple('FieldDescriptor', [('type', str), ('mode', str)])
 
 
-class SchemaDescriptor(object):
+class SchemaDescriptor():
   """A dict based description for :class:`bigquery.TableSchema` object.
 
      This class provides APIs for checking if and how (e.g. type, mode) a field

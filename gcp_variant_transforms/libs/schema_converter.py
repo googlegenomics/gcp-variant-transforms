@@ -367,7 +367,7 @@ def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
     if (field.type not in bigquery_util.get_supported_bigquery_schema_types()
         or field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS):
       continue
-    elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
+    if field.name == bigquery_util.ColumnKeyConstants.CALLS:
       _add_format_fields(field, formats, allow_incompatible_schema)
     else:
       _add_info_fields(field, infos, allow_incompatible_schema)
@@ -380,8 +380,8 @@ def _add_format_fields(schema, formats, allow_incompatible_schema=False):
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
-    elif (field.name in list(vcf_reserved_fields.FORMAT_FIELDS.keys()) and
-          not allow_incompatible_schema):
+    if (field.name in list(vcf_reserved_fields.FORMAT_FIELDS.keys()) and
+        not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
       _validate_reserved_field(field, reserved_definition)
       formats.update({field.name: vcf_header_io.CreateFormatField(
@@ -440,7 +440,7 @@ def _add_info_fields_from_alternate_bases(schema,
   for field in schema.fields:
     if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
       continue
-    elif field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
+    if field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
       infos.update({field.name: vcf_header_io.CreateInfoField(
           field.name,
           vcfio.MISSING_FIELD_VALUE,

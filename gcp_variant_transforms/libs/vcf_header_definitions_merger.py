@@ -27,7 +27,7 @@ Definition = namedtuple('Definition',
                          vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
 
 
-class VcfHeaderDefinitions(object):
+class VcfHeaderDefinitions():
   """Container for header definitions."""
 
   def __init__(self, vcf_header=None):
@@ -64,7 +64,7 @@ class VcfHeaderDefinitions(object):
     return self._formats
 
 
-class DefinitionsMerger(object):
+class DefinitionsMerger():
   """Class for merging two `VcfHeaderDefinitions`s."""
 
   # For the same field definition, save at most `_MAX_NUM_FILE_NAMES` names.

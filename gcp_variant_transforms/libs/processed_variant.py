@@ -61,7 +61,7 @@ class _CounterEnum(enum.Enum):
   ALLELE_NUM_INCORRECT = 'allele_num_incorrect'
 
 
-class ProcessedVariant(object):
+class ProcessedVariant():
   """A wrapper around the ``Variant`` class with extra functionality.
 
   Given header file information, this can parse INFO fields that need to be
@@ -146,7 +146,7 @@ class ProcessedVariant(object):
     return self._alternate_datas
 
 
-class AlternateBaseData(object):
+class AlternateBaseData():
   """This is to keep all information for a single alternate-bases."""
 
   def __init__(self, alt_bases):
@@ -185,7 +185,7 @@ class AlternateBaseData(object):
     return self._annotation_field_names
 
 
-class ProcessedVariantFactory(object):
+class ProcessedVariantFactory():
   """Factory class for creating `ProcessedVariant` instances.
 
   This is the only right way for creating ProcessedVariants in production code.
@@ -392,7 +392,7 @@ class ProcessedVariantFactory(object):
     return field_value == _FIELD_COUNT_ALTERNATE_ALLELE
 
 
-class _AnnotationProcessor(object):
+class _AnnotationProcessor():
   """This is for handling all annotation related logic for variants."""
 
 

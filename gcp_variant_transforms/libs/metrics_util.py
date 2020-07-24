@@ -45,7 +45,7 @@ _METRICS_NAMESPACE = 'VT_metrics_namespace'
 _COUNTERS = 'counters'
 
 
-class CounterInterface(object):
+class CounterInterface():
   """The interface of counter objects"""
 
   def inc(self, n=1):
@@ -76,7 +76,7 @@ class _CounterWrapper(CounterInterface):
     self._counter.inc(n)
 
 
-class CounterFactoryInterface(object):
+class CounterFactoryInterface():
   """The interface for counter factories."""
 
   def create_counter(self, counter_name):

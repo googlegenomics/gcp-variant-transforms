@@ -61,14 +61,14 @@ _PADDING_CHARACTER = ' '
 _DELIMITER = '\t'
 
 
-class _InconsistencyType(object):
+class _InconsistencyType():
   """Inconsistency types that included in the report."""
   HEADER_CONFLICTS = 'Header Conflicts'
   INFERRED_HEADERS = 'Inferred Headers'
   MALFORMED_RECORDS = 'Malformed Records'
 
 
-class _HeaderLine(object):
+class _HeaderLine():
   """Header lines for each error type."""
   CONFLICTS_HEADER = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution'
   INFERRED_FIELD_HEADER = 'ID\tCategory\tProposed Resolution'
@@ -115,7 +115,7 @@ def _extract_conflicts(
     which maps `Definition` to a list of file names.
   """
   # len(v) > 1 means there are conflicting definitions for this field.
-  return dict([(k, v) for k, v in list(definitions.items()) if len(v) > 1])
+  return {k:v for k, v in list(definitions.items()) if len(v) > 1}
 
 
 def _append_conflicting_headers_to_report(

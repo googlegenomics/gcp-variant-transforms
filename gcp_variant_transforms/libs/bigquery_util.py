@@ -14,7 +14,6 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
-from concurrent.futures import TimeoutError
 import enum
 import logging
 import os
@@ -39,7 +38,7 @@ _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 BQ_NUM_RETRIES = 5
 
 
-class ColumnKeyConstants(object):
+class ColumnKeyConstants():
   """Constants for column names in the BigQuery schema."""
   REFERENCE_NAME = 'reference_name'
   START_POSITION = 'start_position'
@@ -56,7 +55,7 @@ class ColumnKeyConstants(object):
   CALLS_PHASESET = 'phaseset'
 
 
-class TableFieldConstants(object):
+class TableFieldConstants():
   """Constants for field modes/types in the BigQuery schema."""
   TYPE_STRING = 'STRING'
   TYPE_INTEGER = 'INTEGER'
@@ -68,7 +67,7 @@ class TableFieldConstants(object):
   MODE_REPEATED = 'REPEATED'
 
 
-class AvroConstants(object):
+class AvroConstants():
   """Constants that are relevant to Avro schema."""
   TYPE = 'type'
   NAME = 'name'
@@ -158,9 +157,8 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
     if e.status_code == 404:
       raise ValueError('Dataset %s:%s does not exist.' %
                        (project_id, dataset_id))
-    else:
-      # For the rest of the errors, use BigQuery error message.
-      raise
+    # For the rest of the errors, use BigQuery error message.
+    raise
 
 
 def table_exist(client, project_id, dataset_id, table_id):
@@ -195,17 +193,15 @@ def table_empty(project_id, dataset_id, table_id):
         time.sleep(90)
       else:
         raise e
+    if results.total_rows == 1:
+      break
+    logging.error('Query did not returned expected # of rows: %s', query)
+    if num_retries < BQ_NUM_RETRIES:
+      num_retries += 1
+      time.sleep(90)
     else:
-      if results.total_rows == 1:
-        break
-      else:
-        logging.error('Query did not returned expected # of rows: %s', query)
-        if num_retries < BQ_NUM_RETRIES:
-          num_retries += 1
-          time.sleep(90)
-        else:
-          raise ValueError('Expected 1 row in query result, got {}'.format(
-              results.total_rows))
+      raise ValueError('Expected 1 row in query result, got {}'.format(
+          results.total_rows))
 
   row = list(results)[0]
   col_names = list(row.keys())

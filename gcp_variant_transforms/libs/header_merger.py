@@ -20,7 +20,7 @@ from typing import Dict, Any  #pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver #pylint: disable=unused-import
 
-class HeaderMerger(object):
+class HeaderMerger():
   """Class for merging two :class:`VcfHeader`s."""
 
   def __init__(self, resolver):

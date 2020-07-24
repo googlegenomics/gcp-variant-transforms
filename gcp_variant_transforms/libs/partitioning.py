@@ -14,7 +14,6 @@
 
 """Utilities to create integer range partitioned BigQuery tables."""
 
-from concurrent.futures import TimeoutError
 import json
 import logging
 import math
@@ -56,7 +55,7 @@ _BQ_CREATE_PARTITIONED_TABLE_COMMAND = (
     '--clustering_fields=start_position,end_position '
     '{FULL_TABLE_ID} {SCHEMA_FILE_PATH}')
 
-class FlattenCallColumn(object):
+class FlattenCallColumn():
   """Flattens call column to convert variant opt tables to sample opt tables."""
 
   def __init__(self, base_table_id, suffixes, append):

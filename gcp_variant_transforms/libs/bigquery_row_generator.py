@@ -29,7 +29,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: d
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
 
-class BigQueryRowGenerator(object):
+class BigQueryRowGenerator():
   """Base abstract class for BigQuery row generator.
 
   The base class provides the common functionalities when generating BigQuery

@@ -44,7 +44,7 @@ RESERVED_VARIANT_CALL_COLUMNS = [
 ]
 
 
-class VariantGenerator(object):
+class VariantGenerator():
   """Class to generate variant from one BigQuery row."""
 
   def __init__(self, annotation_id_to_annotation_names=None):

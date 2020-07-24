@@ -23,7 +23,7 @@ from gcp_variant_transforms.libs import bigquery_util
 _MAX_NUM_CONCURRENT_AVRO_LOAD_JOBS = 4
 
 
-class LoadAvro(object):
+class LoadAvro():
   """Loads AVRO files from Cloud Storage to already created BigQuery tables."""
   def __init__(self,
                avro_root_path,  # type: str

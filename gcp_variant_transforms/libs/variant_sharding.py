@@ -52,7 +52,7 @@ _REGIONS = 'regions'
 _PARTITION_RANGE_END = 'partition_range_end'
 
 
-class _ChromosomeSharder(object):
+class _ChromosomeSharder():
   """Assigns shard indices to multiple regions inside a chromosome.
 
   This class logic is implemented using an interval tree, each region is
@@ -93,7 +93,7 @@ class _ChromosomeSharder(object):
     else:
       return _UNDEFINED_SHARD_INDEX
 
-class VariantSharding(object):
+class VariantSharding():
   """Sharding variants based on their reference_name [and position]."""
 
   def __init__(self, config_file_path=None):
