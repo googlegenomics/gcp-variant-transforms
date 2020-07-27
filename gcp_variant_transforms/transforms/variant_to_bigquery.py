@@ -14,7 +14,7 @@
 
 """A PTransform to output a PCollection of ``Variant`` records to BigQuery."""
 
-from __future__ import absolute_import
+
 
 import random
 from typing import Dict, List  # pylint: disable=unused-import

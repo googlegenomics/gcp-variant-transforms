@@ -22,7 +22,7 @@ This module is used to create 5 main signals that describe the supplied input:
   - file count: number of input files.
 """
 
-from __future__ import absolute_import
+
 
 import apache_beam as beam
 

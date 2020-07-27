@@ -21,7 +21,7 @@ To limit sink we generate a random dummy key and group by input elements (which
 are BigQuery rows) based on that key before writing them to output table.
 """
 
-from __future__ import absolute_import
+
 
 import random
 import apache_beam as beam

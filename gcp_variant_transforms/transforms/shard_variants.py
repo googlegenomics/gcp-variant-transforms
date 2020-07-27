@@ -14,7 +14,7 @@
 
 """A PTransform for sharding variants based on their reference_name."""
 
-from __future__ import absolute_import
+
 
 import apache_beam as beam
 from gcp_variant_transforms.beam_io import vcfio # pylint: disable=unused-import
