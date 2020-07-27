@@ -30,7 +30,7 @@ class BqToVcfTest(unittest.TestCase):
   """Test cases for the `bq_to_vcf` module."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+    return collections.namedtuple('MockArgs', list(args.keys()))(*list(args.values()))
 
   def test_write_vcf_data_header(self):
     lines = [

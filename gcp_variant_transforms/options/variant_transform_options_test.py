@@ -112,7 +112,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
         tableReference=bigquery.TableReference(projectId='project',
                                                datasetId='dataset',
                                                tableId='table__sample_info'))
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__sample_info already exists'):
       self._options.validate(args, client)
@@ -139,7 +139,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
     client = mock.Mock()
     client.tables.Get.side_effect = side_effect
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__chr01_part1 already exists'):
       self._options.validate(args, client)
@@ -153,7 +153,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client = mock.Mock()
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__sample_info does not exist'):
       self._options.validate(args, client)
@@ -181,7 +181,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
     client = mock.Mock()
     client.tables.Get.side_effect = side_effect
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__chr01_part1 does not exist'):
       self._options.validate(args, client)

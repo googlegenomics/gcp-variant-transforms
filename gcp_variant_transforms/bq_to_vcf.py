@@ -39,8 +39,8 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --runner DataflowRunner
 """
 
-from __future__ import absolute_import
-from __future__ import division
+
+
 
 import logging
 import sys
@@ -354,7 +354,7 @@ def _write_vcf_header_with_sample_names(sample_names,
     file_to_write.write('\n')
 
 
-def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
+def _get_file_path_and_sorted_variants(xxx_todo_changeme, file_path_prefix):
   # type: (Tuple[str, List], str) -> Iterable[Tuple[str, List]]
   """Returns the file path and the sorted variants.
 
@@ -366,7 +366,7 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
       pipeline. The files written will begin with this prefix, followed by the
       `file_name`.
   """
-  # pylint: disable=redefined-outer-name,reimported
+  (file_name, variants) = xxx_todo_changeme
   from apache_beam.io import filesystems
   file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
