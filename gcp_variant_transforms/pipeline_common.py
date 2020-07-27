@@ -95,17 +95,15 @@ def _get_all_patterns(input_pattern, input_file):
           raise ValueError(
               'Input pattern {} from {} did not match any files.'.format(
                   match.pattern, input_file))
-        else:
-          raise ValueError(
-              'Input pattern {} did not match any files.'.format(match.pattern))
-  except filesystem.BeamIOError:
+        raise ValueError(
+            'Input pattern {} did not match any files.'.format(match.pattern))
+  except filesystem.BeamIOError as e:
     if input_file:
       raise ValueError(
           'Some patterns in {} are invalid or inaccessible.'.format(
-              input_file))
-    else:
-      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
-          input_pattern))
+              input_file)) from e
+    raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+        input_pattern)) from e
   return patterns
 
 

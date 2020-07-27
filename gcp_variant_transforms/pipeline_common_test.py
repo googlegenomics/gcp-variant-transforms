@@ -35,7 +35,8 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
   """Tests cases for the `pipeline_common` script with pattern input."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', list(args.keys()))(*list(args.values()))
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
@@ -165,7 +166,8 @@ class PipelineCommonWithFileTest(unittest.TestCase):
 
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', list(args.keys()))(*list(args.values()))
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,

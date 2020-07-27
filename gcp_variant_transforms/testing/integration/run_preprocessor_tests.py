@@ -169,7 +169,7 @@ def main():
 
 
 if __name__ == '__main__':
-  print 'Starting preprocessor tests...'
+  print('Starting preprocessor tests...')
   ret_code = main()
-  print 'Finished all preprocessor tests successfully.'
+  print('Finished all preprocessor tests successfully.')
   sys.exit(ret_code)

@@ -126,11 +126,10 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
           tableId='table__sample_info')):
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
-      else:
-        return bigquery.Table(tableReference=bigquery.TableReference(
-            projectId='project',
-            datasetId='dataset',
-            tableId='table__chr1_part1'))
+      return bigquery.Table(tableReference=bigquery.TableReference(
+          projectId='project',
+          datasetId='dataset',
+          tableId='table__chr1_part1'))
     args = self._make_args(
         ['--append', 'False', '--output_table', 'project:dataset.table',
          '--sharding_config_path',

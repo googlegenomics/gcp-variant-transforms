@@ -27,7 +27,8 @@ class VcfToBqTest(unittest.TestCase):
   """Tests cases for the ``vcf_to_bq`` script."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', list(args.keys()))(*list(args.values()))
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def test_no_merge_strategy(self):
     args = self._create_mock_args(
