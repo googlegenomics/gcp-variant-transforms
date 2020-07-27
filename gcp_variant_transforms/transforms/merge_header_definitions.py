@@ -29,7 +29,7 @@ class _MergeDefinitionsFn(beam.CombineFn):
 
   def __init__(self, definitions_merger):
     # type: (vcf_header_definitions_merger.DefinitionsMerger) -> None
-    super(_MergeDefinitionsFn, self).__init__()
+    super().__init__()
     self._definitions_merger = definitions_merger
 
   def create_accumulator(self):
@@ -66,7 +66,7 @@ class MergeDefinitions(beam.PTransform):
 
   def __init__(self):
     """Initializes `MergeDefinitions` object."""
-    super(MergeDefinitions, self).__init__()
+    super().__init__()
     self._definitions_merger = vcf_header_definitions_merger.DefinitionsMerger()
 
   def expand(self, pcoll):

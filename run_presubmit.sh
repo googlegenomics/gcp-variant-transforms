@@ -30,6 +30,8 @@ coverage run --source=gcp_variant_transforms setup.py test -s \
   gcp_variant_transforms.beam_io
 coverage run --source=gcp_variant_transforms setup.py test -s \
   gcp_variant_transforms.libs
+coverage run --source=gcp_variant_transforms setup.py test -s \
+  gcp_variant_transforms.transforms
 
 echo ========== Running pylint.
 if [[ -z `which pylint` ]];then
@@ -42,3 +44,4 @@ fi
 python -m pylint setup.py
 python -m pylint gcp_variant_transforms/beam_io
 python -m pylint gcp_variant_transforms/libs
+python -m pylint gcp_variant_transforms/transforms

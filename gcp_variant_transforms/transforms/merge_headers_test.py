@@ -87,8 +87,10 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS', 'AF', 'NS2'])
-    self.assertCountEqual(list(merged_headers.formats.keys()), ['GT', 'GQ', 'GQ2'])
+    self.assertCountEqual(list(merged_headers.infos.keys()),
+                          ['NS', 'AF', 'NS2'])
+    self.assertCountEqual(list(merged_headers.formats.keys()),
+                          ['GT', 'GQ', 'GQ2'])
 
   def test_combine_multiple_headers_as_accumulators(self):
     headers_1 = self._get_header_from_lines(FILE_1_LINES)
@@ -104,8 +106,10 @@ class MergeHeadersTest(unittest.TestCase):
                                                      merged_headers_2])
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS', 'AF', 'NS2'])
-    self.assertCountEqual(list(merged_headers.formats.keys()), ['GT', 'GQ', 'GQ2'])
+    self.assertCountEqual(list(merged_headers.infos.keys()),
+                          ['NS', 'AF', 'NS2'])
+    self.assertCountEqual(list(merged_headers.formats.keys()),
+                          ['GT', 'GQ', 'GQ2'])
 
   def test_combine_two_type_conflicting_but_resolvable_headers(self):
     # These two headers have type conflict (Integer vs Float), however pipeline

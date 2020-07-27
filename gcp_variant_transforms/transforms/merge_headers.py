@@ -29,7 +29,7 @@ class _MergeHeadersFn(beam.CombineFn):
 
   def __init__(self, merger):
     # type: (HeaderMerger) -> None
-    super(_MergeHeadersFn, self).__init__()
+    super().__init__()
     self._header_merger = merger
 
   def create_accumulator(self):
@@ -73,7 +73,7 @@ class MergeHeaders(beam.PTransform):
       allow_incompatible_records: If true, header definition with type mismatch
         (e.g., string vs float) are always resolved.
     """
-    super(MergeHeaders, self).__init__()
+    super().__init__()
     # Resolver makes extra efforts to resolve conflict in header definitions
     # when flag allow_incompatible_records is set. For example, it resolves
     # type conflict of string and float into string.
