@@ -348,10 +348,10 @@ def _write_vcf_header_with_sample_names(sample_names,
   metadata_header_lines = vcf_header_parser.get_metadata_header_lines(
       representative_header_file)
   with filesystems.FileSystems.create(file_path) as file_to_write:
-    file_to_write.write(''.join(metadata_header_lines))
+    file_to_write.write(''.join(metadata_header_lines).encode('utf-8'))
     file_to_write.write(
-        str('\t'.join(vcf_fixed_columns + sample_names)))
-    file_to_write.write('\n')
+        str('\t'.join(vcf_fixed_columns + sample_names)).encode('utf-8'))
+    file_to_write.write(b'\n')
 
 
 def _get_file_path_and_sorted_variants(xxx_todo_changeme, file_path_prefix):

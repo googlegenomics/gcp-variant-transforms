@@ -58,7 +58,7 @@ class BqToVcfTest(unittest.TestCase):
           '#CHROM\tPOS\tID\tREF\tALT\tSample 1\tSample 2\n'
       ]
       with filesystems.FileSystems.open(file_path) as f:
-        content = f.readlines()
+        content = [b.decode('utf-8') for b in f.readlines()]
         self.assertEqual(content, expected_content)
 
   def test_get_variant_query_no_region(self):
