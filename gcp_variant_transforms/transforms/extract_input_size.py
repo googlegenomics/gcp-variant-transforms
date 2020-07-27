@@ -86,8 +86,9 @@ def print_estimates_to_file(variant_count,
                             file_count,
                             file_path):
   with filesystems.FileSystems.create(file_path) as file_to_write:
-    file_to_write.write('{}\n{}\n{}\n{}\n{}\n'.format(int(variant_count),
-                                                      sample_count,
-                                                      int(value_count),
-                                                      files_size,
-                                                      file_count))
+    file_to_write.write(('{}\n{}\n{}\n{}\n{}\n'.format(
+        int(variant_count),
+        sample_count,
+        int(value_count),
+        files_size,
+        file_count)).encode('utf-8'))

@@ -38,7 +38,7 @@ class ConvertSampleInfoToRow(beam.DoFn):
     self._sample_name_encoding = sample_name_encoding
 
   def _get_now_to_minute(self):
-    return int(time.time()) / _SECS_IN_MIN * _SECS_IN_MIN * _MICROS_IN_SEC
+    return int(time.time()) // _SECS_IN_MIN * _SECS_IN_MIN * _MICROS_IN_SEC
 
   def process(self, vcf_header):
     # type: (vcf_header_io.VcfHeader, bool) -> Dict[str, Union[int, str]]
