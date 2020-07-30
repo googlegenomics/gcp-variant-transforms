@@ -183,15 +183,15 @@ class FieldSanitizer(object):
       return input_float
 
   def _get_sanitized_string(self, input_str):
-    # type: (str) -> unicode
+    # type: (Any) -> str
     """Returns a unicode as BigQuery API does not support UTF-8 strings."""
     return _decode_utf8_string(input_str)
 
 
 def _decode_utf8_string(input_str):
-  # type: (str) -> unicode
+  # type: (Any) -> str
   try:
-    return (input_str if isinstance(input_str, unicode)
+    return (input_str if isinstance(input_str, str)
             else input_str.decode('utf-8'))
   except UnicodeDecodeError:
     raise ValueError('input_str is not UTF-8: %s ' % (input_str))

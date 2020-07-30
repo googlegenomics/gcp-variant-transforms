@@ -18,7 +18,6 @@ The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
 
-
 from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
 
@@ -65,7 +64,7 @@ class _ToVcfRecordCoder(coders.Coder):
     self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
   def encode(self, variant):
-    # type: (Variant) -> str
+    # type: (Variant) -> bytes
     """Converts a :class:`Variant` object back to a VCF line."""
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
@@ -112,7 +111,7 @@ class _ToVcfRecordCoder(coders.Coder):
         and start_0_based + len(variant.reference_bases) != variant.end):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
-    for k, v in list(variant.info.items()):
+    for k, v in variant.info.items():
       if v is True:
         encoded_infos.append(k)
       else:
@@ -280,10 +279,10 @@ class ReadFromBGZF(beam.PTransform):
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
 
-  def _read_records(self, xxx_todo_changeme):
+  def _read_records(self, file_path_and_block_tuple):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
-    (file_path, block) = xxx_todo_changeme
+    (file_path, block) = file_path_and_block_tuple
     record_iterator = vcf_parser.PySamParser(
         file_path,
         block,
@@ -509,9 +508,9 @@ class _WriteVcfDataLinesFn(beam.DoFn):
     """
     self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
-  def process(self, xxx_todo_changeme1, *args, **kwargs):
+  def process(self, file_path_and_variants_tuple, *args, **kwargs):
     # type: (Tuple[str, List[Variant]]) -> None
-    (file_path, variants) = xxx_todo_changeme1
+    (file_path, variants) = file_path_and_variants_tuple
     with filesystems.FileSystems.create(file_path) as file_to_write:
       for variant in variants:
         file_to_write.write(self._coder.encode(variant))

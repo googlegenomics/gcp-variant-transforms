@@ -16,7 +16,6 @@
 """Tests for vcfio module."""
 
 
-
 import glob
 import gzip
 import logging

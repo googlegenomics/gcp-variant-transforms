@@ -15,7 +15,6 @@
 """Tests for vcf_parser module."""
 
 
-
 import logging
 import unittest
 from itertools import permutations
