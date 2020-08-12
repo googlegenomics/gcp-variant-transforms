@@ -57,6 +57,11 @@ Run the script below and replace the following parameters:
   * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
   to process your data, for example: `us-west1`. For more information please refer to
   [Setting Regions](docs/setting_region.md).
+  * `GOOGLE_CLOUD_LOCATION`: You must choose a geographic location for Cloud Life
+  Sciences API to orchestrate job from. This is not where the data will be processed,
+  but where some operation metadata will be. This can be the same or different from
+  the region chosen for Cloud Dataflow. See the list of
+  [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations)
   * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
@@ -74,6 +79,7 @@ Run the script below and replace the following parameters:
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
 GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+GOOGLE_CLOUD_LOCATION=GOOGLE_CLOUD_LOCATION
 TEMP_LOCATION=gs://BUCKET/temp
 INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
@@ -87,11 +93,12 @@ COMMAND="vcf_to_bq \
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --location "${GOOGLE_CLOUD_LOCATION}" \
   --region "${GOOGLE_CLOUD_REGION}" \
   --temp_location "${TEMP_LOCATION}" \
   "${COMMAND}"
 ```
-`--project`, `--region`, and `--temp_location` are required inputs. You must set all of them, unless your project and region default values
+`--project`, `--location`, `--region`, and `--temp_location` are required inputs. You must set all of them, unless your project and region default values
 are set in your local `gcloud` configuration. You may set the default project
 and region using the following commands:
 ```bash
