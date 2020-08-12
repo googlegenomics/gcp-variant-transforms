@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips:,service_account: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips:,service_account:,location: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -31,6 +31,10 @@ function parse_args {
 
       --region)
         region="$2"
+        ;;
+
+      --location)
+        location="$2"
         ;;
 
       --temp_location)
@@ -73,6 +77,7 @@ function main {
   region="${region:-$(gcloud config get-value compute/region)}"
   vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms}"
 
+  location="${location:-}"
   temp_location="${temp_location:-}"
   subnetwork="${subnetwork:-}"
   use_public_ips="${use_public_ips:-}"
@@ -125,7 +130,15 @@ function main {
     df_optional_args="${df_optional_args} --service_account_email ${service_account}"
   fi
 
-  pipelines --project "${google_cloud_project}" run \
+  # Optional location for Life Sciences API (default us-central1), see currently available
+  # locations here: https://cloud.google.com/life-sciences/docs/concepts/locations
+  l_s_location=""
+  if [[ ! -z "${location}" ]]; then
+    echo "Adding --location ${location} to Life Sciences API invocation command."
+    l_s_location="--location ${location}"
+  fi
+
+  pipelines --project "${google_cloud_project}" ${l_s_location} run \
     --command "/opt/gcp_variant_transforms/bin/${command} ${df_required_args} ${df_optional_args}" \
     --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
     --wait \
@@ -135,7 +148,8 @@ function main {
     --machine-type "g1-small" \
     --pvm-attempts 0 \
     --attempts 1 \
-    --disk-size 10 ${pt_optional_args}
+    --disk-size 10 \
+    ${pt_optional_args}
 }
 
 main "$@"
