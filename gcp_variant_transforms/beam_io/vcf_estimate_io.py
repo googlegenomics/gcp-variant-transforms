@@ -15,7 +15,7 @@
 
 """A source for reading VCF files and extracting signals about input size."""
 
-from __future__ import absolute_import
+
 
 from functools import partial
 from typing import Dict, Iterable  # pylint: disable=unused-import
@@ -28,7 +28,7 @@ from apache_beam.io import iobase
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 
 
-class VcfEstimate(object):
+class VcfEstimate():
   """Container for estimation data about the VCF file."""
 
   def __init__(self,
@@ -84,13 +84,13 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
     # type: (str, str) -> (int, str)
     """Returns the header size and sample names."""
     header_size = 0
-    header_line = file_to_read.readline()
+    header_line = file_to_read.readline().decode('utf-8')
     # Read and skip all header lines starting with ##. Make sure to calculate
     # their total size, to marginally better approximate the line count.
     while (header_line.startswith('##') or not header_line or
            not header_line.strip()):
       header_size += len(header_line)
-      header_line = file_to_read.readline()
+      header_line = file_to_read.readline().decode('utf-8')
     if not header_line.startswith('#'):
       raise ValueError(('No column-defining header line was found in file {}.'
                         .format(file_name)))

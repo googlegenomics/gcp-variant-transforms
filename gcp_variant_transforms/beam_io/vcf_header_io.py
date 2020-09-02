@@ -14,7 +14,7 @@
 
 """A source for reading VCF file headers."""
 
-from __future__ import absolute_import
+
 
 import collections
 from functools import partial
@@ -44,7 +44,7 @@ HEADER_SPECIAL_NUMBERS = [vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
 FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 
-class VcfHeaderFieldTypeConstants(object):
+class VcfHeaderFieldTypeConstants():
   """Constants for types from VCF header."""
   FLOAT = 'Float'
   INTEGER = 'Integer'
@@ -53,7 +53,7 @@ class VcfHeaderFieldTypeConstants(object):
   CHARACTER = 'Character'
 
 
-class VcfParserHeaderKeyConstants(object):
+class VcfParserHeaderKeyConstants():
   """Constants for header fields from the parser."""
   ID = 'id'
   NUM = 'num'
@@ -64,7 +64,7 @@ class VcfParserHeaderKeyConstants(object):
   LENGTH = 'length'
 
 
-class PysamHeaderKeyConstants(object):
+class PysamHeaderKeyConstants():
   """Constants for header fields from the parser."""
   NUM = 'Number'
   TYPE = 'Type'
@@ -104,7 +104,7 @@ def CreateFormatField(info_id, number, info_type, description=''):
 VariantHeaderMetadataMock = collections.namedtuple(
     'VariantHeaderMetadata', ['id', 'record'])
 
-class VcfHeader(object):
+class VcfHeader():
   """Container for header data."""
 
   def __init__(self,
@@ -257,7 +257,7 @@ class VcfHeader(object):
   def _verify_header(self, fields, is_format):
     # type: (Dict[str, VariantHeaderMetadata], bool) -> None
     """Verifies the integrity of INFO and FORMAT fields"""
-    for header_id, field in fields.iteritems():
+    for header_id, field in fields.items():
       # ID, Description, Type and Number are mandatory fields.
       if not header_id:
         raise ValueError('Corrupt ID at header line {}.'.format(field.id))
@@ -271,8 +271,8 @@ class VcfHeader(object):
       # Number can only be a number or one of 'A', 'R', 'G' and '.'.
       if PysamHeaderKeyConstants.NUM not in field.record:
         raise ValueError('No number for header line {}.'.format(field.id))
-      elif (field.record[PysamHeaderKeyConstants.NUM] not in
-            HEADER_SPECIAL_NUMBERS):
+      if (field.record[PysamHeaderKeyConstants.NUM] not in
+          HEADER_SPECIAL_NUMBERS):
         try:
           int(field.record[PysamHeaderKeyConstants.NUM])
         except ValueError:
@@ -334,9 +334,9 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
     with self.open_file(file_path) as file_to_read:
       record = None
       while True:
-        record = file_to_read.readline()
+        record = file_to_read.readline().decode('utf-8')
         while record and not record.strip():  # Skip empty lines.
-          record = file_to_read.readline()
+          record = file_to_read.readline().decode('utf-8')
         if record and record.startswith('#'):
           yield record.strip()
         else:
@@ -438,7 +438,7 @@ class ReadAllVcfHeaders(PTransform):
     return pvalue | 'ReadAllFiles' >> self._read_all_files
 
 
-class HeaderTypeConstants(object):
+class HeaderTypeConstants():
   INFO = 'INFO'
   FILTER = 'FILTER'
   ALT = 'ALT'
@@ -446,7 +446,7 @@ class HeaderTypeConstants(object):
   CONTIG = 'contig'
 
 
-class _HeaderFieldKeyConstants(object):
+class _HeaderFieldKeyConstants():
   ID = 'ID'
   NUMBER = 'Number'
   TYPE = 'Type'
@@ -460,7 +460,7 @@ class WriteVcfHeaderFn(beam.DoFn):
   """A DoFn for writing VCF headers to a file."""
 
   HEADER_TEMPLATE = '##{}=<{}>\n'
-  FINAL_HEADER_LINE = '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
+  FINAL_HEADER_LINE = b'#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT\n'
 
   def __init__(self, file_path):
     # type: (str) -> None
@@ -471,7 +471,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     # type: (VcfHeader, str) -> None
     with FileSystems.create(self._file_path) as self._file_to_write:
       if vcf_version_line:
-        self._file_to_write.write(vcf_version_line)
+        self._file_to_write.write(vcf_version_line.encode('utf-8'))
       self._write_headers_by_type(HeaderTypeConstants.INFO, header.infos)
       self._write_headers_by_type(HeaderTypeConstants.FILTER, header.filters)
       self._write_headers_by_type(HeaderTypeConstants.ALT, header.alts)
@@ -490,7 +490,7 @@ class WriteVcfHeaderFn(beam.DoFn):
     """
     for header in headers.values():
       self._file_to_write.write(
-          self._to_vcf_header_line(header_type, header))
+          self._to_vcf_header_line(header_type, header).encode('utf-8'))
 
   def _to_vcf_header_line(self, header_type, header):
     # type: (str, Dict[str, Union[str, int]]) -> str
@@ -519,13 +519,13 @@ class WriteVcfHeaderFn(beam.DoFn):
       A formatted string composed of header keys and values.
     """
     formatted_values = []
-    for key, value in header.iteritems():
+    for key, value in header.items():
       if self._should_include_key_value(key, value):
         formatted_values.append(self._format_header_key_value(key, value))
     return ','.join(formatted_values)
 
   def _should_include_key_value(self, key, value):
-    return value is not None or (key != 'source' and key != 'version')
+    return value is not None or (key not in ('source', 'version'))
 
   def _format_header_key_value(self, key, value):
     # type: (str, Union[str, int]) -> str
@@ -544,9 +544,9 @@ class WriteVcfHeaderFn(beam.DoFn):
       value = vcfio.MISSING_FIELD_VALUE
     elif key == _HeaderFieldKeyConstants.NUMBER:
       value = self._format_number(value)
-    elif (key == _HeaderFieldKeyConstants.DESCRIPTION
-          or key == _HeaderFieldKeyConstants.SOURCE
-          or key == _HeaderFieldKeyConstants.VERSION):
+    elif (key in (_HeaderFieldKeyConstants.DESCRIPTION,
+                  _HeaderFieldKeyConstants.SOURCE,
+                  _HeaderFieldKeyConstants.VERSION)):
       value = self._format_string_value(value)
     return '{}={}'.format(key, value)
 
@@ -589,9 +589,9 @@ class WriteVcfHeaderFn(beam.DoFn):
       raise ValueError('Invalid value for number: {}'.format(number))
 
   def _format_string_value(self, value):
-    # type: (str, unicode) -> str
-    if isinstance(value, unicode):
-      return '"{}"'.format(value.encode('utf-8'))
+    # type: (str, bytes) -> str
+    if isinstance(value, bytes):
+      return '"{}"'.format(value.decode('utf-8'))
     return '"{}"'.format(value)
 
 
