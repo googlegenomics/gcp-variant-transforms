@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import unittest
 
 from apache_beam.io import filesystem
@@ -63,7 +62,7 @@ class VepRunnerUtilTest(unittest.TestCase):
                      len(_INPUT_FILES_WITH_SIZE))
     merged_dict = {}
     for actions_list in worker_actions_list:
-      for k, v in list(actions_list.io_map.items()):
+      for k, v in actions_list.io_map.items():
         merged_dict[k] = v
     self.assertDictEqual(
         merged_dict,

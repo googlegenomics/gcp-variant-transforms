@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-
-
 import logging
 import math
 import re

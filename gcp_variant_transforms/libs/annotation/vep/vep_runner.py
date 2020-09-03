@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import argparse  # pylint: disable=unused-import
 import logging
 import time
@@ -391,7 +390,7 @@ class VepRunner():
     api_request[_API_PIPELINE]['resources'][
         'virtualMachine']['disks'][0]['sizeGb'] = (
             size_gb + _MINIMUM_DISK_SIZE_GB)
-    for input_file, output_file in list(io_infos.io_map.items()):
+    for input_file, output_file in io_infos.io_map.items():
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(

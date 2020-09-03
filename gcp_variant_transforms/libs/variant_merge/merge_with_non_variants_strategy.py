@@ -15,7 +15,6 @@
 """Variant merge stategy that can handle both Variants and Non-variants."""
 
 
-
 import collections
 import copy
 from typing import Iterable, Set  # pylint: disable=unused-import
@@ -96,7 +95,8 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
           group_key = next(self._move_to_calls.get_merge_keys(v))
         except StopIteration:
           continue
-        grouped_variants[group_key].append(v)
+        else:
+          grouped_variants[group_key].append(v)
 
     non_variants = self._merge_non_variants(non_variant_tree)
     variants = self._merge_variants(grouped_variants)
@@ -113,9 +113,10 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
           non_variant = next(iter(non_variant_interval)).data
         except StopIteration:
           continue
-        v.calls.extend(non_variant.calls)
-        v.calls = sorted(v.calls)
-        self._update_splits(splits, v)
+        else:
+          v.calls.extend(non_variant.calls)
+          v.calls = sorted(v.calls)
+          self._update_splits(splits, v)
       yield v
 
     for non_variant in self._split_non_variants(non_variant_tree, splits):
@@ -143,9 +144,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
             non_variant.quality is not None):
           merged_non_variant.quality = min(merged_non_variant.quality,
                                            non_variant.quality)
-        elif merged_non_variant.quality is not None:
-          merged_non_variant.quality = merged_non_variant.quality
-        else:
+        elif merged_non_variant.quality is None:
           merged_non_variant.quality = non_variant.quality
         merged_non_variant.calls.extend(non_variant.calls)
 
@@ -159,7 +158,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
   def _merge_variants(self, grouped_variants):
     merged_variants = []
-    for merge_key, variants in list(grouped_variants.items()):
+    for merge_key, variants in grouped_variants.items():
       merged_variants.extend(
           self._move_to_calls.get_merged_variants(variants, merge_key))
     return merged_variants

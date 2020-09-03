@@ -19,7 +19,6 @@ through unit-testing of processed_variant module.
 """
 
 
-
 import unittest
 
 from gcp_variant_transforms.libs.annotation import annotation_parser
