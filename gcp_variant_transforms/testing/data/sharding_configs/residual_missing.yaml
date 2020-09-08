@@ -1,0 +1,20 @@
+-  output_table:
+     table_name_suffix: "chr01_part1"
+     regions:
+       - "chr1:0-1,000,000"
+     partition_range_end: 1,000,000
+-  output_table:
+     table_name_suffix: "chr01_part2"
+     regions:
+       - "chr1:1,000,000-2,000,000"
+     partition_range_end: 2,000,000
+-  output_table:
+     table_name_suffix: "chrom02"
+     regions:
+       - "chr2"
+     partition_range_end: 243,189,284
+-  output_table:
+     table_name_suffix: "chr3_02"
+     regions:
+       - "3:500,000-1,000,000"
+     partition_range_end: 1,000,000

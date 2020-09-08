@@ -16,10 +16,11 @@
 
 from __future__ import absolute_import
 
-from collections import OrderedDict
+import collections
 from functools import partial
-from typing import Dict, Iterable  # pylint: disable=unused-import
-import vcf
+from typing import Dict, Iterable, List  # pylint: disable=unused-import
+from pysam import libcbcf
+
 
 import apache_beam as beam
 from apache_beam.io import filebasedsource
@@ -29,7 +30,18 @@ from apache_beam.io.filesystems import FileSystems
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
+from gcp_variant_transforms.beam_io import bgzf
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_parser
+
+LAST_HEADER_LINE_PREFIX = vcf_parser.LAST_HEADER_LINE_PREFIX
+FORMAT_TYPES = ['Integer', 'Float', 'Character', 'String', '.']
+INFO_TYPES = FORMAT_TYPES + ['Flag']
+HEADER_SPECIAL_NUMBERS = [vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE,
+                          vcf_parser.FIELD_COUNT_ALL_ALLELE,
+                          vcf_parser.FIELD_COUNT_GENOTYPE,
+                          vcf_parser.MISSING_FIELD_VALUE]
+FILE_FORMAT_HEADER_TEMPLATE = '##fileformat=VCFv{VERSION}'
 
 
 class VcfHeaderFieldTypeConstants(object):
@@ -42,7 +54,7 @@ class VcfHeaderFieldTypeConstants(object):
 
 
 class VcfParserHeaderKeyConstants(object):
-  """Constants for header fields from the parser (currently PyVCF)."""
+  """Constants for header fields from the parser."""
   ID = 'id'
   NUM = 'num'
   TYPE = 'type'
@@ -52,16 +64,57 @@ class VcfParserHeaderKeyConstants(object):
   LENGTH = 'length'
 
 
+class PysamHeaderKeyConstants(object):
+  """Constants for header fields from the parser."""
+  NUM = 'Number'
+  TYPE = 'Type'
+  DESC = 'Description'
+  SOURCE = 'Source'
+  VERSION = 'Version'
+
+def CreateInfoField(info_id,
+                    number,
+                    info_type,
+                    description='',
+                    source=None,
+                    version=None):
+  # type: (str, Any, str, str, str, str) -> VariantHeaderMetadata
+  """Creates mock PySam INFO object."""
+  return VariantHeaderMetadataMock(
+      info_id,
+      {
+          PysamHeaderKeyConstants.TYPE: info_type,
+          PysamHeaderKeyConstants.NUM: str(number),
+          PysamHeaderKeyConstants.DESC: description,
+          PysamHeaderKeyConstants.SOURCE: None if source is None
+                                          else str(source),
+          PysamHeaderKeyConstants.VERSION: None if version is None
+                                           else str(version)
+      })
+
+def CreateFormatField(info_id, number, info_type, description=''):
+  # type: (str, Any, str, str) -> VariantHeaderMetadata
+  """Creates mock PySam FORMAT object."""
+  return VariantHeaderMetadataMock(info_id,
+                                   {PysamHeaderKeyConstants.NUM: str(number),
+                                    PysamHeaderKeyConstants.TYPE: info_type,
+                                    PysamHeaderKeyConstants.DESC: description})
+
+# Mock of PySam VariantHeaderMetadata field
+VariantHeaderMetadataMock = collections.namedtuple(
+    'VariantHeaderMetadata', ['id', 'record'])
+
 class VcfHeader(object):
   """Container for header data."""
 
   def __init__(self,
-               infos=None,  # type: OrderedDict[str, vcf.parser._Info]
-               filters=None,  # type: OrderedDict[str, vcf.parser._Filter]
-               alts=None,  # type: OrderedDict[str, vcf.parser._Alt]
-               formats=None,  # type: OrderedDict[str, vcf.parser._Format]
-               contigs=None,  # type: OrderedDict[str, vcf.parser._Contig]
-               file_name=None  # type: str
+               infos=None,  # type: libcbcf.VariantHeaderMetadata
+               filters=None,  # type: libcbcf.VariantHeaderMetadata
+               alts=None,  # type: Dict[str, libcbcf.VariantHeaderRecord]
+               formats=None,  # type: libcbcf.VariantHeaderMetadata
+               contigs=None,  # type: libcbcf.VariantHeaderContigs
+               samples=None,  # type: str
+               file_path=None  # type: str
               ):
     # type: (...) -> None
     """Initializes a VcfHeader object.
@@ -76,15 +129,16 @@ class VcfHeader(object):
       alts: A dictionary mapping alt keys to vcf alt metadata values.
       formats: A dictionary mapping format keys to vcf format metadata values.
       contigs: A dictionary mapping contig keys to vcf contig metadata values.
-      file_name: The file name of the vcf file.
+      samples: A list of sample names.
+      file_path: The full file path of the vcf file.
     """
-    # type: OrderedDict[str, OrderedDict]
-    self.infos = self._values_asdict(infos or {})
-    self.filters = self._values_asdict(filters or {})
-    self.alts = self._values_asdict(alts or {})
-    self.formats = self._values_asdict(formats or {})
-    self.contigs = self._values_asdict(contigs or {})
-    self.file_name = file_name
+    self.infos = self._get_infos(infos or {})
+    self.filters = self._get_filters(filters or {})
+    self.alts = self._get_alts(alts or {})
+    self.formats = self._get_formats(formats or {})
+    self.contigs = self._get_contigs(contigs or {})
+    self.samples = self._get_samples(samples or '')
+    self.file_path = file_path
 
   def __eq__(self, other):
     return (self.infos == other.infos and
@@ -99,23 +153,134 @@ class VcfHeader(object):
                                                  self.alts,
                                                  self.formats,
                                                  self.contigs]])
+  def _get_infos(self,
+                 infos  # type: Dict[str, VariantHeaderMetadata]
+                ):
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
+    self._verify_header(infos, is_format=False)
+    results = collections.OrderedDict()
+    for info_id, field in infos.items():
+      result = collections.OrderedDict()
+      result[VcfParserHeaderKeyConstants.ID] = info_id
+      result[VcfParserHeaderKeyConstants.NUM] = (
+          field.record[PysamHeaderKeyConstants.NUM] if
+          field.record[PysamHeaderKeyConstants.NUM] in HEADER_SPECIAL_NUMBERS
+          else int(field.record[PysamHeaderKeyConstants.NUM]))
+      result[VcfParserHeaderKeyConstants.TYPE] = (
+          field.record[PysamHeaderKeyConstants.TYPE])
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
+      # Pysam doesn't return these fields in info
+      result[VcfParserHeaderKeyConstants.SOURCE] = (
+          field.record[PysamHeaderKeyConstants.SOURCE].strip("\"")
+          if PysamHeaderKeyConstants.SOURCE in field.record and
+          field.record[PysamHeaderKeyConstants.SOURCE] is not None else None)
+      result[VcfParserHeaderKeyConstants.VERSION] = (
+          field.record[PysamHeaderKeyConstants.VERSION].strip("\"")
+          if PysamHeaderKeyConstants.VERSION in field.record and
+          field.record[PysamHeaderKeyConstants.VERSION] is not None else None)
+      results[info_id] = result
+    return results
 
-  def _values_asdict(self, header):
-    """Converts PyVCF header values to ordered dictionaries."""
-    ordered_dict = OrderedDict()
-    for key in header:
-      # These methods were not designed to be protected. They start with an
-      # underscore to avoid conflicts with field names. For more info, see
-      # https://docs.python.org/2/library/collections.html#collections.namedtuple
-      ordered_dict[key] = header[key]._asdict()  # pylint: disable=W0212
-    return ordered_dict
+  def _get_filters(self,
+                   filters  # type: Dict[str, VariantHeaderMetadata]
+                  ):
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
+    results = collections.OrderedDict()
+    for filter_id, field in filters.items():
+      result = collections.OrderedDict()
+      result[VcfParserHeaderKeyConstants.ID] = filter_id
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
+      results[filter_id] = result
+    # PySAM adds default PASS value to its filters
+    if 'PASS' in results:
+      del results['PASS']
+    return results
+
+  def _get_alts(self,
+                alts  # type: Dict[str, VariantHeaderMetadata]
+               ):
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
+    results = collections.OrderedDict()
+    for alt_id, field in alts.items():
+      result = collections.OrderedDict()
+      result[VcfParserHeaderKeyConstants.ID] = alt_id
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field[PysamHeaderKeyConstants.DESC].strip("\""))
+      results[alt_id] = result
+    return results
+
+  def _get_formats(self,
+                   formats  # type: Dict[str, VariantHeaderMetadata]
+                  ):
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
+    self._verify_header(formats, is_format=True)
+    results = collections.OrderedDict()
+    for format_id, field in formats.items():
+      result = collections.OrderedDict()
+      result[VcfParserHeaderKeyConstants.ID] = format_id
+      result[VcfParserHeaderKeyConstants.NUM] = (
+          field.record[PysamHeaderKeyConstants.NUM] if
+          field.record[PysamHeaderKeyConstants.NUM] in HEADER_SPECIAL_NUMBERS
+          else int(field.record[PysamHeaderKeyConstants.NUM]))
+      result[VcfParserHeaderKeyConstants.TYPE] = (
+          field.record[PysamHeaderKeyConstants.TYPE])
+      result[VcfParserHeaderKeyConstants.DESC] = (
+          field.record[PysamHeaderKeyConstants.DESC].strip("\""))
+      results[format_id] = result
+    return results
+
+  def _get_contigs(self,
+                   contigs  # type: Dict[str, VariantHeaderMetadata]
+                  ):
+    # type: (...) -> OrderedDict[str, OrderedDict[str, Any]]
+    results = collections.OrderedDict()
+    for contig_id, field in contigs.items():
+      result = collections.OrderedDict()
+      result[VcfParserHeaderKeyConstants.ID] = contig_id
+      result[VcfParserHeaderKeyConstants.LENGTH] = field.length
+      results[contig_id] = result
+    return results
+
+  def _get_samples(self, sample_line):
+    # type: (str) -> List[str]
+    sample_tags = sample_line.split('\t')
+    # CHROM... line has 8 const fields. If samples are present, they are listed
+    # after 9th field - FORMAT.
+    default_items_num = len(LAST_HEADER_LINE_PREFIX.split('\t')) + 1
+    if len(sample_tags) > default_items_num:
+      return sample_tags[default_items_num:]
+    else:
+      return []
+
+  def _verify_header(self, fields, is_format):
+    # type: (Dict[str, VariantHeaderMetadata], bool) -> None
+    """Verifies the integrity of INFO and FORMAT fields"""
+    for header_id, field in fields.iteritems():
+      # ID, Description, Type and Number are mandatory fields.
+      if not header_id:
+        raise ValueError('Corrupt ID at header line {}.'.format(field.id))
+      if 'Description' not in field.record:
+        raise ValueError(
+            'Corrupt Description at header line {}.'.format(field.id))
+      accepted_types = FORMAT_TYPES if is_format else INFO_TYPES
+      if (PysamHeaderKeyConstants.TYPE not in field.record or
+          (field.record[PysamHeaderKeyConstants.TYPE] not in accepted_types)):
+        raise ValueError('Corrupt Type at header line {}'.format(field.id))
+      # Number can only be a number or one of 'A', 'R', 'G' and '.'.
+      if PysamHeaderKeyConstants.NUM not in field.record:
+        raise ValueError('No number for header line {}.'.format(field.id))
+      elif (field.record[PysamHeaderKeyConstants.NUM] not in
+            HEADER_SPECIAL_NUMBERS):
+        try:
+          int(field.record[PysamHeaderKeyConstants.NUM])
+        except ValueError:
+          raise ValueError('Unknown Number at header line {}.'.format(field.id))
 
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
-  """A source for reading VCF file headers.
-
-  Parses VCF files (version 4) using PyVCF library.
-  """
+  """A source for reading VCF file headers."""
 
   def __init__(self,
                file_pattern,
@@ -130,40 +295,66 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
 
   def read_records(
       self,
-      file_name,  # type: str
-      unused_range_tracker  # type: range_trackers.UnsplittableRangeTracker
+      file_path,  # type: str
+      unused_range_tracker,  # type: range_trackers.UnsplittableRangeTracker
       ):
     # type: (...) -> Iterable[VcfHeader]
-    try:
-      vcf_reader = vcf.Reader(fsock=self._read_headers(file_name))
-    except StopIteration:
-      raise ValueError('{} has no header.'.format(file_name))
+    header = libcbcf.VariantHeader()
+    lines = self._read_headers_plus_one_record(file_path)
+    sample_line = None
+    read_file_format_line = False
+    for line in lines:
+      if not read_file_format_line:
+        read_file_format_line = True
+        if line and not line.startswith(
+            FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+          header.add_line(FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.0'))
+      if line.startswith('##'):
+        header.add_line(line.strip())
+      elif line.startswith('#'):
+        sample_line = line
+      elif line:
+        # If non-empty non-header line exists, #CHROM line has to be supplied.
+        if not sample_line:
+          raise ValueError('Header line is missing')
+      else:
+        # If no records were found, use dummy #CHROM line for sample extraction.
+        if not sample_line:
+          sample_line = LAST_HEADER_LINE_PREFIX
 
-    yield VcfHeader(infos=vcf_reader.infos,
-                    filters=vcf_reader.filters,
-                    alts=vcf_reader.alts,
-                    formats=vcf_reader.formats,
-                    contigs=vcf_reader.contigs,
-                    file_name=file_name)
+    yield VcfHeader(infos=header.info,
+                    filters=header.filters,
+                    alts=header.alts,
+                    formats=header.formats,
+                    contigs=header.contigs,
+                    samples=sample_line,
+                    file_path=file_path)
 
-  def _read_headers(self, file_name):
-    with FileSystems.open(
-        file_name, compression_type=self._compression_type) as file_to_read:
+  def _read_headers_plus_one_record(self, file_path):
+    with self.open_file(file_path) as file_to_read:
+      record = None
       while True:
         record = file_to_read.readline()
-        while not record or not record.strip():  # Skip empty lines.
+        while record and not record.strip():  # Skip empty lines.
           record = file_to_read.readline()
         if record and record.startswith('#'):
-          yield record
+          yield record.strip()
         else:
           break
+      # Return one record line to verify that file has records. If no record
+      # lines were found, the last line would be empty.
+      yield record.strip()
+
+  def open_file(self, file_path):
+    if self._compression_type == CompressionTypes.GZIP:
+      return bgzf.open_bgzf(file_path)
+    else:
+      return FileSystems.open(file_path,
+                              compression_type=self._compression_type)
 
 
 class ReadVcfHeaders(PTransform):
-  """A PTransform for reading the header lines of VCF files.
-
-  Parses VCF files (version 4) using PyVCF library.
-  """
+  """A PTransform for reading the header lines of VCF files."""
 
   def __init__(
       self,
@@ -187,13 +378,17 @@ class ReadVcfHeaders(PTransform):
     """
     super(ReadVcfHeaders, self).__init__(**kwargs)
     self._source = VcfHeaderSource(
-        file_pattern, compression_type, validate=validate)
+        file_pattern,
+        compression_type,
+        validate=validate)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
 
 
-def _create_vcf_header_source(file_pattern=None, compression_type=None):
+def CreateVcfHeaderSource(
+    file_pattern=None,
+    compression_type=None):
   return VcfHeaderSource(file_pattern=file_pattern,
                          compression_type=compression_type)
 
@@ -231,7 +426,8 @@ class ReadAllVcfHeaders(PTransform):
     """
     super(ReadAllVcfHeaders, self).__init__(**kwargs)
     source_from_file = partial(
-        _create_vcf_header_source, compression_type=compression_type)
+        CreateVcfHeaderSource,
+        compression_type=compression_type)
     self._read_all_files = filebasedsource.ReadAllFiles(
         False,  # splittable (we are just reading the headers)
         CompressionTypes.AUTO, desired_bundle_size,
@@ -374,30 +570,21 @@ class WriteVcfHeaderFn(beam.DoFn):
 
   def _format_number(self, number):
     # type: (int) -> Optional[str]
-    """Returns the string representation of field_count from PyVCF.
-
-    PyVCF converts field counts to an integer with some predefined constants
-    as specified in the vcf.parser.field_counts dict (e.g. 'A' is -1). This
-    method converts them back to their string representation to avoid having
-    direct dependency on the arbitrary PyVCF constants.
+    """Returns the string representation of number field.
 
     Args:
-      number: An integer representing the number of fields in INFO as specified
-        by PyVCF.
+      number: An integer representing the number of fields in INFO
 
     Returns:
-      A string representation of field_count (e.g. '-1' becomes 'A').
+      A string representation of field_count.
 
     Raises:
       ValueError: if the number is not valid.
     """
-    if number is None:
-      return None
-    elif number >= 0:
+    if number in HEADER_SPECIAL_NUMBERS:
+      return number
+    if isinstance(number, int) and number >= 0:
       return str(number)
-    number_to_string = {v: k for k, v in vcf.parser.field_counts.items()}
-    if number in number_to_string:
-      return number_to_string[number]
     else:
       raise ValueError('Invalid value for number: {}'.format(number))
 

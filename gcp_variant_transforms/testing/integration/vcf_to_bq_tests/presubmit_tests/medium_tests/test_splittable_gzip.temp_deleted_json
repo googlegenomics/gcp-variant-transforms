@@ -1,0 +1,23 @@
+[
+  {
+    "test_name": "test-splittable-gzip",
+    "table_name": "test_splittable_gzip",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/splittable-gzip/**.bgz",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
+    "runner": "DataflowRunner",
+    "assertion_configs": [
+      {
+        "query": ["NUM_ROWS_QUERY"],
+        "expected_result": {"num_rows": 409932}
+      },
+      {
+        "query": ["SUM_START_QUERY"],
+        "expected_result": {"sum_start": 32190612702539}
+      },
+      {
+        "query": ["SUM_END_QUERY"],
+        "expected_result": {"sum_end": 32190612813885}
+      }
+    ]
+  }
+]

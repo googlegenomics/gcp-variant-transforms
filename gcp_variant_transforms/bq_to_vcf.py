@@ -45,8 +45,6 @@ from __future__ import division
 import logging
 import sys
 import tempfile
-import uuid
-from datetime import datetime
 from typing import Dict, Iterable, List, Tuple  # pylint: disable=unused-import
 
 import apache_beam as beam
@@ -55,42 +53,52 @@ from apache_beam.io import filesystems
 from apache_beam.io.gcp import bigquery
 from apache_beam.io.gcp.internal.clients import bigquery as bigquery_v2
 from apache_beam.options import pipeline_options
-from apache_beam.runners.direct import direct_runner
 
 from oauth2client import client
 
-from gcp_variant_transforms import vcf_to_bq_common
+from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs import bigquery_util
-from gcp_variant_transforms.libs import bigquery_vcf_schema_converter
+from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import genomic_region_parser
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_file_composer
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
-from gcp_variant_transforms.transforms import combine_call_names
+from gcp_variant_transforms.transforms import combine_sample_ids
 from gcp_variant_transforms.transforms import densify_variants
+from gcp_variant_transforms.transforms import sample_mapping_table
+
 
 
 _BASE_QUERY_TEMPLATE = 'SELECT {COLUMNS} FROM `{INPUT_TABLE}`'
 _BQ_TO_VCF_SHARDS_JOB_NAME = 'bq-to-vcf-shards'
 _COMMAND_LINE_OPTIONS = [variant_transform_options.BigQueryToVcfOptions]
+TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
+SAMPLE_INFO_TABLE_SUFFIX = (
+    sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
 _GENOMIC_REGION_TEMPLATE = ('({REFERENCE_NAME_ID}="{REFERENCE_NAME_VALUE}" AND '
                             '{START_POSITION_ID}>={START_POSITION_VALUE} AND '
                             '{END_POSITION_ID}<={END_POSITION_VALUE})')
 _VCF_FIXED_COLUMNS = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                       'INFO', 'FORMAT']
-_VCF_VERSION_LINE = '##fileformat=VCFv4.3\n'
+_VCF_VERSION_LINE = (
+    vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='4.3') + '\n')
+_SAMPLE_INFO_QUERY_TEMPLATE = (
+    'SELECT sample_id, sample_name, file_path FROM '
+    '`{PROJECT_ID}.{DATASET_ID}.{TABLE_NAME}`')
 
 
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs BigQuery to VCF pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
-                                                          _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = pipeline_common.parse_args(argv,
+                                                         _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  is_direct_runner = _is_direct_runner(beam.Pipeline(options=options))
+  is_direct_runner = pipeline_common.is_pipeline_direct_runner(
+      beam.Pipeline(options=options))
   google_cloud_options = options.view_as(pipeline_options.GoogleCloudOptions)
   if not google_cloud_options.project:
     raise ValueError('project must be set.')
@@ -101,12 +109,8 @@ def run(argv=None):
     known_args.number_of_bases_per_shard = sys.maxsize
 
   temp_folder = google_cloud_options.temp_location or tempfile.mkdtemp()
-  # TODO(allieychen): Refactor the generation of the unique temp id to a common
-  # lib.
-  unique_temp_id = '-'.join(
-      [google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME,
-       datetime.now().strftime('%Y%m%d-%H%M%S'),
-       str(uuid.uuid4())])
+  unique_temp_id = pipeline_common.generate_unique_name(
+      google_cloud_options.job_name or _BQ_TO_VCF_SHARDS_JOB_NAME)
   vcf_data_temp_folder = filesystems.FileSystems.join(
       temp_folder,
       '{}_data_temp_files'.format(unique_temp_id))
@@ -115,7 +119,7 @@ def run(argv=None):
   filesystems.FileSystems.mkdirs(vcf_data_temp_folder)
   vcf_header_file_path = filesystems.FileSystems.join(
       temp_folder,
-      '{}_header_with_call_names.vcf'.format(unique_temp_id))
+      '{}_header_with_sample_ids.vcf'.format(unique_temp_id))
 
   if not known_args.representative_header_file:
     known_args.representative_header_file = filesystems.FileSystems.join(
@@ -146,11 +150,10 @@ def _write_vcf_meta_info(input_table,
   # type: (str, str, bool) -> None
   """Writes the meta information generated from BigQuery schema."""
   header_fields = (
-      bigquery_vcf_schema_converter.generate_header_fields_from_schema(
+      schema_converter.generate_header_fields_from_schema(
           _get_schema(input_table), allow_incompatible_schema))
   write_header_fn = vcf_header_io.WriteVcfHeaderFn(representative_header_file)
   write_header_fn.process(header_fields, _VCF_VERSION_LINE)
-
 
 def _bigquery_to_vcf_shards(
     known_args,  # type: argparse.Namespace
@@ -167,45 +170,82 @@ def _bigquery_to_vcf_shards(
   writes to one VCF file. All VCF data files are saved in
   `vcf_data_temp_folder`.
 
-  Also, it writes the meta info and data header with the call names to
+  Also, it writes the meta info and data header with the sample names to
   `vcf_header_file_path`.
   """
   schema = _get_schema(known_args.input_table)
-  # TODO(allieychen): Modify the SQL query with the specified call_names.
-  query = _get_bigquery_query(known_args, schema)
-  logging.info('Processing BigQuery query %s:', query)
-  bq_source = bigquery.BigQuerySource(query=query,
-                                      validate=True,
-                                      use_standard_sql=True)
+  variant_query = _get_variant_query(known_args, schema)
+  logging.info('Processing BigQuery query %s:', variant_query)
+  project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+      known_args.input_table)
+  bq_variant_source = bigquery.BigQuerySource(query=variant_query,
+                                              validate=True,
+                                              use_standard_sql=True)
   annotation_names = _extract_annotation_names(schema)
+
+  base_table_id = bigquery_util.get_table_base_name(table_id)
+  sample_query = _SAMPLE_INFO_QUERY_TEMPLATE.format(
+      PROJECT_ID=project_id,
+      DATASET_ID=dataset_id,
+      TABLE_NAME=bigquery_util.compose_table_name(base_table_id,
+                                                  SAMPLE_INFO_TABLE_SUFFIX))
+  bq_sample_source = bigquery.BigQuerySource(query=sample_query,
+                                             validate=True,
+                                             use_standard_sql=True)
   with beam.Pipeline(options=beam_pipeline_options) as p:
     variants = (p
-                | 'ReadFromBigQuery ' >> beam.io.Read(bq_source)
+                | 'ReadFromBigQuery ' >> beam.io.Read(bq_variant_source)
                 | bigquery_to_variant.BigQueryToVariant(annotation_names))
-    if known_args.call_names:
-      call_names = (p
-                    | transforms.Create(known_args.call_names)
-                    | beam.combiners.ToList())
+    sample_table_rows = (
+        p
+        | 'ReadFromSampleTable' >> beam.io.Read(bq_sample_source))
+    if known_args.sample_names:
+      temp_sample_names = (p
+                           | transforms.Create(known_args.sample_names,
+                                               reshuffle=False))
     else:
-      call_names = (variants
-                    | 'CombineCallNames' >>
-                    combine_call_names.CallNamesCombiner(
-                        known_args.preserve_call_names_order))
+      # Get sample names from sample IDs in the variants and sort.
+      id_to_name_hash_table = (
+          sample_table_rows
+          | 'SampleIdToNameDict' >> sample_mapping_table.SampleIdToNameDict())
+      temp_sample_ids = (variants
+                         | 'CombineSampleIds' >>
+                         combine_sample_ids.SampleIdsCombiner(
+                             known_args.preserve_sample_order))
+      temp_sample_names = (
+          temp_sample_ids
+          | 'GetSampleNames' >>
+          sample_mapping_table.GetSampleNames(
+              beam.pvalue.AsSingleton(id_to_name_hash_table))
+          | 'CombineToList' >> beam.combiners.ToList()
+          | 'SortSampleNames' >> beam.ParDo(sorted))
 
-    _ = (call_names
+    name_to_id_hash_table = (
+        sample_table_rows
+        | 'SampleNameToIdDict' >> sample_mapping_table.SampleNameToIdDict())
+    sample_ids = (
+        temp_sample_names
+        | 'GetSampleIds' >>
+        sample_mapping_table.GetSampleIds(
+            beam.pvalue.AsSingleton(name_to_id_hash_table))
+        | 'CombineSortedSampleIds' >> beam.combiners.ToList())
+    sample_names = temp_sample_names | beam.combiners.ToList()
+
+    _ = (sample_names
          | 'GenerateVcfDataHeader' >>
-         beam.ParDo(_write_vcf_header_with_call_names,
+         beam.ParDo(_write_vcf_header_with_sample_names,
                     _VCF_FIXED_COLUMNS,
                     known_args.representative_header_file,
                     header_file_path))
 
     _ = (variants
-         | densify_variants.DensifyVariants(beam.pvalue.AsSingleton(call_names))
+         | densify_variants.DensifyVariants(
+             beam.pvalue.AsSingleton(sample_ids))
          | 'PairVariantWithKey' >>
          beam.Map(_pair_variant_with_key, known_args.number_of_bases_per_shard)
          | 'GroupVariantsByKey' >> beam.GroupByKey()
          | beam.ParDo(_get_file_path_and_sorted_variants, vcf_data_temp_folder)
-         | vcfio.WriteVcfDataLines())
+         | vcfio.WriteVcfDataLines(known_args.bq_uses_1_based_coordinate))
 
 
 def _get_schema(input_table):
@@ -220,7 +260,7 @@ def _get_schema(input_table):
   return table.schema
 
 
-def _get_bigquery_query(known_args, schema):
+def _get_variant_query(known_args, schema):
   # type: (argparse.Namespace, bigquery_v2.TableSchema) -> str
   """Returns a BigQuery query for the interested regions."""
   columns = _get_query_columns(schema)
@@ -281,12 +321,12 @@ def _get_query_columns(schema):
   return columns
 
 
-def _write_vcf_header_with_call_names(sample_names,
-                                      vcf_fixed_columns,
-                                      representative_header_file,
-                                      file_path):
+def _write_vcf_header_with_sample_names(sample_names,
+                                        vcf_fixed_columns,
+                                        representative_header_file,
+                                        file_path):
   # type: (List[str], List[str], str, str) -> None
-  """Writes VCF header containing meta info and header line with call names.
+  """Writes VCF header containing meta info and header line with sample names.
 
   It writes all meta-information starting with `##` extracted from
   `representative_header_file`, followed by one data header line with
@@ -330,11 +370,6 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
   from apache_beam.io import filesystems
   file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
-
-
-# TODO(allieychen): Move this function to a general lib.
-def _is_direct_runner(pipeline):
-  return isinstance(pipeline.runner, direct_runner.DirectRunner)
 
 
 def _pair_variant_with_key(variant, number_of_variants_per_shard):

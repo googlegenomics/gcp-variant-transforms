@@ -101,17 +101,29 @@ followed by `_vep_output.vcf`. Note that if this directory already exists, then
 Variant Transforms fails. This is to prevent unintentional overwriting of old
 annotated VCFs.
 
+* [`--shard_variants`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L290)
+by default, the input files are sharded into smaller temporary VCF files before
+running VEP annotation. If the input files are small, i.e., each VCF file
+contains less than 50,000 variants, setting this flag can be computationally
+wasteful.
+
+* [`--number_of_variants_per_shard`](https://github.com/googlegenomics/gcp-variant-transforms/blob/master/gcp_variant_transforms/options/variant_transform_options.py#L360)
+the maximum number of variants written to each shard if `shard_variants` is
+true. The default value should work for most cases. You may change this flag to
+a smaller value if you have a dataset with a lot of samples. Notice that
+pipeline may take longer to finish for smaller value of this flag.
+
 * [`--vep_image_uri`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L196)
 the docker image for VEP created using the
 [Dockerfile in variant-annotation](https://github.com/googlegenomics/variant-annotation/tree/master/batch/vep)
-GitHub repo. By default `gcr.io/gcp-variant-annotation/vep_91` is used which is
+GitHub repo. By default `gcr.io/cloud-lifesciences/vep_91` is used which is
 a public image that Google maintains (VEP version 91).
 
 * [`--vep_cache_path`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L200)
 the GCS location that has the compressed version of VEP cache. This file can be
 created using
 [build_vep_cache.sh](https://github.com/googlegenomics/variant-annotation/blob/master/batch/vep/build_vep_cache.sh)
-script. By default `gs://gcp-variant-annotation-vep-cache/vep_cache_homo_sapiens_GRCh38_91.tar.gz`
+script. By default `gs://cloud-lifesciences/vep/vep_cache_homo_sapiens_GRCh38_91.tar.gz`
 is used which is good for human genome aligned with GRCh38 reference sequence.
 
 * [`--vep_info_field`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L204)
@@ -121,18 +133,15 @@ annotations; use this field to override the field name.
 * [`--vep_num_fork`](https://github.com/googlegenomics/gcp-variant-transforms/blob/c4659bba2cf577d64f15db5cd9f477d9ea2b51b0/gcp_variant_transforms/options/variant_transform_options.py#L208)
 number of forks when running VEP, see [`--fork` option of VEP](ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_fork).
 
+
 For other parameters, like how many VMs to use or where the VMs should be
 located, the same parameters for
 [Dataflow pipeline execution](https://cloud.google.com/dataflow/pipelines/specifying-exec-params)
-are reused, e.g., `--num_workers`.
+are reused, e.g., `--num_workers`. It is recommended to provide one worker per
+50,000 variants. For instance, for a dataset with 5,000,000 variants, you may
+set `--num_workers` to 100.
 
 ### Caveats and troubleshooting
-
-Running VEP is slow especially if you have large VCF inputs. This is because in
-this first version of VEP integration with Variant Transforms, we are not
-sharding input files and so each input VCF is processed by one single VEP run.
-Therefore if your input VCFs are large, it is recommended to set `--num_workers`
-at least as big as number of input files.
 
 In the `annotation_output_dir`, beside output annotated VCFs, there is a `logs`
 directory which contains the logs from virtual machines on which VEP was run.

@@ -1,0 +1,97 @@
+[
+  {
+    "test_name": "platinum-partition-with-residual",
+    "table_name": "platinum_partition_with_residual",
+    "sample_lookup_optimized_output_table" : "{TABLE_NAME}_samples",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_3k_rnd_lines/*.vcf",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_with_residual.yaml",
+    "runner": "DataflowRunner",
+    "variant_merge_strategy": "MOVE_TO_CALLS",
+    "assertion_configs": [
+      {
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 23}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01`"],
+        "expected_result": {"num_rows": 1376}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr02`"],
+        "expected_result": {"num_rows": 1383}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr03`"],
+        "expected_result": {"num_rows": 1101}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr04_05`"],
+        "expected_result": {"num_rows": 2136}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr06_07_08_09`"],
+        "expected_result": {"num_rows": 3656}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_10M`"],
+        "expected_result": {"num_rows": 94}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_20M`"],
+        "expected_result": {"num_rows": 76}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrX`"],
+        "expected_result": {"num_rows": 1201}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chrY_M`"],
+        "expected_result": {"num_rows": 156}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__all_remaining`"],
+        "expected_result": {"num_rows": 6821}
+      },
+       {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01`"],
+        "expected_result": {"num_rows": 1376}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr02`"],
+        "expected_result": {"num_rows": 1383}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr03`"],
+        "expected_result": {"num_rows": 1101}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr04_05`"],
+        "expected_result": {"num_rows": 2136}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr06_07_08_09`"],
+        "expected_result": {"num_rows": 3656}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr19_10M`"],
+        "expected_result": {"num_rows": 94}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr19_20M`"],
+        "expected_result": {"num_rows": 76}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chrX`"],
+        "expected_result": {"num_rows": 1201}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chrY_M`"],
+        "expected_result": {"num_rows": 156}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__all_remaining`"],
+        "expected_result": {"num_rows": 6821}
+      }
+    ]
+  }
+]

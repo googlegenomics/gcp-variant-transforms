@@ -1,0 +1,15 @@
+##fileformat=VCFv4.3
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
+##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
+##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">
+##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129">
+##INFO=<ID=H2,Number=0,Type=Flag,Description="HapMap2 membership">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=HQ,Number=2,Type=Integer,Description="Haplotype Quality">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA00001	NA00002	NA00003	NA00004
+19	1234567	microsat1;microsat2	GTCT	G,GTACT	50.0	PASS	AA=G;NS=2;DP=9	GT:DP:GQ	0/1:4:35	0/2:2:17	1/1:3:40	.:.:.
+20	14370	rs6054257	G	A	30.0	PASS;q10	H2;NS=2;DB;DP=14;AF=0.5	GT:DP:GQ:HQ	0|0:1:48:51,51	1|0:8:48:51,51	1/1:5:43:.	0|0:1:48:51,51
+20	17290	.	T	A	3.0	q10	NS=2;DP=11;AF=0.017	GT:DP:GQ:HQ	0|0:3:49:58,50	0|1:5:3:65,3	.:.:.:.	.:.:.:.
+20	17330	.	T	A	3.0	q10	NS=1;DP=11;AF=0.017	GT:DP:GQ	.:.:.	.:.:.	0/0:3:41	.:.:.

@@ -1,0 +1,26 @@
+[
+  {
+    "description": "An Integer that uniquely identifies a sample.",
+    "mode": "NULLABLE",
+    "name": "sample_id",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Name of the sample as we read it from the VCF file.",
+    "mode": "NULLABLE",
+    "name": "sample_name",
+    "type": "STRING"
+  },
+  {
+    "description": "Full file path on GCS of the sample.",
+    "mode": "NULLABLE",
+    "name": "file_path",
+    "type": "STRING"
+  },
+  {
+    "description": "Ingestion datetime (up to current minute) of samples.",
+    "mode": "NULLABLE",
+    "name": "ingestion_datetime",
+    "type": "TIMESTAMP"
+  }
+]

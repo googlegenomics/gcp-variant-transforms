@@ -1,0 +1,26 @@
+[
+  {
+    "test_name": "non-splittable-bgzf-preprocessor",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/non_splittable_bgzf_preprocessor/*.gz",
+    "report_all_conflicts": "True",
+    "header_blob_name": "temp/non_splittalbe_bgzf_preprocessor_header.vcf",
+    "report_blob_name": "temp/non_splittalbe_bgzf_preprocessor_report.tsv",
+    "runner": "DataflowRunner",
+    "expected_contents": [
+      "Header Conflicts",
+      "ID\tCategory\tConflicts\tFile Paths\tProposed Resolution",
+      "GL\tFORMAT\tnum=3 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/non_splittable_bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.phase1_samtools_si.20101123.snps.low_coverage.genotypes.vcf.gz\tnum=. type=Float",
+      " \t \tnum=. type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/non_splittable_bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.genome_strip_hq.20101123.svs.low_coverage.genotypes.vcf.gz\t ",
+      "GQ\tFORMAT\tnum=1 type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/non_splittable_bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.genome_strip_hq.20101123.svs.low_coverage.genotypes.vcf.gz\tnum=1 type=Float",
+      " \t \tnum=1 type=Integer\tgs://gcp-variant-transforms-testfiles/small_tests/non_splittable_bgzf_preprocessor/1000-genomes_vcf_ALL.chrY.phase1_samtools_si.20101123.snps.low_coverage.genotypes.vcf.gz\t ",
+      "",
+      "Inferred Headers",
+      "ID\tCategory\tProposed Resolution",
+      "FT\tFORMAT\tnum=1 type=String",
+      "",
+      "No Malformed Records Found.",
+      "",
+      ""
+    ]
+  }
+]

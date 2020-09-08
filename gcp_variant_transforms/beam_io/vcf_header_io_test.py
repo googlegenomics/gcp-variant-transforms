@@ -18,13 +18,14 @@ import collections
 import os
 import unittest
 
-import vcf
+from pysam import libcbcf
 
 import apache_beam as beam
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 import apache_beam.io.source_test_utils as source_test_utils
 from apache_beam.testing.test_pipeline import TestPipeline
+from gcp_variant_transforms.beam_io.vcf_header_io import LAST_HEADER_LINE_PREFIX
 from gcp_variant_transforms.beam_io.vcf_header_io import VcfHeaderSource
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadAllVcfHeaders
 from gcp_variant_transforms.beam_io.vcf_header_io import ReadVcfHeaders
@@ -36,17 +37,36 @@ from gcp_variant_transforms.testing import temp_dir
 from gcp_variant_transforms.testing import testdata_util
 
 
-def _get_header_from_reader(vcf_reader, file_name=None):
+def _get_header_from_reader(vcf_reader, file_path=None):
   return VcfHeader(infos=vcf_reader.infos,
                    filters=vcf_reader.filters,
                    alts=vcf_reader.alts,
                    formats=vcf_reader.formats,
                    contigs=vcf_reader.contigs,
-                   file_name=file_name)
+                   samples=vcf_reader.samples,
+                   file_path=file_path)
 
 
 def _get_vcf_header_from_lines(lines, file_name=None):
-  return _get_header_from_reader(vcf.Reader(iter(lines)), file_name)
+  header = libcbcf.VariantHeader()
+  sample_line = LAST_HEADER_LINE_PREFIX
+  header.add_line('##fileformat=VCFv4.0')
+  for line in lines:
+    if line.startswith('#'):
+      if line.startswith(LAST_HEADER_LINE_PREFIX):
+        sample_line = line.strip()
+        break
+      else:
+        header.add_line(line.strip())
+    else:
+      break
+  return VcfHeader(infos=header.info,
+                   filters=header.filters,
+                   alts=header.alts,
+                   formats=header.formats,
+                   contigs=header.contigs,
+                   samples=sample_line,
+                   file_path=file_name)
 
 
 class VcfHeaderSourceTest(unittest.TestCase):
@@ -61,7 +81,8 @@ class VcfHeaderSourceTest(unittest.TestCase):
   def _create_file_and_read_headers(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(suffix='.vcf', lines=self.lines)
-      headers = source_test_utils.read_from_source(VcfHeaderSource(filename))
+      headers = source_test_utils.read_from_source(
+          VcfHeaderSource(filename))
       return headers[0]
 
   def test_vcf_header_eq(self):
@@ -75,10 +96,28 @@ class VcfHeaderSourceTest(unittest.TestCase):
     header = self._create_file_and_read_headers()
     self.assertEqual(header, _get_vcf_header_from_lines(headers))
 
+  def test_malformed_headers(self):
+    # TODO(tneymanov): Add more tests.
+    malformed_header_lines = [
+        # Malformed FILTER.
+        [
+            '##FILTER=<ID=PASS,Description="All filters passed">\n',
+            '##FILTER=<ID=LowQual,Descri\n',
+            '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSample\n',
+            '19\t123\trs12345\tT\tC\t50\tq10\tAF=0.2;NS=2\tGT:GQ\t1|0:48'
+        ]
+    ]
+
+    for content in malformed_header_lines:
+      self.lines = content
+      with self.assertRaises(ValueError):
+        self._create_file_and_read_headers()
+
   def test_all_fields(self):
     self.lines = [
         '##contig=<ID=M,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
         '##contig=<ID=P,length=16,assembly=B37,md5=c6,species="Homosapiens">\n',
+        '\n',
         '##ALT=<ID=CGA_CNVWIN,Description="Copy number analysis window">\n',
         '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
         '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
@@ -266,7 +305,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
         '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
         '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
-        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##INFO=<ID=HR,Number=R,Type=String,Description="ChrInfo_R">\n',
         self.lines[-1],
     ]
     header = _get_vcf_header_from_lines(self.lines)
@@ -293,7 +332,7 @@ class WriteVcfHeadersTest(unittest.TestCase):
         '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
         '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
         '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
-        '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+        '##INFO=<ID=HR,Number=R,Type=String,Description="ChrInfo_R">\n',
         '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
         '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
         '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',

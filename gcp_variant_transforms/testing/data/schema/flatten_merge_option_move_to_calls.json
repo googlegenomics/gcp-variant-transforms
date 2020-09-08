@@ -1,0 +1,109 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "reference_name",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "start_position",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "end_position",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "reference_bases",
+    "type": "STRING"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "alt",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "AF",
+        "type": "FLOAT"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "alternate_bases",
+    "type": "RECORD"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "names",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "quality",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "filter",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "call_sample_id",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "call_genotype",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "call_phaseset",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "call_DP",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "call_GQ",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "call_HQ",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "NS",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "DP",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "AA",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "DB",
+    "type": "BOOLEAN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "H2",
+    "type": "BOOLEAN"
+  }
+]

@@ -18,23 +18,23 @@ from __future__ import absolute_import
 
 import unittest
 
+import apache_beam as beam
 from apache_beam.io.gcp.internal.clients import bigquery
-from apache_beam import ParDo
 from apache_beam.testing.test_pipeline import TestPipeline
 from apache_beam.testing.util import assert_that
 from apache_beam.testing.util import equal_to
 from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.libs import bigquery_row_generator
 from gcp_variant_transforms.libs import bigquery_schema_descriptor
-from gcp_variant_transforms.libs import bigquery_vcf_data_converter
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 from gcp_variant_transforms.testing import vcf_header_util
-from gcp_variant_transforms.transforms import variant_to_bigquery
-from gcp_variant_transforms.transforms.variant_to_bigquery import _ConvertToBigQueryTableRow as ConvertToBigQueryTableRow
+from gcp_variant_transforms.testing.testdata_util import hash_name
+from gcp_variant_transforms.transforms.variant_to_bigquery import ConvertVariantToRow
 
 
 class ConvertToBigQueryTableRowTest(unittest.TestCase):
@@ -46,7 +46,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     self._conflict_resolver = (
         vcf_field_conflict_resolver.FieldConflictResolver())
 
-    self._row_generator = bigquery_vcf_data_converter.BigQueryRowGenerator(
+    self._row_generator = bigquery_row_generator.VariantCallRowGenerator(
         self._schema_descriptor, self._conflict_resolver)
 
   def _get_table_schema(self):
@@ -110,10 +110,10 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
               'IS': 'some data', 'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FB': True}),
         ]
     )
@@ -126,11 +126,11 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.QUALITY: 2,
            ColumnKeyConstants.FILTER: ['PASS'],
            ColumnKeyConstants.CALLS: [
-               {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
                 'GQ': 20, 'FIR': [10, 20]},
-               {ColumnKeyConstants.CALLS_NAME: 'Sample2',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
                 ColumnKeyConstants.CALLS_PHASESET: None,
                 'GQ': 10, 'FB': True}],
@@ -184,7 +184,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         info={'II': 1234},
         calls=[
             vcfio.VariantCall(
-                name='EmptySample', genotype=[], phaseset='*',
+                sample_id=hash_name('EmptySample'), genotype=[], phaseset='*',
                 info={}),
         ])
     header_num_dict = {'II': '1'}
@@ -205,7 +205,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         info={'IFR': ['0.1', '0.2'], 'IS': 1, 'ISR': 1},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'FIR': [10.0, 20.0]}),
         ]
     )
@@ -217,7 +217,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            ColumnKeyConstants.ALTERNATE_BASES: [],
            ColumnKeyConstants.FILTER: ['PASS'],
            ColumnKeyConstants.CALLS: [
-               {ColumnKeyConstants.CALLS_NAME: 'Sample1',
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
                 ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
                 ColumnKeyConstants.CALLS_PHASESET: '*',
                 'GQ': 20, 'FIR': [10, 20]}],
@@ -244,7 +244,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var_1, proc_var_2, proc_var_3])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
     pipeline.run()
@@ -258,7 +258,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator, omit_empty_sample_calls=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
@@ -273,329 +273,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
     bigquery_rows = (
         pipeline
         | Create([proc_var])
-        | 'ConvertToRow' >> ParDo(ConvertToBigQueryTableRow(
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator, allow_incompatible_records=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
-
-  def test_merge_field_schemas_no_same_id(self):
-    field_schemas_1 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='IFR',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_REPEATED,
-            description='INFO foo desc')
-    ]
-    field_schemas_2 = [
-        bigquery.TableFieldSchema(
-            name='AB',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    merged_field_schemas = variant_to_bigquery._get_merged_field_schemas(
-        field_schemas_1, field_schemas_2)
-    expected_merged_field_schemas = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='IFR',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_REPEATED,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='AB',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    self.assertEqual(merged_field_schemas, expected_merged_field_schemas)
-
-  def test_merge_field_schemas_same_id_no_conflicts(self):
-    field_schemas_1 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='IFR',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_REPEATED,
-            description='INFO foo desc')
-    ]
-    field_schemas_2 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='AB',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    merged_field_schemas = variant_to_bigquery._get_merged_field_schemas(
-        field_schemas_1, field_schemas_2)
-    expected_merged_field_schemas = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='IFR',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_REPEATED,
-            description='INFO foo desc'),
-        bigquery.TableFieldSchema(
-            name='AB',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    self.assertEqual(merged_field_schemas, expected_merged_field_schemas)
-
-  def test_merge_field_schemas_conflict_mode(self):
-    field_schemas_1 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    field_schemas_2 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_REPEATED,
-            description='INFO foo desc')
-    ]
-    self.assertRaises(ValueError, variant_to_bigquery._get_merged_field_schemas,
-                      field_schemas_1, field_schemas_2)
-
-  def test_merge_field_schemas_conflict_type(self):
-    field_schemas_1 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_INTEGER,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    field_schemas_2 = [
-        bigquery.TableFieldSchema(
-            name='II',
-            type=TableFieldConstants.TYPE_FLOAT,
-            mode=TableFieldConstants.MODE_NULLABLE,
-            description='INFO foo desc')
-    ]
-    self.assertRaises(ValueError, variant_to_bigquery._get_merged_field_schemas,
-                      field_schemas_1, field_schemas_2)
-
-  def test_merge_field_schemas_conflict_record_fields(self):
-    call_record_1 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_1.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_BOOLEAN,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-    field_schemas_1 = [call_record_1]
-
-    call_record_2 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_2.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_INTEGER,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-    field_schemas_2 = [call_record_2]
-    self.assertRaises(ValueError, variant_to_bigquery._get_merged_field_schemas,
-                      field_schemas_1, field_schemas_2)
-
-  def test_merge_field_schemas_same_record(self):
-    call_record_1 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_1.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_BOOLEAN,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-
-    field_schemas_1 = [call_record_1]
-    field_schemas_2 = [call_record_1]
-
-    expected_merged_field_schemas = [call_record_1]
-    self.assertEqual(
-        variant_to_bigquery._get_merged_field_schemas(field_schemas_1,
-                                                      field_schemas_2),
-        expected_merged_field_schemas)
-
-  def test_merge_field_schemas_merge_record_fields(self):
-    call_record_1 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_1.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_BOOLEAN,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-
-    field_schemas_1 = [call_record_1]
-
-    call_record_2 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_2.fields.append(bigquery.TableFieldSchema(
-        name='GQ',
-        type=TableFieldConstants.TYPE_INTEGER,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-    field_schemas_2 = [call_record_2]
-
-    call_record_3 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    call_record_3.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_BOOLEAN,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-    call_record_3.fields.append(bigquery.TableFieldSchema(
-        name='GQ',
-        type=TableFieldConstants.TYPE_INTEGER,
-        mode=TableFieldConstants.MODE_NULLABLE,
-        description='FORMAT foo desc'))
-
-    expected_merged_field_schemas = [call_record_3]
-    self.assertEqual(
-        variant_to_bigquery._get_merged_field_schemas(field_schemas_1,
-                                                      field_schemas_2),
-        expected_merged_field_schemas)
-
-  def test_merge_field_schemas_conflict_inner_record_fields(self):
-    record_1 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_1 = bigquery.TableFieldSchema(
-        name='inner record',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_1.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    record_1.fields.append(inner_record_1)
-    field_schemas_1 = [record_1]
-
-    record_2 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_2 = bigquery.TableFieldSchema(
-        name='inner record',
-        type=TableFieldConstants.TYPE_INTEGER,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_2.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    record_2.fields.append(inner_record_2)
-    field_schemas_2 = [record_2]
-    self.assertRaises(ValueError, variant_to_bigquery._get_merged_field_schemas,
-                      field_schemas_1, field_schemas_2)
-
-  def test_merge_field_schemas_merge_inner_record_fields(self):
-    record_1 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_1 = bigquery.TableFieldSchema(
-        name='inner record',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_1.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    record_1.fields.append(inner_record_1)
-    field_schemas_1 = [record_1]
-
-    record_2 = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_2 = bigquery.TableFieldSchema(
-        name='inner record',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    inner_record_2.fields.append(bigquery.TableFieldSchema(
-        name='AB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    record_2.fields.append(inner_record_2)
-    field_schemas_2 = [record_2]
-
-    merged_record = bigquery.TableFieldSchema(
-        name=ColumnKeyConstants.CALLS,
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    merged_inner_record = bigquery.TableFieldSchema(
-        name='inner record',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='One record for each call.')
-    merged_inner_record.fields.append(bigquery.TableFieldSchema(
-        name='FB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    merged_inner_record.fields.append(bigquery.TableFieldSchema(
-        name='AB',
-        type=TableFieldConstants.TYPE_RECORD,
-        mode=TableFieldConstants.MODE_REPEATED,
-        description='FORMAT foo desc'))
-    merged_record.fields.append(merged_inner_record)
-    expected_merged_field_schemas = [merged_record]
-    self.assertEqual(
-        variant_to_bigquery._get_merged_field_schemas(field_schemas_1,
-                                                      field_schemas_2),
-        expected_merged_field_schemas)

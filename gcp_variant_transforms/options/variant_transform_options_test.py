@@ -26,6 +26,7 @@ from apache_beam.io.gcp.internal.clients import bigquery
 from apitools.base.py import exceptions
 
 from gcp_variant_transforms.options import variant_transform_options
+from gcp_variant_transforms.testing import temp_dir
 
 
 def make_args(options, args):
@@ -47,18 +48,37 @@ class VcfReadOptionsTest(unittest.TestCase):
     # type: (List[str]) -> argparse.Namespace
     return make_args(self._options, args)
 
-  def test_failure_for_conflicting_flags(self):
-    args = self._make_args(['--input_pattern', 'gs://some_pattern',
-                            '--infer_headers',
-                            '--representative_header_file', 'gs://some_file'])
-
+  def test_no_inputs(self):
+    args = self._make_args([])
     self.assertRaises(ValueError, self._options.validate, args)
 
-  def test_failure_for_conflicting_flags_no_errors(self):
-    args = self._make_args(['--input_pattern', 'gs://some_pattern',
-                            '--representative_header_file', 'gs://some_file'])
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
 
+  def test_failure_for_conflicting_flags_headers(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--infer_headers',
+                            '--representative_header_file', 'gs://some_file'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--representative_header_file', 'gs://some_file'])
     self._options.validate(args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_file_input(self):
+    lines = ['./gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n',
+             './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
+    with temp_dir.TempDir() as tempdir:
+      filename = tempdir.create_temp_file(lines=lines)
+      args = self._make_args([
+          '--input_file',
+          filename,
+          '--representative_header_file', 'gs://some_file'])
+      self._options.validate(args)
 
 
 class BigQueryWriteOptionsTest(unittest.TestCase):
@@ -80,11 +100,91 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
             projectId='project', datasetId='dataset'))
     self._options.validate(args, client)
 
-  def test_existing_table(self):
-    args = self._make_args(['--append', 'False',
-                            '--output_table', 'project:dataset.table'])
+  def test_existing_sample_table(self):
+    args = self._make_args(
+        ['--append', 'False', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
+
     client = mock.Mock()
-    self.assertRaises(ValueError, self._options.validate, args, client)
+    client.tables.Get.return_value = bigquery.Table(
+        tableReference=bigquery.TableReference(projectId='project',
+                                               datasetId='dataset',
+                                               tableId='table__sample_info'))
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__sample_info already exists'):
+      self._options.validate(args, client)
+
+  def test_existing_main_table(self):
+
+    def side_effect(request):
+      if (request == bigquery.BigqueryTablesGetRequest(
+          projectId='project',
+          datasetId='dataset',
+          tableId='table__sample_info')):
+        raise exceptions.HttpError(response={'status': '404'},
+                                   url='', content='')
+      else:
+        return bigquery.Table(tableReference=bigquery.TableReference(
+            projectId='project',
+            datasetId='dataset',
+            tableId='table__chr1_part1'))
+    args = self._make_args(
+        ['--append', 'False', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
+
+    client = mock.Mock()
+    client.tables.Get.side_effect = side_effect
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__chr01_part1 already exists'):
+      self._options.validate(args, client)
+
+  def test_missing_sample_table(self):
+    args = self._make_args(
+        ['--append', 'True', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
+    client = mock.Mock()
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__sample_info does not exist'):
+      self._options.validate(args, client)
+
+  def test_missing_main_table(self):
+
+    def side_effect(request):
+      if (request == bigquery.BigqueryTablesGetRequest(
+          projectId='project',
+          datasetId='dataset',
+          tableId='table__sample_info')):
+        return bigquery.Table(tableReference=bigquery.TableReference(
+            projectId='project',
+            datasetId='dataset',
+            tableId='table__sample_info'))
+      else:
+        raise exceptions.HttpError(response={'status': '404'},
+                                   url='', content='')
+
+    args = self._make_args(
+        ['--append', 'True', '--output_table', 'project:dataset.table',
+         '--sharding_config_path',
+         'gcp_variant_transforms/testing/data/sharding_configs/'
+         'residual_at_end.yaml'])
+
+    client = mock.Mock()
+    client.tables.Get.side_effect = side_effect
+    with self.assertRaisesRegexp(
+        ValueError,
+        'project:dataset.table__chr01_part1 does not exist'):
+      self._options.validate(args, client)
 
   def test_no_project(self):
     args = self._make_args(['--output_table', 'dataset.table'])
@@ -149,3 +249,30 @@ class AnnotationOptionsTest(unittest.TestCase):
                             '--vep_image_uri', 'AN_IMAGE',
                             '--vep_cache_path', 'VEP_CACHE'])
     self.assertRaises(ValueError, self._options.validate, args)
+
+
+class PreprocessOptionsTest(unittest.TestCase):
+  """Tests cases for the PreprocessOptions class."""
+
+  def setUp(self):
+    self._options = variant_transform_options.PreprocessOptions()
+
+  def _make_args(self, args):
+    # type: (List[str]) -> argparse.Namespace
+    return make_args(self._options, args)
+
+  def test_failure_for_conflicting_flags_inputs(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path',
+                            '--input_file', 'asd'])
+    self.assertRaises(ValueError, self._options.validate, args)
+
+  def test_failure_for_conflicting_flags_no_errors(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)
+
+  def test_failure_for_conflicting_flags_no_errors_with_pattern_input(self):
+    args = self._make_args(['--input_pattern', '*',
+                            '--report_path', 'some_path'])
+    self._options.validate(args)

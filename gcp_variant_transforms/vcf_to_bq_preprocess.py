@@ -55,8 +55,7 @@ import apache_beam as beam
 from apache_beam import pvalue
 from apache_beam.options import pipeline_options
 
-from gcp_variant_transforms import vcf_to_bq_common
-from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms import pipeline_common
 from gcp_variant_transforms.libs import preprocess_reporter
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import filter_variants
@@ -91,20 +90,24 @@ def run(argv=None):
   # type: (List[str]) -> (str, str)
   """Runs preprocess pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
-  known_args, pipeline_args = vcf_to_bq_common.parse_args(argv,
-                                                          _COMMAND_LINE_OPTIONS)
+  known_args, pipeline_args = pipeline_common.parse_args(argv,
+                                                         _COMMAND_LINE_OPTIONS)
   options = pipeline_options.PipelineOptions(pipeline_args)
-  pipeline_mode = vcf_to_bq_common.get_pipeline_mode(known_args.input_pattern)
+  all_patterns = known_args.all_patterns
+  pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns)
 
   with beam.Pipeline(options=options) as p:
-    headers = vcf_to_bq_common.read_headers(p, pipeline_mode, known_args)
-    merged_headers = vcf_to_bq_common.get_merged_headers(headers)
+    headers = pipeline_common.read_headers(p, pipeline_mode, all_patterns)
+    merged_headers = pipeline_common.get_merged_headers(headers)
     merged_definitions = (headers
                           | 'MergeDefinitions' >>
                           merge_header_definitions.MergeDefinitions())
     if known_args.report_all_conflicts:
-      variants = p | 'ReadFromVcf' >> vcfio.ReadFromVcf(
-          known_args.input_pattern, allow_malformed_records=True)
+      variants = pipeline_common.read_variants(p,
+                                               all_patterns,
+                                               pipeline_mode,
+                                               allow_malformed_records=True,
+                                               pre_infer_headers=True)
       malformed_records = variants | filter_variants.ExtractMalformedVariants()
       inferred_headers, merged_headers = (_get_inferred_headers(variants,
                                                                 merged_headers))
@@ -123,8 +126,8 @@ def run(argv=None):
                       beam.pvalue.AsSingleton(merged_headers)))
 
     if known_args.resolved_headers_path:
-      vcf_to_bq_common.write_headers(merged_headers,
-                                     known_args.resolved_headers_path)
+      pipeline_common.write_headers(merged_headers,
+                                    known_args.resolved_headers_path)
 
 
 if __name__ == '__main__':

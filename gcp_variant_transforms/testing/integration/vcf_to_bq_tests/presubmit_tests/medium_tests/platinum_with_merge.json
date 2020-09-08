@@ -1,0 +1,67 @@
+[
+  {
+    "test_name": "platinum-with-merge",
+    "table_name": "platinum_with_merge",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/medium_tests/platinum_chr1_2_3/*.vcf",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
+    "runner": "DataflowRunner",
+    "variant_merge_strategy": "MOVE_TO_CALLS",
+    "worker_machine_type": "n1-standard-16",
+    "worker_disk_type": "compute.googleapis.com/projects//zones//diskTypes/pd-ssd",
+    "max_num_workers": "20",
+    "assertion_configs": [
+      {
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"num_rows": 20206691}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"sum_start": 2469581032808147}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"sum_end": 2469582344340269}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"num_rows": 20712382}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"sum_start": 2506042589162349}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr2`"],
+        "expected_result": {"sum_end": 2506043978188439}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"num_rows": 16194801}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"sum_start": 1605674422198391}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr3`"],
+        "expected_result": {"sum_end": 1605675559044616}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"num_rows": 667}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_start": 5056702}
+      },
+      {
+        "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__residual`"],
+        "expected_result": {"sum_end": 5119847}
+      }
+    ]
+  }
+]

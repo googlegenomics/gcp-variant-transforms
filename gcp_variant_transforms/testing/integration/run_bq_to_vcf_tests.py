@@ -22,6 +22,7 @@ expected_output_file. `expected_output_file` saves the expected VCF contents.
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_bq_to_vcf_tests.py \
   --project gcp-variant-transforms-test \
+  --region us-central1 \
   --staging_location gs://integration_test_runs/staging \
   --temp_location gs://integration_test_runs/temp \
   --logging_location gs://integration_test_runs/temp/integration_test_logs
@@ -41,10 +42,8 @@ from apache_beam.io import filesystems
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 
-_PIPELINE_NAME = 'gcp-variant-transforms-bq-to-vcf-integration-test'
-_SCOPES = ['https://www.googleapis.com/auth/bigquery']
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/bq_to_vcf_tests'
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/bq_to_vcf'
+_TOOL_NAME = 'bq_to_vcf'
 
 
 class BqToVcfTestCase(run_tests_common.TestCaseInterface):
@@ -56,7 +55,6 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
                input_table,  # type: str
                output_file_name,  # type: str
                expected_output_file,  # type: str
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -67,11 +65,8 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
     self._output_file = filesystems.FileSystems.join(parsed_args.temp_location,
                                                      timestamp,
                                                      output_file_name)
-    self._project = parsed_args.project
-
     args = ['--input_table {}'.format(input_table),
             '--output_file {}'.format(self._output_file),
-            '--project {}'.format(parsed_args.project),
             '--staging_location {}'.format(parsed_args.staging_location),
             '--temp_location {}'.format(parsed_args.temp_location),
             '--job_name {}'.format(
@@ -79,9 +74,12 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        parsed_args.project, parsed_args.logging_location, parsed_args.image,
-        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.run_test_command = run_tests_common.form_command(
+        parsed_args.project,
+        parsed_args.region,
+        filesystems.FileSystems.join(parsed_args.logging_location,
+                                     '_'.join([test_name, timestamp])),
+        parsed_args.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.
@@ -142,5 +140,7 @@ def main():
 
 
 if __name__ == '__main__':
+  print 'Starting bq_to_vcf tests...'
   ret_code = main()
+  print 'Finished all bq_to_vcf tests successfully.'
   sys.exit(ret_code)

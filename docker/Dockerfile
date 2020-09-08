@@ -15,7 +15,16 @@
 # To build a new docker image, run the following from the root source dir:
 # $ docker build . -f docker/Dockerfile -t $IMAGE_NAME
 
-FROM google/cloud-sdk
+FROM golang:latest
+
+RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
+
+FROM google/cloud-sdk:slim
+
+COPY --from=0 /go/bin/pipelines /usr/bin
+
+ARG commit_sha
+ENV COMMIT_SHA=${commit_sha}
 
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
 ADD / /opt/gcp_variant_transforms/src/
@@ -23,12 +32,28 @@ ADD / /opt/gcp_variant_transforms/src/
 # Needed for installing mmh3 (one of the required packages in setup.py).
 RUN apt install -y g++
 
+# Install Pysam dependencies. These dependencies are only required becuase we
+# have a monolithic binary - they primarily have to be installed on the workers.
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    gcc \
+    libbz2-dev \
+    libcurl4-openssl-dev \
+    liblzma-dev \
+    libssl-dev \
+    make \
+    perl \
+    zlib1g-dev \
+    python-pip
+
 # Install dependencies.
-RUN pip install --upgrade pip && pip install --upgrade virtualenv && \
+RUN python -m pip install --upgrade pip && \
+    python -m pip install --upgrade virtualenv && \
     virtualenv /opt/gcp_variant_transforms/venv && \
     . /opt/gcp_variant_transforms/venv/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    pip install --upgrade --no-binary pyvcf .
+    python -m pip install --upgrade .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv/bin/activate && cd /opt/gcp_variant_transforms/src" \
@@ -47,3 +72,5 @@ RUN printf '#!/bin/bash\n%s\n%s' \
       'python -m gcp_variant_transforms.bq_to_vcf --setup_file ./setup.py "$@"' > \
       /opt/gcp_variant_transforms/bin/bq_to_vcf && \
     chmod +x /opt/gcp_variant_transforms/bin/bq_to_vcf
+
+ENTRYPOINT ["/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh"]

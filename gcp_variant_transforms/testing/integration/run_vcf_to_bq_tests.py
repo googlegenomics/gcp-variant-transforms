@@ -16,7 +16,7 @@ r"""Integration testing runner for Variant Transforms' VCF to BigQuery pipeline.
 
 To define a new integration test case, create a json file in
 `gcp_variant_transforms/testing/integration/vcf_to_bq_tests` directory and
-specify at least test_name, table_name, and input_pattern for the integration
+specify at least test_name and table_name for the integration
 test. You may add multiple test cases (Now at most two are supported) in one
 json file, and the second test case will run after the first one finishes.
 
@@ -24,6 +24,7 @@ You may run this test in any project (the test files are publicly accessible).
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
   --project myproject \
+  --region us-central1 \
   --staging_location gs://mybucket/staging \
   --temp_location gs://mybucket/temp \
   --logging_location gs://mybucket/temp/integration_test_logs
@@ -39,24 +40,26 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
+from concurrent.futures import TimeoutError
 import enum
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
+
+from apache_beam.io import filesystems
 
 # TODO(bashir2): Figure out why pylint can't find this.
 # pylint: disable=no-name-in-module,import-error
 from google.cloud import bigquery
-from oauth2client.client import GoogleCredentials
 
+from gcp_variant_transforms.libs import bigquery_util
 from gcp_variant_transforms.testing.integration import run_tests_common
 
-_PIPELINE_NAME = 'gcp-variant-transforms-vcf-to-bq-integration-test'
-_SCOPES = ['https://www.googleapis.com/auth/bigquery']
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq'
+_TOOL_NAME = 'vcf_to_bq'
 _BASE_TEST_FOLDER = 'gcp_variant_transforms/testing/integration/vcf_to_bq_tests'
-
+_NUM_QUERY_RETIRES = 3
 
 class VcfToBQTestCase(run_tests_common.TestCaseInterface):
   """Test case that holds information to run in Pipelines API."""
@@ -65,42 +68,43 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
                context,  # type: TestContextManager
                test_name,  # type: str
                table_name,  # type: str
-               input_pattern,  # type: str
                assertion_configs,  # type: List[Dict]
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
-    dataset_id = context.dataset_id
-    self._table_name = '{}.{}'.format(dataset_id, table_name)
+    self._dataset_id = context.dataset_id
+    self._table_id = table_name
+    dataset_table = '{}.{}'.format(self._dataset_id, self._table_id)
     self._name = test_name
     self._project = context.project
-    output_table = '{}:{}'.format(context.project, self._table_name)
+    full_table_id = '{}:{}'.format(self._project, dataset_table)
     self._assertion_configs = assertion_configs
-    args = ['--input_pattern {}'.format(input_pattern),
-            '--output_table {}'.format(output_table),
-            '--project {}'.format(context.project),
+    args = ['--output_table {}'.format(full_table_id),
             '--staging_location {}'.format(context.staging_location),
             '--temp_location {}'.format(context.temp_location),
-            '--job_name {}-{}'.format(test_name, dataset_id.replace('_', '-'))]
+            '--job_name {}-{}'.format(test_name, self._dataset_id.replace('_',
+                                                                          '-'))]
     for k, v in kwargs.iteritems():
       value = v
       if isinstance(v, basestring):
-        value = v.format(TABLE_NAME=self._table_name)
+        value = v.format(TABLE_NAME=full_table_id)
       args.append('--{} {}'.format(k, value))
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        context.project, context.logging_location, context.image, _SCOPES,
-        _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.run_test_command = run_tests_common.form_command(
+        context.project,
+        context.region,
+        filesystems.FileSystems.join(context.logging_location, full_table_id),
+        context.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
     client = bigquery.Client(project=self._project)
-    query_formatter = QueryFormatter(self._table_name)
+    query_formatter = QueryFormatter(self._dataset_id, self._table_id)
     for assertion_config in self._assertion_configs:
       query = query_formatter.format_query(assertion_config['query'])
       assertion = QueryAssertion(client, self._name, query, assertion_config[
           'expected_result'])
       assertion.run_assertion()
+      time.sleep(5)  # Avoid overwhelming BQ with too many concurrent queries.
 
   def get_name(self):
     return self._name
@@ -118,19 +122,39 @@ class QueryAssertion(object):
 
   def run_assertion(self):
     query_job = self._client.query(self._query)
-    iterator = query_job.result(timeout=60)
-    rows = list(iterator)
-    if len(rows) != 1:
-      raise run_tests_common.TestCaseFailure(
-          'Expected one row in query result, got {} in test {}'.format(
-              len(rows), self._test_name))
-    row = rows[0]
-    if len(self._expected_result) != len(row):
+    num_retries = 0
+    while True:
+      try:
+        results = query_job.result(timeout=300)
+      except TimeoutError as e:
+        print 'WARNING: Time out waiting for query: {}'.format(self._query)
+        if num_retries < _NUM_QUERY_RETIRES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          raise e
+      else:
+        if results.total_rows == 1:
+          break
+        else:
+          print 'ERROR: Query `{}` did not return expected num rows: {}'.format(
+              self._query, results.total_rows)
+          if num_retries < _NUM_QUERY_RETIRES:
+            num_retries += 1
+            time.sleep(90)
+          else:
+            raise run_tests_common.TestCaseFailure(
+                'Expected 1 row query results instead got {} in test {}'.format(
+                    results.total_rows, self._test_name))
+
+    row = list(results)[0]
+    col_names = row.keys()
+    if set(self._expected_result.keys()) != set(col_names):
       raise run_tests_common.TestCaseFailure(
           'Expected {} columns in the query result, got {} in test {}'.format(
-              len(self._expected_result), len(row), self._test_name))
+              self._expected_result.keys(), col_names, self._test_name))
     for key in self._expected_result.keys():
-      if self._expected_result[key] != row.get(key):
+      if self._expected_result.get(key) != row.get(key):
         raise run_tests_common.TestCaseFailure(
             'Column {} mismatch: expected {}, got {} in test {}'.format(
                 key, self._expected_result[key], row.get(key), self._test_name))
@@ -143,14 +167,17 @@ class QueryFormatter(object):
   """
 
   class _QueryMacros(enum.Enum):
-    NUM_ROWS_QUERY = 'SELECT COUNT(0) AS num_rows FROM {TABLE_NAME}'
-    SUM_START_QUERY = (
-        'SELECT SUM(start_position) AS sum_start FROM {TABLE_NAME}')
-    SUM_END_QUERY = 'SELECT SUM(end_position) AS sum_end FROM {TABLE_NAME}'
+    NUM_OUTPUT_TABLES = (
+        'SELECT COUNT(0) AS num_tables FROM `{DATASET_ID}.__TABLES_SUMMARY__` '
+        'WHERE STARTS_WITH(table_id, "{TABLE_ID}' +
+        bigquery_util.TABLE_SUFFIX_SEPARATOR + '") '
+        'OR STARTS_WITH(table_id, "{TABLE_ID}_samples' +
+        bigquery_util.TABLE_SUFFIX_SEPARATOR + '")')
 
-  def __init__(self, table_name):
-    # type: (str) -> None
-    self._table_name = table_name
+  def __init__(self, dataset_id, table_id):
+    # type: (str, str) -> None
+    self._dataset_id = dataset_id
+    self._table_id = table_id
 
   def format_query(self, query):
     # type: (List[str]) -> str
@@ -164,7 +191,8 @@ class QueryFormatter(object):
     return self._replace_variables(self._replace_macros(' '.join(query)))
 
   def _replace_variables(self, query):
-    return query.format(TABLE_NAME=self._table_name)
+    return query.format(TABLE_ID=self._table_id,
+                        DATASET_ID=self._dataset_id)
 
   def _replace_macros(self, query):
     for macro in self._QueryMacros:
@@ -186,7 +214,7 @@ class TestContextManager(object):
     self.temp_location = args.temp_location
     self.logging_location = args.logging_location
     self.project = args.project
-    self.credentials = GoogleCredentials.get_application_default()
+    self.region = args.region
     self.image = args.image
     self._keep_tables = args.keep_tables
     self.revalidation_dataset_id = args.revalidation_dataset_id
@@ -201,6 +229,7 @@ class TestContextManager(object):
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
       dataset = bigquery.Dataset(dataset_ref)
+      dataset.location = 'US'
       _ = client.create_dataset(dataset)  # See #171, pylint: disable=no-member
     return self
 
@@ -210,15 +239,7 @@ class TestContextManager(object):
       client = bigquery.Client(project=self.project)
       dataset_ref = client.dataset(self.dataset_id)
       dataset = bigquery.Dataset(dataset_ref)
-      tables = client.list_tables(dataset)
-      # Delete tables, otherwise dataset deletion will fail because it is still
-      # "in use".
-      for table in tables:
-        # The returned tables are of type TableListItem, but delete_table
-        # needs Table or TableReference.
-        client.delete_table(
-            bigquery.TableReference(dataset_ref, table.table_id))
-      client.delete_dataset(dataset)
+      client.delete_dataset(dataset, delete_contents=True)
 
 
 def _get_args():
@@ -241,6 +262,12 @@ def _get_args():
             'is used in a previous run. Example: '
             '--revalidation_dataset_id integration_tests_20180118_014812'))
   parser.add_argument(
+      '--test_file_suffix',
+      default='',
+      help=('If provided, only the test files in `vcf_to_bq_tests` '
+            'that end with the provided string (must include the file '
+            'extension) will run.'))
+  parser.add_argument(
       '--test_name_prefix',
       default='',
       help=('If provided, all test names will have this prefix. Mainly, to '
@@ -248,13 +275,15 @@ def _get_args():
   return parser.parse_args()
 
 
-def _get_test_configs(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> List[List[Dict]]
-  """Gets all test configs in integration directory and subdirectories."""
-  required_keys = ['test_name', 'table_name', 'input_pattern',
-                   'assertion_configs']
-  test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests)
-  test_configs = run_tests_common.get_configs(test_file_path, required_keys)
+def _get_test_configs(run_presubmit_tests, run_all_tests, test_file_suffix=''):
+  # type: (bool, bool, str) -> List[List[Dict]]
+  """Gets all test configs."""
+  required_keys = ['test_name', 'table_name', 'assertion_configs']
+  test_file_path = _get_test_file_path(run_presubmit_tests, run_all_tests,
+                                       test_file_suffix)
+  test_configs = run_tests_common.get_configs(test_file_path,
+                                              required_keys,
+                                              test_file_suffix)
   for test_case_configs in test_configs:
     for test_config in test_case_configs:
       assertion_configs = test_config['assertion_configs']
@@ -263,9 +292,11 @@ def _get_test_configs(run_presubmit_tests, run_all_tests):
   return test_configs
 
 
-def _get_test_file_path(run_presubmit_tests, run_all_tests):
-  # type: (bool, bool) -> str
-  if run_all_tests:
+def _get_test_file_path(run_presubmit_tests,
+                        run_all_tests,
+                        test_file_suffix=''):
+  # type: (bool, bool, str) -> str
+  if run_all_tests or test_file_suffix:
     test_file_path = os.path.join(os.getcwd(), _BASE_TEST_FOLDER)
   elif run_presubmit_tests:
     test_file_path = os.path.join(
@@ -287,7 +318,7 @@ def _validate_assertion_config(assertion_config):
 def main():
   args = _get_args()
   test_configs = _get_test_configs(
-      args.run_presubmit_tests, args.run_all_tests)
+      args.run_presubmit_tests, args.run_all_tests, args.test_file_suffix)
   with TestContextManager(args) as context:
     tests = []
     for test_case_configs in test_configs:
@@ -304,5 +335,7 @@ def main():
 
 
 if __name__ == '__main__':
+  print 'Starting vcf_to_bq tests...'
   ret_code = main()
+  print 'Finished all vcf_to_bq tests successfully.'
   sys.exit(ret_code)

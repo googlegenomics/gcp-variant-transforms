@@ -18,11 +18,9 @@ from collections import OrderedDict
 
 import unittest
 
-from vcf import parser
-from vcf.parser import _Info as Info
-
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io.vcf_header_io import CreateInfoField as createInfo
 from gcp_variant_transforms.libs import metrics_util
 from gcp_variant_transforms.libs import processed_variant
 from gcp_variant_transforms.libs.annotation import annotation_parser
@@ -30,6 +28,7 @@ from gcp_variant_transforms.libs.annotation import annotation_parser
 # referencing the counter names are too long and hard to read.
 from gcp_variant_transforms.libs.processed_variant import _CounterEnum as CEnum
 from gcp_variant_transforms.testing import vcf_header_util
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 class _CounterSpy(metrics_util.CounterInterface):
@@ -65,9 +64,9 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
         filters=['PASS'],
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
-            vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+            vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
-            vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
 
   def test_create_processed_variant_no_change(self):
@@ -110,6 +109,57 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
     self.assertFalse(proc_var.non_alt_info.has_key('A2'))
 
+  def test_create_processed_variant_move_alt_info_extra_values(self):
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
+    variant = self._get_sample_variant()
+    # Add a value to `A2` (it only has two alternate bases, so this is invalid).
+    variant.info['A2'] = ['data1', 'data2', 'data3']
+
+    # Ensure error is raised by default.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True)
+    with self.assertRaises(ValueError):
+      _ = factory.create_processed_variant(variant)
+
+    # Try again with allow_alternate_allele_info_mismatch=True.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        allow_alternate_allele_info_mismatch=True)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('A')
+    alt1._info = {'A2': 'data1'}
+    alt2 = processed_variant.AlternateBaseData('TT')
+    alt2._info = {'A2': 'data2'}
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+
+  def test_create_processed_variant_move_alt_info_insufficient_values(self):
+    header_fields = vcf_header_util.make_header({'A1': '1', 'A2': 'A'})
+    variant = self._get_sample_variant()
+    # Remove a value from `A2` (it has two alternate bases, so this is invalid).
+    variant.info['A2'] = ['data1']
+
+    # Ensure error is raised by default.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True)
+    with self.assertRaises(ValueError):
+      _ = factory.create_processed_variant(variant)
+
+    # Try again with allow_alternate_allele_info_mismatch=True.
+    factory = processed_variant.ProcessedVariantFactory(
+        header_fields,
+        split_alternate_allele_info_fields=True,
+        allow_alternate_allele_info_mismatch=True)
+    proc_var = factory.create_processed_variant(variant)
+    alt1 = processed_variant.AlternateBaseData('A')
+    alt1._info = {'A2': 'data1'}
+    alt2 = processed_variant.AlternateBaseData('TT')
+    self.assertEqual(proc_var.alternate_data_list, [alt1, alt2])
+    self.assertFalse(proc_var.non_alt_info.has_key('A2'))
+
   def _get_sample_variant_and_header_with_csq(self, additional_infos=None):
     """Provides a simple `Variant` and `VcfHeader` with info fields
 
@@ -121,14 +171,14 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     variant = self._get_sample_variant()
     variant.info['CSQ'] = ['A|C1|I1|S1|G1', 'TT|C2|I2|S2|G2', 'A|C3|I3|S3|G3']
     infos = OrderedDict([
-        ('A1', Info('A1', 1, None, '', None, None)),
-        ('A2', Info('A2', parser.field_counts['A'], None, '', None, None)),
-        ('CSQ', Info('CSQ',
-                     parser.field_counts['.'],
-                     None,
-                     'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
-                     None,
-                     None))])
+        ('A1', createInfo('A1', 1, '.', 'desc', None, None)),
+        ('A2', createInfo('A2', 'A', '.', 'desc', None, None)),
+        ('CSQ', createInfo('CSQ',
+                           '.',
+                           '.',
+                           'some desc Allele|Consequence|IMPACT|SYMBOL|Gene',
+                           None,
+                           None))])
     if additional_infos is not None:
       for key, value in additional_infos:
         infos[key] = value
@@ -429,9 +479,8 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
             CEnum.ANNOTATION_ALT_MINIMAL_AMBIGUOUS.value].get_value(), 1)
 
   def test_create_processed_variant_annotation_alt_allele_num(self):
-    csq_info = parser._Info(
-        id=None, num='.', type=None,
-        desc='some desc Allele|Consequence|IMPACT|ALLELE_NUM',
+    csq_info = createInfo(
+        None, '.', '.', 'some desc Allele|Consequence|IMPACT|ALLELE_NUM',
         source=None, version=None)
     header_fields = vcf_header_io.VcfHeader(infos={'CSQ': csq_info})
     variant = vcfio.Variant(
@@ -510,11 +559,12 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
     ids = ['CSQ_Allele_TYPE', 'CSQ_Consequence_TYPE',
            'CSQ_IMPACT_TYPE', 'CSQ_SYMBOL_TYPE']
     types = ['String', 'Integer', 'Integer', 'Float']
-    infos = [(i, Info(i, 1, t, '', None, None)) for i, t in zip(ids, types)]
+    infos = [(i, createInfo(i, 1, t, 'desc', None, None))
+             for i, t in zip(ids, types)]
     _, header_fields = self._get_sample_variant_and_header_with_csq(
         additional_infos=infos)
     for hfi in header_fields.infos.values():
-      if hfi['type'] is None:
+      if hfi['type'] == '.':
         hfi['type'] = 'String'
     factory = processed_variant.ProcessedVariantFactory(
         header_fields,

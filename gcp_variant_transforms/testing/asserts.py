@@ -49,14 +49,28 @@ def count_equals_to(expected_count):
   return _count_equal
 
 
-def has_calls(call_names):
-  """Returns a function for checking presence of calls_names in variants."""
-  def _has_calls(variants):
-    assert_fn = items_equal(call_names)
+def has_sample_ids(sample_ids):
+  """Returns a function for checking presence of sample_ids in variants."""
+  def _has_sample_ids(variants):
+    assert_fn = items_equal(sample_ids)
     for variant in variants:
-      variant_call_names = [call.name for call in variant.calls]
-      assert_fn(variant_call_names)
-  return _has_calls
+      variant_sample_ids = [call.sample_id for call in variant.calls]
+      assert_fn(variant_sample_ids)
+  return _has_sample_ids
+
+
+def dict_values_equal(expected_dict):
+  """Verifies that dictionary is the same as expected."""
+  def _items_equal(actual_dict):
+    actual = actual_dict[0]
+    for k in expected_dict:
+      if k not in actual or expected_dict[k] != actual[k]:
+        raise BeamAssertException(
+            'Failed assert: %s == %s' % (expected_dict, actual))
+    if len(expected_dict) != len(actual):
+      raise BeamAssertException(
+          'Failed assert: %s == %s' % (expected_dict, actual))
+  return _items_equal
 
 
 def header_vars_equal(expected):

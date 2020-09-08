@@ -44,7 +44,7 @@ def compose_gcs_vcf_shards(project,  # type: str
   Args:
     project: The project name.
     vcf_header_file_path: The path of the VCF header file, it contains the meta
-      information, as well as the data header line with the call names.
+      information, as well as the data header line with the sample names.
     vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
     delete: If true, delete the original VCF shards.
@@ -81,7 +81,7 @@ def compose_local_vcf_shards(vcf_header_file_path,
 
   Args:
     vcf_header_file_path: The path of the VCF header file, it contains the meta
-      information, as well as the data header line with the call names.
+      information, as well as the data header line with the sample names.
     vcf_data_files_folder: The folder that contains all VCF data files.
     output_file: The final VCF file path.
   """
@@ -179,6 +179,8 @@ class MultiProcessComposer(object):
     """
     blobs_to_be_composed = list(self._bucket.list_blobs(prefix=blob_prefix))
     logging.info('Total number of blobs is %d.', len(blobs_to_be_composed))
+    if not blobs_to_be_composed:
+      raise RuntimeError('No VCF shards found.')
     if len(blobs_to_be_composed) == 1:
       return blobs_to_be_composed[0]
     new_blob_prefix = filesystems.FileSystems.join(blob_prefix, 'composed_')

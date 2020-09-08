@@ -81,7 +81,7 @@ class VepRunnerTest(unittest.TestCase):
         self._mock_service, _ASSEMBLY, _SPECIES,
         _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
-        pipeline_args or self._get_pipeline_args())
+        pipeline_args or self._get_pipeline_args(), None, 30)
     return test_object
 
   def _get_pipeline_args(self, num_workers=1):
@@ -105,15 +105,17 @@ class VepRunnerTest(unittest.TestCase):
     self.assertEqual(test_instance._vep_cache_path, _CACHE)
     test_instance = vep_runner.VepRunner(
         self._mock_service, _SPECIES, _ASSEMBLY, _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
+        None, 30)
     self.assertEqual(test_instance._vep_cache_path,
-                     ('gs://gcp-variant-annotation-vep-cache/'
+                     ('gs://cloud-lifesciences/vep/'
                       'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
     test_instance = vep_runner.VepRunner(
         self._mock_service, 'mouse', 'mm9', _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args())
+        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
+        None, 30)
     self.assertEqual(test_instance._vep_cache_path,
-                     ('gs://gcp-variant-annotation-vep-cache/'
+                     ('gs://cloud-lifesciences/vep/'
                       'vep_cache_mouse_mm9_91.tar.gz'))
 
   def test_get_output_pattern(self):
@@ -156,7 +158,7 @@ class VepRunnerTest(unittest.TestCase):
     self._mock_service.projects = mock.Mock(return_value=mock_projects)
     mock_projects.operations = mock.Mock(return_value=mock_opearations)
     mock_opearations.get = mock.Mock(return_value=mock_request)
-    mock_request.execute = mock.Mock(return_value={'done': True})
+    mock_request.execute = mock.Mock(return_value={'done': True, 'error': {}})
     test_instance = self._create_test_instance()
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
@@ -166,6 +168,22 @@ class VepRunnerTest(unittest.TestCase):
       test_instance.wait_until_done()
       # Since all operations are done, the next call should raise no exceptions.
       test_instance.run_on_all_files()
+
+  def test_wait_until_done_fail(self):
+    mock_projects = mock.Mock()
+    mock_opearations = mock.Mock()
+    mock_request = mock.Mock()
+    self._mock_service.projects = mock.Mock(return_value=mock_projects)
+    mock_projects.operations = mock.Mock(return_value=mock_opearations)
+    mock_opearations.get = mock.Mock(return_value=mock_request)
+    mock_request.execute = mock.Mock(return_value={
+        'done': True, 'error': {'message': 'failed'}})
+
+    test_instance = self._create_test_instance()
+    with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
+      test_instance.run_on_all_files()
+      with self.assertRaisesRegexp(RuntimeError, '.*failed.*retries.*'):
+        test_instance.wait_until_done()
 
 
 class PipelinesSpy(object):

@@ -25,6 +25,7 @@ from apache_beam.transforms import Create
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs.variant_merge import move_to_calls_strategy
 from gcp_variant_transforms.testing import asserts
+from gcp_variant_transforms.testing.testdata_util import hash_name
 from gcp_variant_transforms.transforms import merge_variants
 
 
@@ -39,10 +40,10 @@ class MergeVariantsTest(unittest.TestCase):
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'HQ': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FLAG1': True}),
         ]
     )
@@ -52,9 +53,9 @@ class MergeVariantsTest(unittest.TestCase):
         filters=['q10'],
         info={'A1': 'some data2', 'A3': ['data3', 'data4']},
         calls=[
-            vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
+            vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
             vcfio.VariantCall(
-                name='Sample4', genotype=[1, 0],
+                sample_id=hash_name('Sample4'), genotype=[1, 0],
                 info={'GQ': 20}),
         ]
     )
@@ -65,16 +66,16 @@ class MergeVariantsTest(unittest.TestCase):
         info={'A2': ['data1', 'data2'], 'A3': ['data3', 'data4']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FLAG1': True, 'A1': 'some data'}),
             vcfio.VariantCall(
-                name='Sample3', genotype=[1, 1],
+                sample_id=hash_name('Sample3'), genotype=[1, 1],
                 info={'A1': 'some data2'}),
             vcfio.VariantCall(
-                name='Sample4', genotype=[1, 0],
+                sample_id=hash_name('Sample4'), genotype=[1, 0],
                 info={'GQ': 20, 'A1': 'some data2'}),
         ]
     )
@@ -85,12 +86,14 @@ class MergeVariantsTest(unittest.TestCase):
     variant_1 = vcfio.Variant(
         reference_name='19', start=123, end=125, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs2'],
-        calls=[vcfio.VariantCall(name='Unmerged1', genotype=[0, 1])])
+        calls=[vcfio.VariantCall(sample_id=hash_name('Unmerged1'),
+                                 genotype=[0, 1])])
     # Ordering of alternate_bases is different from merged variants.
     variant_2 = vcfio.Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
         alternate_bases=['TT', 'A'], names=['rs3'],
-        calls=[vcfio.VariantCall(name='Unmerged2', genotype=[0, 1])])
+        calls=[vcfio.VariantCall(sample_id=hash_name('Unmerged2'),
+                                 genotype=[0, 1])])
     return [variant_1, variant_2]
 
   def test_merge_variants(self):
@@ -101,7 +104,7 @@ class MergeVariantsTest(unittest.TestCase):
     pipeline = TestPipeline()
     merged_variants = (
         pipeline
-        | Create(variant_list + unmerged_variant_list)
+        | Create(variant_list + unmerged_variant_list, reshuffle=False)
         | 'MergeVariants' >> merge_variants.MergeVariants(variant_merger))
     assert_that(merged_variants,
                 asserts.variants_equal_to_ignore_order([merged_variant] +

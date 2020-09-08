@@ -15,9 +15,15 @@
 from __future__ import absolute_import
 
 import unittest
+from apitools.base.py import exceptions
+
+import mock
+from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
+from gcp_variant_transforms.libs.bigquery_util import TableFieldConstants
 
 
 class BigqueryUtilTest(unittest.TestCase):
@@ -69,7 +75,7 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.get_vcf_type_from_bigquery_type, 'DUMMY')
 
   def test_get_vcf_num_from_bigquery_schema(self):
-    self.assertEqual(None,
+    self.assertEqual('.',
                      bigquery_util.get_vcf_num_from_bigquery_schema(
                          bigquery_util.TableFieldConstants.MODE_REPEATED,
                          bigquery_util.TableFieldConstants.TYPE_INTEGER))
@@ -87,3 +93,391 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.get_vcf_num_from_bigquery_schema(
             bigquery_mode=None,
             bigquery_type=bigquery_util.TableFieldConstants.TYPE_BOOLEAN))
+
+
+  def test_merge_field_schemas_no_same_id(self):
+    field_schemas_1 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='IFR',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_REPEATED,
+            description='INFO foo desc')
+    ]
+    field_schemas_2 = [
+        bigquery.TableFieldSchema(
+            name='AB',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    merged_field_schemas = bigquery_util._get_merged_field_schemas(
+        field_schemas_1, field_schemas_2)
+    expected_merged_field_schemas = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='IFR',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_REPEATED,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='AB',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    self.assertEqual(merged_field_schemas, expected_merged_field_schemas)
+
+  def test_merge_field_schemas_same_id_no_conflicts(self):
+    field_schemas_1 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='IFR',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_REPEATED,
+            description='INFO foo desc')
+    ]
+    field_schemas_2 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='AB',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    merged_field_schemas = bigquery_util._get_merged_field_schemas(
+        field_schemas_1, field_schemas_2)
+    expected_merged_field_schemas = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='IFR',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_REPEATED,
+            description='INFO foo desc'),
+        bigquery.TableFieldSchema(
+            name='AB',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    self.assertEqual(merged_field_schemas, expected_merged_field_schemas)
+
+  def test_merge_field_schemas_conflict_mode(self):
+    field_schemas_1 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    field_schemas_2 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_REPEATED,
+            description='INFO foo desc')
+    ]
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
+                      field_schemas_1, field_schemas_2)
+
+  def test_merge_field_schemas_conflict_type(self):
+    field_schemas_1 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_INTEGER,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    field_schemas_2 = [
+        bigquery.TableFieldSchema(
+            name='II',
+            type=TableFieldConstants.TYPE_FLOAT,
+            mode=TableFieldConstants.MODE_NULLABLE,
+            description='INFO foo desc')
+    ]
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
+                      field_schemas_1, field_schemas_2)
+
+  def test_merge_field_schemas_conflict_record_fields(self):
+    call_record_1 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_1.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    field_schemas_1 = [call_record_1]
+
+    call_record_2 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_2.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    field_schemas_2 = [call_record_2]
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
+                      field_schemas_1, field_schemas_2)
+
+  def test_merge_field_schemas_same_record(self):
+    call_record_1 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_1.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+
+    field_schemas_1 = [call_record_1]
+    field_schemas_2 = [call_record_1]
+
+    expected_merged_field_schemas = [call_record_1]
+    self.assertEqual(
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
+        expected_merged_field_schemas)
+
+  def test_merge_field_schemas_merge_record_fields(self):
+    call_record_1 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_1.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+
+    field_schemas_1 = [call_record_1]
+
+    call_record_2 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_2.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    field_schemas_2 = [call_record_2]
+
+    call_record_3 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    call_record_3.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_BOOLEAN,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+    call_record_3.fields.append(bigquery.TableFieldSchema(
+        name='GQ',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='FORMAT foo desc'))
+
+    expected_merged_field_schemas = [call_record_3]
+    self.assertEqual(
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
+        expected_merged_field_schemas)
+
+  def test_merge_field_schemas_conflict_inner_record_fields(self):
+    record_1 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_1 = bigquery.TableFieldSchema(
+        name='inner record',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_1.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    record_1.fields.append(inner_record_1)
+    field_schemas_1 = [record_1]
+
+    record_2 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_2 = bigquery.TableFieldSchema(
+        name='inner record',
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_2.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    record_2.fields.append(inner_record_2)
+    field_schemas_2 = [record_2]
+    self.assertRaises(ValueError, bigquery_util._get_merged_field_schemas,
+                      field_schemas_1, field_schemas_2)
+
+  def test_merge_field_schemas_merge_inner_record_fields(self):
+    record_1 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_1 = bigquery.TableFieldSchema(
+        name='inner record',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_1.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    record_1.fields.append(inner_record_1)
+    field_schemas_1 = [record_1]
+
+    record_2 = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_2 = bigquery.TableFieldSchema(
+        name='inner record',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    inner_record_2.fields.append(bigquery.TableFieldSchema(
+        name='AB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    record_2.fields.append(inner_record_2)
+    field_schemas_2 = [record_2]
+
+    merged_record = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    merged_inner_record = bigquery.TableFieldSchema(
+        name='inner record',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    merged_inner_record.fields.append(bigquery.TableFieldSchema(
+        name='FB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    merged_inner_record.fields.append(bigquery.TableFieldSchema(
+        name='AB',
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='FORMAT foo desc'))
+    merged_record.fields.append(merged_inner_record)
+    expected_merged_field_schemas = [merged_record]
+    self.assertEqual(
+        bigquery_util._get_merged_field_schemas(field_schemas_1,
+                                                field_schemas_2),
+        expected_merged_field_schemas)
+
+
+  def test_table_exist(self):
+    client = mock.Mock()
+    client.tables.Get.return_value = bigquery.Table(
+        tableReference=bigquery.TableReference(
+            projectId='project', datasetId='dataset', tableId='table'))
+    self.assertEqual(
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
+        True)
+
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    self.assertEqual(
+        bigquery_util.table_exist(client, 'project', 'dataset', 'table'),
+        False)
+
+    client.tables.Get.side_effect = exceptions.HttpError(
+        response={'status': '401'}, url='', content='')
+    self.assertRaises(exceptions.HttpError,
+                      bigquery_util.table_exist,
+                      client, 'project', 'dataset', 'table')
+
+  def test_raise_error_if_dataset_not_exists(self):
+    client = mock.Mock()
+    client.datasets.Get.return_value = bigquery.Dataset(
+        datasetReference=bigquery.DatasetReference(
+            projectId='project', datasetId='dataset'))
+    bigquery_util.raise_error_if_dataset_not_exists(client,
+                                                    'project',
+                                                    'dataset')
+
+    client.datasets.Get.side_effect = exceptions.HttpError(
+        response={'status': '404'}, url='', content='')
+    self.assertRaises(ValueError,
+                      bigquery_util.raise_error_if_dataset_not_exists,
+                      client, 'project', 'dataset')
+
+    client.datasets.Get.side_effect = exceptions.HttpError(
+        response={'status': '401'}, url='', content='')
+    self.assertRaises(exceptions.HttpError,
+                      bigquery_util.raise_error_if_dataset_not_exists,
+                      client, 'project', 'dataset')
+
+  def test_get_table_base_name(self):
+    without_suffix1 = 'project_id.dataset_id.table_id'
+    without_suffix2 = 'project_id:dataset_id.table_id'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(without_suffix1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(without_suffix2))
+
+    with_suffix1 = without_suffix1 + '___chr1'
+    with_suffix2 = without_suffix2 + '___chr1'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(with_suffix1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(with_suffix2))
+
+    with_two_suffixes1 = with_suffix1 + '___extra_suffix'
+    with_two_suffixes2 = with_suffix2 + '___extra_suffix'
+    self.assertEqual(without_suffix1,
+                     bigquery_util.get_table_base_name(with_two_suffixes1))
+    self.assertEqual(without_suffix2,
+                     bigquery_util.get_table_base_name(with_two_suffixes2))

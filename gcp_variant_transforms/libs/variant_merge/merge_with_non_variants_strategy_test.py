@@ -22,6 +22,7 @@ import unittest
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.libs.bigquery_util import ColumnKeyConstants
 from gcp_variant_transforms.libs.variant_merge import merge_with_non_variants_strategy
+from gcp_variant_transforms.testing.testdata_util import hash_name
 
 
 class MergeWithNonVariantsStrategyTest(unittest.TestCase):
@@ -34,9 +35,9 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         filters=['PASS'],
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
-            vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+            vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                               info={'GQ': 20, 'HQ': [10, 20]}),
-            vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                               info={'GQ': 10, 'FLAG1': True})])
     variant_2 = vcfio.Variant(
         reference_name='19', start=11, end=12, reference_bases='C',
@@ -44,8 +45,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         filters=['q10'],
         info={'A1': 'some data2', 'A3': ['data3', 'data4']},
         calls=[
-            vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
-            vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+            vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
+            vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                               info={'GQ': 20})])
     return [variant_1, variant_2]
 
@@ -75,12 +76,13 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20]}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0], info={'GQ': 20})],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
+                           info={'GQ': 20})],
         merged_variant.calls)
     self.assertItemsEqual(['A1', 'A2', 'A3'], merged_variant.info.keys())
     self.assertTrue(
@@ -98,11 +100,11 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']})],
@@ -112,18 +114,18 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20,
                                  ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']})],
@@ -144,9 +146,9 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True, 'A1': 'some data'})],
         single_merged_variant.calls)
 
@@ -154,13 +156,13 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20], 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True, 'A1': 'some data'}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={'A1': 'some data2'}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20, 'A1': 'some data2'})],
         merged_variant.calls)
     self.assertItemsEqual(['A2', 'A3'], merged_variant.info.keys())
@@ -177,12 +179,12 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     # Test single variant merge.
     single_merged_variant = list(strategy.get_merged_variants([variants[0]]))[0]
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
@@ -192,21 +194,21 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
     merged_variant = list(strategy.get_merged_variants(variants))[0]
     self._assert_common_expected_merged_fields(merged_variant)
     self.assertEqual(
-        [vcfio.VariantCall(name='Sample1', genotype=[0, 1],
+        [vcfio.VariantCall(sample_id=hash_name('Sample1'), genotype=[0, 1],
                            info={'GQ': 20, 'HQ': [10, 20],
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample2', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample2'), genotype=[1, 0],
                            info={'GQ': 10, 'FLAG1': True,
                                  'A1': 'some data', 'A2': ['data1', 'data2'],
                                  ColumnKeyConstants.QUALITY: 2,
                                  ColumnKeyConstants.FILTER: ['PASS']}),
-         vcfio.VariantCall(name='Sample3', genotype=[1, 1],
+         vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1],
                            info={'A1': 'some data2', 'A3': ['data3', 'data4'],
                                  ColumnKeyConstants.QUALITY: 20,
                                  ColumnKeyConstants.FILTER: ['q10']}),
-         vcfio.VariantCall(name='Sample4', genotype=[1, 0],
+         vcfio.VariantCall(sample_id=hash_name('Sample4'), genotype=[1, 0],
                            info={'GQ': 20,
                                  'A1': 'some data2', 'A3': ['data3', 'data4'],
                                  ColumnKeyConstants.QUALITY: 20,
@@ -252,9 +254,12 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                               end=2,
                               reference_bases='A',
                               alternate_bases=['T'])
-    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 0]))
-    variant_3.calls.append(vcfio.VariantCall(name='Sample3', genotype=[1, 0]))
+    variant_1.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample1'),
+                                             genotype=[1, 0]))
+    variant_2.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample2'),
+                                             genotype=[1, 0]))
+    variant_3.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample3'),
+                                             genotype=[1, 0]))
     variants = [variant_1, variant_2, variant_3]
     merged_variants = list(strategy.get_merged_variants(variants))
     self.assertEqual(sorted(merged_variants), sorted(variants))
@@ -283,18 +288,24 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
                               end=2,
                               reference_bases='A',
                               alternate_bases=['C'])
-    variant_1.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
-    variant_2.calls.append(vcfio.VariantCall(name='Sample2', genotype=[1, 0]))
-    variant_3.calls.append(vcfio.VariantCall(name='Sample3', genotype=[1, 0]))
-    variant_4.calls.append(vcfio.VariantCall(name='Sample4', genotype=[1, 0]))
+    variant_1.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample1'),
+                                             genotype=[1, 0]))
+    variant_2.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample2'),
+                                             genotype=[1, 0]))
+    variant_3.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample3'),
+                                             genotype=[1, 0]))
+    variant_4.calls.append(vcfio.VariantCall(sample_id=hash_name('Sample4'),
+                                             genotype=[1, 0]))
     variants = [variant_1, variant_2, variant_3, variant_4]
     merged = vcfio.Variant(reference_name='1',
                            start=1,
                            end=2,
                            reference_bases='A',
                            alternate_bases=['C'])
-    merged.calls.append(vcfio.VariantCall(name='Sample1', genotype=[1, 0]))
-    merged.calls.append(vcfio.VariantCall(name='Sample4', genotype=[1, 0]))
+    merged.calls.append(vcfio.VariantCall(
+        sample_id=hash_name('Sample1'), genotype=[1, 0]))
+    merged.calls.append(vcfio.VariantCall(
+        sample_id=hash_name('Sample4'), genotype=[1, 0]))
     merged_variants = list(strategy.get_merged_variants(variants))
     self.assertEqual(
         sorted(merged_variants), sorted([merged, variant_2, variant_3]))
@@ -319,8 +330,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
         quality=2)
-    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[0, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     non_variant_1.calls.append(call_1)
     non_variant_2.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -376,8 +387,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
         quality=2)
-    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[0, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     non_variant_1.calls.append(call_1)
     non_variant_2.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -426,8 +437,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         names=['nonv2', 'nonv3'],
         filters=['f2', 'f3'],
         quality=2)
-    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[0, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     non_variant_1.calls.append(call_1)
     non_variant_2.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -477,8 +488,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         filters=['nvf'],
         quality=2)
 
-    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[1, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     variant.calls.append(call_1)
     non_variant.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -537,8 +548,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         filters=['nvf'],
         quality=2)
 
-    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[1, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     variant.calls.append(call_1)
     non_variant.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -587,8 +598,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         filters=['nvf'],
         quality=2)
 
-    call_1 = vcfio.VariantCall(name='1', genotype=[1, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[0, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[1, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[0, 0])
     variant.calls.append(call_1)
     non_variant.calls.append(call_2)
     expected_1 = vcfio.Variant(
@@ -637,8 +648,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         names=['mnp2', 'mnp3'],
         filters=['f2', 'f3'],
         quality=2)
-    call_1 = vcfio.VariantCall(name='1', genotype=[1, 2])
-    call_2 = vcfio.VariantCall(name='2', genotype=[2, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[1, 2])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[2, 0])
     expected = vcfio.Variant(
         reference_name='1',
         start=5,
@@ -711,8 +722,8 @@ class MergeWithNonVariantsStrategyTest(unittest.TestCase):
         end=6,
         reference_bases='C',
         alternate_bases=['A'])
-    call_1 = vcfio.VariantCall(name='1', genotype=[0, 0])
-    call_2 = vcfio.VariantCall(name='2', genotype=[1, 0])
+    call_1 = vcfio.VariantCall(sample_id=hash_name('1'), genotype=[0, 0])
+    call_2 = vcfio.VariantCall(sample_id=hash_name('2'), genotype=[1, 0])
     non_variant.calls.append(call_1)
     variant.calls.append(call_2)
     expected_1 = vcfio.Variant(

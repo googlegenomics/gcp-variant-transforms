@@ -5,55 +5,98 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/infer-header-fields.vcf",
     "infer_headers": "True",
     "allow_incompatible_records": "True",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "assertion_configs": [
       {
-        "query": ["NUM_ROWS_QUERY"],
-        "expected_result": {"num_rows": 3}
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
       },
       {
-        "query": ["SELECT COUNT(AA) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 3}
-      },
-      {
-        "query": ["SELECT COUNT(AF) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 3}
-      },
-      {
-        "query": ["SELECT COUNT(DB) AS cnt FROM {TABLE_NAME}"],
+        "query": ["SELECT COUNT(AA) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
         "expected_result": {"cnt": 1}
       },
       {
-        "query": ["SELECT COUNT(DP) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 3}
-      },
-      {
-        "query": ["SELECT COUNT(H2) AS cnt FROM {TABLE_NAME}"],
+        "query": ["SELECT COUNT(AF) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
         "expected_result": {"cnt": 1}
       },
       {
-        "query": ["SELECT COUNT(NS) AS cnt FROM {TABLE_NAME}"],
-        "expected_result": {"cnt": 3}
+        "query": ["SELECT COUNT(DB) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"cnt": 1}
+      },
+      {
+        "query": ["SELECT COUNT(DP) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"cnt": 1}
+      },
+      {
+        "query": ["SELECT COUNT(H2) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"cnt": 1}
+      },
+      {
+        "query": ["SELECT COUNT(NS) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
+        "expected_result": {"cnt": 1}
       },
       {
         "query": [
-          "SELECT SUM(HQ) AS sum FROM {TABLE_NAME} t, t.call as call,",
+          "SELECT SUM(HQ) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr19` t, t.call as call,",
           "call.HQ as HQ"
         ],
-        "expected_result": {"sum": 274}
+        "expected_result": {"sum": 204}
       },
       {
         "query": [
-          "SELECT SUM(call.GQ) AS sum FROM {TABLE_NAME} t, t.call as call"
+          "SELECT SUM(call.GQ) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr19` t, t.call as call"
         ],
-        "expected_result": {"sum": 289}
+        "expected_result": {"sum": 139}
       },
       {
         "query": [
-          "SELECT SUM(call.DP) AS sum FROM {TABLE_NAME} t, t.call as call"
+          "SELECT SUM(call.DP) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr19` t, t.call as call"
         ],
-        "expected_result": {"sum": 33.2}
+        "expected_result": {"sum": 14.0}
+      },
+      {
+        "query": ["SELECT COUNT(AA) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 2}
+      },
+      {
+        "query": ["SELECT COUNT(AF) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 2}
+      },
+      {
+        "query": ["SELECT COUNT(DB) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 0}
+      },
+      {
+        "query": ["SELECT COUNT(DP) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 2}
+      },
+      {
+        "query": ["SELECT COUNT(H2) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 0}
+      },
+      {
+        "query": ["SELECT COUNT(NS) AS cnt FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
+        "expected_result": {"cnt": 2}
+      },
+      {
+        "query": [
+          "SELECT SUM(HQ) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr20` t, t.call as call,",
+          "call.HQ as HQ"
+        ],
+        "expected_result": {"sum": 70}
+      },
+      {
+        "query": [
+          "SELECT SUM(call.GQ) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr20` t, t.call as call"
+        ],
+        "expected_result": {"sum": 150}
+      },
+      {
+        "query": [
+          "SELECT SUM(call.DP) AS sum FROM `{DATASET_ID}.{TABLE_ID}__chr20` t, t.call as call"
+        ],
+        "expected_result": {"sum": 19.2}
       }
     ]
   }

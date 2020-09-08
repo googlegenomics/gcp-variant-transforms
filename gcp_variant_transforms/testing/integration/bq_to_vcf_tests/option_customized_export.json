@@ -1,12 +1,12 @@
 [
   {
     "test_name": "bq-to-vcf-option-customized-export",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0__suffix",
     "output_file_name": "bq_to_vcf_option_customized_export.vcf",
     "genomic_regions": "19:1234566-1234570 20:14369-17330",
-    "call_names": "NA00001 NA00003",
+    "sample_names": "NA00001 NA00003",
+    "bq_uses_1_based_coordinate": false,
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_customized_export.vcf"
   }
 ]

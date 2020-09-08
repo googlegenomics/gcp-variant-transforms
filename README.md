@@ -40,16 +40,26 @@ data science with BigQuery.
 ### Using docker
 
 The easiest way to run the VCF to BigQuery pipeline is to use the
-[docker](https://www.docker.com/) image and run it with the
-[Google Genomics Pipelines API](https://cloud-dot-devsite.googleplex.com/genomics/pipelines)
-as it has the binaries and all dependencies pre-installed. Please ensure you
-have the latest `gcloud` tool by running `gcloud components update` (more
-details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
+[docker](https://www.docker.com/) image, as it has the binaries and all
+dependencies pre-installed. Please ensure you have the latest `gcloud` tool by
+running `gcloud components update` (more details [here](https://cloud.google.com/sdk/gcloud/reference/components/update)).
+
+Use the following command to get the latest version of Variant Transforms.
+```bash
+docker pull gcr.io/cloud-lifesciences/gcp-variant-transforms
+```
 
 Run the script below and replace the following parameters:
 
-* `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
+* Dataflow's [required inputs](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service):
+  * `GOOGLE_CLOUD_PROJECT`: This is your project ID that contains the BigQuery
   dataset.
+  * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
+  to process your data, for example: `us-west1`. For more information please refer to
+  [Setting Regions](docs/setting_region.md).
+  * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   load multiple files at once. Please refer to the
@@ -58,44 +68,36 @@ Run the script below and replace the following parameters:
   uncompressed VCF formats. However, it runs slower for compressed files as they
   cannot be sharded.
 * `OUTPUT_TABLE`: The full path to a BigQuery table to store the output.
-* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
-  project has write access to. It's used to store temporary files and logs
-  from the pipeline.
 
 ```bash
 #!/bin/bash
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
+GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+TEMP_LOCATION=gs://BUCKET/temp
 INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
-TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq \
-  --project ${GOOGLE_CLOUD_PROJECT} \
+COMMAND="vcf_to_bq \
   --input_pattern ${INPUT_PATTERN} \
   --output_table ${OUTPUT_TABLE} \
-  --temp_location ${TEMP_LOCATION} \
   --job_name vcf-to-bigquery \
   --runner DataflowRunner"
-gcloud alpha genomics pipelines run \
+
+docker run -v ~/.config:/root/.config \
+  gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
-  --zones us-west1-b \
-  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
-  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
-  --command-line "${COMMAND}"
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}" \
+  "${COMMAND}"
 ```
-
-Please note the operation ID returned by the above script. You can track the
-status of your operation by running:
-
+`--project`, `--region`, and `--temp_location` are required inputs. You must set all of them, unless your project and region default values
+are set in your local `gcloud` configuration. You may set the default project
+and region using the following commands:
 ```bash
-gcloud alpha genomics operations describe <operation-id>
+gcloud config set project GOOGLE_CLOUD_PROJECT
+gcloud config set compute/region REGION
 ```
-
-The returned data will have `done: true` when the operation is done.
-A detailed description of the Operation resource can be found in the
-[API documentation](https://cloud.google.com/genomics/reference/rest/v2alpha1/projects.operations).
 
 The underlying pipeline uses
 [Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
@@ -110,8 +112,8 @@ source. First install git, python, pip, and virtualenv:
 
 ```bash
 sudo apt-get install -y git python-pip python-dev build-essential
-sudo pip install --upgrade pip
-sudo pip install --upgrade virtualenv
+sudo python -m pip install --upgrade pip
+sudo python -m pip install --upgrade virtualenv
 ```
 
 Run virtualenv, clone the repo, and install pip packages:
@@ -121,7 +123,7 @@ virtualenv venv
 source venv/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
-pip install --upgrade .
+python -m pip install --upgrade .
 ```
 
 You may use the
@@ -136,7 +138,9 @@ Example command for DirectRunner:
 ```bash
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
-  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
+  --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
+  --job_name vcf-to-bigquery-direct-runner \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 Example command for DataflowRunner:
@@ -145,13 +149,13 @@ Example command for DataflowRunner:
 python -m gcp_variant_transforms.vcf_to_bq \
   --input_pattern gs://BUCKET/*.vcf \
   --output_table GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --temp_location gs://BUCKET/temp \
   --job_name vcf-to-bigquery \
   --setup_file ./setup.py \
-  --runner DataflowRunner
+  --runner DataflowRunner \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}"
 ```
-
 
 ## Running VCF files preprocessor
 
@@ -168,22 +172,17 @@ The BigQuery to VCF pipeline is used to export variants in BigQuery to one VCF f
 Please refer to [BigQuery to VCF pipeline](docs/bigquery_to_vcf.md) for more
 details.
 
-## Running jobs in a particular region/zone
-
-You may need to constrain Cloud Dataflow job processing to a specific geographic
-region in support of your project’s security and compliance needs. See
-[Setting zone/region doc](docs/setting_zone_region.md).
-
 
 ## Additional topics
 
-* [Understanding the BigQuery Variants Table Schema](docs/bigquery_schema.md)
+* [Understanding the BigQuery Variants Table
+  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
 * [Appending data to existing tables](docs/data_append.md)
 * [Variant Annotation](docs/variant_annotation.md)
-* [Partitioning](docs/partitioning.md)
+* [Sharding](docs/sharding.md)
 * [Flattening the BigQuery table](docs/flattening_table.md)
 * [Troubleshooting](docs/troubleshooting.md)
 

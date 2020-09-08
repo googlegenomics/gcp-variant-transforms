@@ -18,7 +18,12 @@ from __future__ import absolute_import
 
 import os.path
 
+from gcp_variant_transforms.libs import hashing_util
+
 __all__ = ['get_full_file_path', 'get_full_dir']
+
+def hash_name(sample_name, file_name=''):
+  return hashing_util.generate_sample_id(sample_name, file_name)
 
 
 def get_full_file_path(file_name):
@@ -42,7 +47,7 @@ def get_sample_vcf_header_lines():
       '##INFO=<ID=NS,Number=1,Type=Integer,Description="Number samples">\n',
       '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n',
       '##INFO=<ID=HG,Number=G,Type=Integer,Description="IntInfo_G">\n',
-      '##INFO=<ID=HR,Number=R,Type=Character,Description="ChrInfo_R">\n',
+      '##INFO=<ID=HR,Number=R,Type=String,Description="ChrInfo_R">\n',
       '##FILTER=<ID=MPCBT,Description="Mate pair count below 10">\n',
       '##ALT=<ID=INS:ME:MER,Description="Insertion of MER element">\n',
       '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n',

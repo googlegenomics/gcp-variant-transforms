@@ -15,14 +15,19 @@
 from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
-import re
 
 from apache_beam.io.gcp.internal.clients import bigquery
-from apitools.base.py import exceptions
 from oauth2client.client import GoogleCredentials
 
-from gcp_variant_transforms.beam_io import vcfio
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_sanitizer
+from gcp_variant_transforms.libs import bigquery_util
+from gcp_variant_transforms.libs import sample_info_table_schema_generator
+from gcp_variant_transforms.libs import variant_sharding
+
+TABLE_SUFFIX_SEPARATOR = bigquery_util.TABLE_SUFFIX_SEPARATOR
+SAMPLE_INFO_TABLE_SUFFIX = (
+    sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
 
 
 class VariantTransformsOptions(object):
@@ -51,9 +56,16 @@ class VcfReadOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     """Adds all options of this transform to parser."""
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help=('Input pattern for VCF files to process. Either'
+              'this or --input_file flag has to be provided, exclusively.'))
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exclusively.'
+              'Note that using input_file rather than input_pattern is slower '
+              'for inputs that contain less than 50k files.'))
     parser.add_argument(
         '--allow_malformed_records',
         type='bool', default=False, nargs='?', const=True,
@@ -68,9 +80,7 @@ class VcfReadOptions(VariantTransformsOptions):
     parser.add_argument(
         '--optimize_for_large_inputs',
         type='bool', default=False, nargs='?', const=True,
-        help=('If true, the pipeline runs in optimized way for handling large '
-              'inputs. Set this to true if you are loading more than 50,000 '
-              'files.'))
+        help='This flag is deprecated and will be removed in the next release.')
     parser.add_argument(
         '--representative_header_file',
         default='',
@@ -96,14 +106,12 @@ class VcfReadOptions(VariantTransformsOptions):
               'setting this flag or `--infer_annotation_types` incurs a '
               'performance penalty of an extra pass over all variants.'))
     parser.add_argument(
-        '--vcf_parser',
-        default=vcfio.VcfParserType.PYVCF.name,
-        choices=[parser.name for parser in vcfio.VcfParserType],
-        help=('Choose the underlying parser for reading VCF files. Currently '
-              'we only support `{}` (default) and `{}`. Note: Nucleus parser '
-              'is still in experimental stage so using it for production jobs '
-              'is not recommended.'.format(vcfio.VcfParserType.PYVCF.name,
-                                           vcfio.VcfParserType.NUCLEUS.name)))
+        '--use_1_based_coordinate',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If true, start position will be 1-based, and end position will '
+              'be inclusive. Otherwise, the records will be stored in 0-based '
+              'coordinates, with exclusive end position. For more information '
+              'please refer to www.biostars.org/p/84686/'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -111,6 +119,7 @@ class VcfReadOptions(VariantTransformsOptions):
       raise ValueError('Both --infer_headers and --representative_header_file '
                        'are passed! Please double check and choose at most one '
                        'of them.')
+    _validate_inputs(parsed_args)
 
 
 class BigQueryWriteOptions(VariantTransformsOptions):
@@ -118,9 +127,64 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
-    parser.add_argument('--output_table',
-                        required=True,
-                        help='BigQuery table to store the results.')
+    parser.add_argument(
+        '--output_table',
+        default='',
+        help=('Base name of the BigQuery tables which will store the results. '
+              'Note that sharded tables will be named as following: '
+              ' * `output_table`__chr1 '
+              ' * `output_table`__chr2 '
+              ' * ... '
+              ' * `output_table`__residual '
+              'where "chr1", "chr2", ..., and "residual" suffixes correspond '
+              'to the value of `table_name_suffix` in the sharding config file '
+              '(see --sharding_config_path).'))
+
+    parser.add_argument(
+        '--sample_lookup_optimized_output_table',
+        default='',
+        help=('In addition to the default output tables (which are optimized '
+              'for variant lookup queries), you can store a second copy of '
+              'your data in BigQuery tables that are optimized for sample '
+              'lookup queries using this flag.'
+              'Note that setting this flag will *at least* double your '
+              'BigQuery storage costs. If your input VCF files are joint '
+              'genotyped (say with n sample) then sample lookup tables will '
+              'have n * the number of rows of their corresponding variant '
+              'lookup table.'))
+    parser.add_argument(
+        '--output_avro_path',
+        default='',
+        help=('This flag is deprecated and will be removed in the next '
+              'release, instead use --keep_intermediate_avro_files flag.'))
+    parser.add_argument(
+        '--keep_intermediate_avro_files',
+        type='bool', default=False, nargs='?', const=True,
+        help=('If set to True, the intermediate AVRO files will be kept. They '
+              'are stored in your temp directory (set by --temp_location) '
+              'under gs://[YOUR-TEMP-DIRECTORY]/avro/JOB_NAME/'))
+    parser.add_argument(
+        '--sharding_config_path',
+        default=('gcp_variant_transforms/data/sharding_configs/'
+                 'homo_sapiens_default.yaml'),
+        help=('File containing list of output tables, their name suffixes, and '
+              'approximate number of total base pairs which is used to conduct '
+              'BigQuery integer range partitioning. Default value is set to a '
+              'file which is optimized for the human genome. It results in one '
+              'table per chromosome (overall 25 BigQuery tables). For more '
+              'information visit gcp-variant-trannsforms/docs/sharding.md'))
+
+    parser.add_argument(
+        '--sample_name_encoding',
+        default=vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
+        choices=['WITHOUT_FILE_PATH', 'WITH_FILE_PATH'],
+        help=('Choose the way sample ID should be hashed. if `{}` is supplied, '
+              'sample_id will be hash value of [sample_name] (default); '
+              'alternatively, if `{}` is supplied, sample_id will be hashed '
+              'from [file_name, sample_id]'.format(
+                  vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
+                  vcf_parser.SampleNameEncoding.WITH_FILE_PATH.name)))
+
     parser.add_argument(
         '--split_alternate_allele_info_fields',
         type='bool', default=True, nargs='?', const=True,
@@ -149,12 +213,7 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--num_bigquery_write_shards',
         type=int, default=1,
-        help=('Before writing the final result to output BigQuery, the data is '
-              'sharded to avoid a known failure for very large inputs (issue '
-              '#199). Setting this flag to 1 will avoid this extra sharding.'
-              'It is recommended to use 20 for loading large inputs without '
-              'merging. Use a smaller value (2 or 3) if both merging and '
-              'optimize_for_large_inputs are enabled.'))
+        help='This flag is deprecated and will be removed in the next release.')
     parser.add_argument(
         '--null_numeric_value_replacement',
         type=int,
@@ -165,50 +224,78 @@ class BigQueryWriteOptions(VariantTransformsOptions):
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
-    output_table_re_match = re.match(
-        r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$',
-        parsed_args.output_table)
-    if not output_table_re_match:
+    if parsed_args.update_schema_on_append and not parsed_args.append:
+      raise ValueError('--update_schema_on_append requires --append to be '
+                       'true.')
+    if (not parsed_args.sharding_config_path or
+        not parsed_args.sharding_config_path.strip()):
       raise ValueError(
-          'Expected a table reference (PROJECT:DATASET.TABLE) '
-          'instead of {}.'.format(parsed_args.output_table))
+          '--sharding_config_path must point to a valid config file.')
+
     if not client:
       credentials = GoogleCredentials.get_application_default().create_scoped(
           ['https://www.googleapis.com/auth/bigquery'])
       client = bigquery.BigqueryV2(credentials=credentials)
-    project_id = output_table_re_match.group('project')
-    dataset_id = output_table_re_match.group('dataset')
-    table_id = output_table_re_match.group('table')
-    try:
-      client.datasets.Get(bigquery.BigqueryDatasetsGetRequest(
-          projectId=project_id,
-          datasetId=dataset_id))
-    except exceptions.HttpError as e:
-      if e.status_code == 404:
-        raise ValueError('Dataset %s:%s does not exist.' %
-                         (project_id, dataset_id))
+    if not parsed_args.output_table:
+      raise ValueError('--output_table must have a value.')
+    self._validate_output_tables(
+        client, parsed_args.output_table,
+        parsed_args.sharding_config_path, parsed_args.append, True)
+
+    if parsed_args.sample_lookup_optimized_output_table:
+      if (parsed_args.output_table ==
+          parsed_args.sample_lookup_optimized_output_table):
+        raise ValueError('sample_lookup_optimized_output_table cannot be the '
+                         'same as output_table.')
+      self._validate_output_tables(
+          client, parsed_args.sample_lookup_optimized_output_table,
+          parsed_args.sharding_config_path, parsed_args.append, False)
+
+  def _validate_output_tables(self, client,
+                              output_table_base_name,
+                              sharding_config_path, append, is_main_output):
+    if (output_table_base_name !=
+        bigquery_util.get_table_base_name(output_table_base_name)):
+      raise ValueError(('Output table cannot contain "{}". we reserve this '
+                        'string to mark sharded output tables.').format(
+                            bigquery_util.TABLE_SUFFIX_SEPARATOR))
+
+    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+        output_table_base_name)
+    bigquery_util.raise_error_if_dataset_not_exists(client, project_id,
+                                                    dataset_id)
+    all_output_tables = []
+    if is_main_output:
+      all_output_tables.append(
+          bigquery_util.compose_table_name(table_id, SAMPLE_INFO_TABLE_SUFFIX))
+    sharding = variant_sharding.VariantSharding(sharding_config_path)
+    num_shards = sharding.get_num_shards()
+    # In case there is no residual in config we will ignore the last shard.
+    if not sharding.should_keep_shard(sharding.get_residual_index()):
+      num_shards -= 1
+    for i in range(num_shards):
+      table_suffix = sharding.get_output_table_suffix(i)
+      if table_suffix != bigquery_util.get_table_base_name(table_suffix):
+        raise ValueError(('Table suffix cannot contain "{}" we reserve this  '
+                          'string to mark sharded output tables.').format(
+                              bigquery_util.TABLE_SUFFIX_SEPARATOR))
+      all_output_tables.append(bigquery_util.compose_table_name(table_id,
+                                                                table_suffix))
+
+    for output_table in all_output_tables:
+      if append:
+        if not bigquery_util.table_exist(client, project_id,
+                                         dataset_id, output_table):
+          raise ValueError(
+              'Table {}:{}.{} does not exist, cannot append to it.'.format(
+                  project_id, dataset_id, output_table))
       else:
-        # For the rest of the errors, use BigQuery error message.
-        raise
-    # Ensuring given output table doesn't already exist to avoid overwriting it.
-    if not parsed_args.append:
-      if parsed_args.update_schema_on_append:
-        raise ValueError('--update_schema_on_append requires --append to be '
-                         'true.')
-      try:
-        client.tables.Get(bigquery.BigqueryTablesGetRequest(
-            projectId=project_id,
-            datasetId=dataset_id,
-            tableId=table_id))
-        raise ValueError('Table %s:%s.%s already exists, cannot overwrite it.' %
-                         (project_id, dataset_id, table_id))
-      except exceptions.HttpError as e:
-        if e.status_code == 404:
-          # This is expected, output table must not already exist
-          pass
-        else:
-          # For the rest of the errors, use BigQuery error message.
-          raise
+        if bigquery_util.table_exist(client, project_id,
+                                     dataset_id, output_table):
+          raise ValueError(
+              ('Table {}:{}.{} already exists, cannot overwrite it. Please '
+               'set `--append True` if you want to append to it.').format(
+                   project_id, dataset_id, output_table))
 
 
 class AnnotationOptions(VariantTransformsOptions):
@@ -256,27 +343,36 @@ class AnnotationOptions(VariantTransformsOptions):
         help=('If true, runs annotation tools (currently only VEP) on input '
               'VCFs before loading to BigQuery.'))
     parser.add_argument(
+        '--shard_variants',
+        type='bool', default=True, nargs='?', const=True,
+        help=('By default, the input files are sharded into smaller temporary '
+              'VCF files before running VEP annotation. If the input files are '
+              'small, i.e., each VCF file contains less than 50,000 variants, '
+              'setting this flag can be computationally wasteful.'))
+    parser.add_argument(
         '--' + AnnotationOptions._OUTPUT_DIR_FLAG,
         default='',
         help=('The path on Google Cloud Storage to store annotated outputs. '
               'The output files are VCF and follow the same directory '
-              'structure as input files with a suffix added to them.'))
+              'structure as input files with a suffix added to them. Note that '
+              'this is expected not to exist and will be created in the '
+              'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/gcp-variant-annotation/vep_91',
+        default='gcr.io/cloud-lifesciences/vep_91',
         help=('The URI of the docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
         default='',
         help=('The path for VEP cache on Google Cloud Storage. By default, '
-              'this will be set to gs://gcp-variant-annotation-vep-cache/'
+              'this will be set to gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh38_91.tar.gz, assuming neither the '
               '`--vep_species` nor the `--vep_assembly` flags have been set. '
               'For convenience, if either of those flags are provided, this '
               'path will be automatically updated to reflect the new cache, '
               'given values are a species and/or assembly we maintain. For '
               'example, `--vep_assembly GRCh37` is satisfactory for specifying '
-              'our gs://gcp-variant-annotation-vep-cache/'
+              'our gs://cloud-lifesciences/vep/'
               'vep_cache_homo_sapiens_GRCh37_91.tar.gz cache.'))
     parser.add_argument(
         '--vep_info_field',
@@ -311,6 +407,20 @@ class AnnotationOptions(VariantTransformsOptions):
               'pass over all variants. Additionally, this flag will resolve '
               'conflicts for all headers as if `allow_incompatible_types` was '
               'true.'))
+    parser.add_argument(
+        '--run_with_garbage_collection',
+        type='bool', default=True, nargs='?', const=True,
+        help=('If set, in case of failure or cancellation, the VMs running '
+              'VEP annotation will be cleaned up automatically.'))
+    parser.add_argument(
+        '--number_of_variants_per_shard',
+        type=int, default=20000,
+        help=('The maximum number of variants written to each shard if '
+              '`shard_variants` is true. The default value should work '
+              'for most cases. You may change this flag to a smaller value if '
+              'you have a dataset with a lot of samples. Notice that the '
+              'pipeline may take longer to finish for smaller value of this '
+              'flag.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -338,9 +448,9 @@ class FilterOptions(VariantTransformsOptions):
     parser.add_argument(
         '--reference_names',
         default=None, nargs='+',
-        help=('A list of reference names (separated by a space) to load '
-              'to BigQuery. If this parameter is not specified, all '
-              'references will be kept.'))
+        help=('This flag is deprecated and will be removed in the next '
+              'release. You can achieve the same goal by using a sharding '
+              'file and setting the --sharding_config_path flag.'))
 
 
 class MergeOptions(VariantTransformsOptions):
@@ -423,9 +533,16 @@ class PreprocessOptions(VariantTransformsOptions):
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
-    parser.add_argument('--input_pattern',
-                        required=True,
-                        help='Input pattern for VCF files to process.')
+    parser.add_argument(
+        '--input_pattern',
+        help='Input pattern for VCF files to process. Either'
+             'this or --input_file flag has to be provided, exclusively.')
+    parser.add_argument(
+        '--input_file',
+        help=('File that contains the list of VCF file names to input. Either '
+              'this or --input_pattern flag has to be provided, exlusively. '
+              'Note that using input_file than input_pattern is slower for '
+              'inputs that contain less than 50k files.'))
     parser.add_argument(
         '--report_all_conflicts',
         type='bool', default=False, nargs='?', const=True,
@@ -447,18 +564,8 @@ class PreprocessOptions(VariantTransformsOptions):
               'generated if unspecified. Otherwise, please provide a local '
               'path if run locally, or a cloud path if run on Dataflow.'))
 
-class PartitionOptions(VariantTransformsOptions):
-  """Options for partitioning Variant records."""
-
-  def add_arguments(self, parser):
-    parser.add_argument(
-        '--partition_config_path',
-        default='',
-        help=('File containing list of partitions and output table names. You '
-              'can use provided default partition_config file to split output '
-              'by chromosome (one table per chromosome) which is located at: '
-              'gcp_variant_transforms/data/partition_configs/'
-              'homo_sapiens_default.yaml'))
+  def validate(self, parsed_args):
+    _validate_inputs(parsed_args)
 
 
 class BigQueryToVcfOptions(VariantTransformsOptions):
@@ -507,11 +614,11 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               '`[1000,2000)` from BigQuery. If this flag is not specified, all '
               'variants will be loaded.'))
     parser.add_argument(
-        '--call_names',
+        '--sample_names',
         default=None, nargs='+',
-        help=('A list of call names (separated by a space). Only variants for '
-              'these calls will be loaded from BigQuery. If this parameter is '
-              'not specified, all calls will be loaded.'))
+        help=('A list of sample names (separated by a space). Only variants '
+              'for these samples will be loaded from BigQuery. If this flag '
+              'is not specified, all existing samples will be loaded.'))
     parser.add_argument(
         '--allow_incompatible_schema',
         type='bool', default=False, nargs='?', const=True,
@@ -522,10 +629,66 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'meta-information are inferred from the schema without '
               'validation.'))
     parser.add_argument(
-        '--preserve_call_names_order',
+        '--preserve_sample_order',
         type='bool', default=False, nargs='?', const=True,
-        help=('By default, call names in the output VCF file are generated in '
-              'ascending order. If set to true, the order of call names will '
-              'be the same as the BigQuery table, but it requires all '
-              'extracted variants to have the same call name ordering (usually '
+        help=('By default, sample names in the output VCF file are generated '
+              'in ascending order. If set to true, the order of sample names '
+              'will be the same as the BigQuery table, but it requires all '
+              'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
+
+    parser.add_argument(
+        '--bq_uses_1_based_coordinate',
+        type='bool', default=True, nargs='?', const=True,
+        help=('Set to False, if --use_1_based_coordinate was set to False when '
+              'generating the BQ tables, and hence, start positions are '
+              '0-based. By default, imported BQ tables use 1-based coordinate. '
+              'Please examine your table''s start_position column description '
+              'to find out whether your variant tables uses 0-based or 1-based '
+              'coordinate.'))
+
+
+
+  def validate(self, parsed_args, client=None):
+    if not client:
+      credentials = GoogleCredentials.get_application_default().create_scoped(
+          ['https://www.googleapis.com/auth/bigquery'])
+      client = bigquery.BigqueryV2(credentials=credentials)
+
+    project_id, dataset_id, table_id = bigquery_util.parse_table_reference(
+        parsed_args.input_table)
+    if not bigquery_util.table_exist(client, project_id, dataset_id, table_id):
+      raise ValueError('Table {}:{}.{} does not exist.'.format(
+          project_id, dataset_id, table_id))
+    if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
+      raise ValueError(
+          'Input table {} is malformed - exactly one suffix separator "{}" is '
+          'required'.format(parsed_args.input_table,
+                            TABLE_SUFFIX_SEPARATOR))
+    base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
+    sample_table_id = bigquery_util.compose_table_name(base_table_id,
+                                                       SAMPLE_INFO_TABLE_SUFFIX)
+
+    if not bigquery_util.table_exist(client, project_id, dataset_id,
+                                     sample_table_id):
+      raise ValueError('Sample table {}:{}.{} does not exist.'.format(
+          project_id, dataset_id, sample_table_id))
+
+
+def _validate_inputs(parsed_args):
+  if ((parsed_args.input_pattern and parsed_args.input_file) or
+      (not parsed_args.input_pattern and not parsed_args.input_file)):
+    raise ValueError('Exactly one of input_pattern and input_file has to be '
+                     'provided.')
+
+
+class ExperimentalOptions(VariantTransformsOptions):
+  """Options for experimental features."""
+
+  def add_arguments(self, parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        '--auto_flags_experiment',
+        default=False,
+        help=('Set flag values automatically based on heuristics extracted '
+              'from input files'))

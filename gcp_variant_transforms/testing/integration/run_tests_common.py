@@ -22,15 +22,13 @@ It provides common functions and classes for both run_vcf_to_bq_tests
 import argparse  # pylint: disable=unused-import
 import json
 import os
+import subprocess
 import time
 from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
-from googleapiclient import discovery
-from oauth2client.client import GoogleCredentials
 
-_DEFAULT_IMAGE_NAME = 'gcr.io/gcp-variant-transforms/gcp-variant-transforms'
-_DEFAULT_ZONES = ['us-east1-b']
+_DEFAULT_IMAGE_NAME = 'gcr.io/cloud-lifesciences/gcp-variant-transforms'
 
 # `TestCaseState` saves current running test and the remaining tests in the same
 # test script (.json).
@@ -63,12 +61,9 @@ class TestRunner(object):
       revalidate: If True, only run the result validation part of the tests.
     """
     self._tests = tests
-    self._service = discovery.build(
-        'genomics',
-        'v1alpha2',
-        credentials=GoogleCredentials.get_application_default())
     self._revalidate = revalidate
-    self._operation_names_to_test_states = {}  # type: Dict[str, TestCaseState]
+    self._test_names_to_test_states = {}  # type: Dict[str, TestCaseState]
+    self._test_names_to_processes = {}  # type: Dict[str, subprocess.Popen]
 
   def run(self):
     """Runs all tests."""
@@ -87,47 +82,43 @@ class TestRunner(object):
     """Runs the first test case in `test_cases`.
 
     The first test case and the remaining test cases form `TestCaseState` and
-    are added into `_operation_names_to_test_states` for future usage.
+    are added into `_test_names_to_test_states` for future usage.
     """
     if not test_cases:
       return
-    # The following pylint hint is needed because `pipelines` is a method that
-    # is dynamically added to the returned `service` object above. See
-    # `googleapiclient.discovery.Resource._set_service_methods`.
-    # pylint: disable=no-member
-    request = self._service.pipelines().run(
-        body=test_cases[0].pipeline_api_request)
-    operation_name = request.execute()['name']
-    self._operation_names_to_test_states.update(
-        {operation_name: TestCaseState(test_cases[0], test_cases[1:])})
+    self._test_names_to_test_states.update({
+        test_cases[0].get_name(): TestCaseState(test_cases[0], test_cases[1:])})
+    self._test_names_to_processes.update(
+        {test_cases[0].get_name(): subprocess.Popen(
+            test_cases[0].run_test_command, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)})
+    print 'Started executing: {}'.format(test_cases[0].get_name())
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
-    # pylint: disable=no-member
-    operations = self._service.operations()
-    while self._operation_names_to_test_states:
+    while self._test_names_to_processes:
       time.sleep(10)
-      running_operation_names = self._operation_names_to_test_states.keys()
-      for operation_name in running_operation_names:
-        request = operations.get(name=operation_name)
-        response = request.execute()
-        if response['done']:
-          self._handle_failure(response)
-          test_case_state = self._operation_names_to_test_states.get(
-              operation_name)
-          del self._operation_names_to_test_states[operation_name]
+      running_test_names = self._test_names_to_processes.keys()
+      for test_name in running_test_names:
+        running_proc = self._test_names_to_processes.get(test_name)
+        return_code = running_proc.poll()
+        if return_code is not None:
+          test_case_state = self._test_names_to_test_states.get(test_name)
+          self._handle_failure(running_proc, test_case_state.running_test)
+          del self._test_names_to_processes[test_name]
+          print 'Started validating: {}'.format(test_name)
           test_case_state.running_test.validate_result()
           self._run_test(test_case_state.remaining_tests)
 
-  def _handle_failure(self, response):
+  def _handle_failure(self, proc, test_case):
     """Raises errors if test case failed."""
-    if 'error' in response:
-      if 'message' in response['error']:
-        raise TestCaseFailure(response['error']['message'])
-      else:
-        # This case should never happen.
-        raise TestCaseFailure(
-            'No traceback. See logs for more information on error.')
+    if proc.returncode != 0:
+      print 'ERROR: Test execution failed: {}'.format(test_case.get_name())
+      stdout, stderr = proc.communicate()
+      raise TestCaseFailure('Test case {} failed. stdout: {}, stderr: {}, '
+                            'return code: {}.'.format(test_case.get_name(),
+                                                      stdout, stderr,
+                                                      proc.returncode))
 
   def print_results(self):
     """Prints results of test cases."""
@@ -137,38 +128,21 @@ class TestRunner(object):
     return 0
 
 
-def form_pipeline_api_request(project,  # type: str
-                              logging_location,  # type: str
-                              image,  # type: str
-                              scopes,  # type: List[str]
-                              pipeline_name,  # type: str
-                              script_path,  # type: str
-                              zones,  # type: Optional[List[str]]
-                              args  # type: List[str]
-                             ):
-  # type: (...) -> Dict
-  return {
-      'pipelineArgs': {
-          'projectId': project,
-          'logging': {'gcsPath': logging_location},
-          'serviceAccount': {'scopes': scopes}
-      },
-      'ephemeralPipeline': {
-          'projectId': project,
-          'name': pipeline_name,
-          'resources': {'zones': zones or _DEFAULT_ZONES},
-          'docker': {
-              'imageName': image,
-              'cmd': ' '.join([script_path] + args)
-          }
-      }
-  }
+def form_command(project, region, temp_location, image, tool_name, args):
+  # type: (str, str, str, str, str, List[str]) -> List[str]
+  return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
+          '--project', project,
+          '--region', region,
+          '--docker_image', image,
+          '--temp_location', temp_location,
+          ' '.join([tool_name] + args)]
 
 
 def add_args(parser):
   # type: (argparse.ArgumentParser) -> None
   """Adds common arguments."""
   parser.add_argument('--project', required=True)
+  parser.add_argument('--region', required=True)
   parser.add_argument('--staging_location', required=True)
   parser.add_argument('--temp_location', required=True)
   parser.add_argument('--logging_location', required=True)
@@ -182,18 +156,29 @@ def add_args(parser):
       required=False)
 
 
-def get_configs(test_file_path, required_keys):
-  # type: (str, List[str]) -> List[List[Dict]]
-  """Gets all test configs in integration directory and subdirectories."""
+def get_configs(test_file_dir, required_keys, test_file_suffix=''):
+  # type: (str, List[str], str) -> List[List[Dict]]
+  """Gets test configs.
+
+  Args:
+    test_file_dir: The directory where the test cases are saved.
+    required_keys: The keys that are required in each test case.
+    test_file_suffix: If empty, all test cases in `test_file_path` are
+      considered. Otherwise, only the test cases that end with this suffix will
+      run.
+  Raises:
+    TestCaseFailure: If no test cases are found.
+  """
   test_configs = []
-  for root, _, files in os.walk(test_file_path):
+  test_file_suffix = test_file_suffix or '.json'
+  for root, _, files in os.walk(test_file_dir):
     for filename in files:
-      if filename.endswith('.json'):
+      if filename.endswith(test_file_suffix):
         test_configs.append(_load_test_configs(os.path.join(root, filename),
                                                required_keys))
   if not test_configs:
-    raise TestCaseFailure('Found no .json files in directory {}'.format(
-        test_file_path))
+    raise TestCaseFailure('Found no {} file in directory {}'.format(
+        test_file_suffix, test_file_dir))
   return test_configs
 
 

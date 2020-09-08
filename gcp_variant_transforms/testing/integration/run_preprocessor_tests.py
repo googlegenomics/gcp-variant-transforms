@@ -16,12 +16,13 @@ r"""Integration testing runner for Variant Transforms' Preprocessor pipeline.
 
 To define a new preprocessor_tests integration test case, create a json file in
 gcp_variant_transforms/testing/integration/preprocessor_tests directory and
-specify at least test_name, input_pattern, blob_name and expected_contents
+specify at least test_name, blob_name and expected_contents
 for the integration test.
 
 Execute the following command from the root source directory:
 python gcp_variant_transforms/testing/integration/run_preprocessor_tests.py \
   --project gcp-variant-transforms-test \
+  --region us-central1 \
   --staging_location gs://integration_test_runs/staging \
   --temp_location gs://integration_test_runs/temp \
   --logging_location gs://integration_test_runs/temp/integration_test_logs
@@ -38,14 +39,13 @@ import sys
 from datetime import datetime
 from typing import Dict, List  # pylint: disable=unused-import
 
+from apache_beam.io import filesystems
 from google.cloud import storage
 
 from gcp_variant_transforms.testing.integration import run_tests_common
 
 _BUCKET_NAME = 'integration_test_runs'
-_PIPELINE_NAME = 'gcp-variant-transforms-preprocessor-integration-test'
-_SCOPES = []
-_SCRIPT_PATH = '/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess'
+_TOOL_NAME = 'vcf_to_bq_preprocess'
 _TEST_FOLDER = 'gcp_variant_transforms/testing/integration/preprocessor_tests'
 
 
@@ -55,11 +55,9 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
   def __init__(self,
                parser_args,  # type: Namespace
                test_name,  # type: str
-               input_pattern,  # type: str
                expected_contents,  # type: List[str]
                report_blob_name,  # type: str
                header_blob_name=None,  # type: str
-               zones=None,  # type: List[str]
                **kwargs  # type: **str
               ):
     # type: (...) -> None
@@ -71,9 +69,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     self._report_blob_name = self._append_suffix(report_blob_name, suffix)
     self._report_path = '/'.join(['gs:/', _BUCKET_NAME, self._report_blob_name])
     self._project = parser_args.project
-    args = ['--input_pattern {}'.format(input_pattern),
-            '--report_path {}'.format(self._report_path),
-            '--project {}'.format(parser_args.project),
+    args = ['--report_path {}'.format(self._report_path),
             '--staging_location {}'.format(parser_args.staging_location),
             '--temp_location {}'.format(parser_args.temp_location),
             '--job_name {}'.format(
@@ -89,9 +85,12 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
     for k, v in kwargs.iteritems():
       args.append('--{} {}'.format(k, v))
 
-    self.pipeline_api_request = run_tests_common.form_pipeline_api_request(
-        parser_args.project, parser_args.logging_location, parser_args.image,
-        _SCOPES, _PIPELINE_NAME, _SCRIPT_PATH, zones, args)
+    self.run_test_command = run_tests_common.form_command(
+        parser_args.project,
+        parser_args.region,
+        filesystems.FileSystems.join(parser_args.logging_location,
+                                     self._report_blob_name),
+        parser_args.image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.
@@ -148,8 +147,7 @@ def _get_args():
 def _get_test_configs():
   # type: () -> List[List[Dict]]
   """Gets all test configs in preprocessor_tests."""
-  required_keys = ['test_name', 'report_blob_name', 'input_pattern',
-                   'expected_contents']
+  required_keys = ['test_name', 'report_blob_name', 'expected_contents']
   test_file_path = os.path.join(os.getcwd(), _TEST_FOLDER)
   return run_tests_common.get_configs(test_file_path, required_keys)
 
@@ -171,5 +169,7 @@ def main():
 
 
 if __name__ == '__main__':
+  print 'Starting preprocessor tests...'
   ret_code = main()
+  print 'Finished all preprocessor tests successfully.'
   sys.exit(ret_code)

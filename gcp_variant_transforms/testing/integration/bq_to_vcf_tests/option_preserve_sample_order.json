@@ -1,0 +1,11 @@
+[
+  {
+    "test_name": "bq-to-vcf-option-preserve-call-names-order",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.merge_option_move_to_calls__suffix",
+    "output_file_name": "bq_to_vcf_option_preserve_sample_order.vcf",
+    "preserve_sample_order": false,
+    "bq_uses_1_based_coordinate": false,
+    "runner": "DirectRunner",
+    "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/option_preserve_sample_order.vcf"
+  }
+]

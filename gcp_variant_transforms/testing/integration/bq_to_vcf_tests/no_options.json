@@ -1,10 +1,10 @@
 [
   {
     "test_name": "bq-to-vcf-no-options",
-    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0__suffix",
     "output_file_name": "bq_to_vcf_no_options.vcf",
+    "bq_uses_1_based_coordinate": false,
     "runner": "DirectRunner",
-    "zones": ["us-west1-b"],
     "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/no_options.vcf"
   }
 ]

@@ -1,0 +1,111 @@
+[
+  {
+    "test_name": "platinum-partition-without-residual",
+    "table_name": "platinum_partition_without_residual",
+    "sample_lookup_optimized_output_table" : "{TABLE_NAME}_samples",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_3k_rnd_lines/*.vcf",
+    "sharding_config_path": "gcp_variant_transforms/testing/data/sharding_configs/integration_without_residual.yaml",
+    "runner": "DataflowRunner",
+    "variant_merge_strategy": "MOVE_TO_CALLS",
+    "assertion_configs": [
+      {
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 15}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01_100M`"],
+        "expected_result": {"num_rows": 609}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr01_100M`"],
+        "expected_result": {"sum_start": 29658080726}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01_200M`"],
+        "expected_result": {"num_rows": 502}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr01_200M`"],
+        "expected_result": {"sum_start": 77243595398}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr01_remaining`"],
+        "expected_result": {"num_rows": 265}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr01_remaining`"],
+        "expected_result": {"sum_start": 59577868263}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr05_1M`"],
+        "expected_result": {"num_rows": 14}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr05_1M`"],
+        "expected_result": {"sum_start": 6013514}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr07_1M`"],
+        "expected_result": {"num_rows": 10}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr07_1M`"],
+        "expected_result": {"sum_start": 4180572}
+      },      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr19_1M`"],
+        "expected_result": {"num_rows": 11}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19_1M`"],
+        "expected_result": {"sum_start": 6797237}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_100M`"],
+        "expected_result": {"num_rows": 609}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_100M`"],
+        "expected_result": {"sum_start": 29658080726}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_200M`"],
+        "expected_result": {"num_rows": 502}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_200M`"],
+        "expected_result": {"sum_start": 77243595398}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_remaining`"],
+        "expected_result": {"num_rows": 265}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr01_remaining`"],
+        "expected_result": {"sum_start": 59577868263}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr05_1M`"],
+        "expected_result": {"num_rows": 14}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr05_1M`"],
+        "expected_result": {"sum_start": 6013514}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr07_1M`"],
+        "expected_result": {"num_rows": 10}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr07_1M`"],
+        "expected_result": {"sum_start": 4180572}
+      },      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}_samples__chr19_1M`"],
+        "expected_result": {"num_rows": 11}
+      },
+      {
+        "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}_samples__chr19_1M`"],
+        "expected_result": {"sum_start": 6797237}
+      }
+    ]
+  }
+]

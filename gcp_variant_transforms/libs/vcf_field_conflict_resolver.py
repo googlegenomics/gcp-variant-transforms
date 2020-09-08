@@ -14,9 +14,8 @@
 
 """Class for resolving conflicts in VCF field definitions."""
 
-import vcf
-
 from gcp_variant_transforms.beam_io import vcf_header_io
+from gcp_variant_transforms.beam_io import vcf_parser
 from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: disable=unused-import
 from gcp_variant_transforms.libs import bigquery_util
 
@@ -119,8 +118,8 @@ class FieldConflictResolver(object):
     numeric_types = (type_constants.INTEGER, type_constants.FLOAT)
     if first == second:
       return first
-    elif first is None or second is None:
-      return first if second is None else second
+    elif first == '.' or second == '.':
+      return first if second == '.' else second
     elif first in numeric_types and second in numeric_types:
       return type_constants.FLOAT
     elif self._resolve_always:
@@ -135,9 +134,9 @@ class FieldConflictResolver(object):
     elif (self._is_bigquery_field_repeated(first) and
           self._is_bigquery_field_repeated(second)):
       # None implies arbitrary number of values.
-      return None
+      return '.'
     elif self._resolve_always:
-      return None
+      return '.'
     else:
       raise ValueError('Incompatible numbers cannot be resolved: '
                        '{}, {}'.format(first, second))
@@ -151,7 +150,7 @@ class FieldConflictResolver(object):
     """
     if vcf_num in (0, 1):
       return False
-    elif (vcf_num == vcf.parser.field_counts['A'] and
+    elif (vcf_num == vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE and
           self._split_alternate_allele_info_fields):
       # info field with `Number=A` does not become a repeated field if flag
       # `split_alternate_allele_info_fields` is on.

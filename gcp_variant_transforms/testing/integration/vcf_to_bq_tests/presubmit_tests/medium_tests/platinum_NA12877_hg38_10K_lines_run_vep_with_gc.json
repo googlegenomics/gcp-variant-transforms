@@ -1,0 +1,106 @@
+[
+  {
+    "test_name": "platinum-na12877-hg38-10k-lines-run-vep-with-gc",
+    "table_name": "platinum_NA12877_hg38_10K_lines_run_vep_with_gc",
+    "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/platinum_NA12877_hg38_10K_lines_manual_vep_orig_output.vcf",
+    "annotation_fields": "CSQ",
+    "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
+    "runner": "DataflowRunner",
+    "run_annotation_pipeline": "True",
+    "infer_annotation_types": "True",
+    "run_with_garbage_collection": "True",
+    "shard_variants": "True",
+    "annotation_output_dir": "gs://integration_test_runs/temp/vep_output/{TABLE_NAME}",
+    "num_workers": 2,
+    "assertion_configs": [
+      {
+        "query": ["NUM_OUTPUT_TABLES"],
+        "expected_result": {"num_tables": 26}
+      },
+      {
+        "query": ["SELECT COUNT(0) AS num_rows FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
+        "expected_result": {"num_rows": 9953}
+      },
+      {
+        "query": [
+          "SELECT COUNT(0) AS num_annotation_sets ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_annotation_sets": 45770}
+      },
+      {
+        "query": [
+          "SELECT COUNT(0) AS num_annotation_sets ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_annotation_sets": 45770}
+      },
+      {
+        "query": [
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "FROM ( ",
+          "  SELECT start_position, reference_bases, A.alt, ",
+          "         COUNT(0) AS number_of_annotations ",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ",
+          "  GROUP BY 1, 2, 3",
+          ")"
+        ],
+        "expected_result": {"hash_sum": 143375343108}
+      },
+      {
+        "query": [
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "FROM ( ",
+          "  SELECT start_position, reference_bases, A.alt, ",
+          "         COUNT(0) AS number_of_annotations ",
+          "  FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT",
+          "  GROUP BY 1, 2, 3",
+          ")"
+        ],
+        "expected_result": {"hash_sum": 143375343108}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ.Feature) AS num_features ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_features": 1575}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_features": 1575}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ.SYMBOL) AS num_symbol ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"num_symbol": 206}
+      },
+      {
+        "query": [
+          "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"num_symbol": 206}
+      },
+      {
+        "query": [
+          "SELECT SUM(CSQ.MOTIF_POS) AS sum_motif_pos",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ AS CSQ"
+        ],
+        "expected_result": {"sum_motif_pos": 485}
+      },
+      {
+        "query": [
+          "SELECT ROUND(SUM(CSQ_VT.MAX_AF), 5) AS sum_max_af",
+          "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
+        ],
+        "expected_result": {"sum_max_af": 26342.50856}
+      }
+    ]
+  }
+]

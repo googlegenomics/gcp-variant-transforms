@@ -1,0 +1,21 @@
+[
+  {
+    "test_name": "header-conflicts-from-file",
+    "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/error_input",
+    "report_all_conflicts": "True",
+    "report_blob_name": "temp/report_header_conflicts_from_file.tsv",
+    "runner": "DirectRunner",
+    "expected_contents": [
+      "Header Conflicts",
+      "ID\tCategory\tConflicts\tFile Paths\tProposed Resolution",
+      "AF\tINFO\tnum=. type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf\tnum=. type=Float",
+      " \t \tnum=A type=Float\tgs://gcp-variant-transforms-testfiles/small_tests/valid-4.2.vcf\t ",
+      "",
+      "No Inferred Headers Found.",
+      "",
+      "No Malformed Records Found.",
+      "",
+      ""
+    ]
+  }
+]

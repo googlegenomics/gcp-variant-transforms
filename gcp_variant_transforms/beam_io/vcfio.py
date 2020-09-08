@@ -21,7 +21,6 @@ from __future__ import absolute_import
 
 from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
-import enum
 
 import apache_beam as beam
 from apache_beam.coders import coders
@@ -33,12 +32,12 @@ from apache_beam.io.filesystem import CompressionTypes
 from apache_beam.io.iobase import Read
 from apache_beam.transforms import PTransform
 
+from gcp_variant_transforms.beam_io import bgzf_io
 from gcp_variant_transforms.beam_io import vcf_parser
 
 # All other modules depend on vcfio for the following const values.
 # In order to keep the current setting we re-declared them here.
 MalformedVcfRecord = vcf_parser.MalformedVcfRecord
-FIELD_COUNT_ALTERNATE_ALLELE = vcf_parser.FIELD_COUNT_ALTERNATE_ALLELE
 MISSING_FIELD_VALUE = vcf_parser.MISSING_FIELD_VALUE
 PASS_FILTER = vcf_parser.PASS_FILTER
 END_INFO_KEY = vcf_parser.END_INFO_KEY
@@ -48,16 +47,22 @@ DEFAULT_PHASESET_VALUE = vcf_parser.DEFAULT_PHASESET_VALUE
 MISSING_GENOTYPE_VALUE = vcf_parser.MISSING_GENOTYPE_VALUE
 Variant = vcf_parser.Variant
 VariantCall = vcf_parser.VariantCall
-
-
-class VcfParserType(enum.Enum):
-  """An Enum specifying the parser used for reading VCF files."""
-  PYVCF = 0
-  NUCLEUS = 1
+SampleNameEncoding = vcf_parser.SampleNameEncoding
 
 
 class _ToVcfRecordCoder(coders.Coder):
   """Coder for encoding :class:`Variant` objects as VCF text lines."""
+
+  def __init__(self, bq_uses_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize _ToVcfRecordCoder PTransform.
+
+    Args:
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
+    """
+    self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
   def encode(self, variant):
     # type: (Variant) -> str
@@ -65,10 +70,11 @@ class _ToVcfRecordCoder(coders.Coder):
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
     encoded_calls = self._encode_variant_calls(variant, format_keys)
-
     columns = [
         variant.reference_name,
-        None if variant.start is None else variant.start + 1,
+        (None if variant.start is None
+         else (variant.start if self.bq_uses_1_based_coordinate
+               else variant.start + 1)),
         ';'.join(variant.names),
         variant.reference_bases,
         ','.join(variant.alternate_bases),
@@ -95,12 +101,15 @@ class _ToVcfRecordCoder(coders.Coder):
   def _encode_variant_info(self, variant):
     """Encodes the info of a :class:`Variant` for a VCF file line."""
     encoded_infos = []
-    # Set END in info if it doesn't match start+len(reference_bases). This is
-    # usually the case for non-variant regions.
+    start_0_based = (None if variant.start is None
+                     else (variant.start - 1 if self.bq_uses_1_based_coordinate
+                           else variant.start))
+    # Set END in info if it doesn't match len(reference_bases)+start in 0-based
+    # coordinate system. This is usually the case for non-variant regions.
     if (variant.start is not None
         and variant.reference_bases
         and variant.end
-        and variant.start + len(variant.reference_bases) != variant.end):
+        and start_0_based + len(variant.reference_bases) != variant.end):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
     for k, v in variant.info.iteritems():
@@ -181,7 +190,7 @@ class _ToVcfRecordCoder(coders.Coder):
 class _VcfSource(filebasedsource.FileBasedSource):
   """A source for reading VCF files.
 
-  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  Parses VCF files (version 4) using PySam library. If file_pattern specifies
   multiple files, then the header from each file is used separately to parse
   the content. However, the output will be a uniform PCollection of
   :class:`Variant` objects.
@@ -189,15 +198,18 @@ class _VcfSource(filebasedsource.FileBasedSource):
 
   DEFAULT_VCF_READ_BUFFER_SIZE = 65536  # 64kB
 
-  def __init__(self,
-               file_pattern,  # type: str
-               representative_header_lines=None,  # type: List[str]
-               compression_type=CompressionTypes.AUTO,  # type: str
-               buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
-               validate=True,  # type: bool
-               allow_malformed_records=False,  # type: bool
-               vcf_parser_type=VcfParserType.PYVCF  # type: int
-              ):
+  def __init__(
+      self,
+      file_pattern,  # type: str
+      representative_header_lines=None,  # type: List[str]
+      compression_type=CompressionTypes.AUTO,  # type: str
+      buffer_size=DEFAULT_VCF_READ_BUFFER_SIZE,  # type: int
+      validate=True,  # type: bool
+      allow_malformed_records=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      use_1_based_coordinate=False  # type: bool
+      ):
     # type: (...) -> None
     super(_VcfSource, self).__init__(file_pattern,
                                      compression_type=compression_type,
@@ -206,28 +218,26 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._compression_type = compression_type
     self._buffer_size = buffer_size
     self._allow_malformed_records = allow_malformed_records
-    self._vcf_parser_type = vcf_parser_type
+    self._pre_infer_headers = pre_infer_headers
+    self._sample_name_encoding = sample_name_encoding
+    self._use_1_based_coordinate = use_1_based_coordinate
+
 
   def read_records(self,
                    file_name,  # type: str
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    vcf_parser_class = None
-    if self._vcf_parser_type == VcfParserType.PYVCF:
-      vcf_parser_class = vcf_parser.PyVcfParser
-    elif self._vcf_parser_type == VcfParserType.NUCLEUS:
-      vcf_parser_class = vcf_parser.NucleusParser
-    else:
-      raise ValueError(
-          'Unrecognized _vcf_parser_type: %s.' % str(self._vcf_parser_type))
-    record_iterator = vcf_parser_class(
+    record_iterator = vcf_parser.PySamParser(
         file_name,
         range_tracker,
-        self._pattern,
         self._compression_type,
         self._allow_malformed_records,
-        self._representative_header_lines,
+        file_pattern=self._pattern,
+        representative_header_lines=self._representative_header_lines,
+        pre_infer_headers=self._pre_infer_headers,
+        sample_name_encoding=self._sample_name_encoding,
+        use_1_based_coordinate=self._use_1_based_coordinate,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -235,11 +245,71 @@ class _VcfSource(filebasedsource.FileBasedSource):
     for record in record_iterator:
       yield record
 
+
+class ReadFromBGZF(beam.PTransform):
+  """Reads variants from BGZF."""
+
+  def __init__(self,
+               input_files,
+               representative_header_lines,
+               allow_malformed_records,
+               pre_infer_headers,
+               sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
+               use_1_based_coordinate=False
+              ):
+    # type: (List[str], List[str], bool, bool, int, bool) -> None
+    """Initializes the transform.
+
+    Args:
+      input_files: The BGZF file paths to read from.
+      representative_header_lines: Header definitions to be used for parsing
+        VCF files.
+      allow_malformed_records: If true, malformed records from VCF files will be
+        returned as `MalformedVcfRecord` instead of failing the pipeline.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
+    """
+    self._input_files = input_files
+    self._representative_header_lines = representative_header_lines
+    self._allow_malformed_records = allow_malformed_records
+    self._pre_infer_headers = pre_infer_headers
+    self._sample_name_encoding = sample_name_encoding
+    self._use_1_based_coordinate = use_1_based_coordinate
+
+  def _read_records(self, (file_path, block)):
+    # type: (Tuple[str, Block]) -> Iterable(Variant)
+    """Reads records from `file_path` in `block`."""
+    record_iterator = vcf_parser.PySamParser(
+        file_path,
+        block,
+        filesystems.CompressionTypes.GZIP,
+        self._allow_malformed_records,
+        representative_header_lines=self._representative_header_lines,
+        splittable_bgzf=True,
+        pre_infer_headers=self._pre_infer_headers,
+        sample_name_encoding=self._sample_name_encoding,
+        use_1_based_coordinate=self._use_1_based_coordinate)
+
+    for record in record_iterator:
+      yield record
+
+  def expand(self, pcoll):
+    return (pcoll
+            | 'InputFiles' >> beam.Create(self._input_files)
+            | 'SplitSource' >> beam.FlatMap(bgzf_io.split_bgzf)
+            | 'Reshuffle' >> beam.Reshuffle()
+            | 'ReadBlock' >> beam.ParDo(self._read_records))
+
+
 class ReadFromVcf(PTransform):
   """A :class:`~apache_beam.transforms.ptransform.PTransform` for reading VCF
   files.
 
-  Parses VCF files (version 4) using PyVCF library. If file_pattern specifies
+  Parses VCF files (version 4) using PySam library. If file_pattern specifies
   multiple files, then the header from each file is used separately to parse
   the content. However, the output will be a PCollection of
   :class:`Variant` (or :class:`MalformedVcfRecord for failed reads) objects.
@@ -252,7 +322,9 @@ class ReadFromVcf(PTransform):
       compression_type=CompressionTypes.AUTO,  # type: str
       validate=True,  # type: bool
       allow_malformed_records=False,  # type: bool
-      vcf_parser_type=VcfParserType.PYVCF,  # type: int
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -269,15 +341,24 @@ class ReadFromVcf(PTransform):
         underlying file_path's extension will be used to detect the compression.
       validate: flag to verify that the files exist during the pipeline creation
         time.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
     super(ReadFromVcf, self).__init__(**kwargs)
+
     self._source = _VcfSource(
         file_pattern,
         representative_header_lines,
         compression_type,
         validate=validate,
         allow_malformed_records=allow_malformed_records,
-        vcf_parser_type=vcf_parser_type)
+        pre_infer_headers=pre_infer_headers,
+        sample_name_encoding=sample_name_encoding,
+        use_1_based_coordinate=use_1_based_coordinate)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
@@ -285,11 +366,16 @@ class ReadFromVcf(PTransform):
 
 def _create_vcf_source(
     file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None):
+    allow_malformed_records=None, pre_infer_headers=False,
+    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
+    use_1_based_coordinate=False):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
-                    allow_malformed_records=allow_malformed_records)
+                    allow_malformed_records=allow_malformed_records,
+                    pre_infer_headers=pre_infer_headers,
+                    sample_name_encoding=sample_name_encoding,
+                    use_1_based_coordinate=use_1_based_coordinate)
 
 
 class ReadAllFromVcf(PTransform):
@@ -312,6 +398,9 @@ class ReadAllFromVcf(PTransform):
       desired_bundle_size=DEFAULT_DESIRED_BUNDLE_SIZE,  # type: int
       compression_type=CompressionTypes.AUTO,  # type: str
       allow_malformed_records=False,  # type: bool
+      pre_infer_headers=False,  # type: bool
+      sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+      use_1_based_coordinate=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -330,13 +419,22 @@ class ReadAllFromVcf(PTransform):
         underlying file_path's extension will be used to detect the compression.
       allow_malformed_records: If true, malformed records from VCF files will be
         returned as :class:`MalformedVcfRecord` instead of failing the pipeline.
+      pre_infer_headers: If true, drop headers and make sure PySam return the
+        exact data for variants and calls, without type matching.
+      sample_name_encoding: specify how we want to encode sample_name mainly
+        to deal with same sample_name used across multiple VCF files.
+      use_1_based_coordinate: specify whether the coordinates should be stored
+        in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
     super(ReadAllFromVcf, self).__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_source,
         representative_header_lines=representative_header_lines,
         compression_type=compression_type,
-        allow_malformed_records=allow_malformed_records)
+        allow_malformed_records=allow_malformed_records,
+        pre_infer_headers=pre_infer_headers,
+        sample_name_encoding=sample_name_encoding,
+        use_1_based_coordinate=use_1_based_coordinate)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,
@@ -354,7 +452,8 @@ class WriteToVcf(PTransform):
                file_path,
                num_shards=1,
                compression_type=CompressionTypes.AUTO,
-               headers=None):
+               headers=None,
+               bq_uses_1_based_coordinate=True):
     # type: (str, int, str, List[str]) -> None
     """Initialize a WriteToVcf PTransform.
 
@@ -375,18 +474,22 @@ class WriteToVcf(PTransform):
       headers: A list of VCF meta-information lines describing the at least the
         INFO and FORMAT entries in each record and a header line describing the
         column names. These lines will be written at the beginning of the file.
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
     """
     self._file_path = file_path
     self._num_shards = num_shards
     self._compression_type = compression_type
     self._header = headers and '\n'.join([h.strip() for h in headers]) + '\n'
+    self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
   def expand(self, pcoll):
     return pcoll | 'WriteToVCF' >> textio.WriteToText(
         self._file_path,
         append_trailing_newlines=False,
         num_shards=self._num_shards,
-        coder=_ToVcfRecordCoder(),
+        coder=_ToVcfRecordCoder(self.bq_uses_1_based_coordinate),
         compression_type=self._compression_type,
         header=self._header)
 
@@ -394,8 +497,16 @@ class WriteToVcf(PTransform):
 class _WriteVcfDataLinesFn(beam.DoFn):
   """A function that writes variants to one VCF file."""
 
-  def __init__(self):
-    self._coder = _ToVcfRecordCoder()
+  def __init__(self, bq_uses_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize _WriteVcfDataLinesFn DoFn function.
+
+    Args:
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
+    """
+    self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
   def process(self, (file_path, variants), *args, **kwargs):
     # type: (Tuple[str, List[Variant]]) -> None
@@ -411,5 +522,17 @@ class WriteVcfDataLines(PTransform):
   writes `variants` to `file_path`. The PTransform `WriteToVcf` takes
   PCollection<`Variant`> as input, and writes all variants to the same file.
   """
+  def __init__(self, bq_uses_1_based_coordinate):
+    # type: (bool) -> None
+    """Initialize WriteVcfDataLines PTransform.
+
+    Args:
+      bq_uses_1_based_coordinate: specify whether the coordinates used to in BQ
+        1-based (default) or 0-based. To find out examine start_position column
+        description.
+    """
+    self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
+
   def expand(self, pcoll):
-    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn())
+    return pcoll | 'WriteToVCF' >> beam.ParDo(_WriteVcfDataLinesFn(
+        self.bq_uses_1_based_coordinate))

@@ -24,6 +24,7 @@ from apache_beam.transforms import Create
 
 from gcp_variant_transforms.beam_io import vcfio
 from gcp_variant_transforms.testing import asserts
+from gcp_variant_transforms.testing.testdata_util import hash_name
 from gcp_variant_transforms.transforms import filter_variants
 
 
@@ -46,10 +47,10 @@ class FilterVariantsTest(unittest.TestCase):
         info={'A1': 'some data', 'A2': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                name='Sample1', genotype=[0, 1], phaseset='*',
+                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
                 info={'GQ': 20, 'HQ': [10, 20]}),
             vcfio.VariantCall(
-                name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), genotype=[1, 0],
                 info={'GQ': 10, 'FLAG1': True}),
         ]
     )
@@ -59,9 +60,9 @@ class FilterVariantsTest(unittest.TestCase):
         filters=['q10'],
         info={'A1': 'some data2', 'A3': ['data3', 'data4']},
         calls=[
-            vcfio.VariantCall(name='Sample3', genotype=[1, 1]),
+            vcfio.VariantCall(sample_id=hash_name('Sample3'), genotype=[1, 1]),
             vcfio.VariantCall(
-                name='Sample4', genotype=[1, 0],
+                sample_id=hash_name('Sample4'), genotype=[1, 0],
                 info={'GQ': 20}),
         ]
     )

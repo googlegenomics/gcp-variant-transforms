@@ -16,39 +16,52 @@
 
 from __future__ import absolute_import
 
-import vcf
+from pysam import libcbcf
 
 from apache_beam.io.filesystems import FileSystems
 from gcp_variant_transforms.beam_io import vcf_header_io
 
-
 def get_vcf_headers(input_file):
-  # type: (str) -> vcf_header_io.VcfHeader
-  """Returns VCF headers from ``input_file``.
 
-  Args:
-    input_file (str): A string specifying the path to the representative VCF
-      file, i.e., the VCF file that contains a header representative of all VCF
-      files matching the input_pattern of the job. It can be local or
-      remote (e.g. on GCS).
-  Returns:
-    VCF header info.
-  Raises:
-    ValueError: If ``input_file`` is not a valid VCF file (e.g. bad format,
-    empty, non-existent).
-  """
   if not FileSystems.exists(input_file):
     raise ValueError('VCF header does not exist')
-  try:
-    vcf_reader = vcf.Reader(fsock=_line_generator(input_file))
-  except (SyntaxError, StopIteration) as e:
-    raise ValueError('Invalid VCF header: %s' % str(e))
-  return vcf_header_io.VcfHeader(infos=vcf_reader.infos,
-                                 filters=vcf_reader.filters,
-                                 alts=vcf_reader.alts,
-                                 formats=vcf_reader.formats,
-                                 contigs=vcf_reader.contigs,
-                                 file_name=input_file)
+  header = libcbcf.VariantHeader()
+  lines = _header_line_generator(input_file)
+  sample_line = None
+  header.add_line('##fileformat=VCFv4.0\n')
+  file_empty = True
+  read_file_format_line = False
+  for line in lines:
+    if not read_file_format_line:
+      read_file_format_line = True
+      if line and not line.startswith(
+          vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(VERSION='')):
+        header.add_line(vcf_header_io.FILE_FORMAT_HEADER_TEMPLATE.format(
+            VERSION='4.0'))
+    if line.startswith('##'):
+      header.add_line(line.strip())
+      file_empty = False
+    elif line.startswith('#'):
+      sample_line = line.strip()
+      file_empty = False
+    elif line:
+      # If non-empty non-header line exists, #CHROM line has to be supplied.
+      if not sample_line:
+        raise ValueError('Header line is missing')
+    else:
+      if file_empty:
+        raise ValueError('File is empty')
+      # If no records were found, use dummy #CHROM line for sample extraction.
+      if not sample_line:
+        sample_line = vcf_header_io.LAST_HEADER_LINE_PREFIX
+
+  return vcf_header_io.VcfHeader(infos=header.info,
+                                 filters=header.filters,
+                                 alts=header.alts,
+                                 formats=header.formats,
+                                 contigs=header.contigs,
+                                 samples=sample_line,
+                                 file_path=input_file)
 
 
 def get_metadata_header_lines(input_file):
@@ -67,15 +80,20 @@ def get_metadata_header_lines(input_file):
   """
   if not FileSystems.exists(input_file):
     raise ValueError('{} does not exist'.format(input_file))
-  return [line for line in _line_generator(input_file) if line.startswith('##')]
+  return[line for line in _header_line_generator(input_file) if
+         line.startswith('##')]
 
 
-def _line_generator(file_name):
+def _header_line_generator(file_name):
   """Generator to return lines delimited by newline chars from ``file_name``."""
   with FileSystems.open(file_name) as f:
+    record = None
     while True:
-      line = f.readline()
-      if line:
-        yield line
+      record = f.readline()
+      while record and not record.strip():  # Skip empty lines.
+        record = f.readline()
+      if record and record.startswith('#'):
+        yield record
       else:
         break
+    yield record

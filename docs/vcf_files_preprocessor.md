@@ -41,7 +41,14 @@ preprocessor can also be run using docker or directly from the source.
 
 Run the script below and replace the following parameters:
 
-* `GOOGLE_CLOUD_PROJECT`: This is your project ID where the job should run.
+* Dataflow's [required inputs](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service):
+  * `GOOGLE_CLOUD_PROJECT`: This is your project ID where the job should run.
+  * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
+  to process your data, for example: `us-west1`. For more information please refer to
+  [Setting Regions](docs/setting_region.md).
+  * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 * `INPUT_PATTERN`: A location in Google Cloud Storage where the
   VCF file are stored. You may specify a single file or provide a pattern to
   analyze multiple files at once.
@@ -53,9 +60,6 @@ Run the script below and replace the following parameters:
   resolved headers which can be further used as a representative header (via
   `--representative_header_file`) for the
   [VCF to BigQuery pipeline](/README.md/#loading-vcf-files-to-bigquery).
-* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
-  project has write access to. It's used to store temporary files and logs
-  from the pipeline.
 
 `report_all_conflicts` is optional. By default, the preprocessor reports the
 inconsistent header definitions across multiple VCF files. By setting this
@@ -66,27 +70,26 @@ records.
 #!/bin/bash
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
+GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+TEMP_LOCATION=gs://BUCKET/temp
 INPUT_PATTERN=gs://BUCKET/*.vcf
 REPORT_PATH=gs://BUCKET/report.tsv
 RESOLVED_HEADERS_PATH=gs://BUCKET/resolved_headers.vcf
-TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq_preprocess \
-  --project ${GOOGLE_CLOUD_PROJECT} \
+COMMAND="vcf_to_bq_preprocess \
   --input_pattern ${INPUT_PATTERN} \
   --report_path ${REPORT_PATH} \
+  --job_name vcf-to-bigquery-preprocess \
   --resolved_headers_path ${RESOLVED_HEADERS_PATH} \
   --report_all_conflicts true \
-  --temp_location ${TEMP_LOCATION} \
-  --job_name vcf-to-bigquery-preprocess \
   --runner DataflowRunner"
-gcloud alpha genomics pipelines run \
+
+docker run -v ~/.config:/root/.config \
+  gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
-  --zones us-west1-b \
-  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
-  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
-  --command-line "${COMMAND}"
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}" \
+  "${COMMAND}"
 ```
 
 ### Running from github
@@ -100,8 +103,10 @@ Example command for DirectRunner:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
   --report_path gs://BUCKET/report.tsv
+  --job_name vcf-to-bigquery-preprocess-direct-runner \
   --resolved_headers_path gs://BUCKET/resolved_headers.vcf \
-  --report_all_conflicts true
+  --report_all_conflicts true \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 Example command for DataflowRunner:
@@ -110,13 +115,14 @@ Example command for DataflowRunner:
 python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gs://BUCKET/*.vcf \
   --report_path gs://BUCKET/report.tsv \
+  --job_name vcf-to-bigquery-preprocess \
   --resolved_headers_path gs://BUCKET/resolved_headers.vcf \
   --report_all_conflicts true \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --temp_location gs://BUCKET/temp \
-  --job_name vcf-to-bigquery-preprocess \
   --setup_file ./setup.py \
-  --runner DataflowRunner
+  --runner DataflowRunner \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 ### Example

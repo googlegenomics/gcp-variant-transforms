@@ -15,39 +15,42 @@ source.
 
 Run the script below and replace the following parameters:
 
-* `GOOGLE_CLOUD_PROJECT`: This is your Google Cloud project ID where the job
+* Dataflow's [required inputs](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service):
+  * `GOOGLE_CLOUD_PROJECT`: This is your Google Cloud project ID where the job
   should run.
+  * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
+  to process your data, for example: `us-west1`. For more information please refer to
+  [Setting Regions](docs/setting_region.md).
+  * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
+  project has write access to. It's used to store temporary files and logs
+  from the pipeline.
 * `INPUT_TABLE`: BigQuery table that will be loaded to VCF. It must be in the
   format of GOOGLE_CLOUD_PROJECT:DATASET.TABLE.
 * `OUTPUT_FILE`: The full path of the output VCF file. This can be a local path
   if you use `DirectRunner` (for very small VCF files) but must be a path in
   Google Cloud Storage if using `DataflowRunner`.
-* `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
-  project has write access to. It's used to store temporary files and logs
-  from the pipeline.
 
 ```bash
 #!/bin/bash
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
+GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+TEMP_LOCATION=gs://BUCKET/temp
 INPUT_TABLE=GOOGLE_CLOUD_PROJECT:DATASET.TABLE
 OUTPUT_FILE=gs://BUCKET/loaded_file.vcf
-TEMP_LOCATION=gs://BUCKET/temp
 
-COMMAND="/opt/gcp_variant_transforms/bin/bq_to_vcf \
-  --project ${GOOGLE_CLOUD_PROJECT} \
+COMMAND="bq_to_vcf \
   --input_table ${INPUT_TABLE} \
   --output_file ${OUTPUT_FILE} \
-  --temp_location ${TEMP_LOCATION} \
   --job_name bq-to-vcf \
   --runner DataflowRunner"
-gcloud alpha genomics pipelines run \
+
+docker run -v ~/.config:/root/.config \
+  gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --logging "${TEMP_LOCATION}/runner_logs_$(date +%Y%m%d_%H%M%S).log" \
-  --zones us-west1-b \
-  --service-account-scopes https://www.googleapis.com/auth/cloud-platform \
-  --docker-image gcr.io/gcp-variant-transforms/gcp-variant-transforms \
-  --command-line "${COMMAND}"
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}" \
+  "${COMMAND}"
 ```
 
 In addition, the following optional flags can be specified in the `COMMAND`
@@ -66,9 +69,9 @@ argument in the above script:
   all variants in `chr1` and all variants in `chr2` with `start_position` in
   `[1000,2000)` from BigQuery. If this flag is not specified, all variants will
   be loaded.
-* `--call_names`: A list of call names (separated by a space). Only variants for
-  these calls will be loaded from BigQuery. If this parameter is not specified,
-  all calls will be loaded.
+* `--sample_names`: A list of sample names (separated by a space). Only
+  variants for these calls will be loaded from BigQuery. If this parameter is
+  not specified, all calls will be loaded.
 * `--allow_incompatible_schema`: If `representative_header_file` is not
   provided, the meta-information is inferred from the BigQuery schema. There are
   some reserved fields based on
@@ -78,10 +81,10 @@ argument in the above script:
   incompatibilities between BigQuery schema and the reserved fields will not
   raise errors. Instead, the VCF meta-information are inferred from the schema
   without validation.
-* `--preserve_call_names_order`: By default, call names in the output VCF file
-  are generated in ascending order. If set to true, the order of call names will
-  be the same as the BigQuery table, but it requires all extracted variants to
-  have the same call name ordering (usually true for tables from single VCF file
+* `--preserve_sample_order`: By default, samples names in the output VCF file
+  are generated in ascending order. If set to true, the order of sample names
+  will be the same as the BigQuery table, but it requires all extracted variants
+  to have the same sample ordering (usually true for tables from single VCF file
   import).
 * `--number_of_bases_per_shard`: The maximum number of base pairs per
   chromosome to include in a shard. A shard is a collection of data within a
@@ -111,9 +114,11 @@ Example command for DirectRunner:
 python -m gcp_variant_transforms.bq_to_vcf \
   --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
   --output_file gs://BUCKET/loaded_file.vcf \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --job_name bq-to-vcf-direct-runner \
   --genomic_regions 1:124852-124853 \
-  --call_names HG00099 HG00105
+  --sample_names HG00099 HG00105 \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --temp_location "${TEMP_LOCATION}"
 ```
 
 Example command for DataflowRunner:
@@ -122,12 +127,13 @@ Example command for DataflowRunner:
 python -m gcp_variant_transforms.bq_to_vcf \
   --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
   --output_file gs://BUCKET/loaded_file.vcf \
-  --representative_header_file gs://BUCKET/representative_header_file.vcf \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --temp_location gs://BUCKET/temp \
-  --genomic_regions 1:124852-124853 \
-  --call_names HG00099 HG00105 \
   --job_name bq-to-vcf \
+  --genomic_regions 1:124852-124853 \
+  --representative_header_file gs://BUCKET/representative_header_file.vcf \
+  --sample_names HG00099 HG00105 \
   --setup_file ./setup.py \
-  --runner DataflowRunner
+  --runner DataflowRunner \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region "${GOOGLE_CLOUD_REGION}" \
+  --temp_location "${TEMP_LOCATION}"
 ```
