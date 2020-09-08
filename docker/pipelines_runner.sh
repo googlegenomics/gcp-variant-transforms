@@ -117,6 +117,7 @@ function main {
   pipelines --project "${google_cloud_project}" run \
     --command "/opt/gcp_variant_transforms/bin/${command} ${df_required_args} ${df_optional_args}" \
     --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
+    --output-interval 60s \
     --wait \
     --scopes "https://www.googleapis.com/auth/cloud-platform" \
     --regions "${region}" \
