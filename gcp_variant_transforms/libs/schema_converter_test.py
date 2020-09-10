@@ -218,7 +218,7 @@ class ConvertTableSchemaToJsonAvroSchemaTest(
   """
 
   def _validate_schema(self, expected_fields, actual_schema):
-    super(ConvertTableSchemaToJsonAvroSchemaTest, self)._validate_schema(
+    super()._validate_schema(
         expected_fields, actual_schema)
     avro_schema = avro.schema.parse(
         schema_converter.convert_table_schema_to_json_avro_schema(
@@ -237,8 +237,7 @@ class ConvertTableSchemaToJsonBQSchemaTest(
   """
 
   def _validate_schema(self, expected_fields, actual_schema):
-    super(ConvertTableSchemaToJsonBQSchemaTest, self)._validate_schema(
-        expected_fields, actual_schema)
+    super()._validate_schema(expected_fields, actual_schema)
     json_schema = schema_converter.convert_table_schema_to_json_bq_schema(
         actual_schema)
     # Beam expects schema to be generated from dict with 'fields' item being

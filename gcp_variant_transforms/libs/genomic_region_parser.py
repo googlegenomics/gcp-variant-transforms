@@ -31,8 +31,8 @@ def parse_comma_sep_int(int_str):
   # type: (str) -> int
   try:
     int_value = int(int_str.replace(',', ''))
-  except:
-    raise ValueError('Given value is not integer: {}'.format(int_str))
+  except Exception as e:
+    raise ValueError('Given value is not integer: {}'.format(int_str)) from e
   return int_value
 
 def parse_genomic_region(genomic_region):

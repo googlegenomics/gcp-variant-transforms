@@ -156,7 +156,7 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
   except exceptions.HttpError as e:
     if e.status_code == 404:
       raise ValueError('Dataset %s:%s does not exist.' %
-                       (project_id, dataset_id))
+                       (project_id, dataset_id)) from e
     # For the rest of the errors, use BigQuery error message.
     raise
 
@@ -308,7 +308,7 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
         table=existing_table,
         tableId=table_id))
   except exceptions.HttpError as e:
-    raise RuntimeError('BigQuery schema update failed: %s' % str(e))
+    raise RuntimeError('BigQuery schema update failed: %s' % str(e)) from e
 
 
 def _get_merged_field_schemas(

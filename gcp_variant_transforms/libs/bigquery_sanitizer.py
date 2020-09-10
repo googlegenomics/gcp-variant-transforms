@@ -193,5 +193,5 @@ def _decode_utf8_string(input_str):
   try:
     return (input_str if isinstance(input_str, str)
             else input_str.decode('utf-8'))
-  except UnicodeDecodeError:
-    raise ValueError('input_str is not UTF-8: %s ' % (input_str))
+  except UnicodeDecodeError as e:
+    raise ValueError('input_str is not UTF-8: %s ' % (input_str)) from e

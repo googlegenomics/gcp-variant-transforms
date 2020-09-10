@@ -140,7 +140,7 @@ class VariantSharding():
       try:
         shards = yaml.load(f)
       except yaml.YAMLError as e:
-        raise ValueError('Invalid yaml file: {}'.format(str(e)))
+        raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
     if len(shards) > _MAX_NUM_SHARDS:
       raise ValueError(
           'There can be at most {} output tables but given config file '
@@ -212,9 +212,10 @@ class VariantSharding():
         try:
           partition_range_end = genomic_region_parser.parse_comma_sep_int(
               partition_range_end)
-        except:
-          raise ValueError('Wrong sharding config file, each output table '
-                           'needs an integer for partition_range_end > 0.')
+        except Exception as e:
+          raise ValueError(
+              'Wrong sharding config file, each output table '
+              'needs an integer for partition_range_end > 0.') from e
       if partition_range_end <= 0:
         raise ValueError('Wrong sharding config file, each output table '
                          'needs an integer for partition_range_end > 0.')
@@ -230,7 +231,7 @@ class VariantSharding():
       try:
         shards = yaml.load(f)
       except yaml.YAMLError as e:
-        raise ValueError('Invalid yaml file: {}'.format(str(e)))
+        raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
 
     self._num_shards = len(shards)
     for shard_index in range(self._num_shards):

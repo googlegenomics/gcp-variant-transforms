@@ -90,6 +90,6 @@ class HeaderMerger():
         except ValueError as e:
           raise ValueError('Incompatible number or types in header fields:'
                            '{}, {} \n. Error: {}'.format(
-                               first_value, second_value, str(e)))
+                               first_value, second_value, str(e))) from e
 
       first[second_key] = merged_value

@@ -243,8 +243,7 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
       allow_incompatible_records,  # type: bool
   ):
     # type: (...) -> (Dict[str, Any], bool)
-    call_record, is_empty = super(
-        VariantCallRowGenerator, self)._get_call_record(
+    call_record, is_empty = super()._get_call_record(
             call, schema_descriptor, allow_incompatible_records)
     call_record.update({
         bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID:
@@ -254,8 +253,8 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
 
   def _get_base_row_from_variant(self, variant, allow_incompatible_records):
     # type: (processed_variant.ProcessedVariant, bool) -> Dict[str, Any]
-    row = super(VariantCallRowGenerator, self)._get_base_variant_record(variant)
-    meta = super(VariantCallRowGenerator, self)._get_variant_meta_record(
+    row = super()._get_base_variant_record(variant)
+    meta = super()._get_variant_meta_record(
         variant, allow_incompatible_records)
     row.update(meta)
     # Set calls to empty for now (will be filled later).
