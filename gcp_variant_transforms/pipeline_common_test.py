@@ -65,7 +65,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
-    match = match_result(list(range(50000)))
+    match = match_result(list(range(500)))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
