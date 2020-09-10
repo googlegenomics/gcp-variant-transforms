@@ -210,9 +210,9 @@ class _VcfSource(filebasedsource.FileBasedSource):
       use_1_based_coordinate=False  # type: bool
       ):
     # type: (...) -> None
-    super(_VcfSource, self).__init__(file_pattern,
-                                     compression_type=compression_type,
-                                     validate=validate)
+    super().__init__(file_pattern,
+                     compression_type=compression_type,
+                     validate=validate)
     self._representative_header_lines = representative_header_lines
     self._compression_type = compression_type
     self._buffer_size = buffer_size
@@ -348,7 +348,7 @@ class ReadFromVcf(PTransform):
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
-    super(ReadFromVcf, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._source = _VcfSource(
         file_pattern,
@@ -426,7 +426,7 @@ class ReadAllFromVcf(PTransform):
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
-    super(ReadAllFromVcf, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_source,
         representative_header_lines=representative_header_lines,

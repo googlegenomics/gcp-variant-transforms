@@ -820,7 +820,7 @@ class VcfSourceTest(unittest.TestCase):
 class VcfSinkTest(unittest.TestCase):
 
   def setUp(self):
-    super(VcfSinkTest, self).setUp()
+    super().setUp()
     self.path = tempfile.NamedTemporaryFile(suffix='.vcf').name
     self.variants, self.variant_lines = list(zip(
         (_get_sample_variant_1(), VCF_LINE_1),

@@ -297,7 +297,7 @@ class Parser():
             alt_index + 1, 1, len(self._alt_list)))
       return alt_index
     except ValueError as e:
-      raise InvalidAlleleNumValue(e)
+      raise InvalidAlleleNumValue(e) from e
 
 
 class AnnotationStrBuilder():
