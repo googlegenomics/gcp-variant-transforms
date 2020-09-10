@@ -188,9 +188,7 @@ parse_args() {
 # Deactivates virtualenv, removes its directory, and deletes the image.
 #################################################
 clean_up() {
-  color_print "Removing integration test environment ${temp_dir}" "${GREEN}"
   deactivate
-  rm -rf "${temp_dir}"
   if [[ -z "${keep_image}" ]]; then
     # TODO(bashir2): Find a way to mark these images as temporary such that they are
     # garbage collected automatically if the test fails before this line.
@@ -226,22 +224,10 @@ if [[ -z "${skip_build}" ]]; then
       --substitutions _CUSTOM_TAG_NAME="${image_tag}" .
 fi
 
-# Running integration tests in a temporary virtualenv
-temp_dir="$(mktemp -d)"
-color_print "Setting up integration test environment in ${temp_dir}" "${GREEN}"
-# Since we have no prompt we need to disable prompt changing in virtualenv.
-export VIRTUAL_ENV_DISABLE_PROMPT="something"
-virtualenv "${temp_dir}"
-source ${temp_dir}/bin/activate;
-trap clean_up EXIT
+source /opt/gcp_variant_transforms/venv3/bin/activate;
 if [[ -n "${run_unit_tests}" ]]; then
-  python -m pip install --upgrade .
   python setup.py test
 fi
-python -m pip install --upgrade .[int_test]
-
-# Force an upgrade to avoid SSL certificate verification errors (issue #453).
-python -m pip install --upgrade httplib2
 
 color_print "Running integration tests against ${full_image_name}" "${GREEN}"
 python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
