@@ -84,9 +84,9 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, self._dataset_id.replace('_',
                                                                           '-'))]
-    for k, v in kwargs.iteritems():
+    for k, v in list(kwargs.items()):
       value = v
-      if isinstance(v, basestring):
+      if isinstance(v, str):
         value = v.format(TABLE_NAME=full_table_id)
       args.append('--{} {}'.format(k, value))
     self.run_test_command = run_tests_common.form_command(
@@ -148,12 +148,12 @@ class QueryAssertion(object):
                     results.total_rows, self._test_name))
 
     row = list(results)[0]
-    col_names = row.keys()
+    col_names = list(row.keys())
     if set(self._expected_result.keys()) != set(col_names):
       raise run_tests_common.TestCaseFailure(
           'Expected {} columns in the query result, got {} in test {}'.format(
-              self._expected_result.keys(), col_names, self._test_name))
-    for key in self._expected_result.keys():
+              list(self._expected_result.keys()), col_names, self._test_name))
+    for key in list(self._expected_result.keys()):
       if self._expected_result.get(key) != row.get(key):
         raise run_tests_common.TestCaseFailure(
             'Column {} mismatch: expected {}, got {} in test {}'.format(

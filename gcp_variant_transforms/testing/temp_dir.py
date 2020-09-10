@@ -14,7 +14,7 @@
 
 """Utility functions and classes for testing."""
 
-from __future__ import absolute_import
+
 
 import bz2
 import gzip

@@ -71,7 +71,7 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
             '--temp_location {}'.format(parsed_args.temp_location),
             '--job_name {}'.format(
                 ''.join([test_name, timestamp]).replace('_', '-'))]
-    for k, v in kwargs.iteritems():
+    for k, v in list(kwargs.items()):
       args.append('--{} {}'.format(k, v))
 
     self.run_test_command = run_tests_common.form_command(

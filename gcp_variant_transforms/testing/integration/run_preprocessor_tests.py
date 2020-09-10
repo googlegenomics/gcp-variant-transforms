@@ -82,7 +82,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
                                     _BUCKET_NAME,
                                     self._header_blob_name])
       args.append('--resolved_headers_path {}'.format(self._header_path))
-    for k, v in kwargs.iteritems():
+    for k, v in list(kwargs.items()):
       args.append('--{} {}'.format(k, v))
 
     self.run_test_command = run_tests_common.form_command(

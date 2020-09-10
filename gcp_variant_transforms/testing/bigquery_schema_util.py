@@ -14,7 +14,7 @@
 
 """Utility functions for creating BigQuery schema used by unit tests."""
 
-from __future__ import absolute_import
+
 
 from apache_beam.io.gcp.internal.clients import bigquery
 
