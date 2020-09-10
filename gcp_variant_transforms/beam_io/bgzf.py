@@ -55,7 +55,7 @@ class BGZF(filesystem.CompressedFile):
   def __init__(self,
                fileobj,
                compression_type=filesystem.CompressionTypes.GZIP):
-    super(BGZF, self).__init__(fileobj, compression_type)
+    super().__init__(fileobj, compression_type)
     self._first_fetch = True
 
   def _fetch_to_internal_buffer(self, num_bytes):
@@ -119,7 +119,7 @@ class BGZFBlockSource(textio._TextSource):
                validate=True
               ):
     """A source for reading BGZF Block."""
-    super(BGZFBlockSource, self).__init__(
+    super().__init__(
         file_name,
         min_bundle_size,
         compression_type,
@@ -164,15 +164,15 @@ class BGZFBlock(BGZF):
                fileobj,
                block,
                compression_type=filesystem.CompressionTypes.GZIP):
-    super(BGZFBlock, self).__init__(fileobj,
-                                    compression_type)
+    super().__init__(fileobj,
+                     compression_type)
     self._block = block
     self._start_offset = self._block.start
 
   def _fetch_and_decompress_data_to_buffer(self, num_bytes):
     if self._first_fetch:
       self._read_first_gzip_block_into_buffer()
-    super(BGZFBlock, self)._fetch_and_decompress_data_to_buffer(num_bytes)
+    super()._fetch_and_decompress_data_to_buffer(num_bytes)
     if self._read_eof:
       self._complete_last_line()
 

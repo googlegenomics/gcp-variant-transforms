@@ -61,7 +61,8 @@ class CustomCommands(setuptools.Command):
     try:
       subprocess.call(command_list)
     except Exception as e:
-      raise RuntimeError('Command %s failed with error: %s' % (command_list, e))
+      raise RuntimeError(
+          'Command %s failed with error: %s' % (command_list, e)) from e
 
   def run(self):
     try:
@@ -71,11 +72,12 @@ class CustomCommands(setuptools.Command):
           self.RunCustomCommand(command)
       self.RunCustomCommand(PYSAM_INSTALLATION_COMMAND)
 
-    except RuntimeError:
+    except RuntimeError as e:
       raise RuntimeError(
           'PySam installation has failed. Make sure you have the ' + \
           'following packages installed: autoconf automake gcc libbz2-dev ' + \
-          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl zlib1g-dev')
+          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl ' + \
+          'zlib1g-dev') from e
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.

@@ -275,8 +275,9 @@ class VcfHeader():
           HEADER_SPECIAL_NUMBERS):
         try:
           int(field.record[PysamHeaderKeyConstants.NUM])
-        except ValueError:
-          raise ValueError('Unknown Number at header line {}.'.format(field.id))
+        except ValueError as e:
+          raise ValueError(
+              'Unknown Number at header line {}.'.format(field.id)) from e
 
 
 class VcfHeaderSource(filebasedsource.FileBasedSource):
@@ -287,10 +288,10 @@ class VcfHeaderSource(filebasedsource.FileBasedSource):
                compression_type=CompressionTypes.AUTO,
                validate=True):
     # type: (str, str, bool) -> None
-    super(VcfHeaderSource, self).__init__(file_pattern,
-                                          compression_type=compression_type,
-                                          validate=validate,
-                                          splittable=False)
+    super().__init__(file_pattern,
+                     compression_type=compression_type,
+                     validate=validate,
+                     splittable=False)
     self._compression_type = compression_type
 
   def read_records(
@@ -376,7 +377,7 @@ class ReadVcfHeaders(PTransform):
       validate: Flag to verify that the files exist during the pipeline creation
         time.
     """
-    super(ReadVcfHeaders, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self._source = VcfHeaderSource(
         file_pattern,
         compression_type,
@@ -424,7 +425,7 @@ class ReadAllVcfHeaders(PTransform):
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
     """
-    super(ReadAllVcfHeaders, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     source_from_file = partial(
         CreateVcfHeaderSource,
         compression_type=compression_type)

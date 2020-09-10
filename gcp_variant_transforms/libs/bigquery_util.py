@@ -16,7 +16,6 @@
 
 from concurrent.futures import TimeoutError
 import enum
-import exceptions
 import logging
 import os
 import re
@@ -124,7 +123,7 @@ _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP = {
 _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
     TableFieldConstants.TYPE_INTEGER: int,
     # Bigquery accepts unicode for strings.
-    TableFieldConstants.TYPE_STRING: unicode,
+    TableFieldConstants.TYPE_STRING: str,
     TableFieldConstants.TYPE_FLOAT: float,
     TableFieldConstants.TYPE_BOOLEAN: bool,
 }

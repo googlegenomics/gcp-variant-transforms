@@ -438,17 +438,17 @@ class PySamParser(VcfParser):
       **kwargs  # type: **str
       ):
     # type: (...) -> None
-    super(PySamParser, self).__init__(file_name,
-                                      range_tracker,
-                                      file_pattern,
-                                      compression_type,
-                                      allow_malformed_records,
-                                      representative_header_lines,
-                                      splittable_bgzf,
-                                      pre_infer_headers,
-                                      sample_name_encoding,
-                                      use_1_based_coordinate,
-                                      **kwargs)
+    super().__init__(file_name,
+                     range_tracker,
+                     file_pattern,
+                     compression_type,
+                     allow_malformed_records,
+                     representative_header_lines,
+                     splittable_bgzf,
+                     pre_infer_headers,
+                     sample_name_encoding,
+                     use_1_based_coordinate,
+                     **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
     self._to_child = None

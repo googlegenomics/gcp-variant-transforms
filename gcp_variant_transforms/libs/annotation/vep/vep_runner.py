@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
 import logging
@@ -95,7 +94,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
   return runner
 
 
-class VepRunner(object):
+class VepRunner():
   """A class for running vep through Pipelines API on a set of input files."""
 
   _VEP_CACHE_BASE = ('gs://cloud-lifesciences/vep/'
@@ -391,7 +390,7 @@ class VepRunner(object):
     api_request[_API_PIPELINE]['resources'][
         'virtualMachine']['disks'][0]['sizeGb'] = (
             size_gb + _MINIMUM_DISK_SIZE_GB)
-    for input_file, output_file in io_infos.io_map.iteritems():
+    for input_file, output_file in io_infos.io_map.items():
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(

@@ -28,6 +28,10 @@ fi
 coverage run --source=gcp_variant_transforms setup.py test -s setup.py
 coverage run --source=gcp_variant_transforms setup.py test -s \
   gcp_variant_transforms.beam_io
+coverage run --source=gcp_variant_transforms setup.py test -s \
+  gcp_variant_transforms.libs.annotation
+coverage run --source=gcp_variant_transforms setup.py test -s \
+  gcp_variant_transforms.libs.variant_merge
 
 echo ========== Running pylint.
 if [[ -z `which pylint` ]];then
@@ -39,3 +43,5 @@ fi
 # of the files are migrated, delete this code and uncomment the above line.
 python -m pylint setup.py
 python -m pylint gcp_variant_transforms/beam_io/
+python -m pylint gcp_variant_transforms/libs/annotation
+python -m pylint gcp_variant_transforms/libs/variant_merge

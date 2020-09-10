@@ -74,10 +74,10 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
                compression_type=filesystem.CompressionTypes.AUTO,
                validate=True):
     # type: (str, str, bool) -> None
-    super(VcfEstimateSource, self).__init__(file_pattern,
-                                            compression_type=compression_type,
-                                            validate=validate,
-                                            splittable=False)
+    super().__init__(file_pattern,
+                     compression_type=compression_type,
+                     validate=validate,
+                     splittable=False)
     self._compression_type = compression_type
 
   def _get_header_info(self, file_to_read, file_name):
@@ -170,7 +170,7 @@ class GetEstimates(transforms.PTransform):
       validate: Flag to verify that the files exist during the pipeline creation
         time.
     """
-    super(GetEstimates, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self._source = VcfEstimateSource(
         file_pattern,
         compression_type,
@@ -212,7 +212,7 @@ class GetAllEstimates(transforms.PTransform):
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
     """
-    super(GetAllEstimates, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_estimate_source,
         compression_type=compression_type)
