@@ -208,7 +208,8 @@ def _generate_conflicting_headers_lines(
   content_lines = []
   for field_id in sorted(conflicts.keys()):
     first_item = True
-    for definition in sorted(conflicts.get(field_id).keys()):
+    for definition in sorted(conflicts.get(field_id).keys(),
+                             key=lambda x: (str(x[0]), x[1])):
       sorted_file_names = sorted(conflicts.get(field_id).get(definition))
       if first_item:
         row = [field_id,

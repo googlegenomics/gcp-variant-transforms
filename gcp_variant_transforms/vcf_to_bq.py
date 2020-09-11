@@ -416,10 +416,10 @@ def _write_schema_to_temp_file(schema, path):
   schema_json = schema_converter.convert_table_schema_to_json_bq_schema(schema)
   schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
   with filesystems.FileSystems.create(schema_file) as file_to_write:
-    file_to_write.write(schema_json)
+    file_to_write.write(schema_json.encode('utf-8'))
   gs_file_path = path + _BQ_SCHEMA_FILE_SUFFIX
   with filesystems.FileSystems.create(gs_file_path) as file_to_write:
-    file_to_write.write(schema_json)
+    file_to_write.write(schema_json.encode('utf-8'))
   return schema_file
 
 

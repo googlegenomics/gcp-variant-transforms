@@ -107,7 +107,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {} in test {}'.format(self._report_path,
                                                             self._name))
-    contents = report_blob.download_as_string()
+    contents = report_blob.download_as_string().decode('utf-8')
     expected_contents = '\n'.join(self._expected_contents)
     if expected_contents != contents:
       raise run_tests_common.TestCaseFailure(

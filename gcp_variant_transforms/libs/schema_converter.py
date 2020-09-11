@@ -236,7 +236,7 @@ def _convert_field_to_avro_dict(field):
   return field_dict
 
 
-def _convert_schema_to_avro_dict(schema):
+def convert_schema_to_avro_dict(schema):
   # type: (bigquery.TableSchema) -> Dict
   fields_dict = {}
   # TODO(bashir2): Check if we need `namespace` and `name` at the top level.
@@ -318,7 +318,7 @@ def convert_table_schema_to_json_avro_schema(schema):
     raise ValueError(
         'Expected an instance of bigquery.TableSchema got {}'.format(
             type(schema)))
-  schema_dict = _convert_schema_to_avro_dict(schema)
+  schema_dict = convert_schema_to_avro_dict(schema)
   json_str = json.dumps(schema_dict)
   logging.info('The Avro schema is: %s', json_str)
   return json_str

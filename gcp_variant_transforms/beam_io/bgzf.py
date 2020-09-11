@@ -147,7 +147,7 @@ class BGZFBlockSource(textio._TextSource):
         record = file_to_read.readline()
         if not record or not record.strip():
           break
-        if record and not record.startswith('#'):
+        if record and not record.startswith(b'#'):
           yield self._coder.decode(record)
 
 
