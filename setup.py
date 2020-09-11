@@ -80,6 +80,19 @@ class CustomCommands(setuptools.Command):
 
   def run(self):
 
+    # When running vcf_to_bq under with Dataflow cost optimizations:
+    #   --flexrs_goal=COST_OPTIMIZED \
+    #   --runner DataflowRunner
+    #
+    # It was observed that new workers would fail with:
+    #   <snip>
+    #   File "/usr/local/lib/python2.7/site-packages/pysam/__init__.py", line 5, in <module>
+    #     from pysam.libchtslib import *
+    #   ImportError: No module named libchtslib
+    #
+    # Root cause for the failure has not been determined, but with the
+    # following retries, the problem has no longer been observed:
+
     for attempt in range(0,10):
       try:
         self.do_install()
@@ -88,8 +101,8 @@ class CustomCommands(setuptools.Command):
       except ImportError:
         time.sleep(10)
 
+    # Try one more time before exiting; would rather fail here than downstream.
     from pysam import libchtslib
-
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.
