@@ -15,7 +15,6 @@
 """Util functions for accessing testdata."""
 
 
-
 import os.path
 
 from gcp_variant_transforms.libs import hashing_util

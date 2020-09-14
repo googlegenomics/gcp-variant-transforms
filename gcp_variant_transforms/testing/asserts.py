@@ -28,8 +28,7 @@ def items_equal(expected):
       if e not in compare:
         raise BeamAssertException(
             'Failed assert: %r != %r' % (expected, actual))
-      else:
-        compare.remove(e)
+      compare.remove(e)
     if compare:
       raise BeamAssertException('Failed assert: %r != %r' % (expected, actual))
   return _items_equal

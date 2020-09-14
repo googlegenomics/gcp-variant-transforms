@@ -15,7 +15,6 @@
 """Utility functions and classes for testing."""
 
 
-
 import bz2
 import gzip
 import os
@@ -27,7 +26,7 @@ from apache_beam.io import filesystem
 __all__ = ['TempDir']
 
 
-class TempDir(object):
+class TempDir():
   """Context Manager to create and clean-up a temporary directory."""
 
   def __init__(self):

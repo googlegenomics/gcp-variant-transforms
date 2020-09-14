@@ -36,7 +36,7 @@ TestCaseState = namedtuple('TestCaseState',
                            ['running_test', 'remaining_tests'])
 
 
-class TestCaseInterface(object):
+class TestCaseInterface():
   """Interface of an integration test case."""
 
   def validate_result(self):
@@ -46,10 +46,9 @@ class TestCaseInterface(object):
 
 class TestCaseFailure(Exception):
   """Exception for failed test cases."""
-  pass
 
 
-class TestRunner(object):
+class TestRunner():
   """Runs the tests using pipelines API."""
 
   def __init__(self, tests, revalidate=False):
