@@ -15,7 +15,6 @@
 """Tests for variant_to_bigquery module."""
 
 
-
 import unittest
 
 import apache_beam as beam

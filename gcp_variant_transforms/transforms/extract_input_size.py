@@ -23,7 +23,6 @@ This module is used to create 5 main signals that describe the supplied input:
 """
 
 
-
 import apache_beam as beam
 
 from apache_beam.io import filesystems

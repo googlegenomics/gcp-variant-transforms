@@ -15,7 +15,6 @@
 """A PTransform to infer undefined/mismatched header fields."""
 
 
-
 from typing import Iterable, List, Optional  # pylint: disable=unused-import
 
 import apache_beam as beam

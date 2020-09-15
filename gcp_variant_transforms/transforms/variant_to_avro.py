@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import apache_beam as beam
 import avro
 

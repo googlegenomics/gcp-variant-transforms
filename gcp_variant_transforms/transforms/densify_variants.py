@@ -15,7 +15,6 @@
 """A PTransform to extend each Variant's calls with data for all samples."""
 
 
-
 import apache_beam as beam
 
 from gcp_variant_transforms.beam_io import vcfio

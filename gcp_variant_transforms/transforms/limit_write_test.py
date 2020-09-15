@@ -15,7 +15,6 @@
 """Tests for limit_write module."""
 
 
-
 import unittest
 
 from apache_beam.testing.test_pipeline import TestPipeline

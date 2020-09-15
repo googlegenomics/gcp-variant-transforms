@@ -15,7 +15,6 @@
 """Tests for densify_variants module."""
 
 
-
 import unittest
 
 from apache_beam import combiners

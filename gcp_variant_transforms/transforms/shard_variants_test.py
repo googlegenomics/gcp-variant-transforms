@@ -15,7 +15,6 @@
 """Tests for shard_variants module."""
 
 
-
 import unittest
 
 import apache_beam as beam
@@ -85,7 +84,7 @@ class ShardVariantsTest(unittest.TestCase):
   def test_shard_variants(self):
     expected_shards = self._get_expected_variant_shards()
     variants = [variant
-                for variant_list in list(expected_shards.values())
+                for variant_list in expected_shards.values()
                 for variant in variant_list]
 
     sharding = variant_sharding.VariantSharding(

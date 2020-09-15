@@ -15,7 +15,6 @@
 """A PTransform for filtering variants."""
 
 
-
 from typing import Iterable  # pylint: disable=unused-import
 import logging
 

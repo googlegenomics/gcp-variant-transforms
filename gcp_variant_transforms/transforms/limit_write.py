@@ -22,7 +22,6 @@ are BigQuery rows) based on that key before writing them to output table.
 """
 
 
-
 import random
 import apache_beam as beam
 

@@ -15,7 +15,6 @@
 """A PTransform for merging variants based on a strategy."""
 
 
-
 import apache_beam as beam
 
 from gcp_variant_transforms.libs.variant_merge import variant_merge_strategy
@@ -42,8 +41,8 @@ class MergeVariants(beam.PTransform):
     for key in self._variant_merger.get_merge_keys(variant):
       yield (key, variant)
 
-  def _merge_variants_by_key(self, xxx_todo_changeme):
-    (key, variants) = xxx_todo_changeme
+  def _merge_variants_by_key(self, key_and_variants):
+    (key, variants) = key_and_variants
     return self._variant_merger.get_merged_variants(variants, key)
 
   def expand(self, pcoll):

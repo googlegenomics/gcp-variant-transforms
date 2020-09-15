@@ -15,7 +15,6 @@
 """Tests for filter_variants module."""
 
 
-
 import unittest
 
 from apache_beam.testing.test_pipeline import TestPipeline
