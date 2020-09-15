@@ -14,7 +14,6 @@
 
 """Unit tests for `genomic_region_parser` module."""
 
-from __future__ import absolute_import
 
 import unittest
 

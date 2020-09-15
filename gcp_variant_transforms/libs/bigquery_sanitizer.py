@@ -31,7 +31,7 @@ _INF_FLOAT_VALUE = sys.float_info.max / 10
 _DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT = -2 ^ 31
 
 
-class SchemaSanitizer(object):
+class SchemaSanitizer():
   """Class to sanitize BigQuery schema according to BigQuery restrictions."""
 
   @staticmethod
@@ -63,7 +63,7 @@ class SchemaSanitizer(object):
     return re.sub('[^a-zA-Z0-9_]', '_', field_name)
 
 
-class FieldSanitizer(object):
+class FieldSanitizer():
   """Class to sanitize field values according to BigQuery restrictions."""
 
   def __init__(self, null_numeric_value_replacement):
@@ -107,7 +107,7 @@ class FieldSanitizer(object):
     """
     if not field:
       return field
-    if isinstance(field, basestring):
+    if isinstance(field, (str, bytes)):
       return self._get_sanitized_string(field)
     elif isinstance(field, float):
       return self._get_sanitized_float(field)
@@ -142,11 +142,11 @@ class FieldSanitizer(object):
     for i in input_list:
       if i is None:
         continue
-      if isinstance(i, basestring):
+      if isinstance(i, str):
         null_replacement_value = vcfio.MISSING_FIELD_VALUE
       elif isinstance(i, bool):
         null_replacement_value = False
-      elif isinstance(i, (int, long, float)):
+      elif isinstance(i, (int, float)):
         null_replacement_value = self._null_numeric_value_replacement
       else:
         raise ValueError('Unsupported value for input: %s' % str(i))
@@ -157,7 +157,7 @@ class FieldSanitizer(object):
     for i in input_list:
       if i is None:
         i = null_replacement_value
-      elif isinstance(i, basestring):
+      elif isinstance(i, (str, bytes)):
         i = self._get_sanitized_string(i)
       elif isinstance(i, float):
         sanitized_float = self._get_sanitized_float(i)
@@ -193,5 +193,5 @@ def _decode_utf8_string(input_str):
   try:
     return (input_str if isinstance(input_str, str)
             else input_str.decode('utf-8'))
-  except UnicodeDecodeError:
-    raise ValueError('input_str is not UTF-8: %s ' % (input_str))
+  except UnicodeDecodeError as e:
+    raise ValueError('input_str is not UTF-8: %s ' % (input_str)) from e

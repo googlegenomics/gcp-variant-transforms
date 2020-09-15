@@ -61,14 +61,14 @@ _PADDING_CHARACTER = ' '
 _DELIMITER = '\t'
 
 
-class _InconsistencyType(object):
+class _InconsistencyType():
   """Inconsistency types that included in the report."""
   HEADER_CONFLICTS = 'Header Conflicts'
   INFERRED_HEADERS = 'Inferred Headers'
   MALFORMED_RECORDS = 'Malformed Records'
 
 
-class _HeaderLine(object):
+class _HeaderLine():
   """Header lines for each error type."""
   CONFLICTS_HEADER = 'ID\tCategory\tConflicts\tFile Paths\tProposed Resolution'
   INFERRED_FIELD_HEADER = 'ID\tCategory\tProposed Resolution'
@@ -115,7 +115,7 @@ def _extract_conflicts(
     which maps `Definition` to a list of file names.
   """
   # len(v) > 1 means there are conflicting definitions for this field.
-  return dict([(k, v) for k, v in definitions.items() if len(v) > 1])
+  return {k:v for k, v in definitions.items() if len(v) > 1}
 
 
 def _append_conflicting_headers_to_report(
@@ -284,10 +284,10 @@ def _append_to_report(file_to_write, error_type, header, contents):
   `file_to_write` sequentially.
   """
   if not contents:
-    file_to_write.write('No ' + error_type + ' Found.\n')
+    file_to_write.write(('No ' + error_type + ' Found.\n').encode('utf-8'))
   else:
-    file_to_write.write(error_type + '\n')
-    file_to_write.write(header + '\n')
+    file_to_write.write((error_type + '\n').encode('utf-8'))
+    file_to_write.write((header + '\n').encode('utf-8'))
     for content in contents:
-      file_to_write.write(content + '\n')
-  file_to_write.write('\n')
+      file_to_write.write((content + '\n').encode('utf-8'))
+  file_to_write.write(b'\n')

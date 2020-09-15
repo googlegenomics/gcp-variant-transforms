@@ -14,7 +14,6 @@
 
 """Tests for `schema_converter` module."""
 
-from __future__ import absolute_import
 
 from collections import OrderedDict
 import json
@@ -218,7 +217,7 @@ class ConvertTableSchemaToJsonAvroSchemaTest(
   """
 
   def _validate_schema(self, expected_fields, actual_schema):
-    super(ConvertTableSchemaToJsonAvroSchemaTest, self)._validate_schema(
+    super()._validate_schema(
         expected_fields, actual_schema)
     avro_schema = avro.schema.parse(
         schema_converter.convert_table_schema_to_json_avro_schema(
@@ -237,8 +236,7 @@ class ConvertTableSchemaToJsonBQSchemaTest(
   """
 
   def _validate_schema(self, expected_fields, actual_schema):
-    super(ConvertTableSchemaToJsonBQSchemaTest, self)._validate_schema(
-        expected_fields, actual_schema)
+    super()._validate_schema(expected_fields, actual_schema)
     json_schema = schema_converter.convert_table_schema_to_json_bq_schema(
         actual_schema)
     # Beam expects schema to be generated from dict with 'fields' item being
@@ -655,7 +653,7 @@ def _get_fields_from_avro_type(field_or_schema, prefix):
   name = field_or_schema.name
   if name and name not in fields and name != 'TBD':
     fields.extend([prefix + field_or_schema.name])
-  if field_or_schema.get_prop('fields'):
+  if 'fields' in field_or_schema.props:
     child_prefix = prefix
     if name != 'TBD':
       child_prefix = prefix + field_or_schema.name + '.'

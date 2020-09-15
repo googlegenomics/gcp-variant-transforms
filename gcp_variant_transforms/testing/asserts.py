@@ -14,7 +14,6 @@
 
 """Custom asserts for tests."""
 
-from __future__ import absolute_import
 
 from typing import Callable, List  # pylint: disable=unused-import
 from apache_beam.testing.util import BeamAssertException
