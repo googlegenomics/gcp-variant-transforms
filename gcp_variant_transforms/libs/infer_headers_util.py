@@ -109,7 +109,7 @@ def infer_format_fields(
   """
   formats = {}
   if defined_headers and defined_headers.formats:
-    for format_key, format_value in list(defined_headers.formats.items()):
+    for format_key, format_value in defined_headers.formats.items():
       formats[format_key] = vcf_header_io.CreateFormatField(
           format_key,
           format_value[_HeaderKeyConstants.NUM],
@@ -118,7 +118,7 @@ def infer_format_fields(
       )
   updated_formats = {}
   for call in variant.calls:
-    for format_key, format_value in list(call.info.items()):
+    for format_key, format_value in call.info.items():
       if format_key not in formats:
         logging.warning('Undefined FORMAT field "%s" in variant "%s"',
                         format_key, str(variant))
@@ -342,7 +342,7 @@ def _infer_non_annotation_info_fields(
       the field values.
     defined_headers: header fields defined in header section of VCF files.
   """
-  for info_field_key, info_field_value in list(variant.info.items()):
+  for info_field_key, info_field_value in variant.info.items():
     if not defined_headers or info_field_key not in defined_headers.infos:
       if info_field_key in infos:
         raise ValueError(

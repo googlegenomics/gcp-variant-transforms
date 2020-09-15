@@ -15,7 +15,6 @@
 """Function for parsing genomic region."""
 
 
-
 import re
 import sys
 from typing import Tuple  # pylint: disable=unused-import

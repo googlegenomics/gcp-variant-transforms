@@ -15,7 +15,6 @@
 """Handles the conversion between BigQuery/Avro schema and VCF header."""
 
 
-
 from collections import OrderedDict
 import json
 import logging
@@ -147,7 +146,7 @@ def generate_schema_from_header_fields(
       description=('Phaseset of the call (if any). "*" is used in cases where '
                    'the genotype is phased, but no phase set ("PS" in FORMAT) '
                    'was specified.')))
-  for key, field in list(header_fields.formats.items()):
+  for key, field in header_fields.formats.items():
     # GT and PS are already included in 'genotype' and 'phaseset' fields.
     if key in (vcfio.GENOTYPE_FORMAT_KEY, vcfio.PHASESET_FORMAT_KEY):
       continue
@@ -165,7 +164,7 @@ def generate_schema_from_header_fields(
   info_keys = set()
   annotation_info_type_keys_set = set(
       proc_variant_factory.gen_annotation_info_type_keys())
-  for key, field in list(header_fields.infos.items()):
+  for key, field in header_fields.infos.items():
     # END info is already included by modifying the end_position. Info type
     # fields exist only to indicate the type of corresponding annotation fields,
     # and should not be added to the schema.

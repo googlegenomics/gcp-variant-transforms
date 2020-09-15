@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import unittest
 from apitools.base.py import exceptions
 

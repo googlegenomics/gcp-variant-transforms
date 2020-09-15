@@ -15,8 +15,6 @@
 """Tests for bigquery_schema_descriptor module."""
 
 
-
-
 import unittest
 
 from apache_beam.io.gcp.internal.clients import bigquery

@@ -15,7 +15,6 @@
 """Tests for `bigquery_vcf_data_converter` module."""
 
 
-
 import unittest
 from typing import Dict  # pylint: disable=unused-import
 

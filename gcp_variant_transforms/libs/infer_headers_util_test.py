@@ -15,7 +15,6 @@
 """Tests for infer_headers_util module."""
 
 
-
 from collections import OrderedDict
 import unittest
 

@@ -27,7 +27,7 @@ def make_header(header_num_dict):
     header_num_dict: a dictionary mapping info keys to string num values.
   """
   infos = {}
-  for k, v in list(header_num_dict.items()):
+  for k, v in header_num_dict.items():
     num_field_value = v if v in vcf_header_io.HEADER_SPECIAL_NUMBERS else int(v)
     infos[k] = vcf_header_io.CreateInfoField(k, num_field_value, '.', '')
   return vcf_header_io.VcfHeader(infos=infos)

@@ -71,7 +71,7 @@ class HashingUtilTest(unittest.TestCase):
         'gs___bucket1_dir1_file1_vcf_sample-@~!*&1':
             ('sample-@~!*&1', 'gs://bucket1/dir1/file1.vcf'),
     }
-    for expected_name, inputs in list(composite_names.items()):
+    for expected_name, inputs in composite_names.items():
       self.assertEqual(expected_name,
                        hashing_util.create_composite_sample_name(inputs[0],
                                                                  inputs[1]))

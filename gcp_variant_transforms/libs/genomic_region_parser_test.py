@@ -15,7 +15,6 @@
 """Unit tests for `genomic_region_parser` module."""
 
 
-
 import unittest
 
 from gcp_variant_transforms.libs import genomic_region_parser

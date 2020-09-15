@@ -109,7 +109,7 @@ class BigQueryRowGenerator():
 
     is_empty = (not call.genotype or
                 set(call.genotype) == {vcf_parser.MISSING_GENOTYPE_VALUE})
-    for key, data in list(call.info.items()):
+    for key, data in call.info.items():
       if data is not None:
         field_name, field_data = self._get_bigquery_field_entry(
             key, data, schema_descriptor,
@@ -143,13 +143,13 @@ class BigQueryRowGenerator():
     for alt in variant.alternate_data_list:
       alt_record = {bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT:
                     alt.alternate_bases}
-      for key, data in list(alt.info.items()):
+      for key, data in alt.info.items():
         alt_record[_BigQuerySchemaSanitizer.get_sanitized_field_name(key)] = (
             data if key in alt.annotation_field_names else
             self._bigquery_field_sanitizer.get_sanitized_field(data))
       row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
     # Add info.
-    for key, data in list(variant.non_alt_info.items()):
+    for key, data in variant.non_alt_info.items():
       if data is not None:
         field_name, field_data = self._get_bigquery_field_entry(
             key, data, self._schema_descriptor, allow_incompatible_records)

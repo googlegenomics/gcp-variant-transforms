@@ -14,7 +14,6 @@
 """A dict based description for BigQuery schema."""
 
 
-
 from typing import NamedTuple
 from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
 

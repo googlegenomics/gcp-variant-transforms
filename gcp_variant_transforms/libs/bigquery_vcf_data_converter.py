@@ -15,8 +15,6 @@
 """Converts BigQuery row to variant."""
 
 
-
-
 from typing import Any, Dict, List  # pylint: disable=unused-import
 
 from gcp_variant_transforms.beam_io import vcfio
@@ -87,11 +85,11 @@ class VariantGenerator():
   def _get_variant_info(self, row):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     info = {}
-    for key, value in list(row.items()):
+    for key, value in row.items():
       if key not in RESERVED_BQ_COLUMNS and not self._is_null_or_empty(value):
         info.update({key: value})
     for alt_base in row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES]:
-      for key, value in list(alt_base.items()):
+      for key, value in alt_base.items():
         if (key != bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT and
             not self._is_null_or_empty(value)):
           if key not in info:
@@ -109,7 +107,7 @@ class VariantGenerator():
     variant_calls = []
     for call_record in variant_call_records:
       info = {}
-      for key, value in list(call_record.items()):
+      for key, value in call_record.items():
         if (key not in RESERVED_VARIANT_CALL_COLUMNS and
             not self._is_null_or_empty(value)):
           info.update({key: value})

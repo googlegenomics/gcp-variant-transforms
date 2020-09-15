@@ -30,7 +30,6 @@ my_counter.inc(4)
 """
 
 
-
 import logging
 
 from apache_beam.runners import runner  # pylint: disable=unused-import

@@ -41,12 +41,12 @@ class VcfHeaderDefinitions():
     self._formats = collections.defaultdict(dict)
     if not vcf_header:
       return
-    for key, val in list(vcf_header.infos.items()):
+    for key, val in vcf_header.infos.items():
       definition = Definition(
           val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
           val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
       self._infos[key][definition] = [vcf_header.file_path]
-    for key, val in list(vcf_header.formats.items()):
+    for key, val in vcf_header.formats.items():
       definition = Definition(
           val[vcf_header_io.VcfParserHeaderKeyConstants.NUM],
           val[vcf_header_io.VcfParserHeaderKeyConstants.TYPE])
@@ -86,8 +86,8 @@ class DefinitionsMerger():
       ):
     # type: (...) -> None
     """Updates `first` by merging values from `first` and `second`."""
-    for key, definitions_to_files_map in list(second.items()):
-      for definition, file_names in list(definitions_to_files_map.items()):
+    for key, definitions_to_files_map in second.items():
+      for definition, file_names in definitions_to_files_map.items():
         first[key].setdefault(definition, [])
         first[key][definition].extend(str(s) for s in file_names)
         first[key][definition] = (

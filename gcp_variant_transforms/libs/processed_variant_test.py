@@ -534,7 +534,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
 
   def test_create_alt_bases_field_schema_descriptions(self):
     _, header_fields = self._get_sample_variant_and_header_with_csq()
-    for hfi in list(header_fields.infos.values()):
+    for hfi in header_fields.infos.values():
       hfi['type'] = 'string'
 
     factory = processed_variant.ProcessedVariantFactory(
@@ -563,7 +563,7 @@ class ProcessedVariantFactoryTest(unittest.TestCase):
              for i, t in zip(ids, types)]
     _, header_fields = self._get_sample_variant_and_header_with_csq(
         additional_infos=infos)
-    for hfi in list(header_fields.infos.values()):
+    for hfi in header_fields.infos.values():
       if hfi['type'] == '.':
         hfi['type'] = 'String'
     factory = processed_variant.ProcessedVariantFactory(

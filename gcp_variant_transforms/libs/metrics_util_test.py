@@ -15,7 +15,6 @@
 """Unit tests for metrics_util module."""
 
 
-
 import unittest
 
 from gcp_variant_transforms.libs import metrics_util

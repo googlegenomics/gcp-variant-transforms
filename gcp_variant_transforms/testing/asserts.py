@@ -15,7 +15,6 @@
 """Custom asserts for tests."""
 
 
-
 from typing import Callable, List  # pylint: disable=unused-import
 from apache_beam.testing.util import BeamAssertException
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import

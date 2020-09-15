@@ -92,7 +92,7 @@ class LoadAvro():
     self._suffixes_to_load_jobs.update({suffix: load_job})
 
   def _cancel_all_running_load_jobs(self):
-    for load_job in list(self._suffixes_to_load_jobs.values()):
+    for load_job in self._suffixes_to_load_jobs.values():
       load_job.cancel()
 
   def _handle_failed_load_job(self, suffix, load_job):

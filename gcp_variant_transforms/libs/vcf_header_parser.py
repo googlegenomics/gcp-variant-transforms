@@ -15,7 +15,6 @@
 """Helper library for reading VCF headers from multiple files."""
 
 
-
 from pysam import libcbcf
 
 from apache_beam.io.filesystems import FileSystems

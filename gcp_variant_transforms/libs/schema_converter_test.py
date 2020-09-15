@@ -15,7 +15,6 @@
 """Tests for `schema_converter` module."""
 
 
-
 from collections import OrderedDict
 import json
 from typing import List, Union  # pylint: disable=unused-import

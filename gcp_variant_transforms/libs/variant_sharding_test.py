@@ -15,7 +15,6 @@
 """Unit tests for variant_sharding module."""
 
 
-
 import unittest
 
 from gcp_variant_transforms.libs import variant_sharding

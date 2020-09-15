@@ -18,7 +18,6 @@ See http://samtools.github.io/hts-specs/VCFv4.3.pdf for more details.
 """
 
 
-
 import collections
 from typing import Optional  # pylint: disable=unused-import
 

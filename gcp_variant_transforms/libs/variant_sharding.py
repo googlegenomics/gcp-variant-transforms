@@ -25,7 +25,6 @@ This class has 2 main operating modes:
 """
 
 
-
 from collections import defaultdict
 import re
 from typing import List, Optional  # pylint: disable=unused-import
