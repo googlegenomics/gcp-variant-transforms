@@ -14,7 +14,6 @@
 
 """Tests for shard_variants module."""
 
-from __future__ import absolute_import
 
 import unittest
 
