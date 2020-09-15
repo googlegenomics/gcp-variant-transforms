@@ -40,8 +40,6 @@ python -m gcp_variant_transforms.bq_to_vcf \
 """
 
 
-
-
 import logging
 import sys
 import tempfile
@@ -352,7 +350,8 @@ def _write_vcf_header_with_sample_names(sample_names,
     file_to_write.write(b'\n')
 
 
-def _get_file_path_and_sorted_variants(xxx_todo_changeme, file_path_prefix):
+def _get_file_path_and_sorted_variants(
+    file_name_and_variants, file_path_prefix):
   # type: (Tuple[str, List], str) -> Iterable[Tuple[str, List]]
   """Returns the file path and the sorted variants.
 
@@ -364,7 +363,7 @@ def _get_file_path_and_sorted_variants(xxx_todo_changeme, file_path_prefix):
       pipeline. The files written will begin with this prefix, followed by the
       `file_name`.
   """
-  (file_name, variants) = xxx_todo_changeme
+  (file_name, variants) = file_name_and_variants
   file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
 

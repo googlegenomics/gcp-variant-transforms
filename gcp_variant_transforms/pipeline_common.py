@@ -149,7 +149,8 @@ def _get_file_names(input_file):
   if not filesystems.FileSystems.exists(input_file):
     raise ValueError('Input file {} doesn\'t exist'.format(input_file))
   with filesystems.FileSystems.open(input_file) as f:
-    contents = list(map(str.strip, [b.decode('utf-8') for b in f.readlines()]))
+    contents = list(map(str.strip,
+                        [line.decode('utf-8') for line in f.readlines()]))
     if not contents:
       raise ValueError('Input file {} is empty.'.format(input_file))
     return contents

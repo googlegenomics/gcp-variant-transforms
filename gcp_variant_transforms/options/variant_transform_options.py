@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import argparse  # pylint: disable=unused-import
 
 from apache_beam.io.gcp.internal.clients import bigquery

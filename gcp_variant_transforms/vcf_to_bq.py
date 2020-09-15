@@ -32,7 +32,6 @@ python -m gcp_variant_transforms.vcf_to_bq \
 """
 
 
-
 import argparse  # pylint: disable=unused-import
 from datetime import datetime
 import logging

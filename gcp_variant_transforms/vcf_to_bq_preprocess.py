@@ -47,7 +47,6 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
 """
 
 
-
 import logging
 import sys
 
