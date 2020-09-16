@@ -78,8 +78,8 @@ def parse_args(argv, command_line_options):
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
-  # Fix NameErrors:
-  # https://cloud.google.com/dataflow/docs/resources/faq#how_do_i_handle_nameerrors
+
+  # https://github.com/googlegenomics/gcp-variant-transforms/issues/667
   pipeline_args.extend(['--save_main_session', 'True'])
   return known_args, pipeline_args
 

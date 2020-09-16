@@ -225,6 +225,7 @@ if [[ -z "${skip_build}" ]]; then
 fi
 
 source /opt/gcp_variant_transforms/venv3/bin/activate;
+trap clean_up EXIT
 if [[ -n "${run_unit_tests}" ]]; then
   python setup.py test
 fi

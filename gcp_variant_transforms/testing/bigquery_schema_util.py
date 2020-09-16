@@ -15,7 +15,6 @@
 """Utility functions for creating BigQuery schema used by unit tests."""
 
 
-
 from apache_beam.io.gcp.internal.clients import bigquery
 
 from gcp_variant_transforms.libs import bigquery_util
