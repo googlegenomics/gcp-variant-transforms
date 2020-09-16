@@ -95,17 +95,15 @@ def _get_all_patterns(input_pattern, input_file):
           raise ValueError(
               'Input pattern {} from {} did not match any files.'.format(
                   match.pattern, input_file))
-        else:
-          raise ValueError(
-              'Input pattern {} did not match any files.'.format(match.pattern))
-  except filesystem.BeamIOError:
+        raise ValueError(
+            'Input pattern {} did not match any files.'.format(match.pattern))
+  except filesystem.BeamIOError as e:
     if input_file:
       raise ValueError(
           'Some patterns in {} are invalid or inaccessible.'.format(
-              input_file))
-    else:
-      raise ValueError('Invalid or inaccessible input pattern {}.'.format(
-          input_pattern))
+              input_file)) from e
+    raise ValueError('Invalid or inaccessible input pattern {}.'.format(
+        input_pattern)) from e
   return patterns
 
 
@@ -151,7 +149,8 @@ def _get_file_names(input_file):
   if not filesystems.FileSystems.exists(input_file):
     raise ValueError('Input file {} doesn\'t exist'.format(input_file))
   with filesystems.FileSystems.open(input_file) as f:
-    contents = map(str.strip, f.readlines())
+    contents = list(map(str.strip,
+                        [line.decode('utf-8') for line in f.readlines()]))
     if not contents:
       raise ValueError('Input file {} is empty.'.format(input_file))
     return contents

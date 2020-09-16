@@ -45,3 +45,11 @@ python -m pylint setup.py
 python -m pylint gcp_variant_transforms/beam_io
 python -m pylint gcp_variant_transforms/libs
 python -m pylint gcp_variant_transforms/transforms
+python -m pylint gcp_variant_transforms/options
+python -m pylint gcp_variant_transforms/vcf_to_bq.py
+python -m pylint gcp_variant_transforms/vcf_to_bq_preprocess.py
+python -m pylint gcp_variant_transforms/vcf_to_bq_test.py
+python -m pylint gcp_variant_transforms/bq_to_vcf.py
+python -m pylint gcp_variant_transforms/bq_to_vcf_test.py
+python -m pylint gcp_variant_transforms/pipeline_common.py
+python -m pylint gcp_variant_transforms/pipeline_common_test.py

@@ -31,7 +31,6 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 """
 
-from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
 from datetime import datetime
@@ -385,7 +384,8 @@ def _validate_annotation_pipeline_args(known_args, pipeline_args):
   flags_dict = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
   expected_flags = ['max_num_workers', 'num_workers']
   for flag in expected_flags:
-    if flag in flags_dict and flags_dict[flag] > 0:
+    if (flag in flags_dict and
+        flags_dict[flag] is not None and flags_dict[flag] > 0):
       return
   raise ValueError('Could not find any of {} with a valid value among pipeline '
                    'flags {}'.format(expected_flags, flags_dict))

@@ -15,7 +15,6 @@
 """Utility functions for creating VcfHeader objects used by unit tests."""
 
 
-
 from gcp_variant_transforms.beam_io import vcf_header_io
 
 
