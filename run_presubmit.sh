@@ -22,34 +22,11 @@ if [[ -z `which coverage` ]];then
   echo "coverage is not installed. Installing ..."
   python -m pip install coverage
 fi
-# coverage run --source=gcp_variant_transforms setup.py test
-# Add individual files and packages as they are migrated to Python 3. Once all
-# of the files are migrated, delete this code and uncomment the above line.
-coverage run --source=gcp_variant_transforms setup.py test -s setup.py
-coverage run --source=gcp_variant_transforms setup.py test -s \
-  gcp_variant_transforms.beam_io
-coverage run --source=gcp_variant_transforms setup.py test -s \
-  gcp_variant_transforms.libs
-coverage run --source=gcp_variant_transforms setup.py test -s \
-  gcp_variant_transforms.transforms
+coverage run --source=gcp_variant_transforms setup.py test
 
 echo ========== Running pylint.
 if [[ -z `which pylint` ]];then
   echo "pylint is not installed. Installing ..."
   python -m pip install pylint
 fi
-# python -m pylint gcp_variant_transforms
-# Add individual files and packages as they are migrated to Python 3. Once all
-# of the files are migrated, delete this code and uncomment the above line.
-python -m pylint setup.py
-python -m pylint gcp_variant_transforms/beam_io
-python -m pylint gcp_variant_transforms/libs
-python -m pylint gcp_variant_transforms/transforms
-python -m pylint gcp_variant_transforms/options
-python -m pylint gcp_variant_transforms/vcf_to_bq.py
-python -m pylint gcp_variant_transforms/vcf_to_bq_preprocess.py
-python -m pylint gcp_variant_transforms/vcf_to_bq_test.py
-python -m pylint gcp_variant_transforms/bq_to_vcf.py
-python -m pylint gcp_variant_transforms/bq_to_vcf_test.py
-python -m pylint gcp_variant_transforms/pipeline_common.py
-python -m pylint gcp_variant_transforms/pipeline_common_test.py
+python -m pylint gcp_variant_transforms
