@@ -1,8 +1,3 @@
-# This branch is under development and is not in working condition.
-## Please rely solely on master branch for the initiation of the tool.
-
-# ------------------------------------------------
-
 # GCP Variant Transforms
 
 [![Build Status](https://travis-ci.org/googlegenomics/gcp-variant-transforms.svg?branch=master)](https://travis-ci.org/googlegenomics/gcp-variant-transforms)
@@ -183,7 +178,7 @@ details.
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table
-  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
+  Schema](https://cloud.google.com/life-sciences/docs/how-tos/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
