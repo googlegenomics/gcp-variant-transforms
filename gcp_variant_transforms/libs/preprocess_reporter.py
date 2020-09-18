@@ -206,9 +206,13 @@ def _generate_conflicting_headers_lines(
                     num=1 type=Integer   file2
   """
   content_lines = []
+  # First element for conflict may be string or integer so such list cannot be
+  # sorted in python 3. Convert all nums to strings, and make sure to sort by
+  # secondary field (type) as well, for determenistic results.
   for field_id in sorted(conflicts.keys()):
     first_item = True
-    for definition in sorted(conflicts.get(field_id).keys()):
+    for definition in sorted(conflicts.get(field_id).keys(),
+                             key=lambda x: (str(x[0]), x[1])):
       sorted_file_names = sorted(conflicts.get(field_id).get(definition))
       if first_item:
         row = [field_id,

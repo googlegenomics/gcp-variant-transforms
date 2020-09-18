@@ -40,7 +40,7 @@ and populating) and only do the validation, use --revalidation_dataset_id, e.g.,
 """
 
 import argparse
-from concurrent.futures import TimeoutError
+from concurrent.futures import TimeoutError as ConcurrentTimeoutError
 import enum
 import os
 import sys
@@ -84,9 +84,9 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
             '--temp_location {}'.format(context.temp_location),
             '--job_name {}-{}'.format(test_name, self._dataset_id.replace('_',
                                                                           '-'))]
-    for k, v in kwargs.iteritems():
+    for k, v in kwargs.items():
       value = v
-      if isinstance(v, basestring):
+      if isinstance(v, str):
         value = v.format(TABLE_NAME=full_table_id)
       args.append('--{} {}'.format(k, value))
     self.run_test_command = run_tests_common.form_command(
@@ -110,7 +110,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
     return self._name
 
 
-class QueryAssertion(object):
+class QueryAssertion():
   """Runs a query and verifies that the output matches the expected result."""
 
   def __init__(self, client, test_name, query, expected_result):
@@ -126,7 +126,7 @@ class QueryAssertion(object):
     while True:
       try:
         results = query_job.result(timeout=300)
-      except TimeoutError as e:
+      except ConcurrentTimeoutError as e:
         print('WARNING: Time out waiting for query: {}'.format(self._query))
         if num_retries < _NUM_QUERY_RETIRES:
           num_retries += 1
@@ -136,23 +136,22 @@ class QueryAssertion(object):
       else:
         if results.total_rows == 1:
           break
-        else:
-          print('ERROR: Query `{}` did not return expected num rows: {}'.format(
+        print('ERROR: Query `{}` did not return expected num rows: {}'.format(
               self._query, results.total_rows))
-          if num_retries < _NUM_QUERY_RETIRES:
-            num_retries += 1
-            time.sleep(90)
-          else:
-            raise run_tests_common.TestCaseFailure(
-                'Expected 1 row query results instead got {} in test {}'.format(
-                    results.total_rows, self._test_name))
+        if num_retries < _NUM_QUERY_RETIRES:
+          num_retries += 1
+          time.sleep(90)
+        else:
+          raise run_tests_common.TestCaseFailure(
+              'Expected 1 row query results instead got {} in test {}'.format(
+                  results.total_rows, self._test_name))
 
     row = list(results)[0]
-    col_names = row.keys()
+    col_names = list(row.keys())
     if set(self._expected_result.keys()) != set(col_names):
       raise run_tests_common.TestCaseFailure(
           'Expected {} columns in the query result, got {} in test {}'.format(
-              self._expected_result.keys(), col_names, self._test_name))
+              list(self._expected_result.keys()), col_names, self._test_name))
     for key in self._expected_result.keys():
       if self._expected_result.get(key) != row.get(key):
         raise run_tests_common.TestCaseFailure(
@@ -160,7 +159,7 @@ class QueryAssertion(object):
                 key, self._expected_result[key], row.get(key), self._test_name))
 
 
-class QueryFormatter(object):
+class QueryFormatter():
   """Formats a query.
 
   Replaces macros and variables in the query.
@@ -201,7 +200,7 @@ class QueryFormatter(object):
     return query
 
 
-class TestContextManager(object):
+class TestContextManager():
   """Manages all resources for a given run of tests.
 
   Responsible for setting up tests (i.e. creating a unique dataset) and

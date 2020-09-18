@@ -508,7 +508,7 @@ class _WriteVcfDataLinesFn(beam.DoFn):
     """
     self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
-  def process(self, file_path_and_variants_tuple, *args, **kwargs):
+  def process(self, file_path_and_variants_tuple, *args, **kwargs): # pylint: disable=unused-argument
     # type: (Tuple[str, List[Variant]]) -> None
     (file_path, variants) = file_path_and_variants_tuple
     with filesystems.FileSystems.create(file_path) as file_to_write:

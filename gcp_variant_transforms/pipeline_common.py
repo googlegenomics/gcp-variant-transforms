@@ -78,6 +78,9 @@ def parse_args(argv, command_line_options):
   if hasattr(known_args, 'input_pattern') or hasattr(known_args, 'input_file'):
     known_args.all_patterns = _get_all_patterns(
         known_args.input_pattern, known_args.input_file)
+
+  # https://github.com/googlegenomics/gcp-variant-transforms/issues/667
+  pipeline_args.extend(['--save_main_session', 'True'])
   return known_args, pipeline_args
 
 

@@ -15,7 +15,6 @@
 """A source for reading VCF file headers."""
 
 
-
 import collections
 from functools import partial
 from typing import Dict, Iterable, List  # pylint: disable=unused-import

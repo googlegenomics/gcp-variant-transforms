@@ -32,7 +32,7 @@ ADD / /opt/gcp_variant_transforms/src/
 # Needed for installing mmh3 (one of the required packages in setup.py).
 RUN apt install -y g++
 
-# Install Pysam dependencies. These dependencies are only required becuase we
+# Install Pysam dependencies. These dependencies are only required because we
 # have a monolithic binary - they primarily have to be installed on the workers.
 RUN apt-get update && apt-get install -y \
     autoconf \
@@ -49,12 +49,12 @@ RUN apt-get update && apt-get install -y \
     python3-venv
 
 # Install dependencies.
-RUN 
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
     . /opt/gcp_variant_transforms/venv3/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
-    python -m pip install --upgrade wheel \
-    python -m pip install --upgrade .
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install --upgrade wheel && \
+    python3 -m pip install --upgrade .
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \

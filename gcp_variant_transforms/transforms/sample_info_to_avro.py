@@ -17,7 +17,7 @@ from typing import Dict, Union  # pylint: disable=unused-import
 import time
 
 import apache_beam as beam
-import avro
+import fastavro
 
 from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_parser
@@ -74,12 +74,12 @@ class SampleInfoToAvro(beam.PTransform):
     self._output_path = output_path
     self._sample_name_encoding = sample_name_encoding
     bq_schema = sample_info_table_schema_generator.generate_schema()
-    self._avro_schema = avro.schema.parse(
-        schema_converter.convert_table_schema_to_json_avro_schema(bq_schema))
+    self._fastavro_schema = fastavro.parse_schema(
+        schema_converter.convert_schema_to_avro_dict(bq_schema))
 
   def expand(self, pcoll):
     return (pcoll
             | 'ConvertSampleInfoToAvroTableRow' >> beam.ParDo(
                 ConvertSampleInfoToRow(self._sample_name_encoding))
             | 'WriteToAvroFiles' >> beam.io.WriteToAvro(
-                self._output_path, self._avro_schema))
+                self._output_path, self._fastavro_schema))

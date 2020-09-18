@@ -386,7 +386,7 @@ class VepRunner():
   def _call_pipelines_api(self, io_infos, output_log_path):
     # type: (vep_runner_util.SingleWorkerActions, str) -> str
     api_request = self._get_api_request_fixed_parts()
-    size_gb = io_infos.disk_size_bytes / (1 << 30)
+    size_gb = io_infos.disk_size_bytes // (1 << 30)
     api_request[_API_PIPELINE]['resources'][
         'virtualMachine']['disks'][0]['sizeGb'] = (
             size_gb + _MINIMUM_DISK_SIZE_GB)

@@ -27,7 +27,7 @@ PYSAM_DEPENDENCY_COMMANDS = [
      'zlib1g-dev']
 ]
 
-PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam<0.16.0']
+PYSAM_INSTALLATION_COMMAND = ['python3', '-m', 'pip', 'install', 'pysam<0.16.0']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -106,8 +106,8 @@ setuptools.setup(
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: System :: Distributed Computing',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
     ],
 
     setup_requires=REQUIRED_SETUP_PACKAGES,
