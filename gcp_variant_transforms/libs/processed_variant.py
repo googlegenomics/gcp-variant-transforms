@@ -20,7 +20,6 @@ objects should be used as non-mutable in other scopes, hence all mutating
 functions are "private".
 """
 
-from __future__ import absolute_import
 
 import enum
 import logging
@@ -61,7 +60,7 @@ class _CounterEnum(enum.Enum):
   ALLELE_NUM_INCORRECT = 'allele_num_incorrect'
 
 
-class ProcessedVariant(object):
+class ProcessedVariant():
   """A wrapper around the ``Variant`` class with extra functionality.
 
   Given header file information, this can parse INFO fields that need to be
@@ -146,7 +145,7 @@ class ProcessedVariant(object):
     return self._alternate_datas
 
 
-class AlternateBaseData(object):
+class AlternateBaseData():
   """This is to keep all information for a single alternate-bases."""
 
   def __init__(self, alt_bases):
@@ -185,7 +184,7 @@ class AlternateBaseData(object):
     return self._annotation_field_names
 
 
-class ProcessedVariantFactory(object):
+class ProcessedVariantFactory():
   """Factory class for creating `ProcessedVariant` instances.
 
   This is the only right way for creating ProcessedVariants in production code.
@@ -255,7 +254,7 @@ class ProcessedVariantFactory(object):
     """
     proc_var = ProcessedVariant(variant)
     self._variant_counter.inc()
-    for key, variant_info_data in variant.info.iteritems():
+    for key, variant_info_data in variant.info.items():
       if key in self._annotation_field_set:
         self._annotation_processor.add_annotation_data(
             proc_var, key, variant_info_data)
@@ -302,7 +301,7 @@ class ProcessedVariantFactory(object):
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
         description='Alternate base.'))
     if self._split_alternate_allele_info_fields:
-      for key, field in self._header_fields.infos.iteritems():
+      for key, field in self._header_fields.infos.items():
         if self._is_num_a(field[_HeaderKeyConstants.NUM]):
           alternate_bases_record.fields.append(bigquery.TableFieldSchema(
               name=_BigQuerySchemaSanitizer.get_sanitized_field_name(key),
@@ -392,7 +391,7 @@ class ProcessedVariantFactory(object):
     return field_value == _FIELD_COUNT_ALTERNATE_ALLELE
 
 
-class _AnnotationProcessor(object):
+class _AnnotationProcessor():
   """This is for handling all annotation related logic for variants."""
 
 
@@ -475,7 +474,7 @@ class _AnnotationProcessor(object):
     for annotation_str in data:
       try:
         ind, annotation_map = parser.parse_and_match_alt(annotation_str)
-        for name, value in annotation_map.iteritems():
+        for name, value in annotation_map.items():
           if name == annotation_parser.ANNOTATION_ALT:
             continue
           type_key = infer_headers_util.get_inferred_annotation_type_header_key(

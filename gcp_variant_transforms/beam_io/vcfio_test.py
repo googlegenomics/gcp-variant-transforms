@@ -15,7 +15,6 @@
 
 """Tests for vcfio module."""
 
-from __future__ import absolute_import
 
 import glob
 import gzip
@@ -398,12 +397,11 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(3, len(read_data))
     self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
-
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_after_splitting(self):
     file_name = testdata_util.get_full_file_path('valid-4.1-large.vcf')
     source = VcfSource(file_name)
-    splits = [p for p in source.split(desired_bundle_size=500)]
+    splits = list(p for p in source.split(desired_bundle_size=500))
     self.assertGreater(len(splits), 1)
     sources_info = ([
         (split.source, split.start_position, split.stop_position) for
@@ -803,7 +801,7 @@ class VcfSourceTest(unittest.TestCase):
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
+      splits = list(split for split in source.split(desired_bundle_size=100000))
       assert len(splits) == 1
       source_test_utils.assert_reentrant_reads_succeed(
           (splits[0].source, splits[0].start_position, splits[0].stop_position))
@@ -813,7 +811,7 @@ class VcfSourceTest(unittest.TestCase):
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
       source = VcfSource(file_name)
-      splits = [split for split in source.split(desired_bundle_size=100000)]
+      splits = list(split for split in source.split(desired_bundle_size=100000))
       assert len(splits) == 1
       source_test_utils.assert_split_at_fraction_exhaustive(
           splits[0].source, splits[0].start_position, splits[0].stop_position)
@@ -822,13 +820,13 @@ class VcfSourceTest(unittest.TestCase):
 class VcfSinkTest(unittest.TestCase):
 
   def setUp(self):
-    super(VcfSinkTest, self).setUp()
+    super().setUp()
     self.path = tempfile.NamedTemporaryFile(suffix='.vcf').name
-    self.variants, self.variant_lines = zip(
+    self.variants, self.variant_lines = list(zip(
         (_get_sample_variant_1(), VCF_LINE_1),
         (_get_sample_variant_2(), VCF_LINE_2),
         (_get_sample_variant_3(), VCF_LINE_3),
-        (_get_sample_non_variant(), GVCF_LINE))
+        (_get_sample_non_variant(), GVCF_LINE)))
 
   def _assert_variant_lines_equal(self, actual, expected):
     actual_fields = actual.strip().split('\t')
@@ -837,17 +835,17 @@ class VcfSinkTest(unittest.TestCase):
     self.assertEqual(len(actual_fields), len(expected_fields))
     self.assertEqual(actual_fields[0], expected_fields[0])
     self.assertEqual(actual_fields[1], expected_fields[1])
-    self.assertItemsEqual(actual_fields[2].split(';'),
+    self.assertCountEqual(actual_fields[2].split(';'),
                           expected_fields[2].split(';'))
     self.assertEqual(actual_fields[3], expected_fields[3])
-    self.assertItemsEqual(actual_fields[4].split(','),
+    self.assertCountEqual(actual_fields[4].split(','),
                           expected_fields[4].split(','))
     self.assertEqual(actual_fields[5], actual_fields[5])
-    self.assertItemsEqual(actual_fields[6].split(';'),
+    self.assertCountEqual(actual_fields[6].split(';'),
                           expected_fields[6].split(';'))
-    self.assertItemsEqual(actual_fields[7].split(';'),
+    self.assertCountEqual(actual_fields[7].split(';'),
                           expected_fields[7].split(';'))
-    self.assertItemsEqual(actual_fields[8].split(':'),
+    self.assertCountEqual(actual_fields[8].split(':'),
                           expected_fields[8].split(':'))
 
     # Assert calls are the same
@@ -857,7 +855,7 @@ class VcfSinkTest(unittest.TestCase):
       # Compare the first and third values of the GT field
       self.assertEqual(actual_split[0], expected_split[0])
       # Compare the rest of the items ignoring order
-      self.assertItemsEqual(actual_split[1:], expected_split[1:])
+      self.assertCountEqual(actual_split[1:], expected_split[1:])
 
   def _get_coder(self, bq_uses_1_based_coordinate=False):
     return vcfio._ToVcfRecordCoder(bq_uses_1_based_coordinate)
@@ -866,11 +864,11 @@ class VcfSinkTest(unittest.TestCase):
     coder = self._get_coder()
     for variant, line in zip(self.variants, self.variant_lines):
       self._assert_variant_lines_equal(
-          coder.encode(variant), line)
+          coder.encode(variant).decode('utf-8'), line)
     empty_variant = vcfio.Variant()
     empty_line = '\t'.join(['.' for _ in range(9)])
     self._assert_variant_lines_equal(
-        coder.encode(empty_variant), empty_line)
+        coder.encode(empty_variant).decode('utf-8'), empty_line)
 
   def test_to_vcf_line_1_based(self):
     coder = self._get_coder(bq_uses_1_based_coordinate=True)
@@ -881,11 +879,11 @@ class VcfSinkTest(unittest.TestCase):
         _get_sample_non_variant(use_1_based_coordinate=True)]
     for variant, line in zip(variants, self.variant_lines):
       self._assert_variant_lines_equal(
-          coder.encode(variant), line)
+          coder.encode(variant).decode('utf-8'), line)
     empty_variant = vcfio.Variant()
     empty_line = '\t'.join(['.' for _ in range(9)])
     self._assert_variant_lines_equal(
-        coder.encode(empty_variant), empty_line)
+        coder.encode(empty_variant).decode('utf-8'), empty_line)
 
   def test_missing_info_key(self):
     coder = self._get_coder()
@@ -898,7 +896,8 @@ class VcfSinkTest(unittest.TestCase):
     expected = ('.	.	.	.	.	.	.	.	GT:AF:GQ	0/1:20:10	'
                 '0/1:20:.\n')
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_info_list(self):
     coder = self._get_coder()
@@ -908,7 +907,8 @@ class VcfSinkTest(unittest.TestCase):
                                      info={'LI': [1, None, 3]}))
     expected = '.	.	.	.	.	.	.	.	GT:LI	0/1:1,.,3\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_info_field_count(self):
     coder = self._get_coder()
@@ -921,7 +921,8 @@ class VcfSinkTest(unittest.TestCase):
     expected = ('.	.	.	.	.	.	.	NS=3;AF=0.333,0.667;DB;'
                 'CSQ=G|upstream_gene_variant||MODIFIER,T|||MODIFIER	.\n')
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_empty_sample_calls(self):
     coder = self._get_coder()
@@ -929,7 +930,8 @@ class VcfSinkTest(unittest.TestCase):
     variant.calls.append(
         VariantCall(sample_id=hash_name('Sample2'), genotype=-1))
     expected = '.	.	.	.	.	.	.	.	GT	.\n'
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_missing_genotype(self):
     coder = self._get_coder()
@@ -939,7 +941,8 @@ class VcfSinkTest(unittest.TestCase):
                     genotype=[1, vcfio.MISSING_GENOTYPE_VALUE]))
     expected = '.	.	.	.	.	.	.	.	GT	1/.\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_triploid_genotype(self):
     coder = self._get_coder()
@@ -948,7 +951,8 @@ class VcfSinkTest(unittest.TestCase):
         sample_id=hash_name('Sample'), genotype=[1, 0, 1]))
     expected = '.	.	.	.	.	.	.	.	GT	1/0/1\n'
 
-    self._assert_variant_lines_equal(coder.encode(variant), expected)
+    self._assert_variant_lines_equal(
+        coder.encode(variant).decode('utf-8'), expected)
 
   def test_write_dataflow_0_based(self):
     pipeline = TestPipeline()
@@ -999,7 +1003,7 @@ class VcfSinkTest(unittest.TestCase):
         read_result.extend(f.read().splitlines())
 
     for actual, expected in zip(read_result, self.variant_lines):
-      self._assert_variant_lines_equal(actual, expected)
+      self._assert_variant_lines_equal(actual.decode('utf-8'), expected)
 
   def test_write_dataflow_header(self):
     pipeline = TestPipeline()
@@ -1017,9 +1021,9 @@ class VcfSinkTest(unittest.TestCase):
       with gzip.GzipFile(file_name, 'r') as f:
         read_result.extend(f.read().splitlines())
 
-    self.assertEqual(read_result[0], 'foo')
+    self.assertEqual(read_result[0].decode('utf-8'), 'foo')
     for actual, expected in zip(read_result[1:], self.variant_lines):
-      self._assert_variant_lines_equal(actual, expected)
+      self._assert_variant_lines_equal(actual.decode('utf-8'), expected)
 
 
 if __name__ == '__main__':

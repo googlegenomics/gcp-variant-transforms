@@ -36,7 +36,7 @@ TestCaseState = namedtuple('TestCaseState',
                            ['running_test', 'remaining_tests'])
 
 
-class TestCaseInterface(object):
+class TestCaseInterface():
   """Interface of an integration test case."""
 
   def validate_result(self):
@@ -46,10 +46,9 @@ class TestCaseInterface(object):
 
 class TestCaseFailure(Exception):
   """Exception for failed test cases."""
-  pass
 
 
-class TestRunner(object):
+class TestRunner():
   """Runs the tests using pipelines API."""
 
   def __init__(self, tests, revalidate=False):
@@ -92,13 +91,13 @@ class TestRunner(object):
         {test_cases[0].get_name(): subprocess.Popen(
             test_cases[0].run_test_command, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)})
-    print 'Started executing: {}'.format(test_cases[0].get_name())
+    print('Started executing: {}'.format(test_cases[0].get_name()))
 
   def _wait_for_all_operations_done(self):
     """Waits until all operations are done."""
     while self._test_names_to_processes:
       time.sleep(10)
-      running_test_names = self._test_names_to_processes.keys()
+      running_test_names = list(self._test_names_to_processes.keys())
       for test_name in running_test_names:
         running_proc = self._test_names_to_processes.get(test_name)
         return_code = running_proc.poll()
@@ -106,14 +105,14 @@ class TestRunner(object):
           test_case_state = self._test_names_to_test_states.get(test_name)
           self._handle_failure(running_proc, test_case_state.running_test)
           del self._test_names_to_processes[test_name]
-          print 'Started validating: {}'.format(test_name)
+          print('Started validating: {}'.format(test_name))
           test_case_state.running_test.validate_result()
           self._run_test(test_case_state.remaining_tests)
 
   def _handle_failure(self, proc, test_case):
     """Raises errors if test case failed."""
     if proc.returncode != 0:
-      print 'ERROR: Test execution failed: {}'.format(test_case.get_name())
+      print('ERROR: Test execution failed: {}'.format(test_case.get_name()))
       stdout, stderr = proc.communicate()
       raise TestCaseFailure('Test case {} failed. stdout: {}, stderr: {}, '
                             'return code: {}.'.format(test_case.get_name(),
@@ -124,7 +123,7 @@ class TestRunner(object):
     """Prints results of test cases."""
     for test_cases in self._tests:
       for test_case in test_cases:
-        print '{} ...ok'.format(test_case.get_name())
+        print('{} ...ok'.format(test_case.get_name()))
     return 0
 
 

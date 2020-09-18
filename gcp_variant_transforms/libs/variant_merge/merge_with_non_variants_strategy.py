@@ -14,7 +14,6 @@
 
 """Variant merge stategy that can handle both Variants and Non-variants."""
 
-from __future__ import absolute_import
 
 import collections
 import copy
@@ -92,8 +91,12 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
       if self._is_non_variant(v):
         non_variant_tree.addi(v.start, v.end, v)
       else:
-        group_key = next(self._move_to_calls.get_merge_keys(v))
-        grouped_variants[group_key].append(v)
+        try:
+          group_key = next(self._move_to_calls.get_merge_keys(v))
+        except StopIteration:
+          continue
+        else:
+          grouped_variants[group_key].append(v)
 
     non_variants = self._merge_non_variants(non_variant_tree)
     variants = self._merge_variants(grouped_variants)
@@ -106,17 +109,21 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
     for v in variants:
       non_variant_interval = non_variant_tree.search(v.start, v.end)
       if non_variant_interval:
-        non_variant = next(iter(non_variant_interval)).data
-        v.calls.extend(non_variant.calls)
-        v.calls = sorted(v.calls)
-        self._update_splits(splits, v)
+        try:
+          non_variant = next(iter(non_variant_interval)).data
+        except StopIteration:
+          continue
+        else:
+          v.calls.extend(non_variant.calls)
+          v.calls = sorted(v.calls)
+          self._update_splits(splits, v)
       yield v
 
     for non_variant in self._split_non_variants(non_variant_tree, splits):
       yield non_variant
 
   def _merge_non_variants(self, t):
-    bounds = sorted(set([p for v in t for p in [v.begin, v.end]]))
+    bounds = sorted({p for v in t for p in [v.begin, v.end]})
     intervals = [(bounds[i], bounds[i+1]) for i, _ in enumerate(bounds[:-1])]
     merged_non_variants = []
     for start, end in intervals:
@@ -133,8 +140,12 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
       for non_variant in overlapping_variants[1:]:
         merged_non_variant.names.extend(non_variant.names)
         merged_non_variant.filters.extend(non_variant.filters)
-        merged_non_variant.quality = min(merged_non_variant.quality,
-                                         non_variant.quality)
+        if (merged_non_variant.quality is not None and
+            non_variant.quality is not None):
+          merged_non_variant.quality = min(merged_non_variant.quality,
+                                           non_variant.quality)
+        elif merged_non_variant.quality is None:
+          merged_non_variant.quality = non_variant.quality
         merged_non_variant.calls.extend(non_variant.calls)
 
       merged_non_variant.names = sorted(set(merged_non_variant.names))
@@ -147,7 +158,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
   def _merge_variants(self, grouped_variants):
     merged_variants = []
-    for merge_key, variants in grouped_variants.iteritems():
+    for merge_key, variants in grouped_variants.items():
       merged_variants.extend(
           self._move_to_calls.get_merged_variants(variants, merge_key))
     return merged_variants
@@ -172,7 +183,7 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
         onv = onv_interval.data
         if split.begin <= onv.start and split.end >= onv.end:
           continue
-        elif split.begin <= onv.start:
+        if split.begin <= onv.start:
           nv = copy.deepcopy(onv)
           nv.start = split.end
           non_variant_tree.addi(nv.start, nv.end, nv)

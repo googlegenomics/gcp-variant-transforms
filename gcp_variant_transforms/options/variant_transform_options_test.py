@@ -112,7 +112,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
         tableReference=bigquery.TableReference(projectId='project',
                                                datasetId='dataset',
                                                tableId='table__sample_info'))
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__sample_info already exists'):
       self._options.validate(args, client)
@@ -126,11 +126,10 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
           tableId='table__sample_info')):
         raise exceptions.HttpError(response={'status': '404'},
                                    url='', content='')
-      else:
-        return bigquery.Table(tableReference=bigquery.TableReference(
-            projectId='project',
-            datasetId='dataset',
-            tableId='table__chr1_part1'))
+      return bigquery.Table(tableReference=bigquery.TableReference(
+          projectId='project',
+          datasetId='dataset',
+          tableId='table__chr1_part1'))
     args = self._make_args(
         ['--append', 'False', '--output_table', 'project:dataset.table',
          '--sharding_config_path',
@@ -139,7 +138,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
     client = mock.Mock()
     client.tables.Get.side_effect = side_effect
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__chr01_part1 already exists'):
       self._options.validate(args, client)
@@ -153,7 +152,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
     client = mock.Mock()
     client.tables.Get.side_effect = exceptions.HttpError(
         response={'status': '404'}, url='', content='')
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__sample_info does not exist'):
       self._options.validate(args, client)
@@ -181,7 +180,7 @@ class BigQueryWriteOptionsTest(unittest.TestCase):
 
     client = mock.Mock()
     client.tables.Get.side_effect = side_effect
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'project:dataset.table__chr01_part1 does not exist'):
       self._options.validate(args, client)

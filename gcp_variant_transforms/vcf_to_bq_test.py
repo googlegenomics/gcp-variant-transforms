@@ -27,7 +27,8 @@ class VcfToBqTest(unittest.TestCase):
   """Tests cases for the ``vcf_to_bq`` script."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def test_no_merge_strategy(self):
     args = self._create_mock_args(
@@ -58,13 +59,13 @@ class VcfToBqTest(unittest.TestCase):
   def test_invalid_annotation_output_directory_raises_error(self):
     known_args = self._create_mock_args(annotation_output_dir='./*')
     pipeline_args = []
-    with self.assertRaisesRegexp(ValueError, 'directory .* already exists'):
+    with self.assertRaisesRegex(ValueError, 'directory .* already exists'):
       vcf_to_bq._validate_annotation_pipeline_args(known_args, pipeline_args)
 
   def test_invalid_annotation_missing_flags_raises_error(self):
     known_args = self._create_mock_args(annotation_output_dir='dummy')
     pipeline_args = []
-    with self.assertRaisesRegexp(ValueError, 'Could not .* pipeline flags'):
+    with self.assertRaisesRegex(ValueError, 'Could not .* pipeline flags'):
       vcf_to_bq._validate_annotation_pipeline_args(known_args, pipeline_args)
 
   def test_valid_annotation_flags(self):
