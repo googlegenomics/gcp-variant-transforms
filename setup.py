@@ -97,11 +97,13 @@ class CustomCommands(setuptools.Command):
       try:
         self.do_install()
 
+        # pylint: disable=import-outside-toplevel, unused-import
         from pysam import libchtslib
       except ImportError:
         time.sleep(10)
 
     # Try one more time before exiting; would rather fail here than downstream.
+    # pylint: disable=import-outside-toplevel, unused-import
     from pysam import libchtslib
 
 class build(_build):  # pylint: disable=invalid-name
