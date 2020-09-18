@@ -59,7 +59,7 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     # type: (vcfio.Variant, List[str]) -> None
     self._counter += 1
     self._sample_names = sample_names
-    self._variant_lines.append(self._coder.encode(variant).strip('\n'))
+    self._variant_lines.append(self._coder.encode(variant).strip(b'\n'))
     if self._counter == self._number_of_variants_per_shard:
       self._write_variant_lines_to_vcf_shard(self._variant_lines)
       self._counter = 0
@@ -71,12 +71,13 @@ class _WriteVariantsToVCFShards(beam.DoFn):
     vcf_fixed_columns = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
                          'INFO', 'FORMAT']
     str_sample_names = [str(sample_name) for sample_name in self._sample_names]
-    vcf_header = str('\t'.join(vcf_fixed_columns + str_sample_names))
+    vcf_header = str('\t'.join(vcf_fixed_columns + str_sample_names)).encode(
+        'utf-8')
     vcf_data_file = self._generate_unique_file_path(len(variant_lines))
     with filesystems.FileSystems.create(vcf_data_file) as file_to_write:
       file_to_write.write(vcf_header)
       for v in variant_lines:
-        file_to_write.write('\n')
+        file_to_write.write(b'\n')
         file_to_write.write(v)
 
   def _generate_unique_file_path(self, variants_num):

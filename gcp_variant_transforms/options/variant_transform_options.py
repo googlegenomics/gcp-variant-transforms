@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
 
@@ -30,7 +29,7 @@ SAMPLE_INFO_TABLE_SUFFIX = (
     sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
 
 
-class VariantTransformsOptions(object):
+class VariantTransformsOptions():
   """Base class for defining groups of options for Variant Transforms.
 
   Transforms should create a derived class of ``VariantTransformsOptions``
@@ -48,7 +47,6 @@ class VariantTransformsOptions(object):
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
     """Validates this group's options parsed from the command line."""
-    pass
 
 
 class VcfReadOptions(VariantTransformsOptions):

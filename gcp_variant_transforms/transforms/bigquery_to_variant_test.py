@@ -31,35 +31,35 @@ class BigQueryToVariantTest(unittest.TestCase):
   """Test cases for `BigQueryToVariant` transform."""
 
   def _get_bigquery_row_and_variant(self):
-    row = {unicode(ColumnKeyConstants.REFERENCE_NAME): unicode('chr19'),
-           unicode(ColumnKeyConstants.START_POSITION): 11,
-           unicode(ColumnKeyConstants.END_POSITION): 12,
-           unicode(ColumnKeyConstants.REFERENCE_BASES): 'C',
-           unicode(ColumnKeyConstants.NAMES): ['rs1', 'rs2'],
-           unicode(ColumnKeyConstants.QUALITY): 2,
-           unicode(ColumnKeyConstants.FILTER): ['PASS'],
-           unicode(ColumnKeyConstants.CALLS): [
-               {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+    row = {str(ColumnKeyConstants.REFERENCE_NAME): str('chr19'),
+           str(ColumnKeyConstants.START_POSITION): 11,
+           str(ColumnKeyConstants.END_POSITION): 12,
+           str(ColumnKeyConstants.REFERENCE_BASES): 'C',
+           str(ColumnKeyConstants.NAMES): ['rs1', 'rs2'],
+           str(ColumnKeyConstants.QUALITY): 2,
+           str(ColumnKeyConstants.FILTER): ['PASS'],
+           str(ColumnKeyConstants.CALLS): [
+               {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
                    hash_name('Sample1')),
-                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
-                unicode(ColumnKeyConstants.CALLS_PHASESET): unicode('*'),
-                unicode('GQ'): 20, unicode('FIR'): [10, 20]},
-               {unicode(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                str(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
+                str(ColumnKeyConstants.CALLS_PHASESET): str('*'),
+                str('GQ'): 20, str('FIR'): [10, 20]},
+               {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
                    hash_name('Sample2')),
-                unicode(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
-                unicode(ColumnKeyConstants.CALLS_PHASESET): None,
-                unicode('GQ'): 10, unicode('FB'): True}
+                str(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+                str(ColumnKeyConstants.CALLS_PHASESET): None,
+                str('GQ'): 10, str('FB'): True}
            ],
-           unicode(ColumnKeyConstants.ALTERNATE_BASES): [
-               {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('A'),
-                unicode('IFR'): None,
-                unicode('IFR2'): 0.2},
-               {unicode(ColumnKeyConstants.ALTERNATE_BASES_ALT): unicode('TT'),
-                unicode('IFR'): 0.2,
-                unicode('IFR2'): 0.3}
+           str(ColumnKeyConstants.ALTERNATE_BASES): [
+               {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('A'),
+                str('IFR'): None,
+                str('IFR2'): 0.2},
+               {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('TT'),
+                str('IFR'): 0.2,
+                str('IFR2'): 0.3}
            ],
-           unicode('IS'): unicode('some data'),
-           unicode('ISR'): [unicode('data1'), unicode('data2')]}
+           str('IS'): str('some data'),
+           str('ISR'): [str('data1'), str('data2')]}
     variant = vcfio.Variant(
         reference_name='chr19', start=11, end=12, reference_bases='C',
         alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,

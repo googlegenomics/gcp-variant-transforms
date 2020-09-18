@@ -14,7 +14,6 @@
 
 """Custom asserts for tests."""
 
-from __future__ import absolute_import
 
 from typing import Callable, List  # pylint: disable=unused-import
 from apache_beam.testing.util import BeamAssertException
@@ -24,11 +23,14 @@ from gcp_variant_transforms.beam_io import vcf_header_io  # pylint: disable=unus
 def items_equal(expected):
   """Returns a function for checking expected and actual have the same items."""
   def _items_equal(actual):
-    sorted_expected = sorted(expected)
-    sorted_actual = sorted(actual)
-    if sorted_expected != sorted_actual:
-      raise BeamAssertException(
-          'Failed assert: %r != %r' % (sorted_expected, sorted_actual))
+    compare = actual.copy()
+    for e in expected:
+      if e not in compare:
+        raise BeamAssertException(
+            'Failed assert: %r != %r' % (expected, actual))
+      compare.remove(e)
+    if compare:
+      raise BeamAssertException('Failed assert: %r != %r' % (expected, actual))
   return _items_equal
 
 

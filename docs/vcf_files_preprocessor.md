@@ -100,7 +100,7 @@ source.
 Example command for DirectRunner:
 
 ```bash
-python -m gcp_variant_transforms.vcf_to_bq_preprocess \
+python3 -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf \
   --report_path gs://BUCKET/report.tsv
   --job_name vcf-to-bigquery-preprocess-direct-runner \
@@ -112,7 +112,7 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
 Example command for DataflowRunner:
 
 ```bash
-python -m gcp_variant_transforms.vcf_to_bq_preprocess \
+python3 -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --input_pattern gs://BUCKET/*.vcf \
   --report_path gs://BUCKET/report.tsv \
   --job_name vcf-to-bigquery-preprocess \

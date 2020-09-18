@@ -14,7 +14,6 @@
 
 """A PTransform to extend each Variant's calls with data for all samples."""
 
-from __future__ import absolute_import
 
 import apache_beam as beam
 
@@ -55,7 +54,7 @@ class DensifyVariants(beam.PTransform):
 
     new_calls = []
     for sample_id in all_sample_ids:
-      if sample_id in existing_sample_ids.keys():
+      if sample_id in list(existing_sample_ids.keys()):
         new_calls.append(existing_sample_ids.get(sample_id))
       else:
         new_calls.append(

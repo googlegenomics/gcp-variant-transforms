@@ -17,7 +17,7 @@
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
-from __future__ import absolute_import
+
 
 from collections import namedtuple
 import enum
@@ -65,7 +65,7 @@ class SampleNameEncoding(enum.Enum):
   NONE = 2
 
 
-class Variant(object):
+class Variant():
   """A class to store info about a genomic variant.
 
   Each object corresponds to a single record in a VCF file.
@@ -152,7 +152,8 @@ class Variant(object):
     other_vars = vars(other)
     for key in sorted(self_vars):
       if self_vars[key] != other_vars[key]:
-        return self_vars[key] < other_vars[key]
+        return (other_vars[key] is not None and
+                (self_vars[key] is None or self_vars[key] < other_vars[key]))
 
     return False
 
@@ -178,7 +179,7 @@ class Variant(object):
     return other <= self
 
 
-class VariantCall(object):
+class VariantCall():
   """A class to store info about a variant call.
 
   A call represents the determination of genotype with respect to a particular
@@ -242,7 +243,7 @@ class VariantCall(object):
             self.sample_id, self.genotype, self.phaseset, self.info]])
 
 
-class VcfParser(object):
+class VcfParser():
   """Base abstract class for defining a VCF file parser.
 
   Derived classes must implement two methods:
@@ -361,16 +362,16 @@ class VcfParser(object):
       parsed_line = (line.strip().replace('Number=G', 'Number=.') if
                      line.startswith(INFO_HEADER_TAG) else line.strip())
       # Tests provide lines in unicode.
-      if isinstance(parsed_line, str):
+      if isinstance(parsed_line, bytes):
         parsed_line = parsed_line.decode('utf-8')
       if parsed_line:
         # For str cases, decode then re-encode lines in utf-8, to not use ascii
         # encoding.
-        parsed_header_lines.append(parsed_line.encode('utf-8'))
+        parsed_header_lines.append(parsed_line)
 
     self._init_with_header(parsed_header_lines)
 
-  def next(self):
+  def __next__(self):
     try:
       text_line = self._next_non_empty_line(self._text_lines)
     except StopIteration as e:
@@ -437,17 +438,17 @@ class PySamParser(VcfParser):
       **kwargs  # type: **str
       ):
     # type: (...) -> None
-    super(PySamParser, self).__init__(file_name,
-                                      range_tracker,
-                                      file_pattern,
-                                      compression_type,
-                                      allow_malformed_records,
-                                      representative_header_lines,
-                                      splittable_bgzf,
-                                      pre_infer_headers,
-                                      sample_name_encoding,
-                                      use_1_based_coordinate,
-                                      **kwargs)
+    super().__init__(file_name,
+                     range_tracker,
+                     file_pattern,
+                     compression_type,
+                     allow_malformed_records,
+                     representative_header_lines,
+                     splittable_bgzf,
+                     pre_infer_headers,
+                     sample_name_encoding,
+                     use_1_based_coordinate,
+                     **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
     self._to_child = None
@@ -460,7 +461,6 @@ class PySamParser(VcfParser):
     self._to_child.flush()
     self._to_child.close()
     os.waitpid(self._process_pid, 0)
-    return
 
   def _init_parent_process(self, return_pipe_read, send_pipe_write):
     from_child = os.fdopen(return_pipe_read)
@@ -516,7 +516,7 @@ class PySamParser(VcfParser):
 
   def _get_variant(self, data_line):
     try:
-      self._to_child.write(data_line.encode('utf-8') + '\n')
+      self._to_child.write(data_line + '\n')
       self._to_child.flush()
       return self._convert_to_variant(next(self._vcf_reader))
     except (ValueError, StopIteration, TypeError) as e:
@@ -548,7 +548,7 @@ class PySamParser(VcfParser):
     """
     self._verify_start_end(record)
     return Variant(
-        reference_name=record.chrom.encode('utf-8'),
+        reference_name=record.chrom,
         # record.pos is 1-based version of record.start (ie. record.start + 1).
         start=record.pos if self._use_1_based_coordinate else record.start,
         end=record.stop,
@@ -612,8 +612,8 @@ class PySamParser(VcfParser):
     if isinstance(value, float):
       return self._parse_float(value)
     # Sometimes PySam returns unicode strings, encode them as strings instead.
-    elif isinstance(value, unicode):
-      value = value.encode('utf-8')
+    elif isinstance(value, bytes):
+      value = value.decode('utf-8')
     return str(value)
 
   def _lookup_encoded_sample_name(self, sample_name):

@@ -14,7 +14,6 @@
 
 """Unit tests for metrics_util module."""
 
-from __future__ import absolute_import
 
 import unittest
 

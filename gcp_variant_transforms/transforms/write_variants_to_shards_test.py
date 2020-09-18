@@ -50,17 +50,17 @@ class WriteVariantsToShardsTest(unittest.TestCase):
       shards_writter = write_variants_to_shards._WriteVariantsToVCFShards(
           tempdir.get_path(), 3)
       variants = self._get_variants()
-      variant_lines = [shards_writter._coder.encode(v).strip('\n')
+      variant_lines = [shards_writter._coder.encode(v).strip(b'\n')
                        for v in variants]
       shards_writter._write_variant_lines_to_vcf_shard(variant_lines)
 
       expected_content = [
           '\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER',
-                     'INFO', 'FORMAT\n']),
+                     'INFO', 'FORMAT\n']).encode('utf-8'),
           '\t'.join(['19', '12', 'rs1', 'C', 'A,TT', '2', 'PASS',
-                     'A1=some data;A2=data1,data2', '.\n']),
+                     'A1=some data;A2=data1,data2', '.\n']).encode('utf-8'),
           '\t'.join(['19', '12', 'rs1', 'C', 'A,TT', '20', 'q10',
-                     'A1=some data2;A3=data3,data4', '.'])]
+                     'A1=some data2;A3=data3,data4', '.']).encode('utf-8')]
 
       file_paths = []
       for dirpath, _, filenames in os.walk(tempdir.get_path()):

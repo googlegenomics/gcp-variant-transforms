@@ -20,7 +20,7 @@ from typing import Dict, Any  #pylint: disable=unused-import
 from gcp_variant_transforms.beam_io import vcf_header_io
 from gcp_variant_transforms.libs import vcf_field_conflict_resolver #pylint: disable=unused-import
 
-class HeaderMerger(object):
+class HeaderMerger():
   """Class for merging two :class:`VcfHeader`s."""
 
   def __init__(self, resolver):
@@ -70,16 +70,16 @@ class HeaderMerger(object):
       ValueError: If the header fields are incompatible (e.g. same key with
         different types or numbers).
     """
-    for second_key, second_value in second.iteritems():
+    for second_key, second_value in second.items():
       if second_key not in first:
         first[second_key] = second_value
         continue
       first_value = first[second_key]
-      if first_value.keys() != second_value.keys():
+      if list(first_value.keys()) != list(second_value.keys()):
         raise ValueError('Incompatible header fields: {}, {}'.format(
             first_value, second_value))
       merged_value = OrderedDict()
-      for first_field_key, first_field_value in first_value.iteritems():
+      for first_field_key, first_field_value in first_value.items():
         second_field_value = second_value[first_field_key]
         try:
           resolution_field_value = self._resolver.resolve_attribute_conflict(
@@ -90,6 +90,6 @@ class HeaderMerger(object):
         except ValueError as e:
           raise ValueError('Incompatible number or types in header fields:'
                            '{}, {} \n. Error: {}'.format(
-                               first_value, second_value, str(e)))
+                               first_value, second_value, str(e))) from e
 
       first[second_key] = merged_value

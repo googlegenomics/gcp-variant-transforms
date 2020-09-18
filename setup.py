@@ -27,7 +27,7 @@ PYSAM_DEPENDENCY_COMMANDS = [
      'zlib1g-dev']
 ]
 
-PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam<0.16.0']
+PYSAM_INSTALLATION_COMMAND = ['python3', '-m', 'pip', 'install', 'pysam<0.16.0']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
@@ -38,7 +38,7 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6,<1.7.12',
     'intervaltree>=2.1.0,<2.2.0',
     'mmh3<2.6',
-    'google-cloud-storage',
+    'google-cloud-storage<1.30.0',
     'pyfarmhash',
     'pyyaml'
 ]
@@ -57,11 +57,12 @@ class CustomCommands(setuptools.Command):
     pass
 
   def RunCustomCommand(self, command_list):
-    print 'Running command: %s' % command_list
+    print('Running command: %s' % command_list)
     try:
       subprocess.call(command_list)
     except Exception as e:
-      raise RuntimeError('Command %s failed with error: %s' % (command_list, e))
+      raise RuntimeError(
+          'Command %s failed with error: %s' % (command_list, e)) from e
 
   def run(self):
     try:
@@ -71,11 +72,12 @@ class CustomCommands(setuptools.Command):
           self.RunCustomCommand(command)
       self.RunCustomCommand(PYSAM_INSTALLATION_COMMAND)
 
-    except RuntimeError:
+    except RuntimeError as e:
       raise RuntimeError(
           'PySam installation has failed. Make sure you have the ' + \
           'following packages installed: autoconf automake gcc libbz2-dev ' + \
-          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl zlib1g-dev')
+          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl ' + \
+          'zlib1g-dev') from e
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.
@@ -104,8 +106,8 @@ setuptools.setup(
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: System :: Distributed Computing',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
     ],
 
     setup_requires=REQUIRED_SETUP_PACKAGES,

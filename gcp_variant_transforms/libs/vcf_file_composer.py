@@ -137,7 +137,7 @@ def _create_blob(client, file_path):
   return file_blob
 
 
-class MultiProcessComposer(object):
+class MultiProcessComposer():
   """Class to compose (a large number of) files in GCS in parallel."""
 
   def __init__(self, project, bucket_name, blob_prefix):

@@ -14,7 +14,6 @@
 
 """A PTransform to infer undefined/mismatched header fields."""
 
-from __future__ import absolute_import
 
 from typing import Iterable, List, Optional  # pylint: disable=unused-import
 

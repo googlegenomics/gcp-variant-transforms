@@ -14,7 +14,6 @@
 
 """Implements a variant merge stategy that moves fields to calls."""
 
-from __future__ import absolute_import
 
 import hashlib
 import re
@@ -81,7 +80,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     if self._should_copy_quality_to_calls():
       additional_call_info[
           bigquery_util.ColumnKeyConstants.QUALITY] = variant.quality
-    for info_key, info_value in variant.info.iteritems():
+    for info_key, info_value in variant.info.items():
       if self._should_move_info_key_to_calls(info_key):
         additional_call_info[info_key] = info_value
     for call in variant.calls:
@@ -97,7 +96,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
       merged_variant: The variant who will receive the info items of `variant`
         if specified.
     """
-    for info_key, info_value in variant.info.iteritems():
+    for info_key, info_value in variant.info.items():
       if not self._should_move_info_key_to_calls(info_key):
         merged_variant.info[info_key] = info_value
 
@@ -126,7 +125,11 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
 
       merged_variant.names.extend(variant.names)
       merged_variant.filters.extend(variant.filters)
-      merged_variant.quality = max(merged_variant.quality, variant.quality)
+      if (merged_variant.quality is not None and
+          variant.quality is not None):
+        merged_variant.quality = max(merged_variant.quality, variant.quality)
+      elif merged_variant.quality is None:
+        merged_variant.quality = variant.quality
 
       self.move_data_to_calls(variant)
       self.move_data_to_merged(variant, merged_variant)
@@ -158,7 +161,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     if not calls_record:
       raise ValueError('calls record must exist in the schema.')
 
-    existing_calls_keys = set([field.name for field in calls_record.fields])
+    existing_calls_keys = {field.name for field in calls_record.fields}
     updated_fields = []
     for field in schema.fields:
       if (self._should_copy_filter_to_calls() and
@@ -188,7 +191,7 @@ class MoveToCallsStrategy(variant_merge_strategy.VariantMergeStrategy):
     schema.fields = updated_fields
 
   def _get_hash(self, value):
-    return hashlib.md5(value).hexdigest()
+    return hashlib.md5(value.encode('utf-8')).hexdigest()
 
   def _should_move_info_key_to_calls(self, info_key):
     return bool(self._info_keys_to_move_to_calls_re and
