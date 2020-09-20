@@ -50,6 +50,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install dependencies.
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
+    sed -i 's/$1/${1:-}/' /opt/gcp_variant_transforms/venv3/bin/activate && \
     . /opt/gcp_variant_transforms/venv3/bin/activate && \
     cd /opt/gcp_variant_transforms/src && \
     python3 -m pip install --upgrade pip && \
