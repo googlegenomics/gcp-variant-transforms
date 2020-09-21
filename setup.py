@@ -18,8 +18,8 @@ import subprocess
 from distutils.command.build import build as _build
 
 import os
-import setuptools
 import time
+import setuptools
 
 PYSAM_DEPENDENCY_COMMANDS = [
     ['apt-get', 'update'],
@@ -88,14 +88,14 @@ class CustomCommands(setuptools.Command):
     #
     # It was observed that new workers would fail with:
     #   <snip>
-    #   File "/usr/local/lib/python2.7/site-packages/pysam/__init__.py", line 5, in <module>
-    #     from pysam.libchtslib import *
+    #   File "/usr/local/lib/python2.7/site-packages/pysam/__init__.py",
+    #     line 5, in <module> from pysam.libchtslib import *
     #   ImportError: No module named libchtslib
     #
     # Root cause for the failure has not been determined, but with the
     # following retries, the problem has no longer been observed:
 
-    for attempt in range(0,10):
+    for _ in range(10):
       try:
         self.do_install()
 
