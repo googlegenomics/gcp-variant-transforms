@@ -236,6 +236,7 @@ sed -i 's/$1/${1:-}/' ${temp_dir}/bin/activate
 source ${temp_dir}/bin/activate;
 python -m pip install --upgrade pip
 trap clean_up EXIT
+
 if [[ -n "${run_unit_tests}" ]]; then
   python -m pip install --upgrade wheel
   python -m pip install --upgrade .
