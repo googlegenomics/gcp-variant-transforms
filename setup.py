@@ -39,7 +39,7 @@ REQUIRED_PACKAGES = [
     'google-api-python-client>=1.6,<1.7.12',
     'intervaltree>=2.1.0,<2.2.0',
     'mmh3<2.6',
-    'google-cloud-storage<1.30.0',
+    'google-cloud-storage',
     'pyfarmhash',
     'pyyaml'
 ]
