@@ -38,8 +38,8 @@ from gcp_variant_transforms.libs import genomic_region_parser
 
 # At most 100 shards (distinct tables) can be set as output of VariantTransform.
 _MAX_NUM_SHARDS = 100
-# Each shard can contain at most 10 regions.
-_MAX_NUM_REGIONS = 10
+# Each shard can contain at most 64 regions.
+_MAX_NUM_REGIONS = 64
 # A special literal for identifying residual partition's region name.
 _RESIDUAL_REGION_LITERAL = 'residual'
 _UNDEFINED_SHARD_INDEX = -1
