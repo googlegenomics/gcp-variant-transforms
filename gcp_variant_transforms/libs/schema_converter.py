@@ -49,6 +49,7 @@ _NON_INFO_OR_FORMAT_CONSTANT_FIELDS = [
 ]
 
 _CONSTANT_CALL_FIELDS = [bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
+                         bigquery_util.ColumnKeyConstants.CALLS_NAME,
                          bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
                          bigquery_util.ColumnKeyConstants.CALLS_PHASESET]
 
@@ -60,7 +61,8 @@ def generate_schema_from_header_fields(
     header_fields,  # type: vcf_header_io.VcfHeader
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
     variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
-    use_1_based_coordinate=False  # type: bool
+    use_1_based_coordinate=False,  # type: bool
+    include_call_name=False # type: bool
     ):
   # type: (...) -> bigquery.TableSchema
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
@@ -133,6 +135,13 @@ def generate_schema_from_header_fields(
       description='Unique ID (type INT64) assigned to each sample. Table with '
                   '`__sample_info` suffix contains the mapping of sample names '
                   '(as read from VCF header) to these assigned IDs.'))
+  if include_call_name:
+    calls_record.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS_NAME,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Name of the call.'))
+
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,

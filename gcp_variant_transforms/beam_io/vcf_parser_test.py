@@ -72,7 +72,7 @@ class VariantCallTest(unittest.TestCase):
 
   def _default_variant_call(self):
     return vcfio.VariantCall(
-        sample_id=hash_name('Sample1'), genotype=[1, 0],
+        sample_id=hash_name('Sample1'), name='Sample1', genotype=[1, 0],
         phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48})
 
   def test_variant_call_order(self):

@@ -137,7 +137,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'where "chr1", "chr2", ..., and "residual" suffixes correspond '
               'to the value of `table_name_suffix` in the sharding config file '
               '(see --sharding_config_path).'))
-
     parser.add_argument(
         '--sample_lookup_optimized_output_table',
         default='',
@@ -171,7 +170,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'file which is optimized for the human genome. It results in one '
               'table per chromosome (overall 25 BigQuery tables). For more '
               'information visit gcp-variant-trannsforms/docs/sharding.md'))
-
     parser.add_argument(
         '--sample_name_encoding',
         default=vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
@@ -182,7 +180,6 @@ class BigQueryWriteOptions(VariantTransformsOptions):
               'from [file_name, sample_id]'.format(
                   vcf_parser.SampleNameEncoding.WITHOUT_FILE_PATH.name,
                   vcf_parser.SampleNameEncoding.WITH_FILE_PATH.name)))
-
     parser.add_argument(
         '--split_alternate_allele_info_fields',
         type='bool', default=True, nargs='?', const=True,
@@ -219,6 +216,10 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         help=('Value to use instead of null for numeric (float/int/long) lists.'
               'For instance, [0, None, 1] will become '
               '[0, `null_numeric_value_replacement`, 1].'))
+    parser.add_argument(
+        '--include_call_name',
+        type='bool', default=False, nargs='?', const=True,
+        help=('Add raw sample name as a separate column in sample record.'))
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None
@@ -644,8 +645,6 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'Please examine your table''s start_position column description '
               'to find out whether your variant tables uses 0-based or 1-based '
               'coordinate.'))
-
-
 
   def validate(self, parsed_args, client=None):
     if not client:

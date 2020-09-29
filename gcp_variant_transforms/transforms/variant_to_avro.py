@@ -40,7 +40,8 @@ class VariantToAvroFiles(beam.PTransform):
       schema,  # type: bigquery.TableSchema
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      include_call_name=False  # type: bool
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -56,6 +57,7 @@ class VariantToAvroFiles(beam.PTransform):
         numeric (float/int/long) lists. For instance, [0, None, 1] will become
         [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
+      include_call_name: If true, sample name will be included with sample ID.
     """
     self._output_path = output_path
     self._fastavro_schema = fastavro.parse_schema(
@@ -65,7 +67,8 @@ class VariantToAvroFiles(beam.PTransform):
             bigquery_schema_descriptor.SchemaDescriptor(schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),
-            null_numeric_value_replacement))
+            null_numeric_value_replacement,
+            include_call_name=include_call_name))
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls

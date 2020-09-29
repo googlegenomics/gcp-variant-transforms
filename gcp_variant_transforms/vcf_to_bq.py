@@ -478,7 +478,8 @@ def run(argv=None):
 
   schema = schema_converter.generate_schema_from_header_fields(
       header_fields, processed_variant_factory, variant_merger,
-      known_args.use_1_based_coordinate)
+      known_args.use_1_based_coordinate,
+      known_args.include_call_name)
 
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   if sharding.should_keep_shard(sharding.get_residual_index()):
@@ -521,7 +522,8 @@ def run(argv=None):
             allow_incompatible_records=known_args.allow_incompatible_records,
             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
             null_numeric_value_replacement=(
-                known_args.null_numeric_value_replacement))
+                known_args.null_numeric_value_replacement),
+            include_call_name=known_args.include_call_name)
     )
   result = pipeline.run()
   try:

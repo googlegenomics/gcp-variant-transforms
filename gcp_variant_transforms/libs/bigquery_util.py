@@ -51,6 +51,7 @@ class ColumnKeyConstants():
   FILTER = 'filter'
   CALLS = 'call'  # Column name is singular for consistency with Variants API.
   CALLS_SAMPLE_ID = 'sample_id'
+  CALLS_NAME = 'name'
   CALLS_GENOTYPE = 'genotype'
   CALLS_PHASESET = 'phaseset'
 
