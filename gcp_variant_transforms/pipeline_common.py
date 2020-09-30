@@ -44,7 +44,7 @@ from gcp_variant_transforms.transforms import merge_headers
 # If the # of files matching the input file_pattern exceeds this value, then
 # headers will be merged in beam.
 _SMALL_DATA_THRESHOLD = 100
-_LARGE_DATA_THRESHOLD = 50000
+_LARGE_DATA_THRESHOLD = 500
 
 _DATAFLOW_RUNNER_ARG_VALUE = 'DataflowRunner'
 SampleNameEncoding = vcf_parser.SampleNameEncoding
