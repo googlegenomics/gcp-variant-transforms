@@ -14,7 +14,6 @@
 
 """Unit tests for variant_sharding module."""
 
-from __future__ import absolute_import
 
 import unittest
 
@@ -131,10 +130,10 @@ class VariantShardingTest(unittest.TestCase):
         'residual_at_end.yaml')
     self.assertEqual(sharder.get_num_shards(), 8)
 
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Given shard index -1 is outside of expected range*'):
       sharder.get_output_table_suffix(-1)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Given shard index 8 is outside of expected range*'):
       sharder.get_output_table_suffix(8)
 
@@ -236,7 +235,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, regions field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -251,7 +250,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1:0-1,000,000"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table_name_suffix field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -264,7 +263,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1:0-1,000,000"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table_name_suffix can not be empty.'):
       _ = variant_sharding.VariantSharding(
@@ -290,7 +289,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "residual"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, there can be only one residual output*'):
       _ = variant_sharding.VariantSharding(
@@ -311,7 +310,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1:999,999-2,000,000"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
       _ = variant_sharding.VariantSharding(
           tempdir.create_temp_file(suffix='.yaml',
@@ -329,7 +328,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1:1,000,000-2,000,000"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
       _ = variant_sharding.VariantSharding(
           tempdir.create_temp_file(suffix='.yaml',
@@ -347,7 +346,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
       _ = variant_sharding.VariantSharding(
           tempdir.create_temp_file(suffix='.yaml',
@@ -370,7 +369,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Wrong sharding config file, regions must be unique*'):
       _ = variant_sharding.VariantSharding(
           tempdir.create_temp_file(suffix='.yaml',
@@ -395,7 +394,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1:1,000,000-2,000,000"',
         '     partition_range_end: 999999999',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table name suffixes must be unique*'):
       _ = variant_sharding.VariantSharding(
@@ -412,7 +411,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharing config file, output_table field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -426,7 +425,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table_name_suffix field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -438,7 +437,7 @@ class VariantShardingTest(unittest.TestCase):
         '     table_name_suffix: "chr1"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, regions field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -451,7 +450,7 @@ class VariantShardingTest(unittest.TestCase):
         '     regions:',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, regions field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -465,7 +464,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr1"',
         '       - "1"',
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, partition_range_end field missing.'):
       _ = variant_sharding.VariantSharding(
@@ -482,7 +481,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table_name_suffix can not be empty.'):
       _ = variant_sharding.VariantSharding(
@@ -498,7 +497,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, BigQuery table name can only contain *'):
       _ = variant_sharding.VariantSharding(
@@ -518,7 +517,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "chr2"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, table name suffixes must be unique*'):
       _ = variant_sharding.VariantSharding(
@@ -534,7 +533,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - " "',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, reference_name can not be empty string: '):
       _ = variant_sharding.VariantSharding(
@@ -550,7 +549,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "dup_value"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, regions must be unique in config file: *'):
       _ = variant_sharding.VariantSharding(
@@ -569,7 +568,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "dup_value"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, regions must be unique in config file: *'):
       _ = variant_sharding.VariantSharding(
@@ -588,7 +587,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "residual"',
         '     partition_range_end: 249240615'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, there can be only one residual output *'):
       _ = variant_sharding.VariantSharding(
@@ -603,7 +602,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: "not int"'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(
@@ -618,7 +617,7 @@ class VariantShardingTest(unittest.TestCase):
         '       - "1"',
         '     partition_range_end: -10'
     ]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         'Wrong sharding config file, each output table needs an integer for *'):
       _ = variant_sharding.VariantSharding(

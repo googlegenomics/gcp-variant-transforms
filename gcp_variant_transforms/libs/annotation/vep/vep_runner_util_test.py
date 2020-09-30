@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
 
 import unittest
 
@@ -63,7 +62,7 @@ class VepRunnerUtilTest(unittest.TestCase):
                      len(_INPUT_FILES_WITH_SIZE))
     merged_dict = {}
     for actions_list in worker_actions_list:
-      for k, v in actions_list.io_map.iteritems():
+      for k, v in actions_list.io_map.items():
         merged_dict[k] = v
     self.assertDictEqual(
         merged_dict,

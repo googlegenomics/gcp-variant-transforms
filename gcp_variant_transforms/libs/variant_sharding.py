@@ -24,7 +24,6 @@ This class has 2 main operating modes:
      available at gcp_variant_transforms/testing/data/misc/*.yaml
 """
 
-from __future__ import absolute_import
 
 from collections import defaultdict
 import re
@@ -52,7 +51,7 @@ _REGIONS = 'regions'
 _PARTITION_RANGE_END = 'partition_range_end'
 
 
-class _ChromosomeSharder(object):
+class _ChromosomeSharder():
   """Assigns shard indices to multiple regions inside a chromosome.
 
   This class logic is implemented using an interval tree, each region is
@@ -93,7 +92,7 @@ class _ChromosomeSharder(object):
     else:
       return _UNDEFINED_SHARD_INDEX
 
-class VariantSharding(object):
+class VariantSharding():
   """Sharding variants based on their reference_name [and position]."""
 
   def __init__(self, config_file_path=None):
@@ -140,7 +139,7 @@ class VariantSharding(object):
       try:
         shards = yaml.load(f)
       except yaml.YAMLError as e:
-        raise ValueError('Invalid yaml file: {}'.format(str(e)))
+        raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
     if len(shards) > _MAX_NUM_SHARDS:
       raise ValueError(
           'There can be at most {} output tables but given config file '
@@ -212,9 +211,10 @@ class VariantSharding(object):
         try:
           partition_range_end = genomic_region_parser.parse_comma_sep_int(
               partition_range_end)
-        except:
-          raise ValueError('Wrong sharding config file, each output table '
-                           'needs an integer for partition_range_end > 0.')
+        except Exception as e:
+          raise ValueError(
+              'Wrong sharding config file, each output table '
+              'needs an integer for partition_range_end > 0.') from e
       if partition_range_end <= 0:
         raise ValueError('Wrong sharding config file, each output table '
                          'needs an integer for partition_range_end > 0.')
@@ -230,7 +230,7 @@ class VariantSharding(object):
       try:
         shards = yaml.load(f)
       except yaml.YAMLError as e:
-        raise ValueError('Invalid yaml file: {}'.format(str(e)))
+        raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
 
     self._num_shards = len(shards)
     for shard_index in range(self._num_shards):

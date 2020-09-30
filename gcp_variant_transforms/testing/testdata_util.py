@@ -14,7 +14,6 @@
 
 """Util functions for accessing testdata."""
 
-from __future__ import absolute_import
 
 import os.path
 

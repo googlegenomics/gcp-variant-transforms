@@ -55,7 +55,7 @@ class BGZF(filesystem.CompressedFile):
   def __init__(self,
                fileobj,
                compression_type=filesystem.CompressionTypes.GZIP):
-    super(BGZF, self).__init__(fileobj, compression_type)
+    super().__init__(fileobj, compression_type)
     self._first_fetch = True
 
   def _fetch_to_internal_buffer(self, num_bytes):
@@ -119,7 +119,7 @@ class BGZFBlockSource(textio._TextSource):
                validate=True
               ):
     """A source for reading BGZF Block."""
-    super(BGZFBlockSource, self).__init__(
+    super().__init__(
         file_name,
         min_bundle_size,
         compression_type,
@@ -147,7 +147,7 @@ class BGZFBlockSource(textio._TextSource):
         record = file_to_read.readline()
         if not record or not record.strip():
           break
-        if record and not record.startswith('#'):
+        if record and not record.startswith(b'#'):
           yield self._coder.decode(record)
 
 
@@ -164,15 +164,15 @@ class BGZFBlock(BGZF):
                fileobj,
                block,
                compression_type=filesystem.CompressionTypes.GZIP):
-    super(BGZFBlock, self).__init__(fileobj,
-                                    compression_type)
+    super().__init__(fileobj,
+                     compression_type)
     self._block = block
     self._start_offset = self._block.start
 
   def _fetch_and_decompress_data_to_buffer(self, num_bytes):
     if self._first_fetch:
       self._read_first_gzip_block_into_buffer()
-    super(BGZFBlock, self)._fetch_and_decompress_data_to_buffer(num_bytes)
+    super()._fetch_and_decompress_data_to_buffer(num_bytes)
     if self._read_eof:
       self._complete_last_line()
 
@@ -181,7 +181,7 @@ class BGZFBlock(BGZF):
     decompressed = self._decompressor.decompress(buf)
     del buf
     # Discards all data before first `\n`.
-    while '\n' not in decompressed:
+    while b'\n' not in decompressed:
       if self._decompressor.unused_data != b'':
         buf = self._decompressor.unused_data
         self._decompressor = zlib.decompressobj(self._gzip_mask)
@@ -191,12 +191,12 @@ class BGZFBlock(BGZF):
         raise ValueError('Read failed. The block {} does not contain any '
                          'valid record.'.format(self._block))
 
-    lines = decompressed.split('\n')
-    self._read_buffer.write('\n'.join(lines[1:]))
+    lines = decompressed.split(b'\n')
+    self._read_buffer.write(b'\n'.join(lines[1:]))
 
   def _read_data_from_source(self):
     if self._start_offset == self._block.end:
-      return ''
+      return b''
     buf = self._file.raw._downloader.get_range(self._start_offset,
                                                self._block.end)
     self._start_offset += len(buf)
@@ -212,7 +212,7 @@ class BGZFBlock(BGZF):
     if not decompressed:
       return
     # Writes all data to the buffer until the first `\n` is reached.
-    while '\n' not in decompressed:
+    while b'\n' not in decompressed:
       if self._decompressor.unused_data != b'':
         self._read_buffer.write(decompressed)
         buf = self._decompressor.unused_data
@@ -222,4 +222,4 @@ class BGZFBlock(BGZF):
       else:
         raise ValueError('Read failed. The record is longer than {} '
                          'bytes.'.format(self._read_size))
-    self._read_buffer.write(decompressed.split('\n')[0] + '\n')
+    self._read_buffer.write(decompressed.split(b'\n')[0] + b'\n')

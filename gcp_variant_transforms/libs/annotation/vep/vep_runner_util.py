@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
 
 import logging
 import math
@@ -52,7 +50,7 @@ _GZ_FACTOR = 10
 _MIN_NUM_OF_VARIANT = 50 * 1000
 
 
-class WorkerIOInfo(object):
+class WorkerIOInfo():
   """Holds information about input/output on a virtual machine.
 
   This is a pure data object and attributes can be accessed directly but the

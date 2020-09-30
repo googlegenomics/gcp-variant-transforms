@@ -111,18 +111,20 @@ In addition to using the docker image, you may run the pipeline directly from
 source. First install git, python, pip, and virtualenv:
 
 ```bash
-sudo apt-get install -y git python-pip python-dev build-essential
-sudo python -m pip install --upgrade pip
-sudo python -m pip install --upgrade virtualenv
+sudo apt-get install -y git python3-pip python3-venv python3.7-venv python-dev build-essential
 ```
+
+Note that python 3.8 is not yet supported, so ensure you are using Python 3.7.
 
 Run virtualenv, clone the repo, and install pip packages:
 
 ```bash
-virtualenv venv
-source venv/bin/activate
+python3 -m venv venv3
+source venv3/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
+python -m pip install --upgrade pip
+python -m pip install --upgrade wheel
 python -m pip install --upgrade .
 ```
 
@@ -176,7 +178,7 @@ details.
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table
-  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
+  Schema](https://cloud.google.com/life-sciences/docs/how-tos/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)

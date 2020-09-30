@@ -29,4 +29,5 @@ if [[ -z `which pylint` ]];then
   echo "pylint is not installed. Installing ..."
   python -m pip install pylint
 fi
+python -m pylint setup.py
 python -m pylint gcp_variant_transforms

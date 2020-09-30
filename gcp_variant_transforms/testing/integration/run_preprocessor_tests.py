@@ -82,7 +82,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
                                     _BUCKET_NAME,
                                     self._header_blob_name])
       args.append('--resolved_headers_path {}'.format(self._header_path))
-    for k, v in kwargs.iteritems():
+    for k, v in kwargs.items():
       args.append('--{} {}'.format(k, v))
 
     self.run_test_command = run_tests_common.form_command(
@@ -107,7 +107,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
       raise run_tests_common.TestCaseFailure(
           'Report is not generated in {} in test {}'.format(self._report_path,
                                                             self._name))
-    contents = report_blob.download_as_string()
+    contents = report_blob.download_as_string().decode('utf-8')
     expected_contents = '\n'.join(self._expected_contents)
     if expected_contents != contents:
       raise run_tests_common.TestCaseFailure(
@@ -169,7 +169,7 @@ def main():
 
 
 if __name__ == '__main__':
-  print 'Starting preprocessor tests...'
+  print('Starting preprocessor tests...')
   ret_code = main()
-  print 'Finished all preprocessor tests successfully.'
+  print('Finished all preprocessor tests successfully.')
   sys.exit(ret_code)

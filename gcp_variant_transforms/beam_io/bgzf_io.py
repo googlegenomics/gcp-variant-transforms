@@ -116,7 +116,7 @@ def _read(index_file):
       if not line:
         break
       lines.append(line)
-  return ''.join(lines)
+  return b''.join(lines)
 
 
 def _remove_invalid_blocks(blocks):

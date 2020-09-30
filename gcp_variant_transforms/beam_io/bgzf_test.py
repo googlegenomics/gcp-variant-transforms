@@ -27,9 +27,10 @@ from gcp_variant_transforms.beam_io import bgzf_io
 class BgzfBlockTest(unittest.TestCase):
 
   def setUp(self):
-    with open(testdata_util.get_full_file_path('Y.vcf.bgz')) as file_to_read:
+    with open(testdata_util.get_full_file_path('Y.vcf.bgz'),
+              mode='rb') as file_to_read:
       data = file_to_read.readlines()
-    self._data = ''.join(data)
+    self._data = b''.join(data)
     self.client = gcsio_test.FakeGcsClient()
     self.gcs = gcsio.GcsIO(self.client)
     self._file_name = 'gs://bucket/test'
@@ -76,12 +77,12 @@ class BgzfBlockTest(unittest.TestCase):
       line = file_to_read.readline()
       if not line:
         break
-      lines.append(line)
+      lines.append(line.decode('utf-8'))
     return lines
 
   def _validate_first_line_is_complete(self, line):
     self.assertEqual(
-        line,
+        line.decode('utf-8'),
         '##INFO=<ID=non_neuro_AC_popmax,Number=A,Type=Integer,'
         'Description="Allele count in the population with the maximum '
         'AF in the non_neuro subset">\n')

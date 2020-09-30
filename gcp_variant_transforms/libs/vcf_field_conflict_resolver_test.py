@@ -209,7 +209,8 @@ class ConflictResolverTest(unittest.TestCase):
           self._resolver_allele.resolve_attribute_conflict(
               VcfParserHeaderKeyConstants.NUM, i, j)
           self.fail(
-              'Should raise exception for unresolvable number: %d vs %d'%(i, j))
+              'Should raise exception for unresolvable number: {} vs {}'.format(
+                  i, j))
 
   def test_resolving_all_field_definition_conflict_in_type(self):
     self.assertEqual(

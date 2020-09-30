@@ -73,8 +73,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS', 'AF'])
-    self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ'])
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS', 'AF'])
+    self.assertCountEqual(list(merged_headers.formats.keys()), ['GT', 'GQ'])
 
   def test_combine_multiple_headers_as_inputs(self):
     headers_1 = self._get_header_from_lines(FILE_1_LINES)
@@ -87,8 +87,10 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS', 'AF', 'NS2'])
-    self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ', 'GQ2'])
+    self.assertCountEqual(list(merged_headers.infos.keys()),
+                          ['NS', 'AF', 'NS2'])
+    self.assertCountEqual(list(merged_headers.formats.keys()),
+                          ['GT', 'GQ', 'GQ2'])
 
   def test_combine_multiple_headers_as_accumulators(self):
     headers_1 = self._get_header_from_lines(FILE_1_LINES)
@@ -104,8 +106,10 @@ class MergeHeadersTest(unittest.TestCase):
                                                      merged_headers_2])
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS', 'AF', 'NS2'])
-    self.assertItemsEqual(merged_headers.formats.keys(), ['GT', 'GQ', 'GQ2'])
+    self.assertCountEqual(list(merged_headers.infos.keys()),
+                          ['NS', 'AF', 'NS2'])
+    self.assertCountEqual(list(merged_headers.formats.keys()),
+                          ['GT', 'GQ', 'GQ2'])
 
   def test_combine_two_type_conflicting_but_resolvable_headers(self):
     # These two headers have type conflict (Integer vs Float), however pipeline
@@ -129,8 +133,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
-    self.assertItemsEqual(merged_headers.infos['NS'],
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS'])
+    self.assertCountEqual(merged_headers.infos['NS'],
                           OrderedDict([('id', 'NS'),
                                        ('num', 1),
                                        ('type', 'Float'),
@@ -153,8 +157,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
-    self.assertItemsEqual(merged_headers.infos['NS'],
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS'])
+    self.assertCountEqual(merged_headers.infos['NS'],
                           OrderedDict([('id', 'NS'),
                                        ('num', 1),
                                        ('type', 'String'),
@@ -184,8 +188,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
-    self.assertItemsEqual(merged_headers.infos['NS'],
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS'])
+    self.assertCountEqual(merged_headers.infos['NS'],
                           OrderedDict([('id', 'NS'),
                                        ('num', '.'),
                                        ('type', 'Integer'),
@@ -215,8 +219,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
-    self.assertItemsEqual(merged_headers.infos['NS'],
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS'])
+    self.assertCountEqual(merged_headers.infos['NS'],
                           OrderedDict([('id', 'NS'),
                                        ('num', '.'),
                                        ('type', 'Integer'),
@@ -250,8 +254,8 @@ class MergeHeadersTest(unittest.TestCase):
     merged_headers = combiner_fn.add_input(merged_headers, headers_2)
     merged_headers = combiner_fn.extract_output(merged_headers)
 
-    self.assertItemsEqual(merged_headers.infos.keys(), ['NS'])
-    self.assertItemsEqual(merged_headers.infos['NS'],
+    self.assertCountEqual(list(merged_headers.infos.keys()), ['NS'])
+    self.assertCountEqual(merged_headers.infos['NS'],
                           OrderedDict([('id', 'NS'),
                                        ('num', '.'),
                                        ('type', 'Integer'),
