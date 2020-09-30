@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips:,service_account: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -49,6 +49,10 @@ function parse_args {
         use_public_ips="$2"
         ;;
 
+      --service_account)
+        service_account="$2"
+        ;;
+
       *)
         command="$@"
         break
@@ -72,6 +76,7 @@ function main {
   temp_location="${temp_location:-}"
   subnetwork="${subnetwork:-}"
   use_public_ips="${use_public_ips:-}"
+  service_account="${service_account:-}"
 
   if [[ -z "${google_cloud_project}" ]]; then
     echo "Please set the google cloud project using flag --project PROJECT."
@@ -112,6 +117,12 @@ function main {
     echo "Adding --private-address and --no_use_public_ips to optional_args"
     pt_optional_args="${pt_optional_args} --private-address"
     df_optional_args="${df_optional_args} --no_use_public_ips"
+  fi
+
+  if [[ ! -z "${service_account}" ]]; then
+    echo "Adding --service-account ${service_account} to optional_args"
+    pt_optional_args="${pt_optional_args} --service-account ${service_account}"
+    df_optional_args="${df_optional_args} --service_account_email ${service_account}"
   fi
 
   pipelines --project "${google_cloud_project}" run \
