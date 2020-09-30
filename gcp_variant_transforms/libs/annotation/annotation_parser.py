@@ -18,7 +18,6 @@ The main class is `Parser`; see its documentation for usage. There are also
 some helper methods that can be used in different contexts.
 """
 
-from __future__ import absolute_import
 
 import re
 
@@ -64,7 +63,7 @@ class AnnotationAltNotFound(AnnotationParserException):
   pass
 
 
-class Parser(object):
+class Parser():
   """The main class for parsing annotation fields of a single variant record.
 
   The expected usage is to pass information about one variant record, namely the
@@ -298,10 +297,10 @@ class Parser(object):
             alt_index + 1, 1, len(self._alt_list)))
       return alt_index
     except ValueError as e:
-      raise InvalidAlleleNumValue(e)
+      raise InvalidAlleleNumValue(e) from e
 
 
-class AnnotationStrBuilder(object):
+class AnnotationStrBuilder():
   """The class for reconstructing annotation str."""
 
   def __init__(self, annotation_id_to_annotation_names):
@@ -367,7 +366,7 @@ class AnnotationStrBuilder(object):
     names are given such that the annotation string can be reconstructed.
     """
     return (self._annotation_id_to_annotation_names and
-            key in self._annotation_id_to_annotation_names.keys())
+            key in list(self._annotation_id_to_annotation_names.keys()))
 
 
 def extract_annotation_list_with_alt(annotation_str):

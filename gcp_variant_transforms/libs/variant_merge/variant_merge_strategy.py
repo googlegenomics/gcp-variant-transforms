@@ -23,7 +23,7 @@ from gcp_variant_transforms.beam_io import vcfio  # pylint: disable=unused-impor
 __all__ = ['VariantMergeStrategy']
 
 
-class VariantMergeStrategy(object):
+class VariantMergeStrategy():
   """Interface for a variant merge strategy."""
 
   def get_merged_variants(self, variants, key):
@@ -59,4 +59,3 @@ class VariantMergeStrategy(object):
       ValueError: If updates to the schema are incompatible with the settings
         specified by the merge strategy.
     """
-    pass

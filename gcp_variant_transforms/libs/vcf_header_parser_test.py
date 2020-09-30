@@ -14,7 +14,7 @@
 
 """Tests for vcf_header_parser module."""
 
-from __future__ import absolute_import
+
 
 import unittest
 
@@ -40,8 +40,8 @@ class GetMergedVcfHeadersTest(unittest.TestCase):
     with temp_dir.TempDir() as tempdir:
       file_path = self._create_temp_vcf_file(lines, tempdir)
       header_fields = vcf_header_parser.get_vcf_headers(file_path)
-      self.assertItemsEqual(['NS', 'AF'], header_fields.infos.keys())
-      self.assertItemsEqual(['GT', 'GQ'], header_fields.formats.keys())
+      self.assertCountEqual(['NS', 'AF'], list(header_fields.infos.keys()))
+      self.assertCountEqual(['GT', 'GQ'], list(header_fields.formats.keys()))
 
   def test_invalid_file(self):
     lines = [

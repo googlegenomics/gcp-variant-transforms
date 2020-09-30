@@ -227,17 +227,22 @@ if [[ -z "${skip_build}" ]]; then
 fi
 
 # Running integration tests in a temporary virtualenv
-temp_dir="$(mktemp -d)"
+temp_dir="$(mktemp -d)"	
 color_print "Setting up integration test environment in ${temp_dir}" "${GREEN}"
 # Since we have no prompt we need to disable prompt changing in virtualenv.
 export VIRTUAL_ENV_DISABLE_PROMPT="something"
-virtualenv "${temp_dir}"
+python3 -m venv "${temp_dir}"
+sed -i 's/$1/${1:-}/' ${temp_dir}/bin/activate
 source ${temp_dir}/bin/activate;
+python -m pip install --upgrade pip
 trap clean_up EXIT
+
 if [[ -n "${run_unit_tests}" ]]; then
+  python -m pip install --upgrade wheel
   python -m pip install --upgrade .
   python setup.py test
 fi
+python -m pip install --upgrade wheel
 python -m pip install --upgrade .[int_test]
 
 # Force an upgrade to avoid SSL certificate verification errors (issue #453).

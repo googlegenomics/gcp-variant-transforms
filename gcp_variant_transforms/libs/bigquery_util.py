@@ -14,9 +14,7 @@
 
 """Constants and simple utility functions related to BigQuery."""
 
-from concurrent.futures import TimeoutError
 import enum
-import exceptions
 import logging
 import os
 import re
@@ -40,7 +38,7 @@ _GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
 BQ_NUM_RETRIES = 5
 
 
-class ColumnKeyConstants(object):
+class ColumnKeyConstants():
   """Constants for column names in the BigQuery schema."""
   REFERENCE_NAME = 'reference_name'
   START_POSITION = 'start_position'
@@ -57,7 +55,7 @@ class ColumnKeyConstants(object):
   CALLS_PHASESET = 'phaseset'
 
 
-class TableFieldConstants(object):
+class TableFieldConstants():
   """Constants for field modes/types in the BigQuery schema."""
   TYPE_STRING = 'STRING'
   TYPE_INTEGER = 'INTEGER'
@@ -69,7 +67,7 @@ class TableFieldConstants(object):
   MODE_REPEATED = 'REPEATED'
 
 
-class AvroConstants(object):
+class AvroConstants():
   """Constants that are relevant to Avro schema."""
   TYPE = 'type'
   NAME = 'name'
@@ -124,7 +122,7 @@ _BIG_QUERY_TYPE_TO_AVRO_TYPE_MAP = {
 _BIG_QUERY_TYPE_TO_PYTHON_TYPE_MAP = {
     TableFieldConstants.TYPE_INTEGER: int,
     # Bigquery accepts unicode for strings.
-    TableFieldConstants.TYPE_STRING: unicode,
+    TableFieldConstants.TYPE_STRING: str,
     TableFieldConstants.TYPE_FLOAT: float,
     TableFieldConstants.TYPE_BOOLEAN: bool,
 }
@@ -158,10 +156,9 @@ def raise_error_if_dataset_not_exists(client, project_id, dataset_id):
   except exceptions.HttpError as e:
     if e.status_code == 404:
       raise ValueError('Dataset %s:%s does not exist.' %
-                       (project_id, dataset_id))
-    else:
-      # For the rest of the errors, use BigQuery error message.
-      raise
+                       (project_id, dataset_id)) from e
+    # For the rest of the errors, use BigQuery error message.
+    raise
 
 
 def table_exist(client, project_id, dataset_id, table_id):
@@ -196,20 +193,18 @@ def table_empty(project_id, dataset_id, table_id):
         time.sleep(90)
       else:
         raise e
+    if results.total_rows == 1:
+      break
+    logging.error('Query did not returned expected # of rows: %s', query)
+    if num_retries < BQ_NUM_RETRIES:
+      num_retries += 1
+      time.sleep(90)
     else:
-      if results.total_rows == 1:
-        break
-      else:
-        logging.error('Query did not returned expected # of rows: %s', query)
-        if num_retries < BQ_NUM_RETRIES:
-          num_retries += 1
-          time.sleep(90)
-        else:
-          raise ValueError('Expected 1 row in query result, got {}'.format(
-              results.total_rows))
+      raise ValueError('Expected 1 row in query result, got {}'.format(
+          results.total_rows))
 
   row = list(results)[0]
-  col_names = row.keys()
+  col_names = list(row.keys())
   if set(col_names) != {num_rows}:
     logging.error('Query `%s` did not return expected `%s` column.',
                   query, num_rows)
@@ -313,7 +308,7 @@ def update_bigquery_schema_on_append(schema_fields, output_table):
         table=existing_table,
         tableId=table_id))
   except exceptions.HttpError as e:
-    raise RuntimeError('BigQuery schema update failed: %s' % str(e))
+    raise RuntimeError('BigQuery schema update failed: %s' % str(e)) from e
 
 
 def _get_merged_field_schemas(
@@ -342,7 +337,7 @@ def _get_merged_field_schemas(
     merged_field_schemas.append(field_schema)
 
   for field_schema in field_schemas_2:
-    if field_schema.name not in existing_fields.keys():
+    if field_schema.name not in list(existing_fields.keys()):
       merged_field_schemas.append(field_schema)
     else:
       existing_field_schema = existing_fields.get(field_schema.name)

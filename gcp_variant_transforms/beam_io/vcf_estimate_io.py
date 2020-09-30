@@ -15,7 +15,7 @@
 
 """A source for reading VCF files and extracting signals about input size."""
 
-from __future__ import absolute_import
+
 
 from functools import partial
 from typing import Dict, Iterable  # pylint: disable=unused-import
@@ -28,7 +28,7 @@ from apache_beam.io import iobase
 from apache_beam.io import range_trackers  # pylint: disable=unused-import
 
 
-class VcfEstimate(object):
+class VcfEstimate():
   """Container for estimation data about the VCF file."""
 
   def __init__(self,
@@ -74,23 +74,23 @@ class VcfEstimateSource(filebasedsource.FileBasedSource):
                compression_type=filesystem.CompressionTypes.AUTO,
                validate=True):
     # type: (str, str, bool) -> None
-    super(VcfEstimateSource, self).__init__(file_pattern,
-                                            compression_type=compression_type,
-                                            validate=validate,
-                                            splittable=False)
+    super().__init__(file_pattern,
+                     compression_type=compression_type,
+                     validate=validate,
+                     splittable=False)
     self._compression_type = compression_type
 
   def _get_header_info(self, file_to_read, file_name):
     # type: (str, str) -> (int, str)
     """Returns the header size and sample names."""
     header_size = 0
-    header_line = file_to_read.readline()
+    header_line = file_to_read.readline().decode('utf-8')
     # Read and skip all header lines starting with ##. Make sure to calculate
     # their total size, to marginally better approximate the line count.
     while (header_line.startswith('##') or not header_line or
            not header_line.strip()):
       header_size += len(header_line)
-      header_line = file_to_read.readline()
+      header_line = file_to_read.readline().decode('utf-8')
     if not header_line.startswith('#'):
       raise ValueError(('No column-defining header line was found in file {}.'
                         .format(file_name)))
@@ -170,7 +170,7 @@ class GetEstimates(transforms.PTransform):
       validate: Flag to verify that the files exist during the pipeline creation
         time.
     """
-    super(GetEstimates, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self._source = VcfEstimateSource(
         file_pattern,
         compression_type,
@@ -212,7 +212,7 @@ class GetAllEstimates(transforms.PTransform):
         <apache_beam.io.filesystem.CompressionTypes.AUTO>`, in which case the
         underlying file_path's extension will be used to detect the compression.
     """
-    super(GetAllEstimates, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_estimate_source,
         compression_type=compression_type)

@@ -46,7 +46,6 @@ python -m gcp_variant_transforms.vcf_to_bq_preprocess \
   --setup_file ./setup.py
 """
 
-from __future__ import absolute_import
 
 import logging
 import sys

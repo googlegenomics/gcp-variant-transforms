@@ -14,8 +14,6 @@
 
 """Converts BigQuery row to variant."""
 
-from __future__ import absolute_import
-from __future__ import division
 
 from typing import Any, Dict, List  # pylint: disable=unused-import
 
@@ -44,7 +42,7 @@ RESERVED_VARIANT_CALL_COLUMNS = [
 ]
 
 
-class VariantGenerator(object):
+class VariantGenerator():
   """Class to generate variant from one BigQuery row."""
 
   def __init__(self, annotation_id_to_annotation_names=None):
@@ -87,11 +85,11 @@ class VariantGenerator(object):
   def _get_variant_info(self, row):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     info = {}
-    for key, value in row.iteritems():
+    for key, value in row.items():
       if key not in RESERVED_BQ_COLUMNS and not self._is_null_or_empty(value):
         info.update({key: value})
     for alt_base in row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES]:
-      for key, value in alt_base.iteritems():
+      for key, value in alt_base.items():
         if (key != bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT and
             not self._is_null_or_empty(value)):
           if key not in info:
@@ -109,7 +107,7 @@ class VariantGenerator(object):
     variant_calls = []
     for call_record in variant_call_records:
       info = {}
-      for key, value in call_record.iteritems():
+      for key, value in call_record.items():
         if (key not in RESERVED_VARIANT_CALL_COLUMNS and
             not self._is_null_or_empty(value)):
           info.update({key: value})

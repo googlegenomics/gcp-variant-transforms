@@ -1,5 +1,6 @@
 *~
 *.pyc
+*.py.bak
 *.egg-info/
 *\.egg/
 .eggs/
@@ -7,6 +8,7 @@ build/
 dist/
 .idea/
 venv/
+venv3/
 .vscode/
 .coverage
 *.DS_Store

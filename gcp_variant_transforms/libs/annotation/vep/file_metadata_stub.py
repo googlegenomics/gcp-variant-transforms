@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-class FileMetadataStub(object):
+class FileMetadataStub():
   """This is an object to imitate apache_beam.io.filesystem.FileMetadata."""
 
   def __init__(self, path, size_in_bytes):

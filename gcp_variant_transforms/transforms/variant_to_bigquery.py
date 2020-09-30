@@ -14,7 +14,6 @@
 
 """A PTransform to output a PCollection of ``Variant`` records to BigQuery."""
 
-from __future__ import absolute_import
 
 import random
 from typing import Dict, List  # pylint: disable=unused-import
@@ -48,7 +47,7 @@ class ConvertVariantToRow(beam.DoFn):
       omit_empty_sample_calls=False  # type: bool
   ):
     # type: (...) -> None
-    super(ConvertVariantToRow, self).__init__()
+    super().__init__()
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._bigquery_row_generator = row_generator

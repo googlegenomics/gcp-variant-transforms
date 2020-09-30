@@ -13,7 +13,6 @@
 # limitations under the License.
 """A dict based description for BigQuery schema."""
 
-from __future__ import absolute_import
 
 from typing import NamedTuple
 from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unused-import
@@ -23,7 +22,7 @@ from apache_beam.io.gcp.internal.clients import bigquery  # pylint: disable=unus
 FieldDescriptor = NamedTuple('FieldDescriptor', [('type', str), ('mode', str)])
 
 
-class SchemaDescriptor(object):
+class SchemaDescriptor():
   """A dict based description for :class:`bigquery.TableSchema` object.
 
      This class provides APIs for checking if and how (e.g. type, mode) a field

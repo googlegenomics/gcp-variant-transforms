@@ -31,7 +31,6 @@ python -m gcp_variant_transforms.vcf_to_bq \
   --runner DataflowRunner
 """
 
-from __future__ import absolute_import
 
 import argparse  # pylint: disable=unused-import
 from datetime import datetime
@@ -385,7 +384,8 @@ def _validate_annotation_pipeline_args(known_args, pipeline_args):
   flags_dict = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
   expected_flags = ['max_num_workers', 'num_workers']
   for flag in expected_flags:
-    if flag in flags_dict and flags_dict[flag] > 0:
+    if (flag in flags_dict and
+        flags_dict[flag] is not None and flags_dict[flag] > 0):
       return
   raise ValueError('Could not find any of {} with a valid value among pipeline '
                    'flags {}'.format(expected_flags, flags_dict))
@@ -416,10 +416,10 @@ def _write_schema_to_temp_file(schema, path):
   schema_json = schema_converter.convert_table_schema_to_json_bq_schema(schema)
   schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
   with filesystems.FileSystems.create(schema_file) as file_to_write:
-    file_to_write.write(schema_json)
+    file_to_write.write(schema_json.encode('utf-8'))
   gs_file_path = path + _BQ_SCHEMA_FILE_SUFFIX
   with filesystems.FileSystems.create(gs_file_path) as file_to_write:
-    file_to_write.write(schema_json)
+    file_to_write.write(schema_json.encode('utf-8'))
   return schema_file
 
 
