@@ -219,7 +219,8 @@ class BigQueryWriteOptions(VariantTransformsOptions):
     parser.add_argument(
         '--include_call_name',
         type='bool', default=False, nargs='?', const=True,
-        help=('Add raw sample name as a separate column in sample record.'))
+        help=('Add raw sample name (from VCF Header line) as a subfield under '
+              'the call column in addition to sample_id.'))
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None

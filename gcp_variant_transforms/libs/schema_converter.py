@@ -140,7 +140,7 @@ def generate_schema_from_header_fields(
         name=bigquery_util.ColumnKeyConstants.CALLS_NAME,
         type=bigquery_util.TableFieldConstants.TYPE_STRING,
         mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
-        description='Name of the call.'))
+        description='Name of the call (sample names in the VCF Header line).'))
 
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,

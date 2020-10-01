@@ -81,7 +81,7 @@ class VariantToBigQuery(beam.PTransform):
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
       allow_incompatible_records: If true, field values are casted to Bigquery
-+       schema if there is a mismatch.
+        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
       num_bigquery_write_shards: If > 1, we will limit number of sources which
@@ -90,7 +90,8 @@ class VariantToBigQuery(beam.PTransform):
         numeric (float/int/long) lists. For instance, [0, None, 1] will become
         [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
-      include_call_name: If true, sample name will be included with sample ID.
+      include_call_name: If true, sample name will be included in addition to
+        sample ID.
     """
     self._output_table = output_table
     self._append = append
