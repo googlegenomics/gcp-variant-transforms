@@ -21,8 +21,9 @@ setting a [GCP
 region](https://cloud.google.com/compute/docs/regions-zones/#available) via
 `--region` flag to run.
 
-When running from Docker, the Cloud Life Sciences API is used to run the
-Variant Transforms container. Cloud Life Sciences API is a [regionalized service](https://cloud.google.com/life-sciences/docs/concepts/locations)
+When running from Docker, the Cloud Life Sciences API is used to spin up a
+worker that launches and monitors the Dataflow job. Cloud Life Sciences API
+is a [regionalized service](https://cloud.google.com/life-sciences/docs/concepts/locations)
 that runs in multiple regions. This is set with the `--location` flag. The
 Life Sciences API location is where metadata about the pipeline's progress
 will be stored, and can be different from the region where the data is
