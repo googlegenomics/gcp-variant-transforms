@@ -43,13 +43,15 @@ class BigQueryRowGenerator():
       schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
       conflict_resolver=None,
       # type: vcf_field_conflict_resolver.ConflictResolver
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      include_call_name=False  # type: bool
   ):
     # type: (...) -> None
     self._schema_descriptor = schema_descriptor
     self._conflict_resolver = conflict_resolver
     self._bigquery_field_sanitizer = bigquery_sanitizer.FieldSanitizer(
         null_numeric_value_replacement)
+    self._include_call_name = include_call_name
 
   def _get_bigquery_field_entry(
       self,
@@ -224,7 +226,9 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
     num_calls_in_row = 0
     for call in variant.calls:
       call_record, empty = self._get_call_record(
-          call, call_record_schema_descriptor, allow_incompatible_records)
+          call,
+          call_record_schema_descriptor,
+          allow_incompatible_records)
 
       if omit_empty_sample_calls and empty:
         continue
@@ -240,7 +244,7 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
       self,
       call,  # type: vcfio.VariantCall
       schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
-      allow_incompatible_records,  # type: bool
+      allow_incompatible_records  # type: bool
   ):
     # type: (...) -> (Dict[str, Any], bool)
     call_record, is_empty = super()._get_call_record(
@@ -249,6 +253,11 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
         bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID:
             self._bigquery_field_sanitizer.get_sanitized_field(call.sample_id)
     })
+    if self._include_call_name:
+      call_record.update({
+          bigquery_util.ColumnKeyConstants.CALLS_NAME:
+              self._bigquery_field_sanitizer.get_sanitized_field(call.name)
+      })
     return call_record, is_empty
 
   def _get_base_row_from_variant(self, variant, allow_incompatible_records):

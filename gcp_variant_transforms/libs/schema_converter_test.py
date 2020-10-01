@@ -59,7 +59,7 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     self.assertEqual(expected_fields, _get_fields_from_schema(actual_schema))
 
   def _generate_expected_fields(self, alt_fields=None, call_fields=None,
-                                info_fields=None):
+                                info_fields=None, include_call_name=False):
     fields = [ColumnKeyConstants.REFERENCE_NAME,
               ColumnKeyConstants.START_POSITION,
               ColumnKeyConstants.END_POSITION,
@@ -75,8 +75,11 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
                    ColumnKeyConstants.FILTER,
                    ColumnKeyConstants.CALLS,
                    '.'.join([ColumnKeyConstants.CALLS,
-                             ColumnKeyConstants.CALLS_SAMPLE_ID]),
-                   '.'.join([ColumnKeyConstants.CALLS,
+                             ColumnKeyConstants.CALLS_SAMPLE_ID])])
+    if include_call_name:
+      fields.append('.'.join([ColumnKeyConstants.CALLS,
+                              ColumnKeyConstants.CALLS_NAME]))
+    fields.extend(['.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_GENOTYPE]),
                    '.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_PHASESET])])
@@ -92,6 +95,15 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
         schema_converter.generate_schema_from_header_fields(
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields)))
+
+  def test_no_header_fields_with_sample_name(self):
+    header_fields = vcf_header_io.VcfHeader()
+    self._validate_schema(
+        self._generate_expected_fields(include_call_name=True),
+        schema_converter.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields),
+            include_call_name=True))
 
   def test_info_header_fields(self):
     infos = OrderedDict([

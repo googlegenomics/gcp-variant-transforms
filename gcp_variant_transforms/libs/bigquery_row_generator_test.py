@@ -140,35 +140,37 @@ def _get_table_schema():
 def _get_big_query_row():
   # type: (...) -> Dict[unicode, Any]
   """Returns one sample BigQuery row for testing."""
-  return {str(ColumnKeyConstants.REFERENCE_NAME): str('chr19'),
-          str(ColumnKeyConstants.START_POSITION): 11,
-          str(ColumnKeyConstants.END_POSITION): 12,
-          str(ColumnKeyConstants.REFERENCE_BASES): 'C',
-          str(ColumnKeyConstants.NAMES): [str('rs1'), str('rs2')],
-          str(ColumnKeyConstants.QUALITY): 2,
-          str(ColumnKeyConstants.FILTER): [str('PASS')],
-          str(ColumnKeyConstants.CALLS): [
-              {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                  str(hash_name('Sample1'))),
-               str(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
-               str(ColumnKeyConstants.CALLS_PHASESET): str('*'),
-               str('GQ'): 20, str('FIR'): [10, 20]},
-              {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
-                  str(hash_name('Sample2'))),
-               str(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
-               str(ColumnKeyConstants.CALLS_PHASESET): None,
-               str('GQ'): 10, str('FB'): True}
-          ],
-          str(ColumnKeyConstants.ALTERNATE_BASES): [
-              {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('A'),
-               str('IFR'): 1,
-               str('IFR2'): 0.2},
-              {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('TT'),
-               str('IFR'): 0.2,
-               str('IFR2'): 0.3}
-          ],
-          str('IS'): str('some data'),
-          str('ISR'): [str('data1'), str('data2')]}
+  row = {str(ColumnKeyConstants.REFERENCE_NAME): str('chr19'),
+         str(ColumnKeyConstants.START_POSITION): 11,
+         str(ColumnKeyConstants.END_POSITION): 12,
+         str(ColumnKeyConstants.REFERENCE_BASES): 'C',
+         str(ColumnKeyConstants.NAMES): [str('rs1'), str('rs2')],
+         str(ColumnKeyConstants.QUALITY): 2,
+         str(ColumnKeyConstants.FILTER): [str('PASS')],
+         str(ColumnKeyConstants.CALLS): [
+             {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                 str(hash_name('Sample1'))),
+             str(ColumnKeyConstants.CALLS_GENOTYPE): [0, 1],
+             str(ColumnKeyConstants.CALLS_PHASESET): str('*'),
+             str('GQ'): 20, str('FIR'): [10, 20]},
+             {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
+                 str(hash_name('Sample2'))),
+             str(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+             str(ColumnKeyConstants.CALLS_PHASESET): None,
+             str('GQ'): 10, str('FB'): True}
+         ],
+         str(ColumnKeyConstants.ALTERNATE_BASES): [
+             {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('A'),
+             str('IFR'): 1,
+             str('IFR2'): 0.2},
+             {str(ColumnKeyConstants.ALTERNATE_BASES_ALT): str('TT'),
+             str('IFR'): 0.2,
+             str('IFR2'): 0.3}
+         ],
+         str('IS'): str('some data'),
+         str('ISR'): [str('data1'), str('data2')]}
+
+  return row
 
 
 class VariantCallRowGeneratorTest(unittest.TestCase):
@@ -194,12 +196,12 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
               'ISR': ['data1', 'data2']},
         calls=[
             vcfio.VariantCall(
-                sample_id=hash_name('Sample1'), genotype=[0, 1], phaseset='*',
-                info={'GQ': 20, 'FIR': [10, 20]}),
+                sample_id=hash_name('Sample1'), name='Sample1', genotype=[0, 1],
+                phaseset='*', info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                sample_id=hash_name('Sample2'), genotype=[1, 0],
+                sample_id=hash_name('Sample2'), name='Sample2', genotype=[1, 0],
                 info={'GQ': 10, 'FB': True}),
-            vcfio.VariantCall(sample_id=hash_name('Sample3'),
+            vcfio.VariantCall(sample_id=hash_name('Sample3'), name='Sample3',
                               genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
     header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
     expected_row = {
@@ -217,21 +219,27 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
         ColumnKeyConstants.FILTER: ['PASS'],
         ColumnKeyConstants.CALLS: [
             {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
+             ColumnKeyConstants.CALLS_NAME: 'Sample1',
              ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
              ColumnKeyConstants.CALLS_PHASESET: '*',
              'GQ': 20, 'FIR': [10, 20]},
             {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
+             ColumnKeyConstants.CALLS_NAME: 'Sample2',
              ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'GQ': 10, 'FB': True},
             {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample3'),
+             ColumnKeyConstants.CALLS_NAME: 'Sample3',
              ColumnKeyConstants.CALLS_GENOTYPE: [vcfio.MISSING_GENOTYPE_VALUE],
              ColumnKeyConstants.CALLS_PHASESET: None}],
         'IS': 'some data',
         'ISR': ['data1', 'data2']}
     proc_variant = _get_processed_variant(variant, header_num_dict)
-    self.assertEqual([expected_row],
-                     list(self._row_generator.get_rows(proc_variant)))
+    row_generator = bigquery_row_generator.VariantCallRowGenerator(
+        self._schema_descriptor, self._conflict_resolver,
+        include_call_name=True)
+    self.assertEqual(
+        [expected_row], list(row_generator.get_rows(proc_variant)))
 
   def test_no_alternate_bases(self):
     variant = vcfio.Variant(

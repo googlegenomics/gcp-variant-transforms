@@ -186,11 +186,13 @@ class VariantCall():
   variant. It may include associated information such as quality and phasing.
   """
 
-  def __init__(self, sample_id=None, genotype=None, phaseset=None, info=None):
-    # type: (int, List[int], str, Dict[str, Any]) -> None
+  def __init__(
+      self, sample_id=None, name=None, genotype=None, phaseset=None, info=None):
+    # type: (int, str, List[int], str, Dict[str, Any]) -> None
     """Initialize the :class:`VariantCall` object.
 
     Args:
+      sample_id: Hashed ID for the call name.
       name: The name of the call.
       genotype: The genotype of this variant call as specified by the VCF
         schema. The values are either `0` representing the reference, or a
@@ -207,13 +209,16 @@ class VariantCall():
         header FORMAT.
     """
     self.sample_id = sample_id
+    self.name = name
     self.genotype = genotype or []
     self.phaseset = phaseset
     self.info = info or {}
 
   def __eq__(self, other):
-    return ((self.sample_id, self.genotype, self.phaseset, self.info) ==
-            (other.sample_id, other.genotype, other.phaseset, other.info))
+    return (
+        (self.sample_id, self.name, self.genotype, self.phaseset, self.info) ==
+            (other.sample_id, other.name, other.genotype, other.phaseset,
+             other.info))
 
   def __lt__(self, other):
     if self.sample_id != other.sample_id:
@@ -238,9 +243,8 @@ class VariantCall():
     return not self == other
 
   def __repr__(self):
-    return ', '.join(
-        [str(s) for s in [
-            self.sample_id, self.genotype, self.phaseset, self.info]])
+    return ', '.join([str(s) for s in [
+        self.sample_id, self.name, self.genotype, self.phaseset, self.info]])
 
 
 class VcfParser():
@@ -664,6 +668,6 @@ class PySamParser(VcfParser):
       if phaseset is None and sample.phased and len(genotype) > 1:
         phaseset = DEFAULT_PHASESET_VALUE
       encoded_name = self._lookup_encoded_sample_name(name)
-      calls.append(VariantCall(encoded_name, genotype, phaseset, info))
+      calls.append(VariantCall(encoded_name, name, genotype, phaseset, info))
 
     return calls
