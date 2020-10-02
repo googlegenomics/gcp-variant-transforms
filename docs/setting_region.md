@@ -28,7 +28,8 @@ that runs in multiple regions. This is set with the `--location` flag. The
 Life Sciences API location is where metadata about the pipeline's progress
 will be stored, and can be different from the region where the data is
 processed. Note that Cloud Life Sciences API is not available in all regions,
-and if this flag is left out, the metadata will be stored in us-central1.
+and if this flag is left out, the metadata will be stored in us-central1. See
+the list of [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations).
 
 In addition to this requirment you might also
 choose to run Variant Transforms in a specific region following your project’s
@@ -47,7 +48,7 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
   "${COMMAND}"
 ```
 
-Note that values of `--project`, `--region`, `--location`, and `--temp_location` flags will be automatically
+Note that values of `--project`, `--region`, and `--temp_location` flags will be automatically
 passed as `COMMAND` inputs in [`piplines_runner.sh`](docker/pipelines_runner.sh).
 
 Instead of setting `--region` flag for each run, you can set your default region
