@@ -20,10 +20,12 @@ inconsistencies can be easily identified.
 Please see
 [this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
 for a high level overview of BigQuery and how to effectively use Variant
-Transforms and BigQuery. Please also read the
-[blog post](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery)
-about how a GCP customer used Variant Transforms for breakthrough clinical
-data science with BigQuery.
+Transforms and BigQuery. Read the blog post
+[How Color uses the new Variant Transforms tool for breakthrough clinical data science with BigQuery](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery).
+Also see the blog post
+[Accelerating Mayo Clinic’s data platform with BigQuery and Variant Transforms](https://cloud.google.com/blog/products/data-analytics/genome-data-analytics-with-google-cloud).
+The [gnomAD sample query notebook](sample_queries) has additional queries
+you can run to practice querying variant data in BigQuery.
 
 ### Prerequisites
 
