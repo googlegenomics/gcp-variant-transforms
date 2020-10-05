@@ -160,9 +160,13 @@ hence are not present in the final BigQuery output table._
 ### Querying annotations directly
 
 We imported the gnomAD genomes table using the features described in
-[Parsing Annotation Fields](#parsing-annotation-fields). Here is a sample
-query to extract high impact variants in the HBB gene which encodes the beta
-chain of Haemoglobin:
+[Parsing Annotation Fields](#parsing-annotation-fields).
+
+The [gnomAD sample query notebook](sample_queries) has additional queries
+you can run to practice querying annotation data.
+
+Here is another sample query to extract high impact variants in the HBB gene
+which encodes the beta chain of Haemoglobin:
 ```
 #standardSQL
 SELECT reference_name, start_position, reference_bases, ALT.alt, CSQ.*
