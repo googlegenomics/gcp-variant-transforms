@@ -17,7 +17,6 @@
 The 4.2 spec is available at https://samtools.github.io/hts-specs/VCFv4.2.pdf.
 """
 
-from __future__ import absolute_import
 
 from typing import Any, Iterable, List, Tuple  # pylint: disable=unused-import
 from functools import partial
@@ -65,7 +64,7 @@ class _ToVcfRecordCoder(coders.Coder):
     self.bq_uses_1_based_coordinate = bq_uses_1_based_coordinate
 
   def encode(self, variant):
-    # type: (Variant) -> str
+    # type: (Variant) -> bytes
     """Converts a :class:`Variant` object back to a VCF line."""
     encoded_info = self._encode_variant_info(variant)
     format_keys = self._get_variant_format_keys(variant)
@@ -87,7 +86,7 @@ class _ToVcfRecordCoder(coders.Coder):
       columns.append(encoded_calls)
     columns = [self._encode_value(c) for c in columns]
 
-    return '\t'.join(columns) + '\n'
+    return ('\t'.join(columns) + '\n').encode('utf-8')
 
   def _encode_value(self, value):
     # type: (Any) -> str
@@ -96,7 +95,7 @@ class _ToVcfRecordCoder(coders.Coder):
       return MISSING_FIELD_VALUE
     elif isinstance(value, list):
       return ','.join([self._encode_value(x) for x in value])
-    return value.encode('utf-8') if isinstance(value, unicode) else str(value)
+    return value.decode('utf-8') if isinstance(value, bytes) else str(value)
 
   def _encode_variant_info(self, variant):
     """Encodes the info of a :class:`Variant` for a VCF file line."""
@@ -112,7 +111,7 @@ class _ToVcfRecordCoder(coders.Coder):
         and start_0_based + len(variant.reference_bases) != variant.end):
       encoded_infos.append('END=%d' % variant.end)
     # Set all other fields of info.
-    for k, v in variant.info.iteritems():
+    for k, v in variant.info.items():
       if v is True:
         encoded_infos.append(k)
       else:
@@ -130,7 +129,7 @@ class _ToVcfRecordCoder(coders.Coder):
       # the key will be added to the format field.
       if self._is_alternate_phaseset(call.phaseset):
         format_keys.append(PHASESET_FORMAT_KEY)
-      format_keys.extend([k for k in call.info])
+      format_keys.extend(list(k for k in call.info))
 
     # Sort all keys and remove duplicates after GENOTYPE_FORMAT_KEY
     format_keys[1:] = sorted(list(set(format_keys[1:])))
@@ -211,9 +210,9 @@ class _VcfSource(filebasedsource.FileBasedSource):
       use_1_based_coordinate=False  # type: bool
       ):
     # type: (...) -> None
-    super(_VcfSource, self).__init__(file_pattern,
-                                     compression_type=compression_type,
-                                     validate=validate)
+    super().__init__(file_pattern,
+                     compression_type=compression_type,
+                     validate=validate)
     self._representative_header_lines = representative_header_lines
     self._compression_type = compression_type
     self._buffer_size = buffer_size
@@ -280,9 +279,10 @@ class ReadFromBGZF(beam.PTransform):
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
 
-  def _read_records(self, (file_path, block)):
+  def _read_records(self, file_path_and_block_tuple):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
+    (file_path, block) = file_path_and_block_tuple
     record_iterator = vcf_parser.PySamParser(
         file_path,
         block,
@@ -348,7 +348,7 @@ class ReadFromVcf(PTransform):
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
-    super(ReadFromVcf, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._source = _VcfSource(
         file_pattern,
@@ -426,7 +426,7 @@ class ReadAllFromVcf(PTransform):
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
     """
-    super(ReadAllFromVcf, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     source_from_file = partial(
         _create_vcf_source,
         representative_header_lines=representative_header_lines,
@@ -508,8 +508,9 @@ class _WriteVcfDataLinesFn(beam.DoFn):
     """
     self._coder = _ToVcfRecordCoder(bq_uses_1_based_coordinate)
 
-  def process(self, (file_path, variants), *args, **kwargs):
+  def process(self, file_path_and_variants_tuple, *args, **kwargs): # pylint: disable=unused-argument
     # type: (Tuple[str, List[Variant]]) -> None
+    (file_path, variants) = file_path_and_variants_tuple
     with filesystems.FileSystems.create(file_path) as file_to_write:
       for variant in variants:
         file_to_write.write(self._coder.encode(variant))

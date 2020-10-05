@@ -29,7 +29,7 @@ from gcp_variant_transforms.libs import vcf_field_conflict_resolver  # pylint: d
 _BigQuerySchemaSanitizer = bigquery_sanitizer.SchemaSanitizer
 
 
-class BigQueryRowGenerator(object):
+class BigQueryRowGenerator():
   """Base abstract class for BigQuery row generator.
 
   The base class provides the common functionalities when generating BigQuery
@@ -43,13 +43,15 @@ class BigQueryRowGenerator(object):
       schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
       conflict_resolver=None,
       # type: vcf_field_conflict_resolver.ConflictResolver
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      include_call_name=False  # type: bool
   ):
     # type: (...) -> None
     self._schema_descriptor = schema_descriptor
     self._conflict_resolver = conflict_resolver
     self._bigquery_field_sanitizer = bigquery_sanitizer.FieldSanitizer(
         null_numeric_value_replacement)
+    self._include_call_name = include_call_name
 
   def _get_bigquery_field_entry(
       self,
@@ -109,7 +111,7 @@ class BigQueryRowGenerator(object):
 
     is_empty = (not call.genotype or
                 set(call.genotype) == {vcf_parser.MISSING_GENOTYPE_VALUE})
-    for key, data in call.info.iteritems():
+    for key, data in call.info.items():
       if data is not None:
         field_name, field_data = self._get_bigquery_field_entry(
             key, data, schema_descriptor,
@@ -143,13 +145,13 @@ class BigQueryRowGenerator(object):
     for alt in variant.alternate_data_list:
       alt_record = {bigquery_util.ColumnKeyConstants.ALTERNATE_BASES_ALT:
                     alt.alternate_bases}
-      for key, data in alt.info.iteritems():
+      for key, data in alt.info.items():
         alt_record[_BigQuerySchemaSanitizer.get_sanitized_field_name(key)] = (
             data if key in alt.annotation_field_names else
             self._bigquery_field_sanitizer.get_sanitized_field(data))
       row[bigquery_util.ColumnKeyConstants.ALTERNATE_BASES].append(alt_record)
     # Add info.
-    for key, data in variant.non_alt_info.iteritems():
+    for key, data in variant.non_alt_info.items():
       if data is not None:
         field_name, field_data = self._get_bigquery_field_entry(
             key, data, self._schema_descriptor, allow_incompatible_records)
@@ -224,7 +226,9 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
     num_calls_in_row = 0
     for call in variant.calls:
       call_record, empty = self._get_call_record(
-          call, call_record_schema_descriptor, allow_incompatible_records)
+          call,
+          call_record_schema_descriptor,
+          allow_incompatible_records)
 
       if omit_empty_sample_calls and empty:
         continue
@@ -240,22 +244,26 @@ class VariantCallRowGenerator(BigQueryRowGenerator):
       self,
       call,  # type: vcfio.VariantCall
       schema_descriptor,  # type: bigquery_schema_descriptor.SchemaDescriptor
-      allow_incompatible_records,  # type: bool
+      allow_incompatible_records  # type: bool
   ):
     # type: (...) -> (Dict[str, Any], bool)
-    call_record, is_empty = super(
-        VariantCallRowGenerator, self)._get_call_record(
+    call_record, is_empty = super()._get_call_record(
             call, schema_descriptor, allow_incompatible_records)
     call_record.update({
         bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID:
             self._bigquery_field_sanitizer.get_sanitized_field(call.sample_id)
     })
+    if self._include_call_name:
+      call_record.update({
+          bigquery_util.ColumnKeyConstants.CALLS_NAME:
+              self._bigquery_field_sanitizer.get_sanitized_field(call.name)
+      })
     return call_record, is_empty
 
   def _get_base_row_from_variant(self, variant, allow_incompatible_records):
     # type: (processed_variant.ProcessedVariant, bool) -> Dict[str, Any]
-    row = super(VariantCallRowGenerator, self)._get_base_variant_record(variant)
-    meta = super(VariantCallRowGenerator, self)._get_variant_meta_record(
+    row = super()._get_base_variant_record(variant)
+    meta = super()._get_variant_meta_record(
         variant, allow_incompatible_records)
     row.update(meta)
     # Set calls to empty for now (will be filled later).

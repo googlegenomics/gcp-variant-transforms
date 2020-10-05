@@ -14,7 +14,6 @@
 
 """Tests for variant_to_bigquery module."""
 
-from __future__ import absolute_import
 
 import unittest
 
@@ -226,6 +225,50 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
            'ISR': ['1']}
     return variant, row, header_num_dict
 
+  def _get_sample_variant_with_sample_name(self):
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='C',
+        alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
+        filters=['PASS'],
+        info={'IFR': [0.1, 0.2], 'IFR2': [0.2, 0.3],
+              'IS': 'some data', 'ISR': ['data1', 'data2']},
+        calls=[
+            vcfio.VariantCall(
+                sample_id=hash_name('Sample1'), name='Sample1', genotype=[0, 1],
+                phaseset='*', info={'GQ': 20, 'FIR': [10, 20]}),
+            vcfio.VariantCall(
+                sample_id=hash_name('Sample2'), name='Sample2', genotype=[1, 0],
+                info={'GQ': 10, 'FB': True}),
+        ]
+    )
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
+    row = {ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+           ColumnKeyConstants.START_POSITION: 11,
+           ColumnKeyConstants.END_POSITION: 12,
+           ColumnKeyConstants.REFERENCE_BASES: 'C',
+           ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+           ColumnKeyConstants.QUALITY: 2,
+           ColumnKeyConstants.FILTER: ['PASS'],
+           ColumnKeyConstants.ALTERNATE_BASES: [
+               {ColumnKeyConstants.ALTERNATE_BASES_ALT:
+                'A', 'IFR': 0.1, 'IFR2': 0.2},
+               {ColumnKeyConstants.ALTERNATE_BASES_ALT:
+                'TT', 'IFR': 0.2, 'IFR2': 0.3}],
+           ColumnKeyConstants.CALLS: [
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
+                ColumnKeyConstants.CALLS_NAME: 'Sample1',
+                ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+                ColumnKeyConstants.CALLS_PHASESET: '*',
+                'GQ': 20, 'FIR': [10, 20]},
+               {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
+                ColumnKeyConstants.CALLS_NAME: 'Sample2',
+                ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+                ColumnKeyConstants.CALLS_PHASESET: None,
+                'GQ': 10, 'FB': True}],
+           'IS': 'some data',
+           'ISR': ['data1', 'data2']}
+    return variant, row, header_num_dict
+
   def test_convert_variant_to_bigquery_row(self):
     variant_1, row_1, header_num_dict_1 = self._get_sample_variant_1()
     variant_2, row_2, header_num_dict_2 = self._get_sample_variant_2()
@@ -247,6 +290,23 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
         | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
             self._row_generator)))
     assert_that(bigquery_rows, equal_to([row_1, row_2, row_3]))
+    pipeline.run()
+
+  def test_convert_variant_with_sample_name_to_bigquery_row(self):
+    self._row_generator = bigquery_row_generator.VariantCallRowGenerator(
+        self._schema_descriptor, self._conflict_resolver,
+        include_call_name=True)
+    variant, row, header_num_dict = self._get_sample_variant_with_sample_name()
+    header_fields = vcf_header_util.make_header(header_num_dict)
+    proc_var = processed_variant.ProcessedVariantFactory(
+        header_fields).create_processed_variant(variant)
+    pipeline = TestPipeline(blocking=True)
+    bigquery_rows = (
+        pipeline
+        | Create([proc_var])
+        | 'ConvertToRow' >> beam.ParDo(ConvertVariantToRow(
+            self._row_generator, omit_empty_sample_calls=True)))
+    assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
 
   def test_convert_variant_to_bigquery_row_omit_empty_calls(self):
@@ -277,3 +337,7 @@ class ConvertToBigQueryTableRowTest(unittest.TestCase):
             self._row_generator, allow_incompatible_records=True)))
     assert_that(bigquery_rows, equal_to([row]))
     pipeline.run()
+
+
+    self._row_generator = bigquery_row_generator.VariantCallRowGenerator(
+        self._schema_descriptor, self._conflict_resolver)

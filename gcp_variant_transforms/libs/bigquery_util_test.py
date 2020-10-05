@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
 
 import unittest
 from apitools.base.py import exceptions
@@ -48,7 +47,7 @@ class BigqueryUtilTest(unittest.TestCase):
         bigquery_util.TableFieldConstants.TYPE_INTEGER))
     self.assertEqual(float, bigquery_util.get_python_type_from_bigquery_type(
         bigquery_util.TableFieldConstants.TYPE_FLOAT))
-    self.assertEqual(unicode,
+    self.assertEqual(str,
                      bigquery_util.get_python_type_from_bigquery_type(
                          bigquery_util.TableFieldConstants.TYPE_STRING))
     self.assertEqual(bool, bigquery_util.get_python_type_from_bigquery_type(

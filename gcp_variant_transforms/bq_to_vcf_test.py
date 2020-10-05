@@ -30,7 +30,8 @@ class BqToVcfTest(unittest.TestCase):
   """Test cases for the `bq_to_vcf` module."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def test_write_vcf_data_header(self):
     lines = [
@@ -58,7 +59,7 @@ class BqToVcfTest(unittest.TestCase):
           '#CHROM\tPOS\tID\tREF\tALT\tSample 1\tSample 2\n'
       ]
       with filesystems.FileSystems.open(file_path) as f:
-        content = f.readlines()
+        content = [line.decode('utf-8') for line in f.readlines()]
         self.assertEqual(content, expected_content)
 
   def test_get_variant_query_no_region(self):

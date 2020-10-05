@@ -118,7 +118,7 @@ source.
 Example command for DirectRunner:
 
 ```bash
-python -m gcp_variant_transforms.bq_to_vcf \
+python3 -m gcp_variant_transforms.bq_to_vcf \
   --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
   --output_file gs://BUCKET/loaded_file.vcf \
   --job_name bq-to-vcf-direct-runner \
@@ -131,7 +131,7 @@ python -m gcp_variant_transforms.bq_to_vcf \
 Example command for DataflowRunner:
 
 ```bash
-python -m gcp_variant_transforms.bq_to_vcf \
+python3 -m gcp_variant_transforms.bq_to_vcf \
   --input_table bigquery-public-data:human_genome_variants.1000_genomes_phase_3_variants_20150220 \
   --output_file gs://BUCKET/loaded_file.vcf \
   --job_name bq-to-vcf \

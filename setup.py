@@ -18,6 +18,7 @@ import subprocess
 from distutils.command.build import build as _build
 
 import os
+import time
 import setuptools
 
 PYSAM_DEPENDENCY_COMMANDS = [
@@ -27,11 +28,11 @@ PYSAM_DEPENDENCY_COMMANDS = [
      'zlib1g-dev']
 ]
 
-PYSAM_INSTALLATION_COMMAND = ['pip', 'install', 'pysam<0.16.0']
+PYSAM_INSTALLATION_COMMAND = ['python3', '-m', 'pip', 'install', 'pysam<0.16.0']
 
 REQUIRED_PACKAGES = [
     'cython>=0.28.1',
-    'apache-beam[gcp]==2.22.0',
+    'apache-beam[gcp]==2.24.0',
     # Note that adding 'google-api-python-client>=1.6' causes some dependency
     # mismatch issues. This is fatal if using 'setup.py install', but works on
     # 'pip install .' as it ignores conflicting versions. See Issue #71.
@@ -57,13 +58,14 @@ class CustomCommands(setuptools.Command):
     pass
 
   def RunCustomCommand(self, command_list):
-    print 'Running command: %s' % command_list
+    print('Running command: %s' % command_list)
     try:
       subprocess.call(command_list)
     except Exception as e:
-      raise RuntimeError('Command %s failed with error: %s' % (command_list, e))
+      raise RuntimeError(
+          'Command %s failed with error: %s' % (command_list, e)) from e
 
-  def run(self):
+  def do_install(self):
     try:
       # For superuser UID is 0, so attempt to install pysam's C dependencies.
       if not os.getuid():
@@ -71,11 +73,40 @@ class CustomCommands(setuptools.Command):
           self.RunCustomCommand(command)
       self.RunCustomCommand(PYSAM_INSTALLATION_COMMAND)
 
-    except RuntimeError:
+    except RuntimeError as e:
       raise RuntimeError(
           'PySam installation has failed. Make sure you have the ' + \
           'following packages installed: autoconf automake gcc libbz2-dev ' + \
-          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl zlib1g-dev')
+          'liblzma-dev libcurl4-openssl-dev libssl-dev make perl ' + \
+          'zlib1g-dev') from e
+
+  def run(self):
+
+    # When running vcf_to_bq under with Dataflow cost optimizations:
+    #   --flexrs_goal=COST_OPTIMIZED \
+    #   --runner DataflowRunner
+    #
+    # It was observed that new workers would fail with:
+    #   <snip>
+    #   File "/usr/local/lib/python2.7/site-packages/pysam/__init__.py",
+    #     line 5, in <module> from pysam.libchtslib import *
+    #   ImportError: No module named libchtslib
+    #
+    # Root cause for the failure has not been determined, but with the
+    # following retries, the problem has no longer been observed:
+
+    for _ in range(10):
+      try:
+        self.do_install()
+
+        # pylint: disable=import-outside-toplevel, unused-import
+        from pysam import libchtslib
+      except ImportError:
+        time.sleep(10)
+
+    # Try one more time before exiting; would rather fail here than downstream.
+    # pylint: disable=import-outside-toplevel, unused-import
+    from pysam import libchtslib
 
 class build(_build):  # pylint: disable=invalid-name
   """A build command class that will be invoked during package install.
@@ -89,7 +120,7 @@ class build(_build):  # pylint: disable=invalid-name
 
 setuptools.setup(
     name='gcp_variant_transforms',
-    version='0.9.0',
+    version='0.10.0',
     description=('Tool for transforming and processing VCF files in a '
                  'scalable manner based on Apache Beam'),
     author='Google',
@@ -104,8 +135,8 @@ setuptools.setup(
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: System :: Distributed Computing',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
     ],
 
     setup_requires=REQUIRED_SETUP_PACKAGES,

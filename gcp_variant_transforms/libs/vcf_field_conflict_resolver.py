@@ -20,7 +20,7 @@ from gcp_variant_transforms.libs import bigquery_schema_descriptor  # pylint: di
 from gcp_variant_transforms.libs import bigquery_util
 
 
-class FieldConflictResolver(object):
+class FieldConflictResolver():
   """A class for resolving all VCF field related mismatches.
 
   Example mismatch: conflict in definition of a VCF field (INFO, FORMAT, etc),

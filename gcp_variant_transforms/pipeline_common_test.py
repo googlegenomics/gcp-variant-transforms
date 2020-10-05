@@ -35,7 +35,8 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
   """Tests cases for the `pipeline_common` script with pattern input."""
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
@@ -43,7 +44,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     return pipeline_common.get_pipeline_mode(all_patterns)
 
   def test_validation_failure_for_invalid_input_pattern(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError, 'Input pattern .* did not match any files.'):
       pipeline_common._get_all_patterns(
           input_pattern='nonexistent_file.vcf', input_file=None)
@@ -60,11 +61,11 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     args = self._create_mock_args(input_pattern='*', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
-    match = match_result(range(101))
+    match = match_result(list(range(101)))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
-    match = match_result(range(50000))
+    match = match_result(list(range(500)))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
@@ -72,7 +73,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
     args = self._create_mock_args(input_pattern='test', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
-    match = match_result(range(50001))
+    match = match_result(list(range(50001)))
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
@@ -82,7 +83,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
                      'gcp-variant-transforms-test',
                      '--staging_location',
                      'gs://integration_test_runs/staging']
-    with self.assertRaisesRegexp(ValueError, 'job_name'):
+    with self.assertRaisesRegex(ValueError, 'job_name'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
     # Add job_name (required for Variant Transforms run). This is now valid.
     pipeline_args.extend(['--job_name', 'correct-01-job-name-02'])
@@ -90,7 +91,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
     # Add Dataflow runner (requires --setup_file).
     pipeline_args.extend(['--runner', 'DataflowRunner'])
-    with self.assertRaisesRegexp(ValueError, 'setup_file'):
+    with self.assertRaisesRegex(ValueError, 'setup_file'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
     # Add setup.py (required for Variant Transforms run). This is now valid.
@@ -99,7 +100,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
     # Add an unknown flag.
     pipeline_args.extend(['--unknown_flag', 'somevalue'])
-    with self.assertRaisesRegexp(ValueError, 'Unrecognized.*unknown_flag'):
+    with self.assertRaisesRegex(ValueError, 'Unrecognized.*unknown_flag'):
       pipeline_common._raise_error_on_invalid_flags(pipeline_args)
 
   def test_get_compression_type(self):
@@ -165,7 +166,8 @@ class PipelineCommonWithFileTest(unittest.TestCase):
 
 
   def _create_mock_args(self, **args):
-    return collections.namedtuple('MockArgs', args.keys())(*args.values())
+    return collections.namedtuple(
+        'MockArgs', list(args.keys()))(*list(args.values()))
 
   def _get_pipeline_mode(self, args):
     all_patterns = pipeline_common._get_all_patterns(args.input_pattern,
@@ -188,25 +190,25 @@ class PipelineCommonWithFileTest(unittest.TestCase):
       args = self._create_mock_args(input_pattern=None, input_file=filename)
       match_result = collections.namedtuple('MatchResult', ['metadata_list'])
 
-      match = match_result(range(50001))
+      match = match_result(list(range(50001)))
       with mock.patch.object(FileSystems, 'match', return_value=[match]):
         self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
-      matches = [match_result(range(25000)),
-                 match_result(range(25000)),
-                 match_result(range(1))]
+      matches = [match_result(list(range(25000))),
+                 match_result(list(range(25000))),
+                 match_result(list(range(1)))]
       with mock.patch.object(FileSystems, 'match', return_value=matches):
         self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_validation_failure_for_invalid_input_file(self):
-    with self.assertRaisesRegexp(ValueError, 'Input file .* doesn\'t exist'):
+    with self.assertRaisesRegex(ValueError, 'Input file .* doesn\'t exist'):
       pipeline_common._get_all_patterns(
           input_pattern=None, input_file='nonexistent_file.vcf')
 
   def test_validation_failure_for_empty_input_file(self):
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(lines=[])
-      with self.assertRaisesRegexp(ValueError, 'Input file .* is empty.'):
+      with self.assertRaisesRegex(ValueError, 'Input file .* is empty.'):
         pipeline_common._get_all_patterns(
             input_pattern=None, input_file=filename)
 
@@ -216,7 +218,7 @@ class PipelineCommonWithFileTest(unittest.TestCase):
              './gcp_variant_transforms/testing/data/vcf/valid-4.0.vcf\n']
     with temp_dir.TempDir() as tempdir:
       filename = tempdir.create_temp_file(lines=lines)
-      with self.assertRaisesRegexp(
+      with self.assertRaisesRegex(
           ValueError, 'Input pattern .* from .* did not match any files.'):
         pipeline_common._get_all_patterns(
             input_pattern=None, input_file=filename)

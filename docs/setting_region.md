@@ -69,7 +69,7 @@ If you are running Variant Transforms from GitHub, you need to specify all three
 as below.
 
 ```bash
-python -m gcp_variant_transforms.vcf_to_bq \
+python3 -m gcp_variant_transforms.vcf_to_bq \
   ... \
   --project "${GOOGLE_CLOUD_PROJECT}" \
   --region europe-west1 \

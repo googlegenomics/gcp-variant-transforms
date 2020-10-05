@@ -14,7 +14,6 @@
 
 """Handles the conversion between BigQuery/Avro schema and VCF header."""
 
-from __future__ import absolute_import
 
 from collections import OrderedDict
 import json
@@ -50,6 +49,7 @@ _NON_INFO_OR_FORMAT_CONSTANT_FIELDS = [
 ]
 
 _CONSTANT_CALL_FIELDS = [bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
+                         bigquery_util.ColumnKeyConstants.CALLS_NAME,
                          bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
                          bigquery_util.ColumnKeyConstants.CALLS_PHASESET]
 
@@ -61,7 +61,8 @@ def generate_schema_from_header_fields(
     header_fields,  # type: vcf_header_io.VcfHeader
     proc_variant_factory,  # type: processed_variant.ProcessedVariantFactory
     variant_merger=None,  # type: variant_merge_strategy.VariantMergeStrategy
-    use_1_based_coordinate=False  # type: bool
+    use_1_based_coordinate=False,  # type: bool
+    include_call_name=False # type: bool
     ):
   # type: (...) -> bigquery.TableSchema
   """Returns a ``TableSchema`` for the BigQuery table storing variants.
@@ -134,6 +135,13 @@ def generate_schema_from_header_fields(
       description='Unique ID (type INT64) assigned to each sample. Table with '
                   '`__sample_info` suffix contains the mapping of sample names '
                   '(as read from VCF header) to these assigned IDs.'))
+  if include_call_name:
+    calls_record.fields.append(bigquery.TableFieldSchema(
+        name=bigquery_util.ColumnKeyConstants.CALLS_NAME,
+        type=bigquery_util.TableFieldConstants.TYPE_STRING,
+        mode=bigquery_util.TableFieldConstants.MODE_NULLABLE,
+        description='Name of the call (sample names in the VCF Header line).'))
+
   calls_record.fields.append(bigquery.TableFieldSchema(
       name=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE,
       type=bigquery_util.TableFieldConstants.TYPE_INTEGER,
@@ -147,7 +155,7 @@ def generate_schema_from_header_fields(
       description=('Phaseset of the call (if any). "*" is used in cases where '
                    'the genotype is phased, but no phase set ("PS" in FORMAT) '
                    'was specified.')))
-  for key, field in header_fields.formats.iteritems():
+  for key, field in header_fields.formats.items():
     # GT and PS are already included in 'genotype' and 'phaseset' fields.
     if key in (vcfio.GENOTYPE_FORMAT_KEY, vcfio.PHASESET_FORMAT_KEY):
       continue
@@ -165,7 +173,7 @@ def generate_schema_from_header_fields(
   info_keys = set()
   annotation_info_type_keys_set = set(
       proc_variant_factory.gen_annotation_info_type_keys())
-  for key, field in header_fields.infos.iteritems():
+  for key, field in header_fields.infos.items():
     # END info is already included by modifying the end_position. Info type
     # fields exist only to indicate the type of corresponding annotation fields,
     # and should not be added to the schema.
@@ -237,7 +245,7 @@ def _convert_field_to_avro_dict(field):
   return field_dict
 
 
-def _convert_schema_to_avro_dict(schema):
+def convert_schema_to_avro_dict(schema):
   # type: (bigquery.TableSchema) -> Dict
   fields_dict = {}
   # TODO(bashir2): Check if we need `namespace` and `name` at the top level.
@@ -319,7 +327,7 @@ def convert_table_schema_to_json_avro_schema(schema):
     raise ValueError(
         'Expected an instance of bigquery.TableSchema got {}'.format(
             type(schema)))
-  schema_dict = _convert_schema_to_avro_dict(schema)
+  schema_dict = convert_schema_to_avro_dict(schema)
   json_str = json.dumps(schema_dict)
   logging.info('The Avro schema is: %s', json_str)
   return json_str
@@ -367,7 +375,7 @@ def generate_header_fields_from_schema(schema, allow_incompatible_schema=False):
     if (field.type not in bigquery_util.get_supported_bigquery_schema_types()
         or field.name in _NON_INFO_OR_FORMAT_CONSTANT_FIELDS):
       continue
-    elif field.name == bigquery_util.ColumnKeyConstants.CALLS:
+    if field.name == bigquery_util.ColumnKeyConstants.CALLS:
       _add_format_fields(field, formats, allow_incompatible_schema)
     else:
       _add_info_fields(field, infos, allow_incompatible_schema)
@@ -380,8 +388,8 @@ def _add_format_fields(schema, formats, allow_incompatible_schema=False):
   for field in schema.fields:
     if field.name in _CONSTANT_CALL_FIELDS:
       continue
-    elif (field.name in vcf_reserved_fields.FORMAT_FIELDS.keys() and
-          not allow_incompatible_schema):
+    if (field.name in list(vcf_reserved_fields.FORMAT_FIELDS.keys()) and
+        not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.FORMAT_FIELDS.get(field.name)
       _validate_reserved_field(field, reserved_definition)
       formats.update({field.name: vcf_header_io.CreateFormatField(
@@ -405,7 +413,7 @@ def _add_info_fields(field, infos, allow_incompatible_schema=False):
     _add_info_fields_from_alternate_bases(field,
                                           infos,
                                           allow_incompatible_schema)
-  elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
+  elif (field.name in list(vcf_reserved_fields.INFO_FIELDS.keys()) and
         not allow_incompatible_schema):
     reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
     _validate_reserved_field(field, reserved_definition)
@@ -440,13 +448,13 @@ def _add_info_fields_from_alternate_bases(schema,
   for field in schema.fields:
     if field.name in _CONSTANT_ALTERNATE_BASES_FIELDS:
       continue
-    elif field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
+    if field.type == bigquery_util.TableFieldConstants.TYPE_RECORD:
       infos.update({field.name: vcf_header_io.CreateInfoField(
           field.name,
           vcfio.MISSING_FIELD_VALUE,
           bigquery_util._VcfHeaderTypeConstants.STRING,
           _remove_special_characters(_get_annotation_description(field)))})
-    elif (field.name in vcf_reserved_fields.INFO_FIELDS.keys() and
+    elif (field.name in list(vcf_reserved_fields.INFO_FIELDS.keys()) and
           not allow_incompatible_schema):
       reserved_definition = vcf_reserved_fields.INFO_FIELDS.get(field.name)
       _validate_reserved_field_type(field, reserved_definition)

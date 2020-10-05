@@ -17,13 +17,11 @@ of files, millions of samples, and billions of records. Additionally, it
 provides a preprocess functionality to validate the VCF files such that the
 inconsistencies can be easily identified.
 
-Please see
-[this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
-for a high level overview of BigQuery and how to effectively use Variant
-Transforms and BigQuery. Please also read the
-[blog post](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery)
-about how a GCP customer used Variant Transforms for breakthrough clinical
-data science with BigQuery.
+Please see the following links for more information:
+*  Presentation: [Overview of BigQuery and how to effectively use Variant Transforms and BigQuery](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
+*  Blog post: [How Color uses the new Variant Transforms tool for breakthrough clinical data science with BigQuery](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery).
+*  Blog post: [Accelerating Mayo Clinic’s data platform with BigQuery and Variant Transforms](https://cloud.google.com/blog/products/data-analytics/genome-data-analytics-with-google-cloud).
+*  Jupyter notebook: [Sample queries to explore variant data in BigQuery](docs/sample_queries)
 
 ### Prerequisites
 
@@ -118,18 +116,20 @@ In addition to using the docker image, you may run the pipeline directly from
 source. First install git, python, pip, and virtualenv:
 
 ```bash
-sudo apt-get install -y git python-pip python-dev build-essential
-sudo python -m pip install --upgrade pip
-sudo python -m pip install --upgrade virtualenv
+sudo apt-get install -y git python3-pip python3-venv python3.7-venv python-dev build-essential
 ```
+
+Note that python 3.8 is not yet supported, so ensure you are using Python 3.7.
 
 Run virtualenv, clone the repo, and install pip packages:
 
 ```bash
-virtualenv venv
-source venv/bin/activate
+python3 -m venv venv3
+source venv3/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
+python -m pip install --upgrade pip
+python -m pip install --upgrade wheel
 python -m pip install --upgrade .
 ```
 
@@ -183,7 +183,7 @@ details.
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table
-  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
+  Schema](https://cloud.google.com/life-sciences/docs/how-tos/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
