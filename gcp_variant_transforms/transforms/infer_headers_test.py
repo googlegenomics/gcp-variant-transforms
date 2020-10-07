@@ -14,7 +14,6 @@
 
 """Tests for infer_headers module."""
 
-from __future__ import absolute_import
 
 from collections import OrderedDict
 import unittest
@@ -304,7 +303,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
     expected_types = {'CSQ_Gene_TYPE': 'String',
                       'CSQ_Position_TYPE': 'Integer',
                       'CSQ_Score_TYPE': 'Float'}
-    for key, item in inferred_headers.infos.iteritems():
+    for key, item in inferred_headers.infos.items():
       self.assertEqual(item['type'], expected_types[key])
     self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
@@ -321,7 +320,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
     expected_types = {'CSQ_Gene_TYPE': 'Float',
                       'CSQ_Position_TYPE': 'String',
                       'CSQ_Score_TYPE': 'Float'}
-    for key, item in inferred_headers.infos.iteritems():
+    for key, item in inferred_headers.infos.items():
       self.assertEqual(item['type'], expected_types[key])
     self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
@@ -338,7 +337,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
     expected_types = {'CSQ_Gene_TYPE': '.',
                       'CSQ_Position_TYPE': 'Integer',
                       'CSQ_Score_TYPE': 'Float'}
-    for key, item in inferred_headers.infos.iteritems():
+    for key, item in inferred_headers.infos.items():
       self.assertEqual(item['type'], expected_types[key])
     self.assertEqual(len(expected_types), len(inferred_headers.infos))
 
@@ -370,7 +369,7 @@ class InferHeaderFieldsTest(unittest.TestCase):
                       'CSQ_VT_Gene_TYPE': 'Integer',
                       'CSQ_VT_Position_TYPE': 'Integer',
                       'CSQ_VT_Score_TYPE': 'Float'}
-    for key, item in inferred_headers.infos.iteritems():
+    for key, item in inferred_headers.infos.items():
       self.assertEqual(item['type'], expected_types[key])
     self.assertEqual(len(expected_types), len(inferred_headers.infos))
 

@@ -41,17 +41,19 @@ git remote add upstream git@github.com:googlegenomics/gcp-variant-transforms.git
 
 #### Setup virtualenv
 
+Ensure you are using Python 3.7 version, since Apache Beam does not support 3.8.
+
 ```bash
-sudo apt-get install python-pip python-dev build-essential
-sudo python -m pip install --upgrade pip
-sudo python -m pip install --upgrade virtualenv
-virtualenv venv
-. venv/bin/activate
+sudo apt-get install python3-pip python3-venv python3.7-venv python-dev build-essential
+python3 -m venv venv3
+. venv3/bin/activate
 ```
 
 #### Install dependences
 
 ```bash
+python -m pip install --upgrade pip
+python -m pip install --upgrade wheel
 python -m pip install --upgrade .
 ```
 Note that after running the above command we get some dependency conflicts in

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
 
 import threading
 import time
@@ -55,7 +54,7 @@ class AnnotateFile(beam.DoFn):
     t.start()
     while t.isAlive():
       with filesystems.FileSystems.create(watchdog_file) as file_to_write:
-        file_to_write.write('Watchdog file.')
+        file_to_write.write(b'Watchdog file.')
       time.sleep(_WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS)
 
   def _annotate_files(self, input_pattern, watchdog_file):

@@ -14,7 +14,6 @@
 
 """A PTransform to output a PCollection of ``Variant`` records to BigQuery."""
 
-from __future__ import absolute_import
 
 import random
 from typing import Dict, List  # pylint: disable=unused-import
@@ -48,7 +47,7 @@ class ConvertVariantToRow(beam.DoFn):
       omit_empty_sample_calls=False  # type: bool
   ):
     # type: (...) -> None
-    super(ConvertVariantToRow, self).__init__()
+    super().__init__()
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls
     self._bigquery_row_generator = row_generator
@@ -70,7 +69,8 @@ class VariantToBigQuery(beam.PTransform):
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       num_bigquery_write_shards=1,  # type: int
-      null_numeric_value_replacement=None  # type: int
+      null_numeric_value_replacement=None,  # type: int
+      include_call_name=False  # type: bool
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -81,7 +81,7 @@ class VariantToBigQuery(beam.PTransform):
       append: If true, existing records in output_table will not be
         overwritten. New records will be appended to those that already exist.
       allow_incompatible_records: If true, field values are casted to Bigquery
-+       schema if there is a mismatch.
+        schema if there is a mismatch.
       omit_empty_sample_calls: If true, samples that don't have a given call
         will be omitted.
       num_bigquery_write_shards: If > 1, we will limit number of sources which
@@ -90,6 +90,8 @@ class VariantToBigQuery(beam.PTransform):
         numeric (float/int/long) lists. For instance, [0, None, 1] will become
         [0, `null_numeric_value_replacement`, 1]. If not set, the value will set
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
+      include_call_name: If true, sample name will be included in addition to
+        sample ID.
     """
     self._output_table = output_table
     self._append = append
@@ -101,7 +103,8 @@ class VariantToBigQuery(beam.PTransform):
             bigquery_schema_descriptor.SchemaDescriptor(self._schema),
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),
-            null_numeric_value_replacement))
+            null_numeric_value_replacement,
+            include_call_name))
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls

@@ -17,13 +17,11 @@ of files, millions of samples, and billions of records. Additionally, it
 provides a preprocess functionality to validate the VCF files such that the
 inconsistencies can be easily identified.
 
-Please see
-[this presentation](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
-for a high level overview of BigQuery and how to effectively use Variant
-Transforms and BigQuery. Please also read the
-[blog post](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery)
-about how a GCP customer used Variant Transforms for breakthrough clinical
-data science with BigQuery.
+Please see the following links for more information:
+*  Presentation: [Overview of BigQuery and how to effectively use Variant Transforms and BigQuery](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
+*  Blog post: [How Color uses the new Variant Transforms tool for breakthrough clinical data science with BigQuery](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery).
+*  Blog post: [Accelerating Mayo Clinic’s data platform with BigQuery and Variant Transforms](https://cloud.google.com/blog/products/data-analytics/genome-data-analytics-with-google-cloud).
+*  Jupyter notebook: [Sample queries to explore variant data in BigQuery](docs/sample_queries)
 
 ### Prerequisites
 
@@ -57,6 +55,11 @@ Run the script below and replace the following parameters:
   * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
   to process your data, for example: `us-west1`. For more information please refer to
   [Setting Regions](docs/setting_region.md).
+  * `GOOGLE_CLOUD_LOCATION`: You may choose a geographic location for Cloud Life
+  Sciences API to orchestrate job from. This is not where the data will be processed,
+  but where some operation metadata will be stored. This can be the same or different from
+  the region chosen for Cloud Dataflow. If this is not set, the metadata will be stored in
+  us-central1. See the list of [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations).
   * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
@@ -74,6 +77,7 @@ Run the script below and replace the following parameters:
 # Parameters to replace:
 GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT
 GOOGLE_CLOUD_REGION=GOOGLE_CLOUD_REGION
+GOOGLE_CLOUD_LOCATION=GOOGLE_CLOUD_LOCATION
 TEMP_LOCATION=gs://BUCKET/temp
 INPUT_PATTERN=gs://BUCKET/*.vcf
 OUTPUT_TABLE=GOOGLE_CLOUD_PROJECT:BIGQUERY_DATASET.BIGQUERY_TABLE
@@ -87,6 +91,7 @@ COMMAND="vcf_to_bq \
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
+  --location "${GOOGLE_CLOUD_LOCATION}" \
   --region "${GOOGLE_CLOUD_REGION}" \
   --temp_location "${TEMP_LOCATION}" \
   "${COMMAND}"
@@ -111,18 +116,20 @@ In addition to using the docker image, you may run the pipeline directly from
 source. First install git, python, pip, and virtualenv:
 
 ```bash
-sudo apt-get install -y git python-pip python-dev build-essential
-sudo python -m pip install --upgrade pip
-sudo python -m pip install --upgrade virtualenv
+sudo apt-get install -y git python3-pip python3-venv python3.7-venv python-dev build-essential
 ```
+
+Note that python 3.8 is not yet supported, so ensure you are using Python 3.7.
 
 Run virtualenv, clone the repo, and install pip packages:
 
 ```bash
-virtualenv venv
-source venv/bin/activate
+python3 -m venv venv3
+source venv3/bin/activate
 git clone https://github.com/googlegenomics/gcp-variant-transforms.git
 cd gcp-variant-transforms
+python -m pip install --upgrade pip
+python -m pip install --upgrade wheel
 python -m pip install --upgrade .
 ```
 
@@ -176,7 +183,7 @@ details.
 ## Additional topics
 
 * [Understanding the BigQuery Variants Table
-  Schema](https://cloud.google.com/genomics/v1/bigquery-variants-schema)
+  Schema](https://cloud.google.com/life-sciences/docs/how-tos/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)

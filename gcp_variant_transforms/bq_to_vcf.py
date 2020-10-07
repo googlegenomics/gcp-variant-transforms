@@ -39,8 +39,6 @@ python -m gcp_variant_transforms.bq_to_vcf \
   --runner DataflowRunner
 """
 
-from __future__ import absolute_import
-from __future__ import division
 
 import logging
 import sys
@@ -64,6 +62,7 @@ from gcp_variant_transforms.libs import schema_converter
 from gcp_variant_transforms.libs import genomic_region_parser
 from gcp_variant_transforms.libs import sample_info_table_schema_generator
 from gcp_variant_transforms.libs import vcf_file_composer
+from gcp_variant_transforms.libs import vcf_header_parser
 from gcp_variant_transforms.options import variant_transform_options
 from gcp_variant_transforms.transforms import bigquery_to_variant
 from gcp_variant_transforms.transforms import combine_sample_ids
@@ -342,19 +341,17 @@ def _write_vcf_header_with_sample_names(sample_names,
       meta-information.
     file_path: The location where the VCF headers is saved.
   """
-  # pylint: disable=redefined-outer-name,reimported
-  from apache_beam.io import filesystems
-  from gcp_variant_transforms.libs import vcf_header_parser
   metadata_header_lines = vcf_header_parser.get_metadata_header_lines(
       representative_header_file)
   with filesystems.FileSystems.create(file_path) as file_to_write:
-    file_to_write.write(''.join(metadata_header_lines))
+    file_to_write.write(str(''.join(metadata_header_lines)).encode('utf-8'))
     file_to_write.write(
-        str('\t'.join(vcf_fixed_columns + sample_names)))
-    file_to_write.write('\n')
+        str('\t'.join(vcf_fixed_columns + sample_names)).encode('utf-8'))
+    file_to_write.write(b'\n')
 
 
-def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
+def _get_file_path_and_sorted_variants(file_name_and_variants,
+                                       file_path_prefix):
   # type: (Tuple[str, List], str) -> Iterable[Tuple[str, List]]
   """Returns the file path and the sorted variants.
 
@@ -366,8 +363,7 @@ def _get_file_path_and_sorted_variants((file_name, variants), file_path_prefix):
       pipeline. The files written will begin with this prefix, followed by the
       `file_name`.
   """
-  # pylint: disable=redefined-outer-name,reimported
-  from apache_beam.io import filesystems
+  (file_name, variants) = file_name_and_variants
   file_path = filesystems.FileSystems.join(file_path_prefix, file_name)
   yield (file_path, sorted(variants))
 

@@ -23,7 +23,7 @@ from gcp_variant_transforms.libs import bigquery_util
 _MAX_NUM_CONCURRENT_AVRO_LOAD_JOBS = 4
 
 
-class LoadAvro(object):
+class LoadAvro():
   """Loads AVRO files from Cloud Storage to already created BigQuery tables."""
   def __init__(self,
                avro_root_path,  # type: str
@@ -118,7 +118,7 @@ class LoadAvro(object):
     # Waits until current jobs are done and then add remaining jobs one by one.
     while self._suffixes_to_load_jobs:
       time.sleep(60)
-      processed_suffixes = self._suffixes_to_load_jobs.keys()
+      processed_suffixes = list(self._suffixes_to_load_jobs.keys())
       for suffix in processed_suffixes:
         load_job = self._suffixes_to_load_jobs.get(suffix)
         if load_job.done():

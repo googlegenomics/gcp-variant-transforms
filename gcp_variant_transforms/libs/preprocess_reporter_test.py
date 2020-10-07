@@ -51,7 +51,7 @@ class PreprocessReporterTest(unittest.TestCase):
                                           inferred_headers,
                                           malformed_records)
       with FileSystems.open(file_path) as f:
-        reader = f.readlines()
+        reader = [b.decode('utf-8') for b in f.readlines()]
         self.assertEqual(reader, expected_content)
 
   def test_report_no_conflicts(self):
