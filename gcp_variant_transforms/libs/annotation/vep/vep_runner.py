@@ -210,6 +210,7 @@ class VepRunner():
                     # machines and the retry functionality.
                     'preemptible': False,
                     'serviceAccount': {
+                        'email': self._service_account,
                         'scopes': [
                             'https://www.googleapis.com/auth/'
                             'devstorage.read_write']
@@ -250,6 +251,11 @@ class VepRunner():
       raise ValueError(
           '--max_num_workers and --num_workers should be positive numbers, '
           'got: {}'.format(self._max_num_workers))
+    try:
+      self._service_account = self._get_flag(
+          flags_dict, 'service_account_email')
+    except ValueError:
+      self._service_account = 'default'
 
   def _get_flag(self, pipeline_flags, *expected_flags):
     # type: (Dict[str, Any], str) -> Any
