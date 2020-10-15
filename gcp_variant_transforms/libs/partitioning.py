@@ -37,8 +37,15 @@ _CALL_TABLE_ALIAS = 'call_table'
 _COLUMN_AS = '{TABLE_ALIAS}.{COL} AS `{COL_NAME}`'
 _FLATTEN_CALL_QUERY = (
     'SELECT {SELECT_COLUMNS} '
-    'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` as {MAIN_TABLE_ALIAS}, '
-    'UNNEST({CALL_COLUMN}) as {CALL_TABLE_ALIAS}')
+    'FROM `{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}` AS {MAIN_TABLE_ALIAS}, '
+    'UNNEST({CALL_COLUMN}) AS {CALL_TABLE_ALIAS} '
+    '{CONDITION}')
+_DROP_HOM_REF_CALLS = (
+    'WHERE EXISTS '
+    '('
+    '  SELECT 1 FROM UNNEST({CALL_TABLE_ALIAS}.{GENOTYPE}) as gt '
+    '  WHERE gt != 0'
+    ')')
 
 MAX_RANGE_END = pow(2, 63) - 1
 _MAX_BQ_NUM_PARTITIONS = 4000
@@ -267,12 +274,16 @@ class FlattenCallColumn():
 
       full_output_table_id = '{}.{}.{}'.format(
           output_project_id, output_dataset_id, output_table_id)
+      drop_hom_ref_calls = _DROP_HOM_REF_CALLS.format(
+          CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS,
+          GENOTYPE=bigquery_util.ColumnKeyConstants.CALLS_GENOTYPE)
       cp_query = _FLATTEN_CALL_QUERY.format(
           SELECT_COLUMNS=select_columns, PROJECT_ID=self._project_id,
           DATASET_ID=self._dataset_id, TABLE_ID=input_table_id,
           MAIN_TABLE_ALIAS=_MAIN_TABLE_ALIAS,
           CALL_COLUMN=bigquery_util.ColumnKeyConstants.CALLS,
-          CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS)
+          CALL_TABLE_ALIAS=_CALL_TABLE_ALIAS,
+          CONDITION=drop_hom_ref_calls)
 
       self._copy_to_flatten_table(full_output_table_id, cp_query)
       logging.info('Flatten table is fully loaded: %s', full_output_table_id)
