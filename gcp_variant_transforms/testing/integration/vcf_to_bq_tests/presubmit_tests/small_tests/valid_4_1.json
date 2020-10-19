@@ -16,7 +16,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],
-        "expected_result": {"sum_start": 5434967210}
+        "expected_result": {"sum_start": 5434957328}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr1`"],

@@ -18,7 +18,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
-        "expected_result": {"sum_start": 1234567}
+        "expected_result": {"sum_start": 1234566}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr19`"],
@@ -30,7 +30,7 @@
       },
       {
         "query": ["SELECT SUM(start_position) AS sum_start FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
-        "expected_result": {"sum_start": 48990}
+        "expected_result": {"sum_start": 48987}
       },
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
@@ -40,7 +40,7 @@
         "query": [
           "SELECT call.quality AS quality ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
-          "WHERE start_position = 14370 ",
+          "WHERE start_position = 14369 ",
           "AND call.sample_id = 1461155635506253861"
         ],
         "expected_result": {"quality": 10.0}
@@ -49,7 +49,7 @@
         "query": [
           "SELECT call.quality AS quality ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
-          "WHERE start_position = 14370 ",
+          "WHERE start_position = 14369 ",
           "AND call.sample_id = 8469201776453291698"
         ],
         "expected_result": {"quality": 10.0}
@@ -58,7 +58,7 @@
         "query": [
           "SELECT call.quality AS quality ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
-          "WHERE start_position = 14370 ",
+          "WHERE start_position = 14369 ",
           "AND call.sample_id = 2841064610214975654"
         ],
         "expected_result": {"quality": 29.0}
@@ -67,7 +67,7 @@
         "query": [
           "SELECT call.quality AS quality ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, t.call as call ",
-          "WHERE start_position = 14370 ",
+          "WHERE start_position = 14369 ",
           "AND call.sample_id = 7282355041988662653"
         ],
         "expected_result": {"quality": 30.0}
