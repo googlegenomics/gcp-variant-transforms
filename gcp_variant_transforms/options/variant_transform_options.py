@@ -359,8 +359,8 @@ class AnnotationOptions(VariantTransformsOptions):
               'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/cloud-lifesciences/vep_91',
-        help=('The URI of the docker image for VEP.'))
+        default='gcr.io/cloud-lifesciences/vep:91',
+        help=('The URI of the latest docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
         default='',
