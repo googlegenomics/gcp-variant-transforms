@@ -1,9 +1,9 @@
 [
   {
-    "test_name": "test-annotation-pipeline-from-file-with-sharding-zero",
-    "table_name": "test_annotation_pipeline_from_file_with_sharding_zero",
+    "test_name": "test-annotation-pipeline-from-file-with-sharding-1-based",
+    "table_name": "test_annotation_pipeline_from_file_with_sharding_1_based",
     "input_file": "gs://gcp-variant-transforms-testfiles/small_tests/input_files/combine_input",
-    "use_1_based_coordinate": "False",
+    "use_1_based_coordinate": "True",
     "vep_assembly": "GRCh37",
     "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DataflowRunner",
@@ -38,7 +38,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 6772961996}
+        "expected_result": {"hash_sum": 6772970420}
       },
       {
         "query": [
@@ -75,7 +75,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 42634483}
+        "expected_result": {"hash_sum": 42634508}
       },
       {
         "query": [

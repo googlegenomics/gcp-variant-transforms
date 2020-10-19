@@ -105,11 +105,10 @@ class VcfReadOptions(VariantTransformsOptions):
               'performance penalty of an extra pass over all variants.'))
     parser.add_argument(
         '--use_1_based_coordinate',
-        type='bool', default=True, nargs='?', const=True,
-        help=('If true, start position will be 1-based, and end position will '
-              'be inclusive. Otherwise, the records will be stored in 0-based '
-              'coordinates, with exclusive end position. For more information '
-              'please refer to www.biostars.org/p/84686/'))
+        type='bool', default=False, nargs='?', const=True,
+        help=('If true, start position will be 1 based, and end position will '
+              'be inclusive. Otherwise, by default the records will be stored '
+              'with 0 based coordinates, with exclusive end position.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
