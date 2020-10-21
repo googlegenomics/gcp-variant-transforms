@@ -106,7 +106,8 @@ def _read_variants(all_patterns,  # type: List[str]
                    pipeline_mode,  # type: int
                    pre_infer_headers=False,  # type: bool
                    keep_raw_sample_names=False,  # type: bool
-                   use_1_based_coordinate=True  # type: bool
+                   use_1_based_coordinate=True,  # type: bool
+                   move_hom_ref_calls=False  # type: bool
                   ):
   # type: (...) -> pvalue.PCollection
   """Helper method for returning a PCollection of Variants from VCFs."""
@@ -124,7 +125,8 @@ def _read_variants(all_patterns,  # type: List[str]
       sample_name_encoding=(
           SampleNameEncoding.NONE if keep_raw_sample_names else
           SampleNameEncoding[known_args.sample_name_encoding]),
-      use_1_based_coordinate=use_1_based_coordinate)
+      use_1_based_coordinate=use_1_based_coordinate,
+      move_hom_ref_calls=move_hom_ref_calls)
 
 
 def _get_variant_merge_strategy(known_args  # type: argparse.Namespace
@@ -201,7 +203,8 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
                               pipeline_mode,
                               pre_infer_headers=False,
                               keep_raw_sample_names=True,
-                              use_1_based_coordinate=False)
+                              use_1_based_coordinate=False,
+                              move_hom_ref_calls=False)
     sample_ids = (variants
                   | 'CombineSampleIds' >>
                   combine_sample_ids.SampleIdsCombiner()
@@ -479,7 +482,8 @@ def run(argv=None):
   schema = schema_converter.generate_schema_from_header_fields(
       header_fields, processed_variant_factory, variant_merger,
       known_args.use_1_based_coordinate,
-      known_args.include_call_name)
+      known_args.include_call_name,
+      known_args.move_hom_ref_calls)
 
   sharding = variant_sharding.VariantSharding(known_args.sharding_config_path)
   if sharding.should_keep_shard(sharding.get_residual_index()):
@@ -497,7 +501,8 @@ def run(argv=None):
   pipeline = beam.Pipeline(options=beam_pipeline_options)
   variants = _read_variants(
       all_patterns, pipeline, known_args, pipeline_mode,
-      use_1_based_coordinate=known_args.use_1_based_coordinate)
+      use_1_based_coordinate=known_args.use_1_based_coordinate,
+      move_hom_ref_calls=known_args.move_hom_ref_calls)
   if known_args.allow_malformed_records:
     variants |= 'DropMalformedRecords' >> filter_variants.FilterVariants()
   sharded_variants = variants | 'ShardVariants' >> beam.Partition(
@@ -523,7 +528,8 @@ def run(argv=None):
             omit_empty_sample_calls=known_args.omit_empty_sample_calls,
             null_numeric_value_replacement=(
                 known_args.null_numeric_value_replacement),
-            include_call_name=known_args.include_call_name)
+            include_call_name=known_args.include_call_name,
+            move_hom_ref_calls=known_args.move_hom_ref_calls)
     )
   result = pipeline.run()
   try:

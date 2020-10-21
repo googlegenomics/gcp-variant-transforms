@@ -125,6 +125,11 @@ class ProcessedVariant():
     return self._variant.filters
 
   @property
+  def hom_ref_calls(self):
+    # type: () -> List[Tuple(int,str)]
+    return self._variant.hom_ref_calls
+
+  @property
   def calls(self):
     # type: () -> List[vcfio.VariantCall]
     return self._variant.calls

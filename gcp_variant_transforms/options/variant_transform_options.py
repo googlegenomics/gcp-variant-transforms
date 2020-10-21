@@ -221,6 +221,11 @@ class BigQueryWriteOptions(VariantTransformsOptions):
         type='bool', default=False, nargs='?', const=True,
         help=('Add raw sample name (from VCF Header line) as a subfield under '
               'the call column in addition to sample_id.'))
+    parser.add_argument(
+        '--move_hom_ref_calls',
+        type='bool', default=False, nargs='?', const=True,
+        help=('Filter out calls with unchanged GT values into hom_ref_calls '
+              'column.'))
 
   def validate(self, parsed_args, client=None):
     # type: (argparse.Namespace, bigquery.BigqueryV2) -> None

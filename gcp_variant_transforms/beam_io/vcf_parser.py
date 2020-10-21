@@ -80,6 +80,7 @@ class Variant():
                names=None,  # type: List[str]
                quality=None,  # type: float
                filters=None,  # type: List[str]
+               hom_ref_calls=None,  # type: List[Tuple(str, int)]
                info=None,  # type: Dict[str, Any]
                calls=None  # type: List[VariantCall]
               ):
@@ -114,6 +115,7 @@ class Variant():
     self.names = names or []
     self.quality = quality
     self.filters = filters or []
+    self.hom_ref_calls = hom_ref_calls
     self.info = info or {}
     self.calls = calls or []
 
@@ -131,6 +133,7 @@ class Variant():
                           self.names,
                           self.quality,
                           self.filters,
+                          self.hom_ref_calls,
                           self.info,
                           self.calls]])
 
@@ -273,6 +276,7 @@ class VcfParser():
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       use_1_based_coordinate=False,  # type: bool
+      move_hom_ref_calls=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -284,6 +288,7 @@ class VcfParser():
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
+    self._move_hom_ref_calls = move_hom_ref_calls
 
     if splittable_bgzf:
       text_source = bgzf.BGZFBlockSource(
@@ -439,6 +444,7 @@ class PySamParser(VcfParser):
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       use_1_based_coordinate=False,  # type: bool
+      move_hom_ref_calls=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -452,6 +458,7 @@ class PySamParser(VcfParser):
                      pre_infer_headers,
                      sample_name_encoding,
                      use_1_based_coordinate,
+                     move_hom_ref_calls,
                      **kwargs)
     # These members will be properly initiated in _init_parent_process().
     self._vcf_reader = None
@@ -551,6 +558,7 @@ class PySamParser(VcfParser):
       ValueError: if `record` is semantically invalid.
     """
     self._verify_start_end(record)
+    hom_ref_calls, calls = self._get_variant_calls(record.samples)
     return Variant(
         reference_name=record.chrom,
         # record.pos is 1-based version of record.start (ie. record.start + 1).
@@ -562,8 +570,9 @@ class PySamParser(VcfParser):
         quality=self._convert_qual(record.qual),
         filters=(None if not list(record.filter.keys()) else
                  list(record.filter.keys())),
+        hom_ref_calls=hom_ref_calls if self._move_hom_ref_calls else None,
         info=self._get_variant_info(record),
-        calls=self._get_variant_calls(record.samples))
+        calls=calls)
 
   def _convert_qual(self, qual):
     if not qual:
@@ -637,21 +646,29 @@ class PySamParser(VcfParser):
     return sample_id
 
   def _get_variant_calls(self, samples):
-    # type: (libcvcf.VariantRecordSamples) -> List[VariantCall]
+    # type: (libcvcf.VariantRecordSamples) -> Tuple(List[str],List[VariantCall])
     calls = []
-
+    hom_ref_calls = []
     for (name, sample) in list(samples.items()):
       phaseset = None
       genotype = None
       info = {}
+      moved_to_hom_ref = False
       for (key, value) in list(sample.items()):
         if key == GENOTYPE_FORMAT_KEY:
           if isinstance(value, tuple):
             genotype = []
             for elem in value:
               genotype.append(MISSING_GENOTYPE_VALUE if elem is None else elem)
+            if self._move_hom_ref_calls and not any(genotype):
+              moved_to_hom_ref = True
+              break
           else:
             genotype = MISSING_GENOTYPE_VALUE if value is None else value
+            if self._move_hom_ref_calls and not genotype:
+              moved_to_hom_ref = True
+              break
+
 
         elif key == PHASESET_FORMAT_KEY:
           phaseset = (
@@ -663,11 +680,15 @@ class PySamParser(VcfParser):
                        if isinstance(value, tuple) else
                        self._convert_field(value))
 
+      encoded_name = self._lookup_encoded_sample_name(name)
+      if moved_to_hom_ref:
+        hom_ref_calls.append((name, encoded_name))
+        continue
       # PySam samples are "phased" for haploids, so check for for the type
       # before settings default phaseset value.
       if phaseset is None and sample.phased and len(genotype) > 1:
         phaseset = DEFAULT_PHASESET_VALUE
-      encoded_name = self._lookup_encoded_sample_name(name)
+
       calls.append(VariantCall(encoded_name, name, genotype, phaseset, info))
 
-    return calls
+    return hom_ref_calls, calls

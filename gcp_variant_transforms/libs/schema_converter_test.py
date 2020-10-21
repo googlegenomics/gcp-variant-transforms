@@ -59,7 +59,8 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
     self.assertEqual(expected_fields, _get_fields_from_schema(actual_schema))
 
   def _generate_expected_fields(self, alt_fields=None, call_fields=None,
-                                info_fields=None, include_call_name=False):
+                                info_fields=None, include_call_name=False,
+                                move_hom_ref_calls=False):
     fields = [ColumnKeyConstants.REFERENCE_NAME,
               ColumnKeyConstants.START_POSITION,
               ColumnKeyConstants.END_POSITION,
@@ -72,8 +73,15 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
          for a in alt_fields or []])
     fields.extend([ColumnKeyConstants.NAMES,
                    ColumnKeyConstants.QUALITY,
-                   ColumnKeyConstants.FILTER,
-                   ColumnKeyConstants.CALLS,
+                   ColumnKeyConstants.FILTER])
+    if move_hom_ref_calls:
+      fields.extend([ColumnKeyConstants.HOM_REF_CALLS,
+                     '.'.join([ColumnKeyConstants.HOM_REF_CALLS,
+                               ColumnKeyConstants.CALLS_SAMPLE_ID])])
+      if include_call_name:
+        fields.append('.'.join([ColumnKeyConstants.HOM_REF_CALLS,
+                                ColumnKeyConstants.CALLS_NAME]))
+    fields.extend([ColumnKeyConstants.CALLS,
                    '.'.join([ColumnKeyConstants.CALLS,
                              ColumnKeyConstants.CALLS_SAMPLE_ID])])
     if include_call_name:
@@ -104,6 +112,25 @@ class GenerateSchemaFromHeaderFieldsTest(unittest.TestCase):
             header_fields,
             processed_variant.ProcessedVariantFactory(header_fields),
             include_call_name=True))
+
+  def test_no_header_fields_with_hom_ref_calls(self):
+    header_fields = vcf_header_io.VcfHeader()
+    self._validate_schema(
+        self._generate_expected_fields(move_hom_ref_calls=True),
+        schema_converter.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields),
+            move_hom_ref_calls=True))
+
+  def test_no_header_fields_with_hom_ref_calls_and_sample_name(self):
+    header_fields = vcf_header_io.VcfHeader()
+    self._validate_schema(
+        self._generate_expected_fields(include_call_name=True,
+                                       move_hom_ref_calls=True),
+        schema_converter.generate_schema_from_header_fields(
+            header_fields,
+            processed_variant.ProcessedVariantFactory(header_fields),
+            include_call_name=True, move_hom_ref_calls=True))
 
   def test_info_header_fields(self):
     infos = OrderedDict([
