@@ -669,14 +669,14 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
           bigquery_util.parse_table_reference(
               parsed_args.custom_sample_info_table))
     else:
-      sample_project_id = project_id
-      sample_dataset_id = dataset_id
       if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
         raise ValueError(
             'Input table {} is malformed - exactly one suffix separator "{}" '
             'is required'.format(parsed_args.input_table,
                                  TABLE_SUFFIX_SEPARATOR))
       base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
+      sample_project_id = project_id
+      sample_dataset_id = dataset_id
       sample_table_id = bigquery_util.compose_table_name(
           base_table_id,
           SAMPLE_INFO_TABLE_SUFFIX)
