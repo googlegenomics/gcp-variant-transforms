@@ -1,0 +1,11 @@
+[
+  {
+    "test_name": "bq-to-vcf-no-options",
+    "input_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0_custom",
+    "custom_sample_info_table": "gcp-variant-transforms-test:bq_to_vcf_integration_tests.4_0_custom_sample_info",
+    "output_file_name": "bq_to_vcf_option_custom_sample_info_table.vcf",
+    "bq_uses_1_based_coordinate": false,
+    "runner": "DirectRunner",
+    "expected_output_file": "gcp_variant_transforms/testing/data/vcf/bq_to_vcf/expected_output/no_options.vcf"
+  }
+]
