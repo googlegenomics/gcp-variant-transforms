@@ -636,7 +636,6 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'will be the same as the BigQuery table, but it requires all '
               'extracted variants to have the same sample ordering (usually '
               'true for tables from single VCF file import).'))
-
     parser.add_argument(
         '--bq_uses_1_based_coordinate',
         type='bool', default=True, nargs='?', const=True,
@@ -646,6 +645,13 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
               'Please examine your table''s start_position column description '
               'to find out whether your variant tables uses 0-based or 1-based '
               'coordinate.'))
+    parser.add_argument(
+        '--custom_sample_info_table',
+        help=('If provided, supplied sample info table will be used to extract '
+              'mapping for sample names from sample IDs. This will remove the '
+              'requirement for input_table to be of <table>__<suffix> format '
+              'and the existence of <table>__sample_info table. If flag is not '
+              'set, the above criteria must be upheld.'))
 
   def validate(self, parsed_args, client=None):
     if not client:
@@ -658,19 +664,27 @@ class BigQueryToVcfOptions(VariantTransformsOptions):
     if not bigquery_util.table_exist(client, project_id, dataset_id, table_id):
       raise ValueError('Table {}:{}.{} does not exist.'.format(
           project_id, dataset_id, table_id))
-    if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
-      raise ValueError(
-          'Input table {} is malformed - exactly one suffix separator "{}" is '
-          'required'.format(parsed_args.input_table,
-                            TABLE_SUFFIX_SEPARATOR))
-    base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
-    sample_table_id = bigquery_util.compose_table_name(base_table_id,
-                                                       SAMPLE_INFO_TABLE_SUFFIX)
+    if parsed_args.custom_sample_info_table:
+      sample_project_id, sample_dataset_id, sample_table_id = (
+          bigquery_util.parse_table_reference(
+              parsed_args.custom_sample_info_table))
+    else:
+      if table_id.count(TABLE_SUFFIX_SEPARATOR) != 1:
+        raise ValueError(
+            'Input table {} is malformed - exactly one suffix separator "{}" '
+            'is required'.format(parsed_args.input_table,
+                                 TABLE_SUFFIX_SEPARATOR))
+      base_table_id = table_id[:table_id.find(TABLE_SUFFIX_SEPARATOR)]
+      sample_project_id = project_id
+      sample_dataset_id = dataset_id
+      sample_table_id = bigquery_util.compose_table_name(
+          base_table_id,
+          SAMPLE_INFO_TABLE_SUFFIX)
 
-    if not bigquery_util.table_exist(client, project_id, dataset_id,
-                                     sample_table_id):
+    if not bigquery_util.table_exist(
+        client, sample_project_id, sample_dataset_id, sample_table_id):
       raise ValueError('Sample table {}:{}.{} does not exist.'.format(
-          project_id, dataset_id, sample_table_id))
+          sample_project_id, sample_dataset_id, sample_table_id))
 
 
 def _validate_inputs(parsed_args):
