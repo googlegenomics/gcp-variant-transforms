@@ -207,7 +207,8 @@ class _VcfSource(filebasedsource.FileBasedSource):
       allow_malformed_records=False,  # type: bool
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
-      use_1_based_coordinate=False  # type: bool
+      use_1_based_coordinate=False,  # type: bool
+      move_hom_ref_calls=False  # type: bool
       ):
     # type: (...) -> None
     super().__init__(file_pattern,
@@ -220,6 +221,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
+    self._move_hom_ref_calls = move_hom_ref_calls
 
 
   def read_records(self,
@@ -237,6 +239,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
         pre_infer_headers=self._pre_infer_headers,
         sample_name_encoding=self._sample_name_encoding,
         use_1_based_coordinate=self._use_1_based_coordinate,
+        move_hom_ref_calls=self._move_hom_ref_calls,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
 
@@ -254,9 +257,10 @@ class ReadFromBGZF(beam.PTransform):
                allow_malformed_records,
                pre_infer_headers,
                sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
-               use_1_based_coordinate=False
+               use_1_based_coordinate=False,
+               move_hom_ref_calls=False
               ):
-    # type: (List[str], List[str], bool, bool, int, bool) -> None
+    # type: (List[str], List[str], bool, bool, int, bool, bool) -> None
     """Initializes the transform.
 
     Args:
@@ -271,6 +275,8 @@ class ReadFromBGZF(beam.PTransform):
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
+      move_hom_ref_calls: If true, filter out 0 GT data out of call list and add
+        the call name to a hom_ref_calls column.
     """
     self._input_files = input_files
     self._representative_header_lines = representative_header_lines
@@ -278,6 +284,7 @@ class ReadFromBGZF(beam.PTransform):
     self._pre_infer_headers = pre_infer_headers
     self._sample_name_encoding = sample_name_encoding
     self._use_1_based_coordinate = use_1_based_coordinate
+    self._move_hom_ref_calls = move_hom_ref_calls
 
   def _read_records(self, file_path_and_block_tuple):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
@@ -292,7 +299,8 @@ class ReadFromBGZF(beam.PTransform):
         splittable_bgzf=True,
         pre_infer_headers=self._pre_infer_headers,
         sample_name_encoding=self._sample_name_encoding,
-        use_1_based_coordinate=self._use_1_based_coordinate)
+        use_1_based_coordinate=self._use_1_based_coordinate,
+        move_hom_ref_calls=self._move_hom_ref_calls)
 
     for record in record_iterator:
       yield record
@@ -325,6 +333,7 @@ class ReadFromVcf(PTransform):
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       use_1_based_coordinate=False,  # type: bool
+      move_hom_ref_calls=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -347,6 +356,8 @@ class ReadFromVcf(PTransform):
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
+      move_hom_ref_calls: If true, filter out 0 GT data out of call list and add
+        the call name to a hom_ref_calls column.
     """
     super().__init__(**kwargs)
 
@@ -358,24 +369,30 @@ class ReadFromVcf(PTransform):
         allow_malformed_records=allow_malformed_records,
         pre_infer_headers=pre_infer_headers,
         sample_name_encoding=sample_name_encoding,
-        use_1_based_coordinate=use_1_based_coordinate)
+        use_1_based_coordinate=use_1_based_coordinate,
+        move_hom_ref_calls=move_hom_ref_calls)
 
   def expand(self, pvalue):
     return pvalue.pipeline | Read(self._source)
 
 
 def _create_vcf_source(
-    file_pattern=None, representative_header_lines=None, compression_type=None,
-    allow_malformed_records=None, pre_infer_headers=False,
+    file_pattern=None,
+    representative_header_lines=None,
+    compression_type=None,
+    allow_malformed_records=None,
+    pre_infer_headers=False,
     sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
-    use_1_based_coordinate=False):
+    use_1_based_coordinate=False,
+    move_hom_ref_calls=False):
   return _VcfSource(file_pattern=file_pattern,
                     representative_header_lines=representative_header_lines,
                     compression_type=compression_type,
                     allow_malformed_records=allow_malformed_records,
                     pre_infer_headers=pre_infer_headers,
                     sample_name_encoding=sample_name_encoding,
-                    use_1_based_coordinate=use_1_based_coordinate)
+                    use_1_based_coordinate=use_1_based_coordinate,
+                    move_hom_ref_calls=move_hom_ref_calls)
 
 
 class ReadAllFromVcf(PTransform):
@@ -401,6 +418,7 @@ class ReadAllFromVcf(PTransform):
       pre_infer_headers=False,  # type: bool
       sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
       use_1_based_coordinate=False,  # type: bool
+      move_hom_ref_calls=False,  # type: bool
       **kwargs  # type: **str
       ):
     # type: (...) -> None
@@ -425,6 +443,8 @@ class ReadAllFromVcf(PTransform):
         to deal with same sample_name used across multiple VCF files.
       use_1_based_coordinate: specify whether the coordinates should be stored
         in BQ using 0-based exclusive (default) or 1-based inclusive coordinate.
+      move_hom_ref_calls: If true, filter out 0 GT data out of call list and add
+        the call name to a hom_ref_calls column.
     """
     super().__init__(**kwargs)
     source_from_file = partial(
@@ -434,7 +454,8 @@ class ReadAllFromVcf(PTransform):
         allow_malformed_records=allow_malformed_records,
         pre_infer_headers=pre_infer_headers,
         sample_name_encoding=sample_name_encoding,
-        use_1_based_coordinate=use_1_based_coordinate)
+        use_1_based_coordinate=use_1_based_coordinate,
+        move_hom_ref_calls=move_hom_ref_calls)
     self._read_all_files = filebasedsource.ReadAllFiles(
         True,  # splittable
         CompressionTypes.AUTO, desired_bundle_size,

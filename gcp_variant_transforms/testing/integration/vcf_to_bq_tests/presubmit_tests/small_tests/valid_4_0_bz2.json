@@ -5,6 +5,8 @@
     "input_pattern": "gs://gcp-variant-transforms-testfiles/small_tests/valid-4.0.vcf.bz2",
     "sharding_config_path": "gcp_variant_transforms/data/sharding_configs/homo_sapiens_default.yaml",
     "runner": "DirectRunner",
+    "include_call_name": true,
+    "move_hom_ref_calls": true,
     "assertion_configs": [
       {
         "query": ["NUM_OUTPUT_TABLES"],
@@ -33,6 +35,48 @@
       {
         "query": ["SELECT SUM(end_position) AS sum_end FROM `{DATASET_ID}.{TABLE_ID}__chr20`"],
         "expected_result": {"sum_end": 2372633}
+      },
+      {
+        "query": [
+          "SELECT DISTINCT c.name FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, ",
+          "t.call as c WHERE c.sample_id=1461155635506253861"
+        ],
+        "expected_result": {"name": "NA00001"}
+      },
+      {
+        "query": [
+          "SELECT data_type FROM `{DATASET_ID}.INFORMATION_SCHEMA.COLUMNS` ",
+          "WHERE table_name = '{TABLE_ID}__chr20' AND ",
+          "column_name='call'"
+        ],
+        "expected_result": {
+          "data_type": "ARRAY<STRUCT<sample_id INT64, name STRING, genotype ARRAY<INT64>, phaseset STRING, DP INT64, GQ INT64, HQ ARRAY<INT64>>>"
+        }
+      },
+      {
+        "query": [
+          "SELECT count(0) as hrc_count FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, ",
+          "t.hom_ref_call as hrc WHERE start_position=17329"
+        ],
+        "expected_result": {"hrc_count": 2}
+      },
+      {
+        "query": [
+          "SELECT hrc.name as hrc_name FROM `{DATASET_ID}.{TABLE_ID}__chr20` AS t, ",
+          "t.hom_ref_call as hrc ",
+          "WHERE start_position=17329 AND hrc.sample_id=1461155635506253861"
+        ],
+        "expected_result": {"hrc_name": "NA00001"}
+      },
+      {
+        "query": [
+          "SELECT data_type FROM `{DATASET_ID}.INFORMATION_SCHEMA.COLUMNS` ",
+          "WHERE table_name = '{TABLE_ID}__chr20' AND ",
+          "column_name='hom_ref_call'"
+        ],
+        "expected_result": {
+          "data_type": "ARRAY<STRUCT<sample_id INT64, name STRING>>"
+        }
       }
     ]
   }

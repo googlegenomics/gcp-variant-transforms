@@ -44,7 +44,8 @@ class BigQueryRowGenerator():
       conflict_resolver=None,
       # type: vcf_field_conflict_resolver.ConflictResolver
       null_numeric_value_replacement=None,  # type: int
-      include_call_name=False  # type: bool
+      include_call_name=False,  # type: bool
+      move_hom_ref_calls=False  # type: bool
   ):
     # type: (...) -> None
     self._schema_descriptor = schema_descriptor
@@ -52,6 +53,7 @@ class BigQueryRowGenerator():
     self._bigquery_field_sanitizer = bigquery_sanitizer.FieldSanitizer(
         null_numeric_value_replacement)
     self._include_call_name = include_call_name
+    self._move_hom_ref_calls = move_hom_ref_calls
 
   def _get_bigquery_field_entry(
       self,
@@ -156,7 +158,18 @@ class BigQueryRowGenerator():
         field_name, field_data = self._get_bigquery_field_entry(
             key, data, self._schema_descriptor, allow_incompatible_records)
         row[field_name] = field_data
-
+    if self._move_hom_ref_calls:
+      hom_ref_call_records = []
+      for name, encoded_name in variant.hom_ref_calls:
+        hom_ref_call_record = {
+            bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID: encoded_name
+        }
+        if self._include_call_name:
+          hom_ref_call_record.update({
+              bigquery_util.ColumnKeyConstants.CALLS_NAME: name
+          })
+        hom_ref_call_records.append(hom_ref_call_record)
+      row[bigquery_util.ColumnKeyConstants.HOM_REF_CALLS] = hom_ref_call_records
     return row
 
   def _is_empty_field(self, value):

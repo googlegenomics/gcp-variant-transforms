@@ -77,7 +77,7 @@ def _get_hashing_function(file_name, use_hashing):
   return _hash_name_method
 
 def _get_sample_variant_1(file_name='', use_1_based_coordinate=False,
-                          use_hashing=True):
+                          use_hashing=True, move_hom_ref_calls=False):
   """Get first sample variant.
 
   Features:
@@ -91,10 +91,13 @@ def _get_sample_variant_1(file_name='', use_1_based_coordinate=False,
       reference_name='20', start=1233 + use_1_based_coordinate, end=1234,
       reference_bases='C', alternate_bases=['A', 'T'], names=['rs123', 'rs2'],
       quality=50, filters=['PASS'],
+      hom_ref_calls=([('Sample1', hash_name_method('Sample1'))] if
+                      move_hom_ref_calls else None),
       info={'AF': [0.5, 0.1], 'NS': 1, 'SVTYPE': ['BÑD']})
-  variant.calls.append(
-      vcfio.VariantCall(sample_id=hash_name_method('Sample1'), name='Sample1',
-                        genotype=[0, 0], info={'GQ': 48}))
+  if not move_hom_ref_calls:
+    variant.calls.append(
+        vcfio.VariantCall(sample_id=hash_name_method('Sample1'), name='Sample1',
+                          genotype=[0, 0], info={'GQ': 48}))
   variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name_method('Sample2'), name='Sample2',
                         genotype=[1, 0], info={'GQ': 20}))
@@ -102,7 +105,7 @@ def _get_sample_variant_1(file_name='', use_1_based_coordinate=False,
   return variant
 
 def _get_sample_variant_2(file_name='', use_1_based_coordinate=False,
-                          use_hashing=True):
+                          use_hashing=True, move_hom_ref_calls=False):
   """Get second sample variant.
 
   Features:
@@ -117,7 +120,8 @@ def _get_sample_variant_2(file_name='', use_1_based_coordinate=False,
       reference_name='19',
       start=122 + use_1_based_coordinate, end=125, reference_bases='GTC',
       alternate_bases=[], names=['rs1234'], quality=40,
-      filters=['q10', 's50'], info={'NS': 2})
+      filters=['q10', 's50'], hom_ref_calls=[] if move_hom_ref_calls else None,
+      info={'NS': 2})
   variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name_method('Sample1'), name='Sample1',
                         genotype=[-1, 0], phaseset=vcfio.DEFAULT_PHASESET_VALUE,
@@ -129,7 +133,7 @@ def _get_sample_variant_2(file_name='', use_1_based_coordinate=False,
 
 
 def _get_sample_variant_3(file_name='', use_1_based_coordinate=False,
-                          use_hashing=True):
+                          use_hashing=True, move_hom_ref_calls=False):
   """Get third sample variant.
 
   Features:
@@ -141,7 +145,8 @@ def _get_sample_variant_3(file_name='', use_1_based_coordinate=False,
   variant = vcfio.Variant(
       reference_name='19', start=11 + use_1_based_coordinate, end=12,
       reference_bases='C', alternate_bases=['<SYMBOLIC>'], quality=49,
-      filters=['q10'], info={'AF': [0.5]})
+      filters=['q10'], hom_ref_calls=[] if move_hom_ref_calls else None,
+      info={'AF': [0.5]})
   variant.calls.append(
       vcfio.VariantCall(sample_id=hash_name_method('Sample1'), name='Sample1',
                         genotype=[0, 1], phaseset='1', info={'GQ': 45}))
@@ -293,6 +298,23 @@ class VcfSourceTest(unittest.TestCase):
 
     self.assertEqual(1, len(read_data))
     self.assertEqual(variant, read_data[0])
+
+  def test_file_pattern_move_hom_ref_calls_verify_details(self):
+    variant_1 = _get_sample_variant_1(move_hom_ref_calls=True)
+    variant_2 = _get_sample_variant_2(move_hom_ref_calls=True)
+    variant_3 = _get_sample_variant_3(move_hom_ref_calls=True)
+    with TempDir() as tempdir:
+      _ = tempdir.create_temp_file(
+          suffix='.vcf', lines=_SAMPLE_HEADER_LINES + [VCF_LINE_1])
+      _ = tempdir.create_temp_file(
+          suffix='.vcf', lines=_SAMPLE_HEADER_LINES + [VCF_LINE_2, VCF_LINE_3])
+      read_data = source_test_utils.read_from_source(
+          VcfSource(os.path.join(tempdir.get_path(), '*.vcf'),
+                    representative_header_lines=None,
+                    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,
+                    move_hom_ref_calls=True))
+      self.assertEqual(3, len(read_data))
+      self._assert_variants_equal([variant_1, variant_2, variant_3], read_data)
 
   def test_file_pattern_1_based_verify_details(self):
     variant_1 = _get_sample_variant_1(use_1_based_coordinate=True)

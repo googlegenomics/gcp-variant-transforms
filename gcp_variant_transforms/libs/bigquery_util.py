@@ -49,6 +49,7 @@ class ColumnKeyConstants():
   NAMES = 'names'
   QUALITY = 'quality'
   FILTER = 'filter'
+  HOM_REF_CALLS = 'hom_ref_call'
   CALLS = 'call'  # Column name is singular for consistency with Variants API.
   CALLS_SAMPLE_ID = 'sample_id'
   CALLS_NAME = 'name'

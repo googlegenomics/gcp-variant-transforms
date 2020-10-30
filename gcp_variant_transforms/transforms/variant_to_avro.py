@@ -41,7 +41,8 @@ class VariantToAvroFiles(beam.PTransform):
       allow_incompatible_records=False,  # type: bool
       omit_empty_sample_calls=False,  # type: bool
       null_numeric_value_replacement=None,  # type: int
-      include_call_name=False  # type: bool
+      include_call_name=False,  # type: bool
+      move_hom_ref_calls=False  # type: bool
       ):
     # type: (...) -> None
     """Initializes the transform.
@@ -59,6 +60,8 @@ class VariantToAvroFiles(beam.PTransform):
         to bigquery_util._DEFAULT_NULL_NUMERIC_VALUE_REPLACEMENT.
       include_call_name: If true, sample name will be included in addition to
         sample ID.
+      move_hom_ref_calls: If true, filter out 0 GT data out of call list and add
+        the call name to a hom_ref_calls column.
     """
     self._output_path = output_path
     self._fastavro_schema = fastavro.parse_schema(
@@ -69,7 +72,8 @@ class VariantToAvroFiles(beam.PTransform):
             vcf_field_conflict_resolver.FieldConflictResolver(
                 resolve_always=allow_incompatible_records),
             null_numeric_value_replacement,
-            include_call_name=include_call_name))
+            include_call_name=include_call_name,
+            move_hom_ref_calls=move_hom_ref_calls))
 
     self._allow_incompatible_records = allow_incompatible_records
     self._omit_empty_sample_calls = omit_empty_sample_calls

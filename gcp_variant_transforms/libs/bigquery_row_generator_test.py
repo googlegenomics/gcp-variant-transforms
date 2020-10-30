@@ -39,7 +39,7 @@ def _get_processed_variant(variant, header_num_dict=None):
       header_fields).create_processed_variant(variant)
 
 
-def _get_table_schema():
+def _get_table_schema(move_hom_ref_calls=False):
   # type (None) -> bigquery.TableSchema
   schema = bigquery.TableSchema()
   schema.fields.append(bigquery.TableFieldSchema(
@@ -102,6 +102,27 @@ def _get_table_schema():
       type=TableFieldConstants.TYPE_STRING,
       mode=TableFieldConstants.MODE_REPEATED,
       description='INFO foo desc'))
+  if move_hom_ref_calls:
+    hom_ref_call_record = bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.HOM_REF_CALLS,
+        type=TableFieldConstants.TYPE_RECORD,
+        mode=TableFieldConstants.MODE_REPEATED,
+        description='One record for each call.')
+    hom_ref_call_record.fields.append(bigquery.TableFieldSchema(
+        name=ColumnKeyConstants.CALLS_SAMPLE_ID,
+        type=TableFieldConstants.TYPE_INTEGER,
+        mode=TableFieldConstants.MODE_NULLABLE,
+        description='Unique ID (type INT64) assigned to each sample. Table '
+                    'with `__sample_info` suffix contains the mapping of '
+                    'sample names (as read from VCF header) to these assigned '
+                    'IDs.'))
+    hom_ref_call_record.fields.append(bigquery.TableFieldSchema(
+          name=ColumnKeyConstants.CALLS_NAME,
+          type=TableFieldConstants.TYPE_STRING,
+          mode=TableFieldConstants.MODE_NULLABLE,
+          description='Name of the call (sample names in the VCF Header '
+                      'line).'))
+    schema.fields.append(hom_ref_call_record)
   # Call record.
   call_record = bigquery.TableFieldSchema(
       name=ColumnKeyConstants.CALLS,
@@ -155,7 +176,7 @@ def _get_big_query_row():
              str('GQ'): 20, str('FIR'): [10, 20]},
              {str(ColumnKeyConstants.CALLS_SAMPLE_ID): (
                  str(hash_name('Sample2'))),
-             str(ColumnKeyConstants.CALLS_GENOTYPE): [1, 0],
+             str(ColumnKeyConstants.CALLS_GENOTYPE): [0, 0],
              str(ColumnKeyConstants.CALLS_PHASESET): None,
              str('GQ'): 10, str('FB'): True}
          ],
@@ -199,7 +220,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
                 sample_id=hash_name('Sample1'), name='Sample1', genotype=[0, 1],
                 phaseset='*', info={'GQ': 20, 'FIR': [10, 20]}),
             vcfio.VariantCall(
-                sample_id=hash_name('Sample2'), name='Sample2', genotype=[1, 0],
+                sample_id=hash_name('Sample2'), name='Sample2', genotype=[0, 0],
                 info={'GQ': 10, 'FB': True}),
             vcfio.VariantCall(sample_id=hash_name('Sample3'), name='Sample3',
                               genotype=[vcfio.MISSING_GENOTYPE_VALUE])])
@@ -225,7 +246,7 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
              'GQ': 20, 'FIR': [10, 20]},
             {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
              ColumnKeyConstants.CALLS_NAME: 'Sample2',
-             ColumnKeyConstants.CALLS_GENOTYPE: [1, 0],
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 0],
              ColumnKeyConstants.CALLS_PHASESET: None,
              'GQ': 10, 'FB': True},
             {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample3'),
@@ -238,6 +259,63 @@ class VariantCallRowGeneratorTest(unittest.TestCase):
     row_generator = bigquery_row_generator.VariantCallRowGenerator(
         self._schema_descriptor, self._conflict_resolver,
         include_call_name=True)
+    self.assertEqual(
+        [expected_row], list(row_generator.get_rows(proc_variant)))
+
+  def test_all_fields_with_hom_ref(self):
+    schema_descriptor = bigquery_schema_descriptor.SchemaDescriptor(
+        _get_table_schema(move_hom_ref_calls=True))
+    conflict_resolver = (
+        vcf_field_conflict_resolver.FieldConflictResolver())
+
+    variant = vcfio.Variant(
+        reference_name='chr19', start=11, end=12, reference_bases='C',
+        alternate_bases=['A', 'TT'], names=['rs1', 'rs2'], quality=2,
+        filters=['PASS'],
+        info={'IFR': [0.1, 0.2],
+              'IFR2': [0.2, 0.3],
+              'IS': 'some data',
+              'ISR': ['data1', 'data2']},
+        hom_ref_calls=[
+          ('Sample2', hash_name('Sample2')),
+          ('Sample3', hash_name('Sample3'))
+        ],
+        calls=[
+            vcfio.VariantCall(
+                sample_id=hash_name('Sample1'), name='Sample1', genotype=[0, 1],
+                phaseset='*', info={'GQ': 20, 'FIR': [10, 20]})])
+    header_num_dict = {'IFR': 'A', 'IFR2': 'A', 'IS': '1', 'ISR': '2'}
+    expected_row = {
+        ColumnKeyConstants.REFERENCE_NAME: 'chr19',
+        ColumnKeyConstants.START_POSITION: 11,
+        ColumnKeyConstants.END_POSITION: 12,
+        ColumnKeyConstants.REFERENCE_BASES: 'C',
+        ColumnKeyConstants.ALTERNATE_BASES: [
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'A',
+             'IFR': 0.1, 'IFR2': 0.2},
+            {ColumnKeyConstants.ALTERNATE_BASES_ALT: 'TT',
+             'IFR': 0.2, 'IFR2': 0.3}],
+        ColumnKeyConstants.NAMES: ['rs1', 'rs2'],
+        ColumnKeyConstants.QUALITY: 2,
+        ColumnKeyConstants.FILTER: ['PASS'],
+        ColumnKeyConstants.HOM_REF_CALLS: [
+          {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample2'),
+           ColumnKeyConstants.CALLS_NAME: 'Sample2'},
+          {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample3'),
+           ColumnKeyConstants.CALLS_NAME: 'Sample3'}
+        ],
+        ColumnKeyConstants.CALLS: [
+            {ColumnKeyConstants.CALLS_SAMPLE_ID: hash_name('Sample1'),
+             ColumnKeyConstants.CALLS_NAME: 'Sample1',
+             ColumnKeyConstants.CALLS_GENOTYPE: [0, 1],
+             ColumnKeyConstants.CALLS_PHASESET: '*',
+             'GQ': 20, 'FIR': [10, 20]}],
+        'IS': 'some data',
+        'ISR': ['data1', 'data2']}
+    proc_variant = _get_processed_variant(variant, header_num_dict)
+    row_generator = bigquery_row_generator.VariantCallRowGenerator(
+        schema_descriptor, conflict_resolver, include_call_name=True,
+        move_hom_ref_calls=True)
     self.assertEqual(
         [expected_row], list(row_generator.get_rows(proc_variant)))
 
