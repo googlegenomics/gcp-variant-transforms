@@ -94,9 +94,17 @@ You can choose the region for the BigQuery dataset at dataset creation time.
 
 ## Advanced Flags
 
-Variant Transforms supports specifying a subnetwork to use with the `--subnetwork` flag.
-This can be used to start the processing VMs in a specific network of your Google Cloud
-project as opposed to the default network.
+Variant Transforms supports custom networks. This can be used to start the processing 
+VMs in a specific network of your Google Cloud project as opposed to the default 
+network.
+
+If you are using a custom network, use the `--network` flag. 
+For example, `--network my-network`.
+
+If you want to specify a subnetwork use the `--subnetwork` flag and provide both the 
+region and subnetwork names as follows 
+`--subnetwork regions/us-central1/subnetworks/my-subnet`, replacing with your intended 
+region and subnet name.
 
 Variant Transforms allows disabling the use of external IP addresses with the
 `--use_public_ips` flag. If not specified, this defaults to true, so to restrict the
@@ -106,8 +114,8 @@ VMs to connect to the external IP addresses used by Google APIs and services, yo
 [enable Private Google Access](https://cloud.google.com/vpc/docs/configure-private-google-access)
 on the subnet.
 
-For example, to run Variant Transforms in a VPC you already created called
-`custom-network-eu-west` with no public IP addresses you can add these flags to the
+For example, to run Variant Transforms in a subnetwork you already created called
+`my-subnet` with no public IP addresses you can add these flags to the
 example above as follows:
 
 ```bash
@@ -115,10 +123,10 @@ COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region europe-west4 \
-  --location europe-west4 \
+  --region us-central1 \
+  --location us-central1 \
   --temp_location "${TEMP_LOCATION}" \
-  --subnetwork custom-network-eu-west \
+  --subnetwork regions/us-central1/subnetworks/my-subnet \
   --use_public_ips false \
   "${COMMAND}"
 ```
