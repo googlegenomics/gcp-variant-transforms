@@ -194,7 +194,7 @@ class MultiProcessComposer():
 
     num_retries = 0
     while num_retries <= _MAX_NUM_OF_COMPOSE_RETRIES:
-      proc_pool = multiprocessing.Pool(processes=8)
+      proc_pool = multiprocessing.Pool(processes=8) # pylint: disable=consider-using-with
       results = []
       for arg in blobs_to_compose_args:
         results.append(proc_pool.apply_async(func=_compose_files, args=arg))

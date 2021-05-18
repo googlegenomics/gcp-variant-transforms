@@ -206,9 +206,9 @@ class MergeWithNonVariantsStrategy(variant_merge_strategy.VariantMergeStrategy):
       return
     start = self._get_window_start(key)
     end = start + self._window_size
-    if v.start < start:
+    if v.start < start: # pylint: disable=consider-using-max-builtin
       v.start = start
-    if v.end > end:
+    if v.end > end: # pylint: disable=consider-using-min-builtin
       v.end = end
 
   def _is_non_variant(self, v):
