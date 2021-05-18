@@ -59,9 +59,9 @@ class TempDir():
     Raises:
       ValueError: If ``compression_type`` is unsupported.
     """
-    f = tempfile.NamedTemporaryFile(delete=False,
+    f = tempfile.NamedTemporaryFile(delete=False, # pylint: disable=consider-using-with
                                     dir=self._tempdir,
-                                    suffix=suffix) # pylint: disable=consider-using-with
+                                    suffix=suffix)
     if not lines:
       return f.name
     data_to_write = b''.join([line.encode('utf-8') for line in lines])
