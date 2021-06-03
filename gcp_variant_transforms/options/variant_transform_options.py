@@ -426,6 +426,11 @@ class AnnotationOptions(VariantTransformsOptions):
               'you have a dataset with a lot of samples. Notice that the '
               'pipeline may take longer to finish for smaller value of this '
               'flag.'))
+    parser.add_argument(
+        '--location',
+        default='us-central1',
+        help=('The location in which to call Life Sciences API which will '
+              'start the vep_runner.'))
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None

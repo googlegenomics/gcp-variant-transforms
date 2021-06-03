@@ -84,10 +84,10 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
   """
   credentials = client.GoogleCredentials.get_application_default()
   pipeline_service = discovery.build(
-      'genomics', 'v2alpha1', credentials=credentials)
+      'lifesciences', 'v2beta', credentials=credentials)
   runner = VepRunner(
-      pipeline_service, known_args.vep_species, known_args.vep_assembly,
-      input_pattern, known_args.annotation_output_dir,
+      pipeline_service, known_args.location, known_args.vep_species,
+      known_args.vep_assembly, input_pattern, known_args.annotation_output_dir,
       known_args.vep_info_field, known_args.vep_image_uri,
       known_args.vep_cache_path, known_args.vep_num_fork, pipeline_args,
       watchdog_file, watchdog_file_update_interval_seconds)
@@ -103,6 +103,7 @@ class VepRunner():
   def __init__(
       self,
       pipeline_service,  # type: discovery.Resource
+      location, # type: str
       species,  # type: str
       assembly,  # type: str
       input_pattern,  # type: str
@@ -122,6 +123,7 @@ class VepRunner():
     function of this module to create an instance of this class from flags.
 
     Args:
+      location: The Life Sciences API location to use.
       input_pattern: The pattern to identify all input files.
       output_dir: The location for all output files. This is expected not to
         exist and is created in the process of running VEP pipelines.
@@ -138,6 +140,7 @@ class VepRunner():
         by the Dataflow worker every `watchdog_file_update_interval_seconds`.
     """
     self._pipeline_service = pipeline_service
+    self._location = location
     self._species = species
     self._assembly = assembly
     self._vep_image_uri = vep_image_uri
@@ -197,7 +200,6 @@ class VepRunner():
                     '--everything --check_ref --allow_non_variant --format vcf',
             },
             'resources': {
-                'projectId': self._project,
                 'virtualMachine': {
                     'disks': [
                         {
@@ -227,7 +229,8 @@ class VepRunner():
     action = {
         'commands': command_args,
         'imageUri': image_uri,
-        'mounts': [{'disk': 'vep', 'path': '/mnt/vep'}]
+        'mounts': [{'disk': 'vep', 'path': '/mnt/vep'}],
+        'alwaysRun': True
     }
     action.update(kwargs)
     # TODO(bashir2): Add a proper `label` based on command arguments.
@@ -341,9 +344,9 @@ class VepRunner():
     # TODO(bashir2): Silence the log messages of googleapiclient.discovery
     # module for the next call of the API since they flood the log file.
     # pylint: disable=no-member
-    request = self._pipeline_service.projects().operations().get(
+    request = self._pipeline_service.projects().locations().operations().get(
         name=operation)
-    is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)['done']
+    is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES).get('done')
     # TODO(bashir2): Add better monitoring and log progress within each
     # operation instead of just checking `done`.
     if is_done:
@@ -351,7 +354,7 @@ class VepRunner():
     return is_done
 
   def _get_error_message(self, operation):
-    request = self._pipeline_service.projects().operations().get(
+    request = self._pipeline_service.projects().locations().operations().get(
         name=operation)
     try:
       errors = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)['error']
@@ -402,10 +405,11 @@ class VepRunner():
     api_request[_API_PIPELINE][_API_ACTIONS].append(
         self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
                           '/google/logs/output',
-                          output_log_path,
-                          flags=['ALWAYS_RUN']))
+                          output_log_path))
     # pylint: disable=no-member
-    request = self._pipeline_service.pipelines().run(body=api_request)
+    parent = 'projects/{}/locations/{}'.format(self._project, self._location)
+    request = self._pipeline_service.projects().locations().pipelines().run(
+        parent=parent, body=api_request)
     operation_name = request.execute(
         num_retries=_NUMBER_OF_API_CALL_RETRIES)['name']
     return operation_name
