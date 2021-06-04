@@ -98,7 +98,7 @@ class VepRunner():
   """A class for running vep through Pipelines API on a set of input files."""
 
   _VEP_CACHE_BASE = ('gs://cloud-lifesciences/vep/'
-                     'vep_cache_{species}_{assembly}_91.tar.gz')
+                     'vep_cache_{species}_{assembly}_104.tar.gz')
 
   def __init__(
       self,
