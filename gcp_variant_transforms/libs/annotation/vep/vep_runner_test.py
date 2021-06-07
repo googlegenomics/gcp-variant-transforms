@@ -73,11 +73,15 @@ class VepRunnerTest(unittest.TestCase):
     self._mock_request = mock.MagicMock()
     self._mock_projects = mock.MagicMock()
     self._mock_locations = mock.MagicMock()
-    self._mock_service.projects = mock.MagicMock(return_value=self._mock_projects)
-    self._mock_projects.locations = mock.MagicMock(return_value=self._mock_locations)
+    self._mock_service.projects = mock.MagicMock(
+      return_value=self._mock_projects)
+    self._mock_projects.locations = mock.MagicMock(
+      return_value=self._mock_locations)
     self._pipelines_spy = PipelinesSpy(self._mock_request)
-    self._mock_locations.pipelines = mock.MagicMock(return_value=self._pipelines_spy)
-    self._mock_request.execute = mock.MagicMock(return_value={'name': 'operation'})
+    self._mock_locations.pipelines = mock.MagicMock(
+      return_value=self._pipelines_spy)
+    self._mock_request.execute = mock.MagicMock(
+      return_value={'name': 'operation'})
 
   def _create_test_instance(self, pipeline_args=None):
     # type: (List[str]) -> vep_runner.VepRunner
@@ -164,7 +168,8 @@ class VepRunnerTest(unittest.TestCase):
     mock_projects.locations = mock.MagicMock(return_value=mock_locations)
     mock_locations.operations = mock.MagicMock(return_value=mock_opearations)
     mock_opearations.get = mock.MagicMock(return_value=mock_request)
-    mock_request.execute = mock.MagicMock(return_value={'done': True, 'error': {}})
+    mock_request.execute = mock.MagicMock(
+      return_value={'done': True, 'error': {}})
     test_instance = self._create_test_instance()
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
@@ -203,6 +208,7 @@ class PipelinesSpy():
     self._mock_request = mock_request
 
   def run(self, parent=None, body=None):
+    assert parent
     assert body
     self._actions_list.append(body['pipeline']['actions'])
     return self._mock_request

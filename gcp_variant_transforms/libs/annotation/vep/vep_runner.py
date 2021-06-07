@@ -346,7 +346,8 @@ class VepRunner():
     # pylint: disable=no-member
     request = self._pipeline_service.projects().locations().operations().get(
         name=operation)
-    is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES).get('done')
+    is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES).get(
+        'done')
     # TODO(bashir2): Add better monitoring and log progress within each
     # operation instead of just checking `done`.
     if is_done:
