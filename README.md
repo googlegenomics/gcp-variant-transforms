@@ -18,7 +18,7 @@ provides a preprocess functionality to validate the VCF files such that the
 inconsistencies can be easily identified.
 
 Please see the following links for more information:
-*  Presentation: [Overview of BigQuery and how to effectively use Variant Transforms and BigQuery](https://docs.google.com/presentation/d/1mIjtfAPlojEBa30fZAcene7GRPr9LYo3GRgtQIQMbRY)
+*  Presentation: [Overview of BigQuery and how to effectively use Variant Transforms and BigQuery](docs/Variant_Transforms_and_BigQuery.pdf)
 *  Blog post: [How Color uses the new Variant Transforms tool for breakthrough clinical data science with BigQuery](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery).
 *  Blog post: [Accelerating Mayo Clinic’s data platform with BigQuery and Variant Transforms](https://cloud.google.com/blog/products/data-analytics/genome-data-analytics-with-google-cloud).
 *  Jupyter notebook: [Sample queries to explore variant data in BigQuery](docs/sample_queries)
