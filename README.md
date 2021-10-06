@@ -104,6 +104,9 @@ gcloud config set project GOOGLE_CLOUD_PROJECT
 gcloud config set compute/region REGION
 ```
 
+If you would like to run Variant Transforms in a custom subnetwork, see the
+[Advanced Flags](docs/setting_region.md#advanced-flags) documentation.
+
 The underlying pipeline uses
 [Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
 [Dataflow Console](https://console.cloud.google.com/dataflow), to see more
