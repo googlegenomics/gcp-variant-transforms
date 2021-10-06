@@ -83,6 +83,14 @@ class VariantCallTest(unittest.TestCase):
     variant_call_2.phaseset = 1
     self.assertGreater(variant_call_2, variant_call_1)
 
+  def test_genotype_compare(self):
+      variant_call_1 = self._default_variant_call()
+      variant_call_2 = vcfio.VariantCall(
+          sample_id=hash_name('Sample1'), name='Sample1', genotype=-1,
+          phaseset=vcfio.DEFAULT_PHASESET_VALUE, info={'GQ': 48})
+
+      self.assertLess(variant_call_2, variant_call_1)
+
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
