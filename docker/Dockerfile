@@ -19,7 +19,7 @@ FROM golang:latest
 
 RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
 
-FROM google/cloud-sdk:slim
+FROM apache/beam_python3.8_sdk:2.33.0
 
 COPY --from=0 /go/bin/pipelines /usr/bin
 
