@@ -136,7 +136,7 @@ setuptools.setup(
         'Topic :: System :: Distributed Computing',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 
     setup_requires=REQUIRED_SETUP_PACKAGES,
