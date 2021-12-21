@@ -57,7 +57,7 @@ RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
     cd /opt/gcp_variant_transforms/src && \
     python3 -m pip install --upgrade pip && \
     python3 -m pip install --upgrade wheel && \
-    python3 -m pip install --upgrade .
+    python3 -m pip install --upgrade -r requirements.txt
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \
