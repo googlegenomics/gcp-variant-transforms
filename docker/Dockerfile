@@ -15,31 +15,32 @@
 # To build a new docker image, run the following from the root source dir:
 # $ docker build . -f docker/Dockerfile -t $IMAGE_NAME
 
-FROM golang:latest
+FROM golang:latest 
+RUN go install -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines@latest
 
-RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
-
-COPY --from=apache/beam_python3.8_sdk:2.34.0 /opt/apache/beam /opt/apache/beam
-
-
-FROM google/cloud-sdk:slim
-COPY --from=0 /go/bin/pipelines /usr/bin
-
+FROM apache/beam_python3.8_sdk:2.34.0
 ARG commit_sha
 ENV COMMIT_SHA=${commit_sha}
+
+COPY --from=0 /go/bin/pipelines /usr/bin
 
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
 ADD / /opt/gcp_variant_transforms/src/
 
-# Needed for installing mmh3 (one of the required packages in setup.py).
-RUN apt install -y g++
+# install gcloud sdk
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - 
 
+# g++ Needed for installing mmh3 (one of the required packages in setup.py).
 # Install Pysam dependencies. These dependencies are only required because we
 # have a monolithic binary - they primarily have to be installed on the workers.
 RUN apt-get update && apt-get install -y \
+    apt-transport-https \
     autoconf \
     automake \
+    g++ \
     gcc \
+    gnupg \
+    google-cloud-sdk \
     libbz2-dev \
     libcurl4-openssl-dev \
     liblzma-dev \
@@ -49,6 +50,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     python3-pip \
     python3-venv
+
 
 # Install dependencies.
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \

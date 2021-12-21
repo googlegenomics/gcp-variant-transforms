@@ -150,6 +150,7 @@ function main {
     --pvm-attempts 0 \
     --attempts 1 \
     --disk-size 10 \
+    --boot-disk-size 100 \
     ${pt_optional_args}
 }
 
