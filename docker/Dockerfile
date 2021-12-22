@@ -24,9 +24,6 @@ ENV COMMIT_SHA=${commit_sha}
 
 COPY --from=0 /go/bin/pipelines /usr/bin
 
-RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
-ADD / /opt/gcp_variant_transforms/src/
-
 # install gcloud sdk
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - 
 
@@ -51,6 +48,9 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv
 
+
+RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
+ADD / /opt/gcp_variant_transforms/src/
 
 # Install dependencies.
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
