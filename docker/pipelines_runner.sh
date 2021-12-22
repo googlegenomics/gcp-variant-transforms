@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,region:,subnetwork:,use_public_ips:,service_account:,location: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,custom_runner_image:,region:,subnetwork:,use_public_ips:,service_account:,location: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -43,6 +43,10 @@ function parse_args {
 
       --docker_image)
         vt_docker_image="$2"
+        ;;
+
+      --custom_runner_image)
+        custom_runner_image="$2"
         ;;
 
       --subnetwork)
@@ -76,6 +80,7 @@ function main {
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   region="${region:-$(gcloud config get-value compute/region)}"
   vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms}"
+  custom_runner_image="${custom_runner_image:-gcr.io/cloud-lifesciences/variant-transforms-custom-runner:latest}"
 
   location="${location:-}"
   temp_location="${temp_location:-}"
@@ -112,13 +117,18 @@ function main {
   pt_optional_args=""
   df_optional_args=""
 
+  if [[ ! -z "${custom_runner_image}" ]]; then
+    echo "Adding --sdk_container_image ${custom_runner_image} to optional_args"
+    df_optional_args="${df_optional_args} --experiments=use_runner_v2 --sdk_container_image=${custom_runner_image}"
+  fi
+
   if [[ ! -z "${subnetwork}" ]]; then
     echo "Adding --subnetwork ${subnetwork} to optional_args"
     pt_optional_args="${pt_optional_args} --subnetwork projects/${google_cloud_project}/regions/${region}/subnetworks/${subnetwork}"
     df_optional_args="${df_optional_args} --subnetwork https://www.googleapis.com/compute/v1/projects/${google_cloud_project}/regions/${region}/subnetworks/${subnetwork}"
   fi
 
-  if [[ ! -z "${use_public_ips}"  && "${use_public_ips}" == "false" ]]; then
+  if [[ ! -z "${use_public_ips}" && "${use_public_ips}" == "false" ]]; then
     echo "Adding --private-address and --no_use_public_ips to optional_args"
     pt_optional_args="${pt_optional_args} --private-address"
     df_optional_args="${df_optional_args} --no_use_public_ips"
