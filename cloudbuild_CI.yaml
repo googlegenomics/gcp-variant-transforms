@@ -31,9 +31,25 @@ steps:
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
+      - 'build'
+      - '--build-arg'
+      - 'commit_sha=${COMMIT_SHA}'
+      - '--tag=gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
+      - '--file=docker/Dockerfile.custom_dataflow_container'
+      - '.'
+    id: 'build-variant-transforms-custom-runner-docker'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
       - 'push'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     id: 'push-gcp-variant-transforms-docker'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
+    id: 'push-variant-transforms-custom-runner-docker'
 
   - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     args:
@@ -56,4 +72,5 @@ steps:
       # - '--gs_dir bashir-variant_integration_test_runs'
 images:
   - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+  - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
 timeout: 270m
