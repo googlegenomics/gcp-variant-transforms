@@ -239,7 +239,7 @@ trap clean_up EXIT
 
 if [[ -n "${run_unit_tests}" ]]; then
   python -m pip install --upgrade wheel
-  python -m pip install --upgrade .
+  python -m pip install -r /opt/gcp_variant_transforms/src/requirements.txt
   python setup.py test
 fi
 python -m pip install --upgrade wheel
