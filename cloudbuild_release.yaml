@@ -21,55 +21,55 @@ steps:
     args:
       - 'pull'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'pull gcp-variant-transforms image'
+    id: 'pull-gcp-variant-transforms-image'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'pull'
       - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
-    id: 'pull variant-transforms-custom-runner image'
+    id: 'pull-variant-transforms-custom-runner-image'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'tag gcp-variant-transforms commit-sha'
+    id: 'tag-gcp-variant-transforms-commit-sha'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner:${COMMIT_SHA}'
-    id: 'tag variant-transforms-custom-runner commit-sha'
+    id: 'tag-variant-transforms-custom-runner-commit-sha'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${TAG_NAME}'
-    id: 'tag gcp-variant-transforms release-version'
+    id: 'tag-gcp-variant-transforms-release-version'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner:${TAG_NAME}'
-    id: 'tag variant-transforms-custom-runner release-version'
+    id: 'tag-variant-transforms-custom-runner-release-version'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:latest'
-    id: 'tag gcp-variant-transforms latest'
+    id: 'tag-gcp-variant-transforms-latest'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'tag'
       - 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner:${COMMIT_SHA}'
       - 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner:latest'
-    id: 'tag variant-transforms-custom-runner latest'
+    id: 'tag-variant-transforms-custom-runner-latest'
 
 images:
   - 'gcr.io/cloud-lifesciences/gcp-variant-transforms:${COMMIT_SHA}'

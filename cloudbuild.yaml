@@ -24,14 +24,14 @@ steps:
       - '--tag=gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
       - '--file=docker/Dockerfile'
       - '.'
-    id: 'build gcp-variant-transforms image'
+    id: 'build-gcp-variant-transforms-image'
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '--tag=gcr.io/$PROJECT_ID/variant-transforms-custom-runner:${_CUSTOM_TAG_NAME}'
       - '--file=docker/Dockerfile.custom_dataflow_container'
       - '.'
-    id: 'build variant-transforms-custom-runner image'
+    id: 'build-variant-transforms-custom-runner-image'
 images:
   - 'gcr.io/$PROJECT_ID/gcp-variant-transforms:${_CUSTOM_TAG_NAME}'
   - 'gcr.io/$PROJECT_ID/variant-transforms-custom-runner:${_CUSTOM_TAG_NAME}'
