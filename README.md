@@ -22,8 +22,13 @@ Please see the following links for more information:
 *  Blog post: [How Color uses the new Variant Transforms tool for breakthrough clinical data science with BigQuery](https://cloud.google.com/blog/big-data/2018/03/how-color-uses-the-new-variant-transforms-tool-for-breakthrough-clinical-data-science-with-bigquery).
 *  Blog post: [Accelerating Mayo Clinic’s data platform with BigQuery and Variant Transforms](https://cloud.google.com/blog/products/data-analytics/genome-data-analytics-with-google-cloud).
 *  Jupyter notebook: [Sample queries to explore variant data in BigQuery](docs/sample_queries)
+* The underlying pipeline uses
+[Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
+[Dataflow Console](https://console.cloud.google.com/dataflow), to see more
+detailed view of the pipeline (e.g. number of records being processed, number of workers, more detailed error logs).
 
-### Prerequisites
+
+## Prerequisites
 
 1.  Follow the [getting started](https://cloud.google.com/genomics/docs/how-tos/getting-started)
     instructions on the Google Cloud page.
@@ -104,14 +109,8 @@ gcloud config set project GOOGLE_CLOUD_PROJECT
 gcloud config set compute/region REGION
 ```
 
-If you would like to run Variant Transforms in a custom subnetwork, see the
-[Advanced Flags](docs/setting_region.md#advanced-flags) documentation.
+There are options to control which service account, subnet and similar in the [Advanced Flags](docs/advanced_flags.md) documentation.
 
-The underlying pipeline uses
-[Cloud Dataflow](https://cloud.google.com/dataflow/). You can navigate to the
-[Dataflow Console](https://console.cloud.google.com/dataflow), to see more
-detailed view of the pipeline (e.g. number of records being processed, number of
-workers, more detailed error logs).
 
 ### Running from github
 
