@@ -137,7 +137,6 @@ class VariantSharding():
     has_any_interval = False
     with FileSystems.open(config_file_path, 'r') as f:
       try:
-        yaml.warnings({'YAMLLoadWarning': False})
         shards = yaml.load(f, Loader=yaml.FullLoader)
       except yaml.YAMLError as e:
         raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
@@ -229,7 +228,6 @@ class VariantSharding():
     """
     with FileSystems.open(config_file_path, 'r') as f:
       try:
-        yaml.warnings({'YAMLLoadWarning': False})
         shards = yaml.load(f, Loader=yaml.FullLoader)
       except yaml.YAMLError as e:
         raise ValueError('Invalid yaml file: {}'.format(str(e))) from e
