@@ -99,6 +99,10 @@ def _record_newly_created_table(full_table_id):
   global _newly_created_tables  # pylint: disable=global-statement
   _newly_created_tables.append(full_table_id)
 
+_new_temp_tables = []
+def _record_new_temp_table(full_table_id):
+  global _new_temp_tables  # pylint: disable=global-statement
+  _new_temp_tables.append(full_table_id)
 
 def _read_variants(all_patterns,  # type: List[str]
                    pipeline,  # type: beam.Pipeline
@@ -569,20 +573,137 @@ def run(argv=None):
               known_args.output_table))
 
     suffixes.append(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    load_avro = avro_util.LoadAvro(
-        avro_root_path, known_args.output_table, suffixes, False)
-    not_empty_variant_suffixes = load_avro.start_loading()
-    logging.info('Following tables were loaded with at least 1 row:')
-    for suffix in not_empty_variant_suffixes:
-      logging.info(bigquery_util.compose_table_name(known_args.output_table,
-                                                    suffix))
-    # Remove sample_info table from both lists to avoid duplicating it when
-    # --sample_lookup_optimized_output_table flag is set
-    suffixes.remove(sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
-    if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
-        not_empty_variant_suffixes:
-      not_empty_variant_suffixes.remove(
+
+    # If creating sample optimized tables and running in append mode, create
+    # temp tables first, to be able to copy just new records to sample
+    # optimized tables.
+    if (known_args.append and known_args.sample_lookup_optimized_output_table):
+      tmp_prefix = '_tmp_'
+      temp_table_base_name = bigquery_util.compose_temp_table_base(
+          known_args.output_table, tmp_prefix)
+
+      temp_suffixes = []
+      for i in range(num_shards):
+        temp_suffixes.append(sharding.get_output_table_suffix(i))
+        temp_partition_range_end = sharding.get_output_table_partition_range_end(
+            i)
+        temp_table_name = bigquery_util.compose_table_name(
+            temp_table_base_name, temp_suffixes[i])
+        partitioning.create_bq_table(
+            temp_table_name, schema_file,
+            bigquery_util.ColumnKeyConstants.START_POSITION,
+            temp_partition_range_end)
+        _record_newly_created_table(temp_table_name)
+        logging.info('Integer range partitioned table %s was created.',
+                     temp_table_name)
+        _record_new_temp_table(temp_table_name)
+      temp_sample_table_id = sample_info_table_schema_generator.create_sample_info_table(
+          temp_table_base_name)
+      _record_newly_created_table(temp_sample_table_id)
+      _record_new_temp_table(temp_sample_table_id)
+      temp_suffixes.append(
           sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+      temp_load_avro = avro_util.LoadAvro(avro_root_path, temp_table_base_name,
+                                          temp_suffixes, False)
+      temp_not_empty_variant_suffixes = temp_load_avro.start_loading()
+
+      # Copy tables
+      for temp_t in _new_temp_tables:
+        try:
+          output_table = bigquery_util.get_non_temp_table_name(
+              temp_t, tmp_prefix)
+          bigquery_util.copy_table(temp_t, output_table)
+        except Exception as e:
+          logging.error(
+              'Something unexpected during the copy of the temp '
+              'table: %s to the target table %s: %s', temp_t, output_table,
+              str(e))
+
+      # Remove sample_info table from both lists to avoid duplicating it when
+      # --sample_lookup_optimized_output_table flag is set
+      temp_suffixes.remove(
+          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+      if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in temp_not_empty_variant_suffixes:
+        temp_not_empty_variant_suffixes.remove(
+            sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+
+      # Copy to sample optimized tables
+      temp_flatten_call_column = partitioning.FlattenCallColumn(
+          temp_table_base_name, temp_not_empty_variant_suffixes,
+          known_args.append)
+      try:
+        temp_flatten_schema_file = tempfile.mkstemp(
+            suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
+        if not temp_flatten_call_column.get_flatten_table_schema(
+            temp_flatten_schema_file):
+          raise ValueError('Failed to extract schema of flatten table')
+        # Copy to flatten sample lookup tables from the variant lookup tables.
+        temp_flatten_call_column.copy_to_flatten_table(
+            known_args.sample_lookup_optimized_output_table)
+        logging.info('All sample lookup optimized tables are fully loaded.')
+      except Exception as e:
+        logging.error(
+            'Something unexpected happened during the loading rows to '
+            'sample optimized table stage. Since this copy failed, the '
+            'temporary tables were not deleted. To avoid extra storage '
+            'charges, delete the temporary tables in your dataset that '
+            'will begin with %s. Error: %s', tmp_prefix, str(e))
+        raise e
+      else:
+        for temp_t in _new_temp_tables:
+          if bigquery_util.delete_table(temp_t) != 0:
+            logging.error('Deletion of temporary table "%s" has failed.',
+                          temp_t)
+
+    else:
+      load_avro = avro_util.LoadAvro(avro_root_path, known_args.output_table,
+                                     suffixes, False)
+      not_empty_variant_suffixes = load_avro.start_loading()
+      logging.info('Following tables were loaded with at least 1 row:')
+      for suffix in not_empty_variant_suffixes:
+        logging.info(
+            bigquery_util.compose_table_name(known_args.output_table, suffix))
+      # Remove sample_info table from both lists to avoid duplicating it when
+      # --sample_lookup_optimized_output_table flag is set
+      suffixes.remove(
+          sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+      if sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX in\
+          not_empty_variant_suffixes:
+        not_empty_variant_suffixes.remove(
+            sample_info_table_schema_generator.SAMPLE_INFO_TABLE_SUFFIX)
+
+      if known_args.sample_lookup_optimized_output_table:
+        flatten_call_column = partitioning.FlattenCallColumn(
+            known_args.output_table, not_empty_variant_suffixes,
+            known_args.append)
+        try:
+          flatten_schema_file = tempfile.mkstemp(
+              suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
+          if not flatten_call_column.get_flatten_table_schema(
+              flatten_schema_file):
+            raise ValueError('Failed to extract schema of flatten table')
+
+          # Create all sample optimized tables including those that will be empty.
+          for suffix in suffixes:
+            output_table_id = bigquery_util.compose_table_name(
+                known_args.sample_lookup_optimized_output_table, suffix)
+            partitioning.create_bq_table(
+                output_table_id, flatten_schema_file,
+                bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
+                partitioning.MAX_RANGE_END)
+            _record_newly_created_table(output_table_id)
+            logging.info('Sample lookup optimized table %s was created.',
+                         output_table_id)
+          # Copy to flatten sample lookup tables from the variant lookup tables.
+          flatten_call_column.copy_to_flatten_table(
+              known_args.sample_lookup_optimized_output_table)
+          logging.info('All sample lookup optimized tables are fully loaded.')
+        except Exception as e:
+          logging.error(
+              'Something unexpected happened during the loading rows to '
+              'sample optimized table stage: %s', str(e))
+          raise e
+
   except Exception as e:
     logging.error('Something unexpected happened during the loading of AVRO '
                   'files to BigQuery: %s', str(e))
@@ -602,36 +723,6 @@ def run(argv=None):
         logging.error('Deletion of intermediate AVRO files located at "%s" has '
                       'failed.', avro_root_path)
 
-
-  if known_args.sample_lookup_optimized_output_table:
-    flatten_call_column = partitioning.FlattenCallColumn(
-        known_args.output_table, not_empty_variant_suffixes, known_args.append)
-    try:
-      flatten_schema_file = tempfile.mkstemp(suffix=_BQ_SCHEMA_FILE_SUFFIX)[1]
-      if not flatten_call_column.get_flatten_table_schema(flatten_schema_file):
-        raise ValueError('Failed to extract schema of flatten table')
-      # Create output flatten tables if needed
-      if not known_args.append:
-        # Create all sample optimized tables including those that will be empty.
-        for suffix in suffixes:
-          output_table_id = bigquery_util.compose_table_name(
-              known_args.sample_lookup_optimized_output_table, suffix)
-          partitioning.create_bq_table(
-              output_table_id, flatten_schema_file,
-              bigquery_util.ColumnKeyConstants.CALLS_SAMPLE_ID,
-              partitioning.MAX_RANGE_END)
-          _record_newly_created_table(output_table_id)
-          logging.info('Sample lookup optimized table %s was created.',
-                       output_table_id)
-      # Copy to flatten sample lookup tables from the variant lookup tables.
-      # Note: uses WRITE_TRUNCATE to overwrite the existing tables (issue #607).
-      flatten_call_column.copy_to_flatten_table(
-          known_args.sample_lookup_optimized_output_table)
-      logging.info('All sample lookup optimized tables are fully loaded.')
-    except Exception as e:
-      logging.error('Something unexpected happened during the loading rows to '
-                    'sample optimized table stage: %s', str(e))
-      raise e
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
