@@ -126,3 +126,23 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --use_public_ips false \
   "${COMMAND}"
 ```
+
+## Custom Dataflow Runner Image
+By default Variant Transforms uses a custom docker image to run the pipeline in: `gcr.io/cloud-lifesciences/variant-transforms-custom-runner:latest`.
+This image contains all the necessary python/linux dependencies needed to run variant transforms so that they are not downloaded from the internet when the pipeline starts.
+
+You can override which container is used by passing a `--sdk_container_image` as in the following example:
+
+```bash
+COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
+
+docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
+  --project "${GOOGLE_CLOUD_PROJECT}" \
+  --region us-central1 \
+  --location us-central1 \
+  --temp_location "${TEMP_LOCATION}" \
+  --subnetwork my-subnet \
+  --use_public_ips false \
+  --sdk_container_image gcr.io/path/to/my/container\
+  "${COMMAND}"
+```
