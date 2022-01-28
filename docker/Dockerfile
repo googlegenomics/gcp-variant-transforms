@@ -15,29 +15,29 @@
 # To build a new docker image, run the following from the root source dir:
 # $ docker build . -f docker/Dockerfile -t $IMAGE_NAME
 
-FROM golang:latest
+FROM golang:latest 
+RUN go install -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines@latest
 
-RUN go get -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines
-
-FROM google/cloud-sdk:slim
-
-COPY --from=0 /go/bin/pipelines /usr/bin
-
+FROM apache/beam_python3.8_sdk:2.34.0
 ARG commit_sha
 ENV COMMIT_SHA=${commit_sha}
 
-RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
-ADD / /opt/gcp_variant_transforms/src/
+COPY --from=0 /go/bin/pipelines /usr/bin
 
-# Needed for installing mmh3 (one of the required packages in setup.py).
-RUN apt install -y g++
+# install gcloud sdk
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - 
 
+# g++ Needed for installing mmh3 (one of the required packages in setup.py).
 # Install Pysam dependencies. These dependencies are only required because we
 # have a monolithic binary - they primarily have to be installed on the workers.
 RUN apt-get update && apt-get install -y \
+    apt-transport-https \
     autoconf \
     automake \
+    g++ \
     gcc \
+    gnupg \
+    google-cloud-sdk \
     libbz2-dev \
     libcurl4-openssl-dev \
     liblzma-dev \
@@ -48,6 +48,10 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv
 
+
+RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
+ADD / /opt/gcp_variant_transforms/src/
+
 # Install dependencies.
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
     sed -i 's/$1/${1:-}/' /opt/gcp_variant_transforms/venv3/bin/activate && \
@@ -55,7 +59,7 @@ RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
     cd /opt/gcp_variant_transforms/src && \
     python3 -m pip install --upgrade pip && \
     python3 -m pip install --upgrade wheel && \
-    python3 -m pip install --upgrade .
+    python3 -m pip install --upgrade -r requirements.txt
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \

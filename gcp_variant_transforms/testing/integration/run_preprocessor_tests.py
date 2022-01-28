@@ -90,7 +90,7 @@ class PreprocessorTestCase(run_tests_common.TestCaseInterface):
         parser_args.region,
         filesystems.FileSystems.join(parser_args.logging_location,
                                      self._report_blob_name),
-        parser_args.image, _TOOL_NAME, args)
+        parser_args.image, parser_args.sdk_container_image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.
