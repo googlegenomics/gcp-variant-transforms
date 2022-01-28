@@ -79,7 +79,7 @@ class BqToVcfTestCase(run_tests_common.TestCaseInterface):
         parsed_args.region,
         filesystems.FileSystems.join(parsed_args.logging_location,
                                      '_'.join([test_name, timestamp])),
-        parsed_args.image, _TOOL_NAME, args)
+        parsed_args.image, parsed_args.sdk_container_image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Validates the results.

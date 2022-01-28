@@ -93,7 +93,7 @@ class VcfToBQTestCase(run_tests_common.TestCaseInterface):
         context.project,
         context.region,
         filesystems.FileSystems.join(context.logging_location, full_table_id),
-        context.image, _TOOL_NAME, args)
+        context.image, context.sdk_container_image, _TOOL_NAME, args)
 
   def validate_result(self):
     """Runs queries against the output table and verifies results."""
@@ -215,6 +215,7 @@ class TestContextManager():
     self.project = args.project
     self.region = args.region
     self.image = args.image
+    self.sdk_container_image = args.sdk_container_image
     self._keep_tables = args.keep_tables
     self.revalidation_dataset_id = args.revalidation_dataset_id
     if self.revalidation_dataset_id:

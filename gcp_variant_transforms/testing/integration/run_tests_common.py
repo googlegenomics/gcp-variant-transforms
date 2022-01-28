@@ -29,6 +29,7 @@ from typing import Dict, List, Optional  # pylint: disable=unused-import
 
 
 _DEFAULT_IMAGE_NAME = 'gcr.io/cloud-lifesciences/gcp-variant-transforms'
+_DEFAULT_SDK_CONTAINER_IMAGE_NAME = 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner'
 
 # `TestCaseState` saves current running test and the remaining tests in the same
 # test script (.json).
@@ -127,13 +128,14 @@ class TestRunner():
     return 0
 
 
-def form_command(project, region, temp_location, image, tool_name, args):
-  # type: (str, str, str, str, str, List[str]) -> List[str]
+def form_command(project, region, temp_location, image, sdk_container_image, tool_name, args):
+  # type: (str, str, str, str, str, str, List[str]) -> List[str]
   return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
           '--project', project,
           '--region', region,
           '--docker_image', image,
           '--temp_location', temp_location,
+          '--sdk_container_image', sdk_container_image,
           ' '.join([tool_name] + args)]
 
 
@@ -152,6 +154,14 @@ def add_args(parser):
             'test_gcp-variant-transforms_2018-01-20-13-47-12. By default the '
             'production image {} is used.').format(_DEFAULT_IMAGE_NAME),
       default=_DEFAULT_IMAGE_NAME,
+      required=False)
+  parser.add_argument(
+      '--sdk_container_image',
+      help=('The name of the dataflow runner container image to run, for '
+            'example: gcr.io/test-gcp-variant-transforms/'
+            'variant-transforms-custom-runner:latest. By default the '
+            'production image {} is used.').format(_DEFAULT_IMAGE_NAME),
+      default=_DEFAULT_SDK_CONTAINER_IMAGE_NAME,
       required=False)
 
 
