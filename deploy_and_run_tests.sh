@@ -214,6 +214,7 @@ if [[ -z "${image_tag}" ]]; then
   image_tag="test_${time_tag}"
 fi
 full_image_name="gcr.io/${project}/gcp-variant-transforms:${image_tag}"
+full_sdk_container_image_name="gcr.io/${project}/variant-transforms-custom-runner:${image_tag}"
 
 if [[ -z "${skip_build}" ]]; then
   color_print "Building the Docker image with tag ${image_tag}" "${GREEN}"
@@ -255,6 +256,7 @@ python gcp_variant_transforms/testing/integration/run_vcf_to_bq_tests.py \
     --staging_location "gs://${gs_dir}/staging" \
     --temp_location "gs://${gs_dir}/temp" \
     --logging_location "gs://${gs_dir}/temp/logs" \
+    --sdk_container_image "${full_sdk_container_image_name}" \
     --image "${full_image_name}" ${TEST_ARGUMENTS} &
 pid_vcf_to_bq="$!"
 if [[ -n "${run_preprocessor_tests}" ]]; then
@@ -264,6 +266,7 @@ if [[ -n "${run_preprocessor_tests}" ]]; then
       --staging_location "gs://${gs_dir}/staging" \
       --temp_location "gs://${gs_dir}/temp" \
       --logging_location "gs://${gs_dir}/temp/logs" \
+      --sdk_container_image "${full_sdk_container_image_name}" \
       --image "${full_image_name}" &
 fi
 # `pid_preprocess` could be the same as `pid_vcf_to_bq` if preprocessor tests
@@ -276,6 +279,7 @@ if [[ -n "${run_bq_to_vcf_tests}" ]]; then
       --staging_location "gs://${gs_dir}/staging" \
       --temp_location "gs://${gs_dir}/temp" \
       --logging_location "gs://${gs_dir}/temp/logs" \
+      --sdk_container_image "${full_sdk_container_image_name}" \
       --image "${full_image_name}" &
 fi
 pid_bq_to_vcf="$!"
