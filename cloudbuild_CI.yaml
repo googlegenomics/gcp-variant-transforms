@@ -28,6 +28,14 @@ steps:
       - '--file=docker/Dockerfile'
       - '.'
     id: 'build-gcp-variant-transforms-docker'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
+    id: 'push-gcp-variant-transforms-docker'
+    waitFor: ['build-gcp-variant-transforms-docker']
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -38,18 +46,14 @@ steps:
       - '--file=docker/Dockerfile.custom_dataflow_container'
       - '.'
     id: 'build-variant-transforms-custom-runner-docker'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
-    id: 'push-gcp-variant-transforms-docker'
+    waitFor: ['-']
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
     id: 'push-variant-transforms-custom-runner-docker'
+    waitFor: ['build-variant-transforms-custom-runner-docker']
 
   - name: 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
     args:
