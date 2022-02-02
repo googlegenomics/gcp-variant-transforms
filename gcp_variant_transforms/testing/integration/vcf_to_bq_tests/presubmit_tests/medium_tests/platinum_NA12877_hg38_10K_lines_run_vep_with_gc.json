@@ -31,10 +31,10 @@
       },
       {
         "query": [
-          "SELECT COUNT(0) AS num_annotation_sets ",
+          "SELECT COUNT(0) AS num_annotation_sets_vt ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": { "num_annotation_sets": 56771 }
+        "expected_result": { "num_annotation_sets_vt": 45770 }
       },
       {
         "query": [
