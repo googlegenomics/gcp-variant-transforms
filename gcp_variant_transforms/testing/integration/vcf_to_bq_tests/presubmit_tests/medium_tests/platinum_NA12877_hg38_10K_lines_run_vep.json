@@ -83,10 +83,10 @@
       },
       {
         "query": [
-          "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol ",
+          "SELECT COUNT(DISTINCT CSQ_VT.SYMBOL) AS num_symbol_vt ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"num_symbol": 206}
+        "expected_result": { "num_symbol_vt": 143 }
       },
       {
         "query": [
