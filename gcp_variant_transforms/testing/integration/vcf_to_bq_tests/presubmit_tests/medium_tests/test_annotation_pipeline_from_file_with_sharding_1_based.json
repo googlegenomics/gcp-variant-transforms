@@ -76,7 +76,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 42634508}
+        "expected_result": { "hash_sum": 49338212 }
       },
       {
         "query": [
