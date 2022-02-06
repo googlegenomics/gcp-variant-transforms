@@ -46,11 +46,11 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 143375297338}
+        "expected_result": { "hash_sum": 185781352846 }
       },
       {
         "query": [
-          "SELECT SUM(start_position * number_of_annotations) AS hash_sum ",
+          "SELECT SUM(start_position * number_of_annotations) AS hash_sum_vt ",
           "FROM ( ",
           "  SELECT start_position, reference_bases, A.alt, ",
           "         COUNT(0) AS number_of_annotations ",
@@ -58,7 +58,7 @@
           "  GROUP BY 1, 2, 3",
           ")"
         ],
-        "expected_result": {"hash_sum": 143375297338}
+        "expected_result": { "hash_sum_vt": 143375297338 }
       },
       {
         "query": [
