@@ -72,7 +72,7 @@
           "SELECT COUNT(DISTINCT CSQ_VT.Feature) AS num_features_vt ",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": { "num_features_vt": 1575 }
+        "expected_result": { "num_features_vt": 2582 }
       },
       {
         "query": [
