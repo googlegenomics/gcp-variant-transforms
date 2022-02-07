@@ -100,7 +100,7 @@
           "SELECT ROUND(SUM(CSQ_VT.MAX_AF), 5) AS sum_max_af",
           "FROM `{DATASET_ID}.{TABLE_ID}__chr1` AS T, T.alternate_bases AS A, A.CSQ_VT AS CSQ_VT"
         ],
-        "expected_result": {"sum_max_af": 26342.50856}
+        "expected_result": { "sum_max_af": 31885.30356 }
       }
     ]
   }
