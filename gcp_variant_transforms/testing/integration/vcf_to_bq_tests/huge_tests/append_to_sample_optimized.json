@@ -1,6 +1,6 @@
 [
   {
-    "test_name": "test-1000-genomes-samples-append",
+    "test_name": "test-1000-genomes-samples-append-1",
     "table_name": "test-1000-genomes-samples-append",
     "sample_lookup_optimized_output_table" : "{TABLE_NAME}_samples",
     "input_pattern": "gs://genomics-public-data/1000-genomes/vcf/*.vcf",
@@ -319,7 +319,7 @@
     ]
   },
   {
-    "test_name": "test-1000-genomes-samples-append",
+    "test_name": "test-1000-genomes-samples-append-2",
     "table_name": "test-1000-genomes-samples-append",
     "sample_lookup_optimized_output_table" : "{TABLE_NAME}_samples",
     "input_pattern": "gs://genomics-public-data/1000-genomes/vcf/*.vcf",
