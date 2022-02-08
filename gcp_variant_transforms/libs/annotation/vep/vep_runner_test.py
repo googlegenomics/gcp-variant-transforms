@@ -45,6 +45,7 @@ _IMAGE = 'gcr.io/image'
 _CACHE = 'gs://path/to/cache'
 _NUM_FORK = 8
 _PROJECT = 'test-project'
+_LOCATION = 'test-location'
 _REGION = 'test-region'
 
 
@@ -68,16 +69,24 @@ class _MockFileSystems(filesystems.FileSystems):
 class VepRunnerTest(unittest.TestCase):
 
   def setUp(self):
-    self._mock_service = mock.Mock()
-    self._mock_request = mock.Mock()
+    self._mock_service = mock.MagicMock()
+    self._mock_request = mock.MagicMock()
+    self._mock_projects = mock.MagicMock()
+    self._mock_locations = mock.MagicMock()
+    self._mock_service.projects = mock.MagicMock(
+      return_value=self._mock_projects)
+    self._mock_projects.locations = mock.MagicMock(
+      return_value=self._mock_locations)
     self._pipelines_spy = PipelinesSpy(self._mock_request)
-    self._mock_service.pipelines = mock.Mock(return_value=self._pipelines_spy)
-    self._mock_request.execute = mock.Mock(return_value={'name': 'operation'})
+    self._mock_locations.pipelines = mock.MagicMock(
+      return_value=self._pipelines_spy)
+    self._mock_request.execute = mock.MagicMock(
+      return_value={'name': 'operation'})
 
   def _create_test_instance(self, pipeline_args=None):
     # type: (List[str]) -> vep_runner.VepRunner
     test_object = vep_runner.VepRunner(
-        self._mock_service, _ASSEMBLY, _SPECIES,
+        self._mock_service, _LOCATION, _ASSEMBLY, _SPECIES,
         _INPUT_PATTERN, _OUTPUT_DIR,
         _VEP_INFO_FIELD, _IMAGE, _CACHE, _NUM_FORK,
         pipeline_args or self._get_pipeline_args(), None, 30)
@@ -103,19 +112,19 @@ class VepRunnerTest(unittest.TestCase):
     test_instance = self._create_test_instance()
     self.assertEqual(test_instance._vep_cache_path, _CACHE)
     test_instance = vep_runner.VepRunner(
-        self._mock_service, _SPECIES, _ASSEMBLY, _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
-        None, 30)
+        self._mock_service, _LOCATION, _SPECIES, _ASSEMBLY, _INPUT_PATTERN,
+        _OUTPUT_DIR, _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK,
+        self._get_pipeline_args(), None, 30)
     self.assertEqual(test_instance._vep_cache_path,
                      ('gs://cloud-lifesciences/vep/'
-                      'vep_cache_homo_sapiens_GRCh38_91.tar.gz'))
+                      'vep_cache_homo_sapiens_GRCh38_104.tar.gz'))
     test_instance = vep_runner.VepRunner(
-        self._mock_service, 'mouse', 'mm9', _INPUT_PATTERN, _OUTPUT_DIR,
-        _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK, self._get_pipeline_args(),
-        None, 30)
+        self._mock_service, _LOCATION, 'mus_musculus', 'GRCm39', _INPUT_PATTERN,
+        _OUTPUT_DIR, _VEP_INFO_FIELD, _IMAGE, '', _NUM_FORK,
+        self._get_pipeline_args(), None, 30)
     self.assertEqual(test_instance._vep_cache_path,
                      ('gs://cloud-lifesciences/vep/'
-                      'vep_cache_mouse_mm9_91.tar.gz'))
+                      'vep_cache_mus_musculus_GRCm39_104.tar.gz'))
 
   def test_get_output_pattern(self):
     output_pattern = self._create_test_instance().get_output_pattern()
@@ -151,13 +160,16 @@ class VepRunnerTest(unittest.TestCase):
     self._validate_run_for_all_files()
 
   def test_wait_until_done(self):
-    mock_projects = mock.Mock()
-    mock_opearations = mock.Mock()
-    mock_request = mock.Mock()
-    self._mock_service.projects = mock.Mock(return_value=mock_projects)
-    mock_projects.operations = mock.Mock(return_value=mock_opearations)
-    mock_opearations.get = mock.Mock(return_value=mock_request)
-    mock_request.execute = mock.Mock(return_value={'done': True, 'error': {}})
+    mock_projects = mock.MagicMock()
+    mock_locations = mock.MagicMock()
+    mock_opearations = mock.MagicMock()
+    mock_request = mock.MagicMock()
+    self._mock_service.projects = mock.MagicMock(return_value=mock_projects)
+    mock_projects.locations = mock.MagicMock(return_value=mock_locations)
+    mock_locations.operations = mock.MagicMock(return_value=mock_opearations)
+    mock_opearations.get = mock.MagicMock(return_value=mock_request)
+    mock_request.execute = mock.MagicMock(
+      return_value={'done': True, 'error': {}})
     test_instance = self._create_test_instance()
     with patch('apache_beam.io.filesystems.FileSystems', _MockFileSystems):
       test_instance.run_on_all_files()
@@ -169,13 +181,15 @@ class VepRunnerTest(unittest.TestCase):
       test_instance.run_on_all_files()
 
   def test_wait_until_done_fail(self):
-    mock_projects = mock.Mock()
-    mock_opearations = mock.Mock()
-    mock_request = mock.Mock()
-    self._mock_service.projects = mock.Mock(return_value=mock_projects)
-    mock_projects.operations = mock.Mock(return_value=mock_opearations)
-    mock_opearations.get = mock.Mock(return_value=mock_request)
-    mock_request.execute = mock.Mock(return_value={
+    mock_projects = mock.MagicMock()
+    mock_locations = mock.MagicMock()
+    mock_opearations = mock.MagicMock()
+    mock_request = mock.MagicMock()
+    self._mock_service.projects = mock.MagicMock(return_value=mock_projects)
+    mock_projects.locations = mock.MagicMock(return_value=mock_locations)
+    mock_locations.operations = mock.MagicMock(return_value=mock_opearations)
+    mock_opearations.get = mock.MagicMock(return_value=mock_request)
+    mock_request.execute = mock.MagicMock(return_value={
         'done': True, 'error': {'message': 'failed'}})
 
     test_instance = self._create_test_instance()
@@ -193,7 +207,8 @@ class PipelinesSpy():
     self._actions_list = []
     self._mock_request = mock_request
 
-  def run(self, body=None):
+  def run(self, parent=None, body=None):
+    assert parent
     assert body
     self._actions_list.append(body['pipeline']['actions'])
     return self._mock_request
