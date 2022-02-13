@@ -92,37 +92,3 @@ You can choose the region for the BigQuery dataset at dataset creation time.
 
 ![BigQuery dataset region](images/bigquery_dataset_region.png)
 
-## Advanced Flags
-
-Variant Transforms supports custom networks. This can be used to start the processing 
-VMs in a specific subnetwork of your Google Cloud project as opposed to the default 
-network.
-
-Specify a subnetwork by using the `--subnetwork` flag and provide the name of
-the subnetwork as follows: 
-`--subnetwork my-subnet`. Just use the name of the subnet, not the full path.
-
-Variant Transforms allows disabling the use of external IP addresses with the
-`--use_public_ips` flag. If not specified, this defaults to true, so to restrict the
-use of external IP addresses, use `--use_public_ips false`. Note that without external
-IP addresses, VMs can only send packets to other internal IP addresses. To allow these
-VMs to connect to the external IP addresses used by Google APIs and services, you can
-[enable Private Google Access](https://cloud.google.com/vpc/docs/configure-private-google-access)
-on the subnet.
-
-For example, to run Variant Transforms in a subnetwork you already created called
-`my-subnet` with no public IP addresses you can add these flags to the
-example above as follows:
-
-```bash
-COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
-
-docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
-  --project "${GOOGLE_CLOUD_PROJECT}" \
-  --region us-central1 \
-  --location us-central1 \
-  --temp_location "${TEMP_LOCATION}" \
-  --subnetwork my-subnet \
-  --use_public_ips false \
-  "${COMMAND}"
-```
