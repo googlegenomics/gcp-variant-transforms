@@ -225,7 +225,7 @@ def _shard_variants(known_args, pipeline_args, pipeline_mode):
 
 
 def _get_input_dimensions(known_args, pipeline_args):
-  pipeline_mode = pipeline_common.get_pipeline_mode(known_args.all_patterns)
+  pipeline_mode = pipeline_common.get_pipeline_mode(known_args.all_patterns, known_args.pipeline_mode)
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   google_cloud_options = beam_pipeline_options.view_as(
       pipeline_options.GoogleCloudOptions)
@@ -403,7 +403,7 @@ def _run_annotation_pipeline(known_args, pipeline_args):
 
     files_to_be_annotated = known_args.all_patterns
     if known_args.shard_variants:
-      pipeline_mode = pipeline_common.get_pipeline_mode(files_to_be_annotated)
+      pipeline_mode = pipeline_common.get_pipeline_mode(files_to_be_annotated, known_args.pipeline_mode)
       files_to_be_annotated = _shard_variants(known_args,
                                               pipeline_args,
                                               pipeline_mode)
@@ -453,7 +453,7 @@ def run(argv=None):
 
   variant_merger = _get_variant_merge_strategy(known_args)
 
-  pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns)
+  pipeline_mode = pipeline_common.get_pipeline_mode(all_patterns, known_args.pipeline_mode)
 
   beam_pipeline_options = pipeline_options.PipelineOptions(pipeline_args)
   avro_root_path = _get_avro_root_path(beam_pipeline_options)
