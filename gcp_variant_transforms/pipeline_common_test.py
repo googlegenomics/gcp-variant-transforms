@@ -52,15 +52,24 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
 
   def test_get_mode_small_pipeline_mode(self):
     args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='small')
-    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.SMALL)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+    match = match_result([None for _ in range(100)])
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.SMALL)
 
   def test_get_mode_medium_pipeline_mode(self):
     args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='medium')
-    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+    match = match_result([None for _ in range(100)])
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.MEDIUM)
 
   def test_get_mode_large_pipeline_mode(self):
     args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='large')
-    self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
+    match_result = collections.namedtuple('MatchResult', ['metadata_list'])
+    match = match_result([None for _ in range(100)])
+    with mock.patch.object(FileSystems, 'match', return_value=[match]):
+      self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
     args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='')
