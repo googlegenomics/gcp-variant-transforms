@@ -72,7 +72,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
       self.assertEqual(self._get_pipeline_mode(args), PipelineModes.LARGE)
 
   def test_get_mode_small(self):
-    args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='')
+    args = self._create_mock_args(input_pattern='*', input_file=None)
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
 
