@@ -51,7 +51,7 @@ class PipelineCommonWithPatternTest(unittest.TestCase):
           input_pattern='nonexistent_file.vcf', input_file=None)
 
   def test_get_mode_small_pipeline_mode(self):
-    args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='medium')
+    args = self._create_mock_args(input_pattern='*', input_file=None, pipeline_mode='small')
     match_result = collections.namedtuple('MatchResult', ['metadata_list'])
     match = match_result([None for _ in range(100)])
     with mock.patch.object(FileSystems, 'match', return_value=[match]):
