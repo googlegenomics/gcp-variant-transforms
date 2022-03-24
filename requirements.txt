@@ -2,7 +2,7 @@ pysam<0.16.0
 cython>=0.28.1
 setuptools
 #warning on apache-beam: https://cloud.google.com/dataflow/docs/guides/common-errors
-apache-beam[gcp]==2.34.0 
+apache-beam[gcp]==2.36.0 
 google-cloud-core
 google-api-python-client>=1.6,<1.7.12
 intervaltree>=2.1.0,<2.2.0
