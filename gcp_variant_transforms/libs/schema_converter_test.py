@@ -20,7 +20,7 @@ import json
 from typing import List, Union  # pylint: disable=unused-import
 import unittest
 
-import avro
+import avro.schema
 from apache_beam.io.gcp.internal.clients import bigquery
 from apache_beam.io.gcp.bigquery_tools import parse_table_schema_from_json
 
