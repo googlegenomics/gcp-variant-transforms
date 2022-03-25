@@ -74,6 +74,8 @@ steps:
       # or change the script to create a temporary bucket on the fly.
       #
       # - '--gs_dir bashir-variant_integration_test_runs'
+options:
+  machineType: 'E2_HIGHCPU_8'
 images:
   - 'gcr.io/${PROJECT_ID}/gcp-variant-transforms:${COMMIT_SHA}'
   - 'gcr.io/${PROJECT_ID}/variant-transforms-custom-runner:${COMMIT_SHA}'
