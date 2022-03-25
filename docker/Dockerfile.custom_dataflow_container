@@ -18,7 +18,7 @@
 # https://cloud.google.com/dataflow/docs/guides/using-custom-containers#python
 
 
-FROM apache/beam_python3.8_sdk:2.36.0
+FROM apache/beam_python3.8_sdk:2.37.0
 
 RUN apt-get update && apt-get install -y \
     autoconf \

@@ -18,7 +18,7 @@
 FROM golang:latest 
 RUN go install -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines@latest
 
-FROM apache/beam_python3.8_sdk:2.36.0
+FROM apache/beam_python3.8_sdk:2.37.0
 ARG commit_sha
 ENV COMMIT_SHA=${commit_sha}
 
