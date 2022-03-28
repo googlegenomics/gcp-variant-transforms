@@ -80,6 +80,11 @@ class VcfReadOptions(VariantTransformsOptions):
         type='bool', default=False, nargs='?', const=True,
         help='This flag is deprecated and will be removed in the next release.')
     parser.add_argument(
+        '--pipeline_mode',
+        default='',
+        help=('If provided ("small", "medium", or "large), overrides input size '
+              'checking logic and forces pipeline optimizations for input size. '))
+    parser.add_argument(
         '--representative_header_file',
         default='',
         help=('If provided, header values from the provided file will be used '
