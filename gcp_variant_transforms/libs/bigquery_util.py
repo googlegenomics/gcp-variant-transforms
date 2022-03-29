@@ -365,6 +365,57 @@ def compose_table_name(base_name, suffix):
   # type: (str, str) -> str
   return TABLE_SUFFIX_SEPARATOR.join([base_name, suffix])
 
+
+def compose_temp_table_base(base_name, prefix):
+  # type: (str, str) -> str
+  table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', base_name)
+  project_id = table_re_match.group('project')
+  dataset_id = table_re_match.group('dataset')
+  table_id = table_re_match.group('table')
+  temp_table_base_name = '{}:{}.{}{}'.format(project_id, dataset_id, prefix,
+                                             table_id)
+  return temp_table_base_name
+
+
+def get_non_temp_table_name(temp_table, prefix):
+  table_re_match = re.match(
+      rf'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<tmpname>{prefix})(?P<table>[\w\$]+)$',
+      temp_table)
+  project_id = table_re_match.group('project')
+  dataset_id = table_re_match.group('dataset')
+  table_id = table_re_match.group('table')
+  non_temp_table_name = ('{}:{}.{}'.format(project_id, dataset_id, table_id))
+  return non_temp_table_name
+
+
+def copy_table(source, destination):
+  source_table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', source)
+  source_project_id = source_table_re_match.group('project')
+  source_dataset_id = source_table_re_match.group('dataset')
+  source_table_id = source_table_re_match.group('table')
+  destination_table_re_match = re.match(
+      r'^((?P<project>.+):)(?P<dataset>\w+)\.(?P<table>[\w\$]+)$', destination)
+  destination_project_id = destination_table_re_match.group('project')
+  destination_dataset_id = destination_table_re_match.group('dataset')
+  destination_table_id = destination_table_re_match.group('table')
+  client = bigquery.Client(project=source_project_id)
+  source_dataset = client.dataset(
+      dataset_id=source_dataset_id, project=source_project_id)
+  source_table = source_dataset.table(source_table_id)
+  destination_dataset = client.dataset(
+      dataset_id=destination_dataset_id, project=destination_project_id)
+  destination_table = destination_dataset.table(destination_table_id)
+  job_config = bigquery.job.CopyJobConfig(write_disposition='WRITE_APPEND')
+  copy_job = client.copy_table(
+      source_table, destination_table, job_config=job_config)
+  try:
+    results = copy_job.result(timeout=600)
+  except TimeoutError as e:
+    logging.warning('Time out copying from temp table: %s', source_table)
+
+
 def get_table_base_name(table_name):
   return table_name.split(TABLE_SUFFIX_SEPARATOR)[0]
 

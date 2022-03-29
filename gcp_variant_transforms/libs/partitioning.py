@@ -82,7 +82,7 @@ class FlattenCallColumn():
     self._sub_fields = []
 
     job_config = bigquery.job.QueryJobConfig(
-        write_disposition='WRITE_TRUNCATE' if append else 'WRITE_EMPTY')
+        write_disposition='WRITE_APPEND' if append else 'WRITE_EMPTY')
     self._client = bigquery.Client(project=self._project_id,
                                    default_query_job_config=job_config)
     self._find_one_non_empty_table()
