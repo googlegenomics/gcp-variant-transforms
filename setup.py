@@ -31,7 +31,7 @@ class build(_build):  # pylint: disable=invalid-name
 
 setuptools.setup(
     name='gcp_variant_transforms',
-    version='0.10.0',
+    version='0.11.0',
     description=('Tool for transforming and processing VCF files in a '
                  'scalable manner based on Apache Beam'),
     author='Google',
