@@ -227,6 +227,10 @@ class VariantCall():
     if self.sample_id != other.sample_id:
       return self.sample_id < other.sample_id
     elif self.genotype != other.genotype:
+      if(type(self.genotype) is list and type(other.genotype) is not list):
+        return False
+      if(type(other.genotype) is list and type(self.genotype) is not list):
+        return True
       return self.genotype < other.genotype
     elif self.phaseset != other.phaseset:
       return self.phaseset < other.phaseset
