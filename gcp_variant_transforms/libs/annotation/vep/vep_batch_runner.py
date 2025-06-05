@@ -11,7 +11,7 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file, watch
   """Returns an instance of BatchVepRunner using the provided args."""
   from apache_beam.options import pipeline_options
   flags_dict = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
-  
+
   project = flags_dict.get("project")
   region = flags_dict.get("region")
   service_account = flags_dict.get("service_account_email", "default")
@@ -117,9 +117,10 @@ class BatchVepRunner:
         ]
       runnables.append({
         "container": {
-          "imageUri": self._vep_image_uri
+          "imageUri": self._vep_image_uri,
+          "commands": commands
         },
-        "commands": commands
+
       })
 
     job_spec = {

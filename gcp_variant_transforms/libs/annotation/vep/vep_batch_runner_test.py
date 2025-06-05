@@ -29,7 +29,7 @@ _SPECIES = 'homo_sapiens'
 _ASSEMBLY = 'GRCh38'
 _OUTPUT_DIR = 'gs://variant-data/output/annotation/test-vep-batch'
 _VEP_INFO_FIELD = 'VEP_INFO'
-_IMAGE = 'us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/vt_vep'
+_IMAGE = 'us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/vt_vep@sha256:355f464a68676153bbf37b48ab78bac5d6a330f04ba1175a9378c8d1fc556dca'
 _CACHE = 'gs://variant-data/vep/vep_cache_homo_sapiens_GRCh38_104.tar.gz'
 _NUM_FORK = 8
 _PROJECT = 'variant-transform-dxt'
@@ -66,4 +66,3 @@ class TestBatchVepRunner(unittest.TestCase):
 
 if __name__ == '__main__':
   unittest.main()
-
