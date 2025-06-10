@@ -19,11 +19,9 @@ import logging
 
 from typing import List  # pylint: disable=unused-import
 
-import mock
-from mock import patch
-
-from apache_beam.io import filesystems
-from gcp_variant_transforms.libs.annotation.vep import vep_batch_runner
+from googleapiclient import discovery
+from oauth2client import client
+from gcp_variant_transforms.libs.annotation.vep import vep_batch_runner, vep_runner_batch
 
 _SPECIES = 'homo_sapiens'
 _ASSEMBLY = 'GRCh38'
@@ -43,8 +41,12 @@ _WATCHDOG_INTERVAL = 30
 
 class TestBatchVepRunner(unittest.TestCase):
   def setUp(self):
-    self.runner = vep_batch_runner.BatchVepRunner(
-        project=_PROJECT,
+    credentials = client.GoogleCredentials.get_application_default()
+    self.runner = vep_runner_batch.VepBatchRunner(
+        pipeline_service = discovery.build(
+            'batch', 'v1', credentials=credentials),
+        pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
+        # project=_PROJECT,
         location=_LOCATION,
         species=_SPECIES,
         assembly=_ASSEMBLY,
@@ -54,10 +56,10 @@ class TestBatchVepRunner(unittest.TestCase):
         vep_image_uri=_IMAGE,
         vep_cache_path=_CACHE,
         vep_num_fork=_NUM_FORK,
-        service_account=_SERVICE_ACCOUNT,
-        machine_type=_MACHINE_TYPE,
+        # service_account=_SERVICE_ACCOUNT,
+        # machine_type=_MACHINE_TYPE,
         watchdog_file=_WATCHDOG_FILE,
-        watchdog_interval=_WATCHDOG_INTERVAL)
+        watchdog_file_update_interval_seconds=_WATCHDOG_INTERVAL)
 
   def test_e2e(self):
     self.runner.run_on_all_files()

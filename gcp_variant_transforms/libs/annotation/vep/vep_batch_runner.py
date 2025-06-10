@@ -93,18 +93,6 @@ class BatchVepRunner:
       output_file = pair["output"]
       commands = [
         "/opt/variant_effect_predictor/run_vep.sh",
-        "--species", self._species,
-        "--assembly", self._assembly,
-        "--input_file", input_file,
-        "--output_file", output_file,
-        "--vcf",
-        "--fork", str(self._vep_num_fork),
-        "--cache",
-        "--dir_cache", self._vep_cache_path,
-        "--everything",
-        "--check_ref",
-        "--allow_non_variant",
-        "--fields", self._vep_info_field
       ]
       if self._watchdog_file:
         commands = [
@@ -117,10 +105,10 @@ class BatchVepRunner:
         ]
       runnables.append({
         "container": {
-          "imageUri": self._vep_image_uri,
-          "commands": commands
-        },
+            "imageUri": self._vep_image_uri,
+            "commands": commands,
 
+        },
       })
 
     job_spec = {
@@ -128,7 +116,17 @@ class BatchVepRunner:
       "taskGroups": [
         {
           "taskSpec": {
-            "runnables": runnables
+            "runnables": runnables,
+            "environment": {
+                "variables": {
+                    "GENOME_ASSEMBLY": self._assembly,
+                    "SPECIES": self._species,
+                    "VEP_CACHE": self._vep_cache_path,
+                    "NUM_FORKS": str(self._vep_num_fork),
+                    "VCF_INFO_FILED": self._vep_info_field,
+                    "OTHER_VEP_OPTS": "--everything --check_ref --allow_non_variant --format vcf"
+                },
+            },
           },
           "taskCount": len(runnables),
           "parallelism": len(runnables)
