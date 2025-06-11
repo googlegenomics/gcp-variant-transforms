@@ -22,7 +22,7 @@ from typing import List, Optional  # pylint: disable=unused-import
 import apache_beam as beam
 from apache_beam.io import filesystems
 
-from gcp_variant_transforms.libs.annotation.vep import vep_batch_runner
+from gcp_variant_transforms.libs.annotation.vep import vep_batch_runner, vep_runner
 
 _WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS = 30
 

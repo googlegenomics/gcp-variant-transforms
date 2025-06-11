@@ -9,8 +9,8 @@ from oauth2client import client
 
 _MINIMUM_DISK_SIZE_GB = 200
 _BATCH_VM_IMAGE = "projects/cos-cloud/global/images/cos-stable-101-17162-40-51"
-_GSUTIL_IMAGE = "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
-_LOCAL_OUTPUT_DIR = "/mnt/vep/output_files"
+_GSUTIL_IMAGE = "gcr.io/google.com/cloudsdktool/cloud-sdk"
+_LOCAL_OUTPUT_DIR = "/mnt/disks/vep/output_files"
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + "/output.vcf"
 
 
@@ -115,15 +115,17 @@ class BatchVepRunner:
     def _generate_job_name(self):
         return f"vep-job-{uuid.uuid4().hex[:8]}"
 
-    def _make_runnable(self, image_uri, *args, **kwargs):
-        # type: (str, *str, **Any) -> Dict
+    def _make_runnable(self, name, image_uri, *args, **kwargs):
+        # type: (str, str, *str, **Any) -> Dict
         """Creates a Batch API Runnable dictionary."""
         runnable = {
             "container": {
                 "imageUri": image_uri,
-                "volumes": ["/mnt:/mnt"],
+                "volumes": ["/mnt/disks/vep:/mnt/disks/vep"],
                 "commands": list(args),
-            }
+            },
+            "displayName": name,
+            "ignoreExitStatus": True,
         }
         # Unlike Life Sciences, Batch does not have an 'alwaysRun' flag on
         # individual runnables. It fails the task on the first failing runnable.
@@ -134,54 +136,26 @@ class BatchVepRunner:
         job_name = self._generate_job_name()
         runnables = [
             self._make_runnable(
-                self._vep_image_uri, "mkdir", "-p", "/mnt/vep/vep_cache"
+                "mkdir_vep_cache",
+                self._vep_image_uri, "mkdir", "-p", "/mnt/disks/vep/vep_cache"
             ),
             self._make_runnable(
+                "cp_vep_cache",
                 _GSUTIL_IMAGE,
                 "gsutil",
                 "cp",
                 self._vep_cache_path,
-                f"/mnt/vep/vep_cache/{_get_base_name(self._vep_cache_path)}",
+                f"/mnt/disks/vep/vep_cache/{_get_base_name(self._vep_cache_path)}",
             ),
         ]
         for pair in io_pairs:
             input_file = pair["input"]
             output_file = pair["output"]
-            local_input_file = "/mnt/vep/{}".format(_get_base_name(input_file))
-            # commands = [
-            #     "/opt/variant_effect_predictor/run_vep.sh",
-            #     "--species",
-            #     self._species,
-            #     "--assembly",
-            #     self._assembly,
-            #     "--input_file",
-            #     input_file,
-            #     "--output_file",
-            #     output_file,
-            #     "--vcf",
-            #     "--fork",
-            #     str(self._vep_num_fork),
-            #     "--cache",
-            #     "--dir_cache",
-            #     self._vep_cache_path,
-            #     "--everything",
-            #     "--check_ref",
-            #     "--allow_non_variant",
-            #     "--fields",
-            #     self._vep_info_field,
-            # ]
-            # if self._watchdog_file:
-            #     commands = [
-            #         "/opt/variant_effect_predictor/run_script_with_watchdog.sh",
-            #         "/opt/variant_effect_predictor/run_vep.sh",
-            #         str(self._watchdog_interval),
-            #         self._watchdog_file,
-            #         input_file,
-            #         output_file,
-            #     ]
+            local_input_file = "/mnt/disks/vep/{}".format(_get_base_name(input_file))
             if self._watchdog_file:
                 action = (
                     self._make_runnable(
+                        "run_vep_with_watchdog",
                         self._vep_image_uri,
                         "/opt/variant_effect_predictor/run_script_with_watchdog.sh",
                         "/opt/variant_effect_predictor/run_vep.sh",
@@ -193,20 +167,16 @@ class BatchVepRunner:
                 )
             else:
                 action = self._make_runnable(
+                    "run_vep",
                     self._vep_image_uri,
                     "/opt/variant_effect_predictor/run_vep.sh",
                     local_input_file,
                     _LOCAL_OUTPUT_FILE,
                 )
-            # runnables.append({
-            #   "container": {
-            #     "imageUri": self._vep_image_uri,
-            #     "commands": commands
-            #   },
-            # })
             runnables.extend(
                 [
                     self._make_runnable(
+                        "cp_input_file",
                         _GSUTIL_IMAGE,
                         "gsutil",
                         "cp",
@@ -214,10 +184,12 @@ class BatchVepRunner:
                         local_input_file,
                     ),
                     self._make_runnable(
+                        "rm_output_dir",
                         self._vep_image_uri, "rm", "-r", "-f", _LOCAL_OUTPUT_DIR
                     ),
                     action,
                     self._make_runnable(
+                        "cp_output_file",
                         _GSUTIL_IMAGE,
                         "gsutil",
                         "cp",
@@ -237,7 +209,7 @@ class BatchVepRunner:
                             "variables": {
                                 "GENOME_ASSEMBLY": self._assembly,
                                 "SPECIES": self._species,
-                                "VEP_CACHE": "/mnt/vep/vep_cache/{}".format(
+                                "VEP_CACHE": "/mnt/disks/vep/vep_cache/{}".format(
                                     _get_base_name(self._vep_cache_path)
                                 ),
                                 "NUM_FORKS": str(self._vep_num_fork),
@@ -245,13 +217,32 @@ class BatchVepRunner:
                                 "OTHER_VEP_OPTS": "--everything --check_ref --allow_non_variant --format vcf",
                             }
                         },
+                        "volumes": [
+                            {
+                                "deviceName": "vep",
+                                "mountPath": "/mnt/disks/vep",
+                                "mountOptions": "rw,async",
+                            }
+                        ],
                     },
                     "taskCount": len(runnables),
                     "parallelism": 1,
                 }
             ],
             "allocationPolicy": {
-                "instances": [{"policy": {"machineType": self._machine_type}}],
+                "instances": [
+                    {
+                        "policy": {
+                            "machineType": self._machine_type,
+                            "disks": [
+                                {
+                                    "newDisk": {"sizeGb": 100, "type": "pd-ssd"},
+                                    "deviceName": "vep",
+                                }
+                            ],
+                        },
+                    }
+                ],
                 "serviceAccount": {
                     "email": self._service_account,
                 },

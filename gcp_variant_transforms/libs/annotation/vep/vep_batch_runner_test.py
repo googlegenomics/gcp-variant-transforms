@@ -27,7 +27,7 @@ _SPECIES = 'homo_sapiens'
 _ASSEMBLY = 'GRCh38'
 _OUTPUT_DIR = 'gs://variant-data/output/annotation/test-vep-batch'
 _VEP_INFO_FIELD = 'VEP_INFO'
-_IMAGE = 'us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/vt_vep@sha256:355f464a68676153bbf37b48ab78bac5d6a330f04ba1175a9378c8d1fc556dca'
+_IMAGE = 'us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/vt_vep:latest'
 _CACHE = 'gs://variant-data/vep/vep_cache_homo_sapiens_GRCh38_104.tar.gz'
 _NUM_FORK = 8
 _PROJECT = 'variant-transform-dxt'
@@ -42,11 +42,8 @@ _WATCHDOG_INTERVAL = 30
 class TestBatchVepRunner(unittest.TestCase):
   def setUp(self):
     credentials = client.GoogleCredentials.get_application_default()
-    self.runner = vep_runner_batch.VepBatchRunner(
-        pipeline_service = discovery.build(
-            'batch', 'v1', credentials=credentials),
-        pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
-        # project=_PROJECT,
+    self.runner =vep_batch_runner.BatchVepRunner(
+        project=_PROJECT,
         location=_LOCATION,
         species=_SPECIES,
         assembly=_ASSEMBLY,
@@ -56,10 +53,27 @@ class TestBatchVepRunner(unittest.TestCase):
         vep_image_uri=_IMAGE,
         vep_cache_path=_CACHE,
         vep_num_fork=_NUM_FORK,
-        # service_account=_SERVICE_ACCOUNT,
-        # machine_type=_MACHINE_TYPE,
-        watchdog_file=_WATCHDOG_FILE,
-        watchdog_file_update_interval_seconds=_WATCHDOG_INTERVAL)
+        service_account=_SERVICE_ACCOUNT,
+        machine_type=_MACHINE_TYPE,
+        watchdog_interval=_WATCHDOG_INTERVAL)
+    # self.runner = vep_runner_batch.VepBatchRunner(
+    #     pipeline_service = discovery.build(
+    #         'batch', 'v1', credentials=credentials),
+    #     pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
+    #     # project=_PROJECT,
+    #     location=_LOCATION,
+    #     species=_SPECIES,
+    #     assembly=_ASSEMBLY,
+    #     input_pattern='gs://variant-data/biovu-cloud-storage/70k/chr22.shapeit2_integrated_snvindels_v2a_27022019_bialleleOnly.GRCh38.phased.70k.vcf',
+    #     output_dir=_OUTPUT_DIR,
+    #     vep_info_field=_VEP_INFO_FIELD,
+    #     vep_image_uri=_IMAGE,
+    #     vep_cache_path=_CACHE,
+    #     vep_num_fork=_NUM_FORK,
+    #     # service_account=_SERVICE_ACCOUNT,
+    #     # machine_type=_MACHINE_TYPE,
+    #     watchdog_file=_WATCHDOG_FILE,
+    #     watchdog_file_update_interval_seconds=_WATCHDOG_INTERVAL)
 
   def test_e2e(self):
     self.runner.run_on_all_files()
