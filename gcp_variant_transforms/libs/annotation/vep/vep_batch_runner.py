@@ -3,12 +3,12 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from gcp_variant_transforms.libs.annotation.vep import vep_runner_util
+
 from apache_beam.io import filesystems
 from googleapiclient import discovery
 from oauth2client import client
 
-_MINIMUM_DISK_SIZE_GB = 200
-_BATCH_VM_IMAGE = "projects/cos-cloud/global/images/cos-stable-101-17162-40-51"
 _GSUTIL_IMAGE = "gcr.io/google.com/cloudsdktool/cloud-sdk"
 _LOCAL_OUTPUT_DIR = "/mnt/disks/vep/output_files"
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + "/output.vcf"
@@ -125,7 +125,7 @@ class BatchVepRunner:
                 "commands": list(args),
             },
             "displayName": name,
-            "ignoreExitStatus": True,
+            # "ignoreExitStatus": True,
         }
         # Unlike Life Sciences, Batch does not have an 'alwaysRun' flag on
         # individual runnables. It fails the task on the first failing runnable.
@@ -137,15 +137,17 @@ class BatchVepRunner:
         runnables = [
             self._make_runnable(
                 "mkdir_vep_cache",
-                self._vep_image_uri, "mkdir", "-p", "/mnt/disks/vep/vep_cache"
+                self._vep_image_uri,
+                "mkdir",
+                "-p",
+                "/mnt/disks/vep/vep_cache",
             ),
             self._make_runnable(
                 "cp_vep_cache",
                 _GSUTIL_IMAGE,
-                "gsutil",
-                "cp",
-                self._vep_cache_path,
-                f"/mnt/disks/vep/vep_cache/{_get_base_name(self._vep_cache_path)}",
+                "sh",
+                "-c",
+                f"gsutil cp {self._vep_cache_path} /mnt/disks/vep/vep_cache/{_get_base_name(self._vep_cache_path)} 2>&1",
             ),
         ]
         for pair in io_pairs:
@@ -178,23 +180,25 @@ class BatchVepRunner:
                     self._make_runnable(
                         "cp_input_file",
                         _GSUTIL_IMAGE,
-                        "gsutil",
-                        "cp",
-                        input_file,
-                        local_input_file,
+                        "sh",
+                        "-c",
+                        f"gsutil cp {input_file} {local_input_file} 2>&1",
                     ),
                     self._make_runnable(
                         "rm_output_dir",
-                        self._vep_image_uri, "rm", "-r", "-f", _LOCAL_OUTPUT_DIR
+                        self._vep_image_uri,
+                        "rm",
+                        "-r",
+                        "-f",
+                        _LOCAL_OUTPUT_DIR,
                     ),
                     action,
                     self._make_runnable(
                         "cp_output_file",
                         _GSUTIL_IMAGE,
-                        "gsutil",
-                        "cp",
-                        _LOCAL_OUTPUT_FILE,
-                        output_file,
+                        "sh",
+                        "-c",
+                        f"gsutil cp {_LOCAL_OUTPUT_FILE} {output_file} 2>&1",
                     ),
                 ]
             )
@@ -225,7 +229,7 @@ class BatchVepRunner:
                             }
                         ],
                     },
-                    "taskCount": len(runnables),
+                    "taskCount": 1,
                     "parallelism": 1,
                 }
             ],
@@ -257,6 +261,10 @@ class BatchVepRunner:
                 raise ValueError(f"Missing required key in job spec: {key}")
 
         return job_spec
+
+    def get_output_pattern(self):
+        # type: () -> str
+        return vep_runner_util.get_output_pattern(self._output_dir)
 
     def run_on_all_files(self):
         matched_files = self._get_matched_files()
