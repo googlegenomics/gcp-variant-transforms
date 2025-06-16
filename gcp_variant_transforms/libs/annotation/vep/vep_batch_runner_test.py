@@ -35,46 +35,46 @@ _LOCATION = 'us-east1'
 _REGION = 'us-east1'
 _SERVICE_ACCOUNT = '704603241590-compute@developer.gserviceaccount.com'
 _MACHINE_TYPE = 'e2-standard-4'
-_WATCHDOG_FILE = 'gs://variant-data/output/annotation/test-vep-batch/watchdog.txt'
+_WATCHDOG_FILE = '/opt/variant_effect_predictor/run_script_with_watchdog.sh'
 _WATCHDOG_INTERVAL = 30
 
 
 class TestBatchVepRunner(unittest.TestCase):
   def setUp(self):
     credentials = client.GoogleCredentials.get_application_default()
-    self.runner =vep_batch_runner.BatchVepRunner(
-        project=_PROJECT,
-        location=_LOCATION,
-        species=_SPECIES,
-        assembly=_ASSEMBLY,
-        input_pattern='gs://variant-data/allChr_onlyTenEach_deidentified.vcf.gz',
-        # input_pattern='gs://variant-data/biovu-cloud-storage/70k/chr22.shapeit2_integrated_snvindels_v2a_27022019_bialleleOnly.GRCh38.phased.70k.vcf',
-        output_dir=_OUTPUT_DIR,
-        vep_info_field=_VEP_INFO_FIELD,
-        vep_image_uri=_IMAGE,
-        vep_cache_path=_CACHE,
-        vep_num_fork=_NUM_FORK,
-        service_account=_SERVICE_ACCOUNT,
-        machine_type=_MACHINE_TYPE,
-        watchdog_interval=_WATCHDOG_INTERVAL)
-    # self.runner = vep_runner_batch.VepBatchRunner(
-    #     pipeline_service = discovery.build(
-    #         'batch', 'v1', credentials=credentials),
-    #     pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
-    #     # project=_PROJECT,
+    # self.runner =vep_batch_runner.BatchVepRunner(
+    #     project=_PROJECT,
     #     location=_LOCATION,
     #     species=_SPECIES,
     #     assembly=_ASSEMBLY,
-    #     input_pattern='gs://variant-data/biovu-cloud-storage/70k/chr22.shapeit2_integrated_snvindels_v2a_27022019_bialleleOnly.GRCh38.phased.70k.vcf',
+    #     input_pattern='gs://variant-data/allChr_onlyTenEach_deidentified.vcf.gz',
+    #     # input_pattern='gs://variant-data/biovu-cloud-storage/70k/chr22.shapeit2_integrated_snvindels_v2a_27022019_bialleleOnly.GRCh38.phased.70k.vcf',
     #     output_dir=_OUTPUT_DIR,
     #     vep_info_field=_VEP_INFO_FIELD,
     #     vep_image_uri=_IMAGE,
     #     vep_cache_path=_CACHE,
     #     vep_num_fork=_NUM_FORK,
-    #     # service_account=_SERVICE_ACCOUNT,
-    #     # machine_type=_MACHINE_TYPE,
-    #     watchdog_file=_WATCHDOG_FILE,
-    #     watchdog_file_update_interval_seconds=_WATCHDOG_INTERVAL)
+    #     service_account=_SERVICE_ACCOUNT,
+    #     machine_type=_MACHINE_TYPE,
+    #     watchdog_interval=_WATCHDOG_INTERVAL)
+    self.runner = vep_runner_batch.VepBatchRunner(
+        pipeline_service = discovery.build(
+            'batch', 'v1', credentials=credentials),
+        pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
+        # project=_PROJECT,
+        location=_LOCATION,
+        species=_SPECIES,
+        assembly=_ASSEMBLY,
+        input_pattern='gs://variant-data/allChr_onlyTenEach_deidentified.vcf.gz',
+        output_dir=_OUTPUT_DIR,
+        vep_info_field=_VEP_INFO_FIELD,
+        vep_image_uri=_IMAGE,
+        vep_cache_path=_CACHE,
+        vep_num_fork=_NUM_FORK,
+        # service_account=_SERVICE_ACCOUNT,
+        # machine_type=_MACHINE_TYPE,
+        watchdog_file=_WATCHDOG_FILE,
+        watchdog_file_update_interval_seconds=_WATCHDOG_INTERVAL)
 
   def test_e2e(self):
     self.runner.run_on_all_files()

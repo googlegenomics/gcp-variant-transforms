@@ -256,22 +256,33 @@ class VepBatchRunner():
                             # "commands": ["mkdir", "-p", vep_cache_dir]
                             self._make_runnable(self._vep_image_uri,
                                 'mkdir', '-p',
-                                '/mnt/vep/vep_cache'),
+                                '/mnt/disks/vep/vep_cache'),
                             # _GSUTIL_IMAGE
                             #"commands": ["gsutil", "-q", "cp", self._vep_cache_path, vep_cache_dir]
                             self._make_runnable(_GSUTIL_IMAGE,
-                                'gsutil', 'cp', self._vep_cache_path, f'/mnt/vep/vep_cache/{_get_base_name(self._vep_cache_path)}'),
+                                "sh",
+                                "-c",
+                                f"gsutil cp {self._vep_cache_path} /mnt/disks/vep/vep_cache/{_get_base_name(self._vep_cache_path)} 2>&1",),
                         ],
                         "environment": {
                             "variables": {
                                 "GENOME_ASSEMBLY": self._assembly,
                                 "SPECIES": self._species,
-                                "VEP_CACHE": f"/mnt/vep/vep_cache/{_get_base_name(self._vep_cache_path)}",
+                                "VEP_CACHE": "/mnt/disks/vep/vep_cache/{}".format(
+                                    _get_base_name(self._vep_cache_path)
+                                ),
                                 "NUM_FORKS": str(self._vep_num_fork),
                                 "VCF_INFO_FILED": self._vep_info_field,
                                 "OTHER_VEP_OPTS": "--everything --check_ref --allow_non_variant --format vcf"
                             }
                         },
+                        "volumes": [
+                            {
+                                "deviceName": "vep",
+                                "mountPath": "/mnt/disks/vep",
+                                "mountOptions": "rw,async",
+                            }
+                        ],
                         "computeResource": {
                             "cpuMilli": 4000,
                             "memoryMib": 8192,
@@ -279,7 +290,8 @@ class VepBatchRunner():
                         },
                         "maxRunDuration": "3600s",
                     },
-                    "taskCount": 1
+                    "taskCount": 1,
+                    "parallelism": 1,
                 }
             ],
             "allocationPolicy": {
@@ -293,9 +305,16 @@ class VepBatchRunner():
                     {
                         "policy": {
                             "machineType": self._machine_type,
-                            "provisioningModel": "STANDARD",
+                            "disks": [
+                                {
+                                    "newDisk": {
+                                        "sizeGb": _MINIMUM_DISK_SIZE_GB,
+                                        "type": "pd-ssd"
+                                    },
+                                    "deviceName": "vep",
+                                }
+                            ],
                         },
-
                     }
                 ],
             },
@@ -309,13 +328,14 @@ class VepBatchRunner():
 
 
     def _make_runnable(self, image_uri, *args, **kwargs):
-        # command_args = list(*args)
+        # type: (str, str, *str, **Any) -> Dict
+        """Creates a Batch API Runnable dictionary."""
         runnable = {
             "container": {
                 "imageUri": image_uri,
-                "commands": args
+                "volumes": ["/mnt/disks/vep:/mnt/disks/vep"],
+                "commands": list(args)
             },
-            "alwaysRun": True
         }
 
         runnable.update(kwargs)
@@ -486,8 +506,8 @@ class VepBatchRunner():
         # type: (vep_runner_util.SingleWorkerActions, str) -> str
         api_request = self._get_batch_job_definition()
         size_gb = io_infos.disk_size_bytes // (1 << 30)
-        api_request[_API_TASKGROUPS][0][_API_TASKSPEC]['computeResource']['bootDiskMib'] = (
-                size_gb + _MINIMUM_DISK_SIZE_GB) * 1024
+        api_request["allocationPolicy"]["instances"][0]["policy"]["disks"][0]["newDisk"]["sizeGb"] = (
+                size_gb + _MINIMUM_DISK_SIZE_GB)
         for input_file, output_file in io_infos.io_map.items():
             api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].extend(
                 self._create_runnables(input_file, output_file))
@@ -496,7 +516,6 @@ class VepBatchRunner():
                     '/google/logs/output',
                     output_log_path))
         # pylint: disable=no-member
-        print(json.dumps(api_request))
         parent = 'projects/{}/locations/{}'.format(self._project, self._location)
         request = self._pipeline_service.projects().locations().jobs().create(
             parent=parent, body=api_request)
@@ -526,38 +545,51 @@ class VepBatchRunner():
     def _create_runnables(self, input_file: str, output_file: str) -> list:
         """Creates a list of Batch v1 `runnables` for processing one input/output pair."""
         base_input = _get_base_name(input_file)
-        local_input_file = f"/mnt/vep/{base_input}"
-
+        local_input_file = "/mnt/disks/vep/{}".format(_get_base_name(input_file))
+        print(local_input_file)
         runnables = []
 
         runnables.append(self._make_runnable(
-            _GSUTIL_IMAGE, "gsutil", "-q", "cp", input_file, local_input_file
+            _GSUTIL_IMAGE,
+            "sh",
+            "-c",
+            f"gsutil cp {input_file} {local_input_file} 2>&1"
         ))
 
         runnables.append(self._make_runnable(
             self._vep_image_uri, "rm", "-r", "-f", _LOCAL_OUTPUT_DIR
         ))
 
-        if self._watchdog_file:
-            runnables.append(self._make_runnable(
-                self._vep_image_uri,
-                _WATCHDOG_RUNNER_SCRIPT,
-                _VEP_RUN_SCRIPT,
-                str(self._watchdog_file_update_interval_seconds),
-                self._watchdog_file,
-                local_input_file,
-                _LOCAL_OUTPUT_FILE
-            ))
-        else:
-            runnables.append(self._make_runnable(
-                self._vep_image_uri,
-                _VEP_RUN_SCRIPT,
-                local_input_file,
-                _LOCAL_OUTPUT_FILE
-            ))
+        runnables.append(self._make_runnable(
+            self._vep_image_uri,
+            _VEP_RUN_SCRIPT,
+            local_input_file,
+            _LOCAL_OUTPUT_FILE
+        ))
+
+        # if self._watchdog_file:
+        #     runnables.append(self._make_runnable(
+        #         self._vep_image_uri,
+        #         _WATCHDOG_RUNNER_SCRIPT,
+        #         _VEP_RUN_SCRIPT,
+        #         str(self._watchdog_file_update_interval_seconds),
+        #         self._watchdog_file,
+        #         local_input_file,
+        #         _LOCAL_OUTPUT_FILE
+        #     ))
+        # else:
+        #     runnables.append(self._make_runnable(
+        #         self._vep_image_uri,
+        #         _VEP_RUN_SCRIPT,
+        #         local_input_file,
+        #         _LOCAL_OUTPUT_FILE
+        #     ))
 
         runnables.append(self._make_runnable(
-            _GSUTIL_IMAGE, "gsutil", "-q", "cp", _LOCAL_OUTPUT_FILE, output_file
+            _GSUTIL_IMAGE,
+            "sh",
+            "-c",
+            f"gsutil cp {_LOCAL_OUTPUT_FILE} {output_file} 2>&1",
         ))
 
         return runnables
