@@ -708,42 +708,18 @@ class PySamParser(VcfParser):
 class FileDescriptorProvider:
     """
     A cross-platform class that provides a file descriptor for inter-process use.
-
-    On Linux, it attempts to use the high-performance /dev/shm (tmpfs). On other
-    platforms (like macOS or Windows), it falls back to the system's default
-    temporary directory.
-
-    It supports two rewind strategies after a write operation:
-    1. TO_START: The FD is always ready for a full read from the beginning.
-    2. BEFORE_LAST_WRITE: The FD is positioned to read only the last chunk of data written.
-
     Best used as a context manager (`with` statement) to guarantee cleanup.
     """
 
     def __init__(self):
-        """
-        Initializes the provider.
-
-        Args:
-            rewind_strategy: The behavior for positioning the cursor after a write.
-                             Defaults to RewindStrategy.TO_START.
-        """
-        
-        # --- Cross-Platform Path Selection ---
-        if sys.platform == "linux" and os.path.exists("/dev/shm"):
-            base_dir = "/dev/shm"
-            print("Platform: Linux. Using /dev/shm for temp file.")
-        else:
-            base_dir = tempfile.gettempdir()
-            platform_name = "macOS/BSD" if sys.platform == "darwin" else sys.platform
-            print(f"Platform: {platform_name}. Falling back to default temp dir: {base_dir}")
-        
+        # TODO: consider using /dev/shm if available
+        base_dir = tempfile.gettempdir()
         self._name: str = os.path.join(base_dir, str(uuid.uuid4()))
         self._temp_file = open(self._name, "w+b")
 
         self._fd: int = self._temp_file.fileno()
         self._is_closed: bool = False
-        print(f"File Descriptor Provider Initialized: File '{self._name}' created, FD={self._fd}")
+        logging.debug(f"File Descriptor Provider Initialized: File '{self._name}' created, FD={self._fd}")
 
     @property
     def fd(self) -> int:
@@ -785,12 +761,12 @@ class FileDescriptorProvider:
         Closes the file handle and deletes the temporary file from the filesystem.
         """
         if not self._is_closed:
-            print(f"Closing File Descriptor Provider: Deleting file '{self._name}' and closing FD={self._fd}.")
+            logging.debug(f"Closing File Descriptor Provider: Deleting file '{self._name}' and closing FD={self._fd}.")
             self._temp_file.close()
-            # try:
-            #     os.remove(self._name)
-            # except FileNotFoundError:
-            #     pass
+            try:
+                os.remove(self._name)
+            except FileNotFoundError:
+                pass
             self._is_closed = True
 
     def __enter__(self):
@@ -799,7 +775,7 @@ class FileDescriptorProvider:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
     
-class PySamParserWithSocket(PySamParser):
+class PySamParserWithFileStreaming(PySamParser):
   def __init__(
     self,
     file_name,  # type: str
@@ -858,6 +834,7 @@ class PySamParserWithSocket(PySamParser):
     """
     self._text_streamer.write_line(data_line)
     try:
+        # only for the first data line
         if self._vcf_reader is None:
             self._text_streamer.rewind()
             self._vcf_reader = libcbcf.VariantFile(self._text_streamer._temp_file.name, 'r')
