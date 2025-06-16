@@ -787,10 +787,10 @@ class FileDescriptorProvider:
         if not self._is_closed:
             print(f"Closing File Descriptor Provider: Deleting file '{self._name}' and closing FD={self._fd}.")
             self._temp_file.close()
-            try:
-                os.remove(self._name)
-            except FileNotFoundError:
-                pass
+            # try:
+            #     os.remove(self._name)
+            # except FileNotFoundError:
+            #     pass
             self._is_closed = True
 
     def __enter__(self):
@@ -860,8 +860,7 @@ class PySamParserWithSocket(PySamParser):
     try:
         if self._vcf_reader is None:
             self._text_streamer.rewind()
-            self._vcf_reader = libcbcf.VariantFile(self._text_streamer.fd, 'r')
-            self._text_streamer._temp_file.seek(-(len(data_line) + 1), os.SEEK_END)
+            self._vcf_reader = libcbcf.VariantFile(self._text_streamer._temp_file.name, 'r')
         record = next(iter(self._vcf_reader))
         variant = self._convert_to_variant(record)
         return variant
