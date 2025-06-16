@@ -61,7 +61,7 @@ _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 _WATCHDOG_RUNNER_SCRIPT = (
     '/opt/variant_effect_predictor/run_script_with_watchdog.sh')
 # The local name of the output file and directory for VEP runs.
-_LOCAL_OUTPUT_DIR = '/mnt/vep/output_files'
+_LOCAL_OUTPUT_DIR = '/mnt/disks/vep/output_files'
 _LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + '/output.vcf'
 
 # The time between operation polling rounds.
@@ -511,10 +511,15 @@ class VepBatchRunner():
         for input_file, output_file in io_infos.io_map.items():
             api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].extend(
                 self._create_runnables(input_file, output_file))
-            api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].append(
-                self._make_runnable(_GSUTIL_IMAGE, 'gsutil', 'cp',
-                    '/google/logs/output',
-                    output_log_path))
+            # Todo: Temporary disable this as we don't know the usage of this
+            # It seems like this gonna copy the log file to gs but the path '/google/logs/output'
+            # haven't been created.
+            #
+            # api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].append(
+            #     self._make_runnable(_GSUTIL_IMAGE, 'gsutil', 'cp',
+            #         '/google/logs/output',
+            #         output_log_path))
+            #
         # pylint: disable=no-member
         parent = 'projects/{}/locations/{}'.format(self._project, self._location)
         request = self._pipeline_service.projects().locations().jobs().create(
