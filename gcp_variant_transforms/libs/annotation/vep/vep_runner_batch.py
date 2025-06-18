@@ -405,8 +405,8 @@ class VepBatchRunner():
         while num_retries < _NUMBER_OF_API_CALL_RETRIES:
             if not self._running_operation_ids:
                 return
-        self._running_operation_ids = self._wait_and_retry_operations()
-        num_retries += 1
+            self._running_operation_ids = self._wait_and_retry_operations()
+            num_retries += 1
 
         raise RuntimeError('Annotations for the input {} failed after {} '
                         'retries.'.format(self._input_pattern,
@@ -453,25 +453,24 @@ class VepBatchRunner():
         # TODO(bashir2): Silence the log messages of googleapiclient.discovery
         # module for the next call of the API since they flood the log file.
         # pylint: disable=no-member
-        request = self._pipeline_service.projects().locations().operations().get(
+        request = self._pipeline_service.projects().locations().jobs().get(
             name=operation)
-        is_done = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES).get(
-            'done')
+        job = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)
+        state = job.get("status", {}).get("state")
         # TODO(bashir2): Add better monitoring and log progress within each
         # operation instead of just checking `done`.
-        if is_done:
-            logging.info('Operation %s is done.', operation)
-        return is_done
+        logging.info("Job %s state: %s", operation, state)
+        return state in ("SUCCEEDED", "FAILED", "DELETION_IN_PROGRESS")
 
     def _get_error_message(self, operation):
-        request = self._pipeline_service.projects().locations().operations().get(
-            name=operation)
-        try:
-            errors = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)['error']
-            return errors['message']
-        except KeyError:
-            logging.info('Operation %s is succeed.', operation)
-        return ''
+        request = self._pipeline_service.projects().locations().jobs().get(name=operation)
+        job = request.execute(num_retries=_NUMBER_OF_API_CALL_RETRIES)
+        if job.get("status", {}).get("state") == "FAILED":
+            events = job["status"].get("statusEvents", [])
+            if events:
+                return events[-1].get("description", "No detailed error message.")
+            return "Job failed without detailed error."
+        return ""
 
     def run_on_all_files(self):
         # type: () -> None
