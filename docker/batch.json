@@ -1,0 +1,73 @@
+{
+  "taskGroups": [
+    {
+      "taskSpec": {
+        "runnables": [
+          {
+            "container": {
+              "imageUri": "gcr.io/google.com/cloudsdktool/cloud-sdk:slim",
+              "entrypoint": "bash",
+              "commands": [
+                "-c",
+                "mkdir -p /mnt/disks/google/.google/tmp"
+              ],
+              "volumes": ["/mnt/disks/google:/mnt/disks/google"]
+            }
+          },
+          {
+            "container": {
+              "imageUri": "us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/batch-runner:latest",
+              "entrypoint": "bash",
+              "commands": [
+                "-c",
+                "$COMMAND $DF_REQUIRED_ARGS $DF_OPTIONAL_ARGS"
+              ],
+              "volumes": ["/mnt/disks/google:/mnt/disks/google"]
+            }
+          }
+        ],
+        "environment": {
+          "variables": {
+            "TMPDIR": "/mnt/disks/google/.google/tmp"
+          }
+        },
+        "volumes": [
+          {
+            "deviceName": "google",
+            "mountPath": "/mnt/disks/google",
+            "mountOptions": "rw,async"
+          }
+        ]
+      },
+      "taskCount": 1
+    }
+  ],
+  "allocationPolicy": {
+    "serviceAccount": {
+      "email": "$SERVICE_ACCOUNT_EMAIL",
+      "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/devstorage.read_write"
+      ]
+    },
+    "instances": [
+      {
+        "policy": {
+          "machineType": "e2-standard-2",
+          "disks": [
+            {
+              "newDisk": {
+                "type": "pd-ssd",
+                "sizeGb": 100
+              },
+              "deviceName": "google"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "logsPolicy": {
+    "destination": "CLOUD_LOGGING"
+  }
+}
