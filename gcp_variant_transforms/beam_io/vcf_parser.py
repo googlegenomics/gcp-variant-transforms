@@ -24,6 +24,11 @@ import enum
 from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
+import uuid
+import os
+import sys
+import tempfile
+from enum import Enum, auto
 
 from apache_beam.coders import coders
 from apache_beam.io import filesystems
@@ -699,73 +704,78 @@ class PySamParser(VcfParser):
 
     return hom_ref_calls, calls
 
-class TextStreamer:
+
+class FileDescriptorProvider:
     """
-    A class that manages a stream with file descriptors for writing and reading text lines.
-    Uses socket.socketpair() to create connected sockets with file descriptors.
+    A cross-platform class that provides a file descriptor for inter-process use.
+    Best used as a context manager (`with` statement) to guarantee cleanup.
     """
-    
+
     def __init__(self):
-        """Initialize the StreamReader with connected sockets for read/write operations."""
-        # Create a pair of connected sockets
-        self.read_socket, self.write_socket = socket.socketpair()
-        self.read_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024*1024)  # 1MB
-        self.write_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024*1024)  # 1MB
-        
-        # Get file descriptors
-        self.read_fd = self.read_socket.fileno()
-        self.write_fd = self.write_socket.fileno()
-        
-        # Create file objects from the sockets
-        self.write_file = self.write_socket.makefile('w')
-        
-        self._closed = False
-    
-    def write_line(self, line: str) -> None:
-        """
-        Write a text line to the stream.
-        
-        Args:
-            line (str): The text line to write to the stream
-        """
-        if self._closed:
-            raise ValueError("StreamReader is closed")
-        
-        # Ensure line ends with newline
-        if not line.endswith('\n'):
-            line += '\n'
-        
-        self.write_file.write(line)
-        self.write_file.flush()  # Ensure data is written immediately
-    
-    def close(self) -> None:
-        """Close both read and write sides of the stream."""
-        if not self._closed:
-            if hasattr(self, 'write_socket'):
-                try:
-                    self.write_socket.close()
-                except (OSError, ValueError):
-                    pass  # Already closed
-            if hasattr(self, 'read_socket'):
-                try:
-                    self.read_socket.close()
-                except (OSError, ValueError):
-                    pass  # Already closed
-            self._closed = True
-    
+        # TODO: consider using /dev/shm if available
+        base_dir = tempfile.gettempdir()
+        self._name: str = os.path.join(base_dir, str(uuid.uuid4()))
+        self._temp_file = open(self._name, "w+b")
+
+        self._fd: int = self._temp_file.fileno()
+        self._is_closed: bool = False
+        logging.debug(f"File Descriptor Provider Initialized: File '{self._name}' created, FD={self._fd}")
+
     @property
-    def read_fd_number(self) -> int:
+    def fd(self) -> int:
+        """Returns the integer file descriptor, ready for reading per the chosen strategy."""
+        if self._is_closed:
+            raise ValueError("Cannot access fd of a closed provider.")
+        return self._fd
+
+    @property
+    def name(self) -> str:
+        """Returns the full path to the temporary file."""
+        if self._is_closed:
+            raise ValueError("Cannot access name of a closed provider.")
+        return self._name
+
+    def rewind(self):
+        """Rewinds the file cursor to the beginning of the file."""
+        self._temp_file.seek(0, os.SEEK_SET)
+
+    def write_line(self, data: str):
         """
-        Get the read file descriptor for client use.
-        
-        Returns:
-            int: The read file descriptor that clients can use directly
+        Appends data to the file and resets the read cursor based on the chosen strategy.
         """
-        if self._closed:
-            raise ValueError("StreamReader is closed")
-        return self.read_fd
+        if self._is_closed:
+            raise ValueError("Cannot write to a closed provider.")
+        if not isinstance(data, str):
+            raise TypeError("Data must be in str.")
+
+        if not data.endswith("\n"):
+            data += "\n"
+        # Always append to the end of the file
+        self._temp_file.seek(0, os.SEEK_END)
+        bytes_written = self._temp_file.write(data.encode())
+        self._temp_file.flush()
+        self._temp_file.seek(-bytes_written, os.SEEK_END)
+
+    def close(self):
+        """
+        Closes the file handle and deletes the temporary file from the filesystem.
+        """
+        if not self._is_closed:
+            logging.debug(f"Closing File Descriptor Provider: Deleting file '{self._name}' and closing FD={self._fd}.")
+            self._temp_file.close()
+            try:
+                os.remove(self._name)
+            except FileNotFoundError:
+                pass
+            self._is_closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
     
-class PySamParserWithSocket(PySamParser):
+class PySamParserWithFileStreaming(PySamParser):
   def __init__(
     self,
     file_name,  # type: str
@@ -800,7 +810,7 @@ class PySamParserWithSocket(PySamParser):
     self._process_pid = None
     self._encoded_sample_names = {}
 
-    self._text_streamer = TextStreamer()
+    self._text_streamer = FileDescriptorProvider()
     self._vcf_reader = None
 
   def _init_with_header(self, header_lines):
@@ -824,8 +834,10 @@ class PySamParserWithSocket(PySamParser):
     """
     self._text_streamer.write_line(data_line)
     try:
+        # only for the first data line
         if self._vcf_reader is None:
-            self._vcf_reader = libcbcf.VariantFile(self._text_streamer.read_fd_number, 'r')
+            self._text_streamer.rewind()
+            self._vcf_reader = libcbcf.VariantFile(self._text_streamer._temp_file.name, 'r')
         record = next(iter(self._vcf_reader))
         variant = self._convert_to_variant(record)
         return variant
