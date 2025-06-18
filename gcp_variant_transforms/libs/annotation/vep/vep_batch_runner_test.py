@@ -21,7 +21,7 @@ from typing import List  # pylint: disable=unused-import
 
 from googleapiclient import discovery
 from oauth2client import client
-from gcp_variant_transforms.libs.annotation.vep import vep_batch_runner, vep_runner_batch
+from gcp_variant_transforms.libs.annotation.vep import vep_runner_batch
 
 _SPECIES = 'homo_sapiens'
 _ASSEMBLY = 'GRCh38'
