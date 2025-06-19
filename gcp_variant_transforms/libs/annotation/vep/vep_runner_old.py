@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# DEPRECATED: This module has been deprecated as of July 2025 and is no longer in use.
+# Please use the new VEP runner implementation instead.
 
 import argparse  # pylint: disable=unused-import
 import logging
@@ -95,7 +97,11 @@ def create_runner(known_args, pipeline_args, input_pattern, watchdog_file,
 
 
 class VepRunner():
-  """A class for running vep through Pipelines API on a set of input files."""
+  """A class for running vep through Pipelines API on a set of input files.
+  
+  DEPRECATED: This class has been deprecated as of July 2025 and is no longer in use.
+  Please use the new VEP runner implementation instead.
+  """
 
   _VEP_CACHE_BASE = ('gs://cloud-lifesciences/vep/'
                      'vep_cache_{species}_{assembly}_104.tar.gz')
@@ -121,6 +127,9 @@ class VepRunner():
 
     Note that external users of this class can use create_runner_and_update_args
     function of this module to create an instance of this class from flags.
+
+    DEPRECATED: This class has been deprecated as of July 2025 and is no longer in use.
+    Please use the new VEP runner implementation instead.
 
     Args:
       location: The Life Sciences API location to use.
