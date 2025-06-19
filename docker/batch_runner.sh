@@ -22,7 +22,7 @@ set -euo pipefail
 #################################################
 function parse_args {
   # getopt command is only for checking arguments.
-  getopt -o '' -l project:,temp_location:,docker_image:,sdk_container_image:,region:,subnetwork:,use_public_ips:,service_account:,location:,service_account_credentials: -- "$@"
+  getopt -o '' -l project:,temp_location:,docker_image:,sdk_container_image:,region:,subnetwork:,use_public_ips:,service_account:,location: -- "$@"
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
       --project)
@@ -61,10 +61,6 @@ function parse_args {
         service_account="$2"
         ;;
 
-      --service_account_credentials)
-        service_account_credentials="$2"
-        ;;
-
       *)
         command="$@"
         break
@@ -91,7 +87,6 @@ function main {
   subnetwork="${subnetwork:-}"
   use_public_ips="${use_public_ips:-}"
   service_account="${service_account:-}"
-  service_account_credentials="${service_account_credentials:-}"
 
   if [[ -z "${google_cloud_project}" ]]; then
     echo "Please set the google cloud project using flag --project PROJECT."
@@ -160,18 +155,6 @@ function main {
   export LOG_TIME=$(date +%Y%m%d_%H%M%S)
   export SERVICE_ACCOUNT_EMAIL="${service_account}"
   export GOOGLE_APPLICATION_CREDENTIALS="/root/.config/gcloud/application_default_credentials.json"
-
-  # Activate the service account if GOOGLE_APPLICATION_CREDENTIALS is set.
-  # if [ ! -f "${SERVICE_ACCOUNT_EMAIL}" ]; then
-  #   echo "Not found: ${SERVICE_ACCOUNT_EMAIL}. Please set it to the path of your service account key file."
-  #   echo "Use default credentials"
-  # else
-  #   export GOOGLE_APPLICATION_CREDENTIALS="${SERVICE_ACCOUNT_EMAIL}"
-  #   gcloud auth activate-service-account --key-file="${SERVICE_ACCOUNT_CREDENTIALS}"
-  # fi
-
-  # Authenticate with the Google Cloud project.
-  # gcloud auth application-default login
 
   # Create the batch.json file using envsubst to replace variables.
   envsubst < /opt/gcp_variant_transforms/src/docker/batch.json > batch.json

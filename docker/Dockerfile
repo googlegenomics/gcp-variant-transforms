@@ -15,22 +15,18 @@
 # To build a new docker image, run the following from the root source dir:
 # $ docker build . -f docker/Dockerfile -t $IMAGE_NAME
 
-FROM golang:latest 
-RUN go install -ldflags '-extldflags "-fno-PIC -static"' -buildmode pie -tags 'osusergo netgo static_build' github.com/googlegenomics/pipelines-tools/pipelines@latest
-
-FROM apache/beam_python3.8_sdk:2.37.0
+FROM apache/beam_python3.12_sdk:2.65.0
 ARG commit_sha
 ENV COMMIT_SHA=${commit_sha}
 
-COPY --from=0 /go/bin/pipelines /usr/bin
-
 # install gcloud sdk
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - 
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && apt-get update -y && apt-get install google-cloud-cli -y
 
 # g++ Needed for installing mmh3 (one of the required packages in setup.py).
 # Install Pysam dependencies. These dependencies are only required because we
 # have a monolithic binary - they primarily have to be installed on the workers.
 RUN apt-get update && apt-get install -y \
+    gettext \
     apt-transport-https \
     autoconf \
     automake \
@@ -50,7 +46,7 @@ RUN apt-get update && apt-get install -y \
 
 
 RUN mkdir -p /opt/gcp_variant_transforms/bin && mkdir -p /opt/gcp_variant_transforms/src
-ADD / /opt/gcp_variant_transforms/src/
+COPY /requirements.txt /opt/gcp_variant_transforms/src/requirements.txt
 
 # Install dependencies.
 RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
@@ -60,6 +56,8 @@ RUN python3 -m venv /opt/gcp_variant_transforms/venv3 && \
     python3 -m pip install --upgrade pip && \
     python3 -m pip install --upgrade wheel && \
     python3 -m pip install --upgrade -r requirements.txt
+
+COPY / /opt/gcp_variant_transforms/src/
 
 RUN printf '#!/bin/bash\n%s\n%s' \
       ". /opt/gcp_variant_transforms/venv3/bin/activate && cd /opt/gcp_variant_transforms/src" \
@@ -79,4 +77,4 @@ RUN printf '#!/bin/bash\n%s\n%s' \
       /opt/gcp_variant_transforms/bin/bq_to_vcf && \
     chmod +x /opt/gcp_variant_transforms/bin/bq_to_vcf
 
-ENTRYPOINT ["/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh"]
+ENTRYPOINT ["/opt/gcp_variant_transforms/src/docker/batch_runner.sh"]
