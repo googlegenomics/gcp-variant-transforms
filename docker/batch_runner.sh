@@ -140,14 +140,6 @@ function main {
     df_optional_args="${df_optional_args} --service_account_email ${service_account}"
   fi
 
-  # Optional location for Life Sciences API (default us-central1), see currently available
-  # locations here: https://cloud.google.com/life-sciences/docs/concepts/locations
-  l_s_location=""
-  if [[ ! -z "${location}" ]]; then
-    echo "Adding --location ${location} to Life Sciences API invocation command."
-    l_s_location="--location ${location}"
-  fi
-
   export COMMAND="/opt/gcp_variant_transforms/bin/${command}"
   export DF_OPTIONAL_ARGS="${df_optional_args}"
   export DF_REQUIRED_ARGS="${df_required_args}"
@@ -155,14 +147,14 @@ function main {
   export LOG_TIME=$(date +%Y%m%d_%H%M%S)
   export SERVICE_ACCOUNT_EMAIL="${service_account}"
   export GOOGLE_APPLICATION_CREDENTIALS="/root/.config/gcloud/application_default_credentials.json"
+  job_name=$(echo "$command" | head -n1 | awk '{print $1}' | tr '_' '-')
 
   # Create the batch.json file using envsubst to replace variables.
   envsubst < /opt/gcp_variant_transforms/src/docker/batch.json > batch.json
 
-  # GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS}" \
-  gcloud batch jobs submit test-batch-job-`date +"%Y%m%d%H%M%S"` \
+  gcloud batch jobs submit "${job_name}"-`date +"%Y%m%d%H%M%S"` \
     --config=batch.json \
-    --location="${region}"
+    --location="${location}"
 }
 
 main "$@"
