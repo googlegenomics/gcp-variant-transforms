@@ -22,7 +22,7 @@ from typing import List, Optional  # pylint: disable=unused-import
 import apache_beam as beam
 from apache_beam.io import filesystems
 
-from gcp_variant_transforms.libs.annotation.vep import  vep_runner, vep_runner_batch
+from gcp_variant_transforms.libs.annotation.vep import  vep_runner
 
 _WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS = 30
 
@@ -59,7 +59,7 @@ class AnnotateFile(beam.DoFn):
 
   def _annotate_files(self, input_pattern, watchdog_file):
     # type: (str, Optional[str]) -> None
-    runner = vep_runner_batch.create_runner(self._known_args,
+    runner = vep_runner.create_runner(self._known_args,
                                       self._pipeline_args,
                                       input_pattern,
                                       watchdog_file,

@@ -21,7 +21,7 @@ from typing import List  # pylint: disable=unused-import
 
 from googleapiclient import discovery
 from oauth2client import client
-from gcp_variant_transforms.libs.annotation.vep import vep_runner_batch
+from gcp_variant_transforms.libs.annotation.vep import vep_runner
 
 _SPECIES = 'homo_sapiens'
 _ASSEMBLY = 'GRCh38'
@@ -42,7 +42,7 @@ _WATCHDOG_INTERVAL = 30
 class TestBatchVepRunner(unittest.TestCase):
   def setUp(self):
     credentials = client.GoogleCredentials.get_application_default()
-    self.runner = vep_runner_batch.VepBatchRunner(
+    self.runner = vep_runner.VepBatchRunner(
         pipeline_service = discovery.build(
             'batch', 'v1', credentials=credentials),
         pipeline_args=["--project=variant-transform-dxt", "--max_num_workers=10", "--location=us-central1"],
