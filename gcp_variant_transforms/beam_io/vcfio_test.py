@@ -259,12 +259,12 @@ class VcfSourceTest(unittest.TestCase):
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_single_file_large(self):
     test_data_conifgs = [
-        # {'file': 'valid-4.0.vcf', 'num_records': 5},
+        {'file': 'valid-4.0.vcf', 'num_records': 5},
         {'file': 'test_read_file.vcf', 'num_records': 8},
-        # {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
-        # {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
-        # {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
-        # {'file': 'valid-4.2.vcf', 'num_records': 13},
+        {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
+        {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
+        {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
+        {'file': 'valid-4.2.vcf', 'num_records': 13},
     ]
     for config in test_data_conifgs:
       read_data = self._read_records(
@@ -736,11 +736,9 @@ class VcfSourceTest(unittest.TestCase):
     self.assertEqual(expected_variant, read_data[0])
 
   def test_pipeline_read_single_file(self):
-    import pprint as pp
     with TempDir() as tempdir:
       file_name = self._create_temp_vcf_file(
           _SAMPLE_HEADER_LINES + _SAMPLE_TEXT_LINES, tempdir)
-      pp.pprint(file_name)
       self._assert_pipeline_read_files_record_count_equal(
           file_name, len(_SAMPLE_TEXT_LINES))
 
