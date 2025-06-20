@@ -16,7 +16,7 @@
           },
           {
             "container": {
-              "imageUri": "us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/batch-runner:latest",
+              "imageUri": "$VT_DOCKER_IMAGE",
               "entrypoint": "bash",
               "commands": [
                 "-c",

@@ -79,7 +79,7 @@ function main {
   # If missing, we will try to find the default values.
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   region="${region:-$(gcloud config get-value compute/region)}"
-  vt_docker_image="${vt_docker_image:-us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/vt_vep:sieu_test_batch}"
+  vt_docker_image="${vt_docker_image:-us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/batch-runner:latest}"
 
   sdk_container_image="${sdk_container_image:-}"
   location="${location:-}"
@@ -141,6 +141,7 @@ function main {
   fi
 
   export COMMAND="/opt/gcp_variant_transforms/bin/${command}"
+  export VT_DOCKER_IMAGE="${vt_docker_image}"
   export DF_OPTIONAL_ARGS="${df_optional_args}"
   export DF_REQUIRED_ARGS="${df_required_args}"
   export TEMP_LOCATION="${temp_location}"
