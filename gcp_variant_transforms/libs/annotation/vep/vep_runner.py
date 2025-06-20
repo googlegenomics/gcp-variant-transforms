@@ -290,7 +290,6 @@ class VepRunner:
         # type: (List[str]) -> None
         flags_dict = pipeline_options.PipelineOptions(pipeline_args).get_all_options()
         self._project = self._get_flag(flags_dict, "project")
-        self._region = self._get_flag(flags_dict, "region")
         # TODO(bahsir2): Fix the error messages of _check_flag since
         # --worker_machine_type has dest='machine_type'.
         try:
