@@ -79,9 +79,9 @@ function main {
   # If missing, we will try to find the default values.
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   region="${region:-$(gcloud config get-value compute/region)}"
-  vt_docker_image="${vt_docker_image:-gcr.io/cloud-lifesciences/gcp-variant-transforms}"
-  sdk_container_image="${sdk_container_image:-gcr.io/cloud-lifesciences/variant-transforms-custom-runner:latest}"
+  vt_docker_image="${vt_docker_image:-us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/batch-runner:latest}"
 
+  sdk_container_image="${sdk_container_image:-}"
   location="${location:-}"
   temp_location="${temp_location:-}"
   subnetwork="${subnetwork:-}"
@@ -140,28 +140,22 @@ function main {
     df_optional_args="${df_optional_args} --service_account_email ${service_account}"
   fi
 
-  # Optional location for Life Sciences API (default us-central1), see currently available
-  # locations here: https://cloud.google.com/life-sciences/docs/concepts/locations
-  l_s_location=""
-  if [[ ! -z "${location}" ]]; then
-    echo "Adding --location ${location} to Life Sciences API invocation command."
-    l_s_location="--location ${location}"
-  fi
+  export COMMAND="/opt/gcp_variant_transforms/bin/${command}"
+  export VT_DOCKER_IMAGE="${vt_docker_image}"
+  export DF_OPTIONAL_ARGS="${df_optional_args}"
+  export DF_REQUIRED_ARGS="${df_required_args}"
+  export TEMP_LOCATION="${temp_location}"
+  export LOG_TIME=$(date +%Y%m%d_%H%M%S)
+  export SERVICE_ACCOUNT_EMAIL="${service_account}"
+  export GOOGLE_APPLICATION_CREDENTIALS="/root/.config/gcloud/application_default_credentials.json"
+  job_name=$(echo "$command" | head -n1 | awk '{print $1}' | tr '_' '-')
 
-  pipelines --project "${google_cloud_project}" ${l_s_location} run \
-    --command "/opt/gcp_variant_transforms/bin/${command} ${df_required_args} ${df_optional_args}" \
-    --output "${temp_location}"/runner_logs_$(date +%Y%m%d_%H%M%S).log \
-    --output-interval 200s \
-    --wait \
-    --scopes "https://www.googleapis.com/auth/cloud-platform" \
-    --regions "${region}" \
-    --image "${vt_docker_image}" \
-    --machine-type "g1-small" \
-    --pvm-attempts 0 \
-    --attempts 1 \
-    --disk-size 10 \
-    --boot-disk-size 100 \
-    ${pt_optional_args}
+  # Create the batch.json file using envsubst to replace variables.
+  envsubst < /opt/gcp_variant_transforms/src/docker/batch.json > batch.json
+
+  gcloud batch jobs submit "${job_name}"-`date +"%Y%m%d%H%M%S"` \
+    --config=batch.json \
+    --location="${location}"
 }
 
 main "$@"
