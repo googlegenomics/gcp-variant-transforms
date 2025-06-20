@@ -229,7 +229,7 @@ class _VcfSource(filebasedsource.FileBasedSource):
                    range_tracker  # type: range_trackers.OffsetRangeTracker
                   ):
     # type: (...) -> Iterable[MalformedVcfRecord]
-    record_iterator = vcf_parser.PySamParser(
+    record_iterator = vcf_parser.PySamParserWithFileStreaming(
         file_name,
         range_tracker,
         self._compression_type,
@@ -290,7 +290,7 @@ class ReadFromBGZF(beam.PTransform):
     # type: (Tuple[str, Block]) -> Iterable(Variant)
     """Reads records from `file_path` in `block`."""
     (file_path, block) = file_path_and_block_tuple
-    record_iterator = vcf_parser.PySamParser(
+    record_iterator = vcf_parser.PySamParserWithFileStreaming(
         file_path,
         block,
         filesystems.CompressionTypes.GZIP,

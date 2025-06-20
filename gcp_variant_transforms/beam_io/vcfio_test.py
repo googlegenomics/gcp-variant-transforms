@@ -263,7 +263,7 @@ class VcfSourceTest(unittest.TestCase):
         {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
         {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
         {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
-        {'file': 'valid-4.2.vcf', 'num_records': 13},
+        {'file': 'valid-4.2.vcf', 'num_records': 13}
     ]
     for config in test_data_conifgs:
       read_data = self._read_records(
