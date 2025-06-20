@@ -52,9 +52,6 @@ setuptools.setup(
 
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
-    package_data={
-        'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
-    },
     install_requires=[
         'pysam',
         'avro-python3',
