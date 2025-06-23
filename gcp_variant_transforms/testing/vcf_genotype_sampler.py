@@ -38,7 +38,7 @@ def get_vcf_info(vcf_path: str) -> Tuple[int, List[str]]:
 
 
 def process_vcf_in_chunks(
-    vcf_path: str, sample_rate: float = ROW_SAMPLE_RATE, chunk_size: int = CHUNK_SIZE
+    vcf_path: str, used_1_based_coordinate:bool, sample_rate: float = ROW_SAMPLE_RATE, chunk_size: int = CHUNK_SIZE, 
 ) -> Tuple[Dict, collections.Counter, int, int]:
     """Process VCF file in chunks to avoid memory issues"""
 
@@ -86,7 +86,8 @@ def process_vcf_in_chunks(
 
         # Process this chunk
         chunk_genotypes, chunk_counts, chunk_total, chunk_nocalls = process_chunk(
-            chunk_df, sample_names, genotype_samples
+            chunk_df, sample_names, genotype_samples, 
+            used_1_based_coordinate = used_1_based_coordinate
         )
 
         # Update global counters
@@ -123,7 +124,8 @@ def process_vcf_in_chunks(
 
 
 def process_chunk(
-    chunk_df: pd.DataFrame, sample_names: List[str], genotype_samples: Dict
+    chunk_df: pd.DataFrame, sample_names: List[str], genotype_samples: Dict,
+    used_1_based_coordinate = False
 ) -> Tuple[Dict, collections.Counter, int, int]:
     """Process a single chunk of the VCF file"""
 
@@ -153,7 +155,7 @@ def process_chunk(
                 genotype_samples[genotype_str].append(
                     {
                         "reference_name": reference_name,
-                        "start_position": start_position,
+                        "start_position": start_position - (int(not used_1_based_coordinate)),
                         "sample_name": sample_name,
                         "genotype": genotype_str,
                     }
@@ -272,6 +274,12 @@ Output CSV columns:
     )
 
     parser.add_argument(
+        "--used-1-based-coordinate",
+        action="store_true",
+        help="This flag indicated that the data in BigQuery is 1-based coordinate"
+    )
+
+    parser.add_argument(
         "--full-file",
         action="store_true",
         help="Process entire file without row sampling",
@@ -312,7 +320,7 @@ Output CSV columns:
 
     # Process VCF data in chunks
     genotype_samples, genotype_counts, total_genotypes, nocall_count = (
-        process_vcf_in_chunks(args.vcf_file, sample_rate, args.chunk_size)
+        process_vcf_in_chunks(args.vcf_file, args.used_1_based_coordinate, sample_rate, args.chunk_size)
     )
 
     # Create output DataFrame
