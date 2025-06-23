@@ -45,8 +45,9 @@ def normalize_csv_genotype(genotype_str: str):
     if not genotype_str or genotype_str in ["./.", ".|.", "."]:
         return "./."
 
-    # Return the genotype exactly as it appears in the CSV
     # This will be compared against the BigQuery genotype after conversion
+    if "|" in genotype_str:
+        genotype_str = "/".join(genotype_str.split("|"))
     return genotype_str
 
 
@@ -267,8 +268,7 @@ def compare_csv_bigquery(
                 batch_df = fetch_bigquery_data(client, query)
 
                 # Add chromosome info to the dataframe if not present
-                if "reference_name" not in batch_df.columns:
-                    batch_df["reference_name"] = chrom
+                batch_df["reference_name"] = chrom
 
                 all_bq_data.append(batch_df)
 

@@ -153,7 +153,7 @@ def process_chunk(
                 genotype_samples[genotype_str].append(
                     {
                         "reference_name": reference_name,
-                        "start_position": start_position,
+                        "start_position": start_position - 1,
                         "sample_name": sample_name,
                         "genotype": genotype_str,
                     }
