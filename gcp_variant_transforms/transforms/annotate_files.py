@@ -52,7 +52,7 @@ class AnnotateFile(beam.DoFn):
     t = threading.Thread(target=self._annotate_files,
                          args=(input_pattern, watchdog_file,))
     t.start()
-    while t.isAlive():
+    while t.is_alive():
       with filesystems.FileSystems.create(watchdog_file) as file_to_write:
         file_to_write.write(b'Watchdog file.')
       time.sleep(_WATCHDOG_FILE_UPDATE_INTERVAL_SECONDS)

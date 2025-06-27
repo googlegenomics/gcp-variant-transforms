@@ -24,12 +24,22 @@ import enum
 from typing import Iterable  # pylint: disable=unused-import
 import logging
 import os
+import uuid
+import os
+import sys
+import tempfile
+from enum import Enum, auto
 
 from apache_beam.coders import coders
 from apache_beam.io import filesystems
 from apache_beam.io import textio
 from pysam import libcbcf
+import pysam
+import tempfile
+from io import StringIO
 
+import socket
+from typing import Iterator
 from gcp_variant_transforms.beam_io import bgzf
 from gcp_variant_transforms.libs import hashing_util
 
@@ -314,11 +324,11 @@ class VcfParser():
           **kwargs)
     else:
       text_source = textio._TextSource(
-          file_pattern,
-          0,  # min_bundle_size
-          compression_type,
-          True,  # strip_trailing_newlines
-          coders.StrUtf8Coder(),  # coder
+          file_pattern=file_pattern,
+          min_bundle_size=0,  # min_bundle_size
+          compression_type=compression_type,
+          strip_trailing_newlines=True,  # strip_trailing_newlines
+          coder=coders.StrUtf8Coder(),  # coder
           validate=False,
           header_processor_fns=(
               lambda x: not x.strip() or x.startswith('#'),
@@ -416,6 +426,7 @@ class VcfParser():
     Note: this method will be called by next(), one line at a time.
     """
     raise NotImplementedError
+
 
 
 class PySamParser(VcfParser):
@@ -692,3 +703,150 @@ class PySamParser(VcfParser):
       calls.append(VariantCall(encoded_name, name, genotype, phaseset, info))
 
     return hom_ref_calls, calls
+
+
+class FileDescriptorProvider:
+    """
+    A cross-platform class that provides a file descriptor for inter-process use.
+    Best used as a context manager (`with` statement) to guarantee cleanup.
+    """
+
+    def __init__(self):
+        # TODO: consider using /dev/shm if available
+        base_dir = tempfile.gettempdir()
+        self._name: str = os.path.join(base_dir, str(uuid.uuid4()))
+        self._temp_file = open(self._name, "w+b")
+
+        self._fd: int = self._temp_file.fileno()
+        self._is_closed: bool = False
+        logging.debug(f"File Descriptor Provider Initialized: File '{self._name}' created, FD={self._fd}")
+
+    @property
+    def fd(self) -> int:
+        """Returns the integer file descriptor, ready for reading per the chosen strategy."""
+        if self._is_closed:
+            raise ValueError("Cannot access fd of a closed provider.")
+        return self._fd
+
+    @property
+    def name(self) -> str:
+        """Returns the full path to the temporary file."""
+        if self._is_closed:
+            raise ValueError("Cannot access name of a closed provider.")
+        return self._name
+
+    def rewind(self):
+        """Rewinds the file cursor to the beginning of the file."""
+        self._temp_file.seek(0, os.SEEK_SET)
+
+    def write_line(self, data: str):
+        """
+        Appends data to the file and resets the read cursor based on the chosen strategy.
+        """
+        if self._is_closed:
+            raise ValueError("Cannot write to a closed provider.")
+        if not isinstance(data, str):
+            raise TypeError("Data must be in str.")
+
+        if not data.endswith("\n"):
+            data += "\n"
+        # Always append to the end of the file
+        self._temp_file.seek(0, os.SEEK_END)
+        bytes_written = self._temp_file.write(data.encode())
+        self._temp_file.flush()
+        self._temp_file.seek(-bytes_written, os.SEEK_END)
+
+    def close(self):
+        """
+        Closes the file handle and deletes the temporary file from the filesystem.
+        """
+        if not self._is_closed:
+            logging.debug(f"Closing File Descriptor Provider: Deleting file '{self._name}' and closing FD={self._fd}.")
+            self._temp_file.close()
+            try:
+                os.remove(self._name)
+            except FileNotFoundError:
+                pass
+            self._is_closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+    
+class PySamParserWithFileStreaming(PySamParser):
+  def __init__(
+    self,
+    file_name,  # type: str
+    range_tracker,  # type: range_trackers.OffsetRangeTracker
+    compression_type,  # type: str
+    allow_malformed_records,  # type: bool
+    file_pattern=None,  # type: str
+    representative_header_lines=None,  # type:  List[str]
+    splittable_bgzf=False,  # type: bool
+    pre_infer_headers=False,  # type: bool
+    sample_name_encoding=SampleNameEncoding.WITHOUT_FILE_PATH,  # type: int
+    use_1_based_coordinate=False,  # type: bool
+    move_hom_ref_calls=False,  # type: bool
+    **kwargs  # type: **str
+    ):
+    # type: (...) -> None
+    super().__init__(file_name=file_name,
+                    range_tracker=range_tracker,
+                    file_pattern=file_pattern,
+                    compression_type=compression_type,
+                    allow_malformed_records=allow_malformed_records,
+                    representative_header_lines=representative_header_lines,
+                    splittable_bgzf=splittable_bgzf,
+                    pre_infer_headers=pre_infer_headers,
+                    sample_name_encoding=sample_name_encoding,
+                    use_1_based_coordinate=use_1_based_coordinate,
+                    move_hom_ref_calls=move_hom_ref_calls,
+                    **kwargs)
+    # These members will be properly initiated in _init_parent_process().
+    self._to_child = None
+    self._original_info_list = None
+    self._process_pid = None
+    self._encoded_sample_names = {}
+
+    self._text_streamer = FileDescriptorProvider()
+    self._vcf_reader = None
+
+  def _init_with_header(self, header_lines):
+    self._header_lines = header_lines
+    ### write header lines to a tmp file then parse it
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        tmp_file.write("\n".join(header_lines).encode())
+        tmp_file_name = tmp_file.name
+    self._original_info_list = libcbcf.VariantFile(tmp_file_name).header.info.keys()
+    self._text_streamer.write_line("\n".join(header_lines))
+
+  def _get_variant(self, data_line):
+    """
+    Parse a single VCF line from a string
+    
+    Args:
+        data_line: Single VCF data line as string
+    
+    Returns:
+        Parsed variant record
+    """
+    self._text_streamer.write_line(data_line)
+    try:
+        # only for the first data line
+        if self._vcf_reader is None:
+            self._text_streamer.rewind()
+            self._vcf_reader = libcbcf.VariantFile(self._text_streamer._temp_file.name, 'r')
+        record = next(iter(self._vcf_reader))
+        variant = self._convert_to_variant(record)
+        return variant
+    except Exception as e:
+        print(f"Error parsing VCF line: {e}")
+        return None
+
+  def send_kill_signal_to_child(self):
+    if self._vcf_reader is not None:
+        self._vcf_reader.close()
+    self._text_streamer.close()
+

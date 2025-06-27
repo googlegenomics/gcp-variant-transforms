@@ -52,10 +52,17 @@ setuptools.setup(
 
     test_suite='nose.collector',
     packages=setuptools.find_packages(),
-    package_data={
-        'gcp_variant_transforms': ['gcp_variant_transforms/testing/testdata/*']
-    },
-
+    install_requires=[
+        'pysam',
+        'avro-python3',
+        'intervaltree',
+        'mmh',
+        'mock',
+        'pyfarmhash',
+        'pyyaml',
+        'nose',
+        'cloudpickle==2.2.1',
+    ],
     cmdclass={
         # Command class instantiated and run during pip install scenarios.
         'build': build,
