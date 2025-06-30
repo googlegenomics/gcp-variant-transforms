@@ -142,7 +142,7 @@ class BGZFBlockSource(textio._TextSource):
     # contains sample info that is unique for `file_name`) to `header_lines`.
     with open_bgzf(file_name) as file_to_read:
       self._process_header(file_to_read, read_buffer)
-    with self.open_file(file_name) as file_to_read:
+    with open_bgzf(file_name) as file_to_read:
       while True:
         record = file_to_read.readline()
         if not record or not record.strip():
@@ -197,15 +197,15 @@ class BGZFBlock(BGZF):
   def _read_data_from_source(self):
     if self._start_offset == self._block.end:
       return b''
-    buf = self._file.raw._downloader.get_range(self._start_offset,
-                                               self._block.end)
+    buf = self._file._blob.download_as_bytes(start=self._start_offset,
+                                             end=self._block.end)
     self._start_offset += len(buf)
     return buf
 
   def _complete_last_line(self):
     # Fetches the first line in the next `self._read_size` bytes.
-    buf = self._file.raw._downloader.get_range(
-        self._block.end, self._block.end + self._read_size)
+    buf = self._file._blob.download_as_bytes(start=self._block.end,
+                                             end=self._block.end + self._read_size)
     self._decompressor = zlib.decompressobj(self._gzip_mask)
     decompressed = self._decompressor.decompress(buf)
     del buf
