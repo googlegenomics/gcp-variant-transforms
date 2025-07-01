@@ -35,6 +35,9 @@ class BgzfBlockTest(unittest.TestCase):
     self.gcs = gcsio.GcsIO(self.client)
     self._file_name = 'gs://bucket/test'
     bucket, name = gcsio.parse_gcs_path(self._file_name)
+    fake_bucket = self.client.create_bucket(bucket)
+    fake_blob = fake_bucket.blob(name)
+    fake_bucket.add_blob(fake_blob)
     self.client.add_file(bucket, name, self._data)
 
   def test_one_gzip_block(self):
