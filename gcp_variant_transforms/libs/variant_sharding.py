@@ -84,7 +84,7 @@ class _ChromosomeSharder():
 
     If no interval is found returns _UNDEFINED_SHARD_INDEX.
     """
-    matched_regions = self._interval_tree.search(pos)
+    matched_regions = self._interval_tree.at(pos)
     # Ensure at most one region is matching to the give position.
     assert len(matched_regions) <= 1
     if len(matched_regions) == 1:
