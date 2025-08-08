@@ -277,12 +277,11 @@ class VcfSourceTest(unittest.TestCase):
   @unittest.skipIf(VCF_FILE_DIR_MISSING, 'VCF test file directory is missing')
   def test_read_single_file_large(self):
     test_data_conifgs = [
-        # {'file': 'valid-4.0.vcf', 'num_records': 5},
-        # {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
-        # {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
-        # {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
-        # {'file': 'valid-4.2.vcf', 'num_records': 13},
-        {'file': 'tmp8nrk3cg7.vcf', 'num_records': 8}
+        {'file': 'valid-4.0.vcf', 'num_records': 5},
+        {'file': 'valid-4.0.vcf.gz', 'num_records': 5},
+        {'file': 'valid-4.0.vcf.bz2', 'num_records': 5},
+        {'file': 'valid-4.1-large.vcf', 'num_records': 9882},
+        {'file': 'valid-4.2.vcf', 'num_records': 13}
     ]
     for config in test_data_conifgs:
       read_data = self._read_records(
