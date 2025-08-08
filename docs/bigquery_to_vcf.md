@@ -21,11 +21,8 @@ Run the script below and replace the following parameters:
   * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
   to process your data, for example: `us-west1`. For more information please refer to
   [Setting Regions](docs/setting_region.md).
-  * `GOOGLE_CLOUD_LOCATION`: You may choose a geographic location for Cloud Life
-  Sciences API to orchestrate job from. This is not where the data will be processed,
-  but where some operation metadata will be stored. This can be the same or different from
-  the region chosen for Cloud Dataflow. If this is not set, the metadata will be stored in
-  us-central1. See the list of [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations).
+  * `GOOGLE_CLOUD_LOCATION`: You may choose a geographic location for Cloud Batch to orchestrate job from. This is not where the data will be processed, but where some operation metadata will be stored. This can be the same or different from
+  the region chosen for Cloud Dataflow. If this is not set, it will use the default value you have configured for `batch/location` in your gcloud CLI (You can see how to set the default location [here](./setting_region.md/#running-jobs-in-a-particular-region)). See the list of [Currently Available Locations](https://cloud.google.com/batch/docs/locations).
   * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
@@ -50,7 +47,7 @@ COMMAND="bq_to_vcf \
   --output_file ${OUTPUT_FILE} \
   --job_name bq-to-vcf \
   --runner DataflowRunner"
-
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \

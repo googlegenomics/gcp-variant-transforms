@@ -58,13 +58,13 @@ class PartitioningTest(unittest.TestCase):
 class FlattenCallColumnTest(unittest.TestCase):
   """Test cases for class `FlattenCallColumn`."""
 
+  @mock.patch('google.cloud.bigquery.Client')
   @mock.patch('gcp_variant_transforms.libs.partitioning_test.partitioning.'
               'FlattenCallColumn._find_one_non_empty_table')
-  def setUp(self, mock_find_non_empty):
-    # We never query this table for running the following test, however, the
-    # mock values are based on this table's schema. In other words:
-    #   mock_columns.return_value = self._flatter._get_column_names()
-    #   mock_sub_fields.return_value = self._flatter._get_call_sub_fields()
+  def setUp(self, mock_find_non_empty, mock_bq_client):
+    # Mock the BigQuery client
+    mock_bq_client.return_value = mock.MagicMock()
+    
     input_base_table = ('gcp-variant-transforms-test:'
                         'bq_to_vcf_integration_tests.'
                         'merge_option_move_to_calls')

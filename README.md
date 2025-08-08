@@ -4,7 +4,7 @@
 
 This is a tool for transforming and processing
 [VCF](https://samtools.github.io/hts-specs/VCFv4.3.pdf) files in a scalable
-manner based on [Apache Beam](https://beam.apache.org/) using 
+manner based on [Apache Beam](https://beam.apache.org/) using
 [Dataflow](https://cloud.google.com/dataflow/) on Google Cloud Platform.
 
 It can be used to directly load VCF files to
@@ -45,6 +45,7 @@ running `gcloud components update` (more details [here](https://cloud.google.com
 
 Use the following command to get the latest version of Variant Transforms.
 ```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 docker pull gcr.io/cloud-lifesciences/gcp-variant-transforms
 ```
 
@@ -56,11 +57,8 @@ Run the script below and replace the following parameters:
   * `GOOGLE_CLOUD_REGION`: You must choose a geographic region for Cloud Dataflow
   to process your data, for example: `us-west1`. For more information please refer to
   [Setting Regions](docs/setting_region.md).
-  * `GOOGLE_CLOUD_LOCATION`: You may choose a geographic location for Cloud Life
-  Sciences API to orchestrate job from. This is not where the data will be processed,
-  but where some operation metadata will be stored. This can be the same or different from
-  the region chosen for Cloud Dataflow. If this is not set, the metadata will be stored in
-  us-central1. See the list of [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations).
+  * `GOOGLE_CLOUD_LOCATION`: You may choose a geographic location for Cloud Batch to orchestrate job from. This is not where the data will be processed,
+  but where some operation metadata will be stored. This can be the same or different from the region chosen for Cloud Dataflow. If this is not set, it will use the default value you have configured for `batch/location` in your gcloud CLI (You can see how to set the default location [here](./setting_region.md/#running-jobs-in-a-particular-region)). See the list of [Currently Available Locations](https://cloud.google.com/batch/docs/locations).
   * `TEMP_LOCATION`: This can be any folder in Google Cloud Storage that your
   project has write access to. It's used to store temporary files and logs
   from the pipeline.
@@ -89,6 +87,7 @@ COMMAND="vcf_to_bq \
   --job_name vcf-to-bigquery \
   --runner DataflowRunner"
 
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 docker run -v ~/.config:/root/.config \
   gcr.io/cloud-lifesciences/gcp-variant-transforms \
   --project "${GOOGLE_CLOUD_PROJECT}" \
@@ -114,10 +113,10 @@ In addition to using the docker image, you may run the pipeline directly from
 source. First install git, python, pip, and virtualenv:
 
 ```bash
-sudo apt-get install -y git python3-pip python3-venv python3.7-venv python-dev build-essential
+sudo apt-get install -y git python3-pip python3-venv python3.12-venv python-dev build-essential
 ```
 
-Note that python 3.8 is not yet supported, so ensure you are using Python 3.7.
+We encourage you to use Python 3.12, as we have upgraded and fully adapted the project to work well with this version.
 
 Run virtualenv, clone the repo, and install pip packages:
 
@@ -180,8 +179,6 @@ details.
 
 ## Additional topics
 
-* [Understanding the BigQuery Variants Table
-  Schema](https://cloud.google.com/life-sciences/docs/how-tos/bigquery-variants-schema)
 * [Loading multiple files](docs/multiple_files.md)
 * [Variant merging](docs/variant_merging.md)
 * [Handling large inputs](docs/large_inputs.md)
@@ -195,4 +192,3 @@ details.
 
 * [Development Guide](docs/development_guide.md)
 * [Release process](docs/release.md)
- 

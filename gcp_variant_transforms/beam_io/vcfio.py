@@ -242,7 +242,6 @@ class _VcfSource(filebasedsource.FileBasedSource):
         move_hom_ref_calls=self._move_hom_ref_calls,
         buffer_size=self._buffer_size,
         skip_header_lines=0)
-
     # Convert iterator to generator to abstract behavior
     for record in record_iterator:
       yield record

@@ -27,7 +27,7 @@ import time
 from collections import namedtuple
 from typing import Dict, List, Optional  # pylint: disable=unused-import
 
-
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 _DEFAULT_IMAGE_NAME = 'gcr.io/cloud-lifesciences/gcp-variant-transforms'
 _DEFAULT_SDK_CONTAINER_IMAGE_NAME = 'gcr.io/cloud-lifesciences/variant-transforms-custom-runner'
 
@@ -130,7 +130,7 @@ class TestRunner():
 
 def form_command(project, region, temp_location, image, sdk_container_image, tool_name, args):
   # type: (str, str, str, str, str, str, List[str]) -> List[str]
-  return ['/opt/gcp_variant_transforms/src/docker/pipelines_runner.sh',
+  return ['/opt/gcp_variant_transforms/src/docker/batch_runner.sh',
           '--project', project,
           '--region', region,
           '--docker_image', image,

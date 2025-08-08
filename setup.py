@@ -14,19 +14,7 @@
 
 """Beam pipelines for processing variants based on VCF files."""
 
-from distutils.command.build import build as _build
-
 import setuptools
-
-
-class build(_build):  # pylint: disable=invalid-name
-  """A build command class that will be invoked during package install.
-
-  The package built using the current setup.py will be staged and later
-  installed in the worker using `pip install package'. This class will be
-  instantiated during install for this specific scenario and will trigger
-  running the custom commands specified.
-  """
 
 
 setuptools.setup(
@@ -35,7 +23,7 @@ setuptools.setup(
     description=('Tool for transforming and processing VCF files in a '
                  'scalable manner based on Apache Beam'),
     author='Google',
-    license='Apache 2.0',
+    license='Apache-2.0',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers for the list
     # of values.
@@ -45,12 +33,10 @@ setuptools.setup(
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: System :: Distributed Computing',
-        'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
     ],
 
-    test_suite='nose.collector',
     packages=setuptools.find_packages(),
     install_requires=[
         'pysam',
@@ -60,11 +46,6 @@ setuptools.setup(
         'mock',
         'pyfarmhash',
         'pyyaml',
-        'nose',
         'cloudpickle==2.2.1',
     ],
-    cmdclass={
-        # Command class instantiated and run during pip install scenarios.
-        'build': build,
-    },
 )

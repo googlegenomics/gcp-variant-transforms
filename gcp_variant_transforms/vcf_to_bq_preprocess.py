@@ -62,6 +62,9 @@ from gcp_variant_transforms.transforms import infer_headers
 from gcp_variant_transforms.transforms import merge_headers
 from gcp_variant_transforms.transforms import merge_header_definitions
 
+from gcp_variant_transforms import helper
+helper.setup_logging()
+
 _COMMAND_LINE_OPTIONS = [variant_transform_options.PreprocessOptions]
 
 

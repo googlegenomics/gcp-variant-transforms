@@ -13,7 +13,7 @@ are located in the same region:
 * Your pipeline's temporary location set by `--temp_location` flag.
 * Your output BigQuery dataset set by `--output_table` flag.
 * Your Dataflow pipeline set by `--region` flag.
-* Your Life Sciences API location set by `--location` flag.
+* Your Cloud Batch location set by `--location` flag.
 
 ## Running jobs in a particular region
 The Dataflow API [requires](https://cloud.google.com/dataflow/docs/guides/specifying-exec-params#configuring-pipelineoptions-for-execution-on-the-cloud-dataflow-service)
@@ -21,23 +21,18 @@ setting a [GCP
 region](https://cloud.google.com/compute/docs/regions-zones/#available) via
 `--region` flag to run.
 
-When running from Docker, the Cloud Life Sciences API is used to spin up a
-worker that launches and monitors the Dataflow job. Cloud Life Sciences API
-is a [regionalized service](https://cloud.google.com/life-sciences/docs/concepts/locations)
-that runs in multiple regions. This is set with the `--location` flag. The
-Life Sciences API location is where metadata about the pipeline's progress
-will be stored, and can be different from the region where the data is
-processed. Note that Cloud Life Sciences API is not available in all regions,
-and if this flag is left out, the metadata will be stored in us-central1. See
-the list of [Currently Available Locations](https://cloud.google.com/life-sciences/docs/concepts/locations).
-
-In addition to this requirment you might also
-choose to run Variant Transforms in a specific region following your project’s
-security and compliance requirements. For example, in order
-to restrict your processing job to europe-west4 (Netherlands), set the region
-and location as follows:
+When running from Docker, Cloud Batch is used to provision a worker VM that runs a user-defined task, such as launching a Dataflow job. Cloud Batch is a regionalized service that runs jobs in specific regions. This is set using the `--location` flag. The location determines where the Batch job will be executed, and where metadata about the job will be stored. Note that Cloud Batch is not available in all regions, and the `--location` flag is required. If the `--location` flag is not set explicitly, the job submission will fail unless you have already configured a default location in your gcloud CLI. In that case, Cloud Batch will use the default location. You can set this default location with the following command:
 
 ```bash
+gcloud config set batch/location YOUR_DEFAULT_LOCATION
+```
+
+See the list of [Currently Available Locations](https://cloud.google.com/batch/docs/locations).
+
+In addition to this requirment you might also choose to run Variant Transforms in a specific region following your project’s security and compliance requirements. For example, in order to restrict your processing job to europe-west4 (Netherlands), set the region and location as follows:
+
+```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -49,7 +44,7 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
 ```
 
 Note that values of `--project`, `--region`, and `--temp_location` flags will be automatically
-passed as `COMMAND` inputs in [`piplines_runner.sh`](docker/pipelines_runner.sh).
+passed as `COMMAND` inputs in [`batch_runner.sh`](docker/batch_runner.sh).
 
 Instead of setting `--region` flag for each run, you can set your default region
 using the following command. In that case, you will not need to set the `--region`
@@ -83,12 +78,11 @@ when you are [creating it](https://cloud.google.com/storage/docs/creating-bucket
 When you create a bucket, you [permanently
 define](https://cloud.google.com/storage/docs/moving-buckets#storage-create-bucket-console)
 its name, its geographic location, and the project it is part of. For an existing bucket, you can check
-[its information](https://cloud.google.com/storage/docs/getting-bucket-information) to find out 
+[its information](https://cloud.google.com/storage/docs/getting-bucket-information) to find out
 about its geographic location.
 
-## Setting BigQuery dataset region 
+## Setting BigQuery dataset region
 
 You can choose the region for the BigQuery dataset at dataset creation time.
 
 ![BigQuery dataset region](images/bigquery_dataset_region.png)
-

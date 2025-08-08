@@ -8,6 +8,7 @@ Specify a subnetwork by using the `--subnetwork` flag and provide the name of th
 
 Example:
 ```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -29,6 +30,7 @@ on the subnet.
 
 Example:
 ```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -39,12 +41,14 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
 ```
 
 ## Custom Dataflow Runner Image
+<!-- TODO: The Docker image must be rebuilt and hosted elsewhere -->
 By default Variant Transforms uses a custom docker image to run the pipeline in: `gcr.io/cloud-lifesciences/variant-transforms-custom-runner:latest`.
 This image contains all the necessary python/linux dependencies needed to run variant transforms so that they are not downloaded from the internet when the pipeline starts.
 
 You can override which container is used by passing a `--sdk_container_image` as in the following example:
 
 ```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -58,6 +62,7 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
 By default the dataflow workers will use the [default compute service account](https://cloud.google.com/compute/docs/access/service-accounts#default_service_account). You can override which service account to use with the `--service_account` flag as in the following example:
 
 ```bash
+# TODO: The Docker image must be rebuilt and hosted elsewhere
 COMMAND="/opt/gcp_variant_transforms/bin/vcf_to_bq ...
 
 docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
@@ -68,5 +73,5 @@ docker run gcr.io/cloud-lifesciences/gcp-variant-transforms \
 ```
 
 **Other Service Account Notes:**
-- The [Life Sciences Service Account is not changable](https://cloud.google.com/life-sciences/docs/troubleshooting#missing_service_account)
+- [Control access for a job using a custom service account](https://cloud.google.com/batch/docs/create-run-job-custom-service-account)
 - The [Dataflow Admin Service Account is not changable](https://cloud.google.com/dataflow/docs/concepts/security-and-permissions#service_account)

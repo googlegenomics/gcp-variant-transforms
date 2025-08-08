@@ -12,3 +12,6 @@ venv3/
 .vscode/
 .coverage
 *.DS_Store
+
+# Secrets
+sa_token.json

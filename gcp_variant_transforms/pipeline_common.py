@@ -80,7 +80,7 @@ def parse_args(argv, command_line_options):
         known_args.input_pattern, known_args.input_file)
 
   # https://github.com/googlegenomics/gcp-variant-transforms/issues/667
-  pipeline_args.extend(['--save_main_session', 'True'])
+  pipeline_args.extend(['--save_main_session', 'true'])
   return known_args, pipeline_args
 
 

@@ -34,10 +34,15 @@ python -m gcp_variant_transforms.vcf_to_bq \
 
 import argparse  # pylint: disable=unused-import
 from datetime import datetime
+import time
 import logging
 import sys
 import tempfile
 from typing import List, Optional  # pylint: disable=unused-import
+from google.cloud import storage, batch_v1
+from google.cloud.batch_v1 import Job, TaskGroup, TaskSpec, Runnable
+from google.cloud.batch_v1.types import AllocationPolicy, ComputeResource, LogsPolicy
+from google.protobuf import duration_pb2
 
 import apache_beam as beam
 from apache_beam import pvalue  # pylint: disable=unused-import
@@ -72,6 +77,9 @@ from gcp_variant_transforms.transforms import merge_variants
 from gcp_variant_transforms.transforms import shard_variants
 from gcp_variant_transforms.transforms import variant_to_avro
 from gcp_variant_transforms.transforms import write_variants_to_shards
+
+from gcp_variant_transforms import helper
+helper.setup_logging()
 
 _COMMAND_LINE_OPTIONS = [
     variant_transform_options.VcfReadOptions,
@@ -439,12 +447,107 @@ def _get_avro_root_path(beam_pipeline_options):
                                       datetime.now().strftime('%Y%m%d_%H%M%S'),
                                       '')
 
+def decompress_gz_files(input_pattern: str, region: str) -> List[str]:
+    gcs_client = storage.Client()
+    bucket_name, prefix = input_pattern.replace("gs://", "").split("/", 1)
+    bucket = gcs_client.get_bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=prefix)
+
+    project_id = gcs_client.project
+
+    batch_client = batch_v1.BatchServiceClient()
+    parent = f"projects/{project_id}/locations/{region}"
+    image_uri = "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+
+    def get_gsuri(blob):
+        return f"gs://{bucket_name}/{blob.name}"
+
+    list_decompressed_patterns = []
+    for blob in blobs:
+        if blob.name.endswith(".gz"):
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            job_id = f"decompress-vcf-gz-file-{timestamp}" # Must match [a-z]([-a-z0-9]{0,62}[a-z0-9])?
+
+            local_gz_path = "/tmp/" + blob.name.split("/")[-1]
+            local_decompressed_path = local_gz_path[:-3]
+            destination_blob_name = (
+                blob.name[:-7]
+                + f'_decompressed_{timestamp}.vcf'
+            )
+
+            command = f"""
+            set -e &&
+            gsutil cp {get_gsuri(blob)} {local_gz_path} 2>&1 &&
+            gunzip -c {local_gz_path} > {local_decompressed_path} 2>&1 &&
+            gsutil cp {local_decompressed_path} {get_gsuri(bucket.blob(destination_blob_name))} 2>&1 &&
+            echo "Decompressed {blob.name} to {destination_blob_name}"
+            """
+            runnable = Runnable(
+              container=Runnable.Container(
+                  image_uri=image_uri,
+                  commands=["bash", "-c", command]
+              )
+            )
+            task_spec = TaskSpec(
+                runnables=[runnable],
+                compute_resource=ComputeResource(cpu_milli=1000, memory_mib=1024),
+                max_run_duration=duration_pb2.Duration(seconds=3600),
+            )
+            task_group = TaskGroup(task_spec=task_spec, task_count=1)
+            allocation_policy = AllocationPolicy(
+                instances=[
+                    AllocationPolicy.InstancePolicyOrTemplate(
+                        policy=AllocationPolicy.InstancePolicy(machine_type="e2-medium")
+                    )
+                ]
+            )
+            logs_policy = LogsPolicy(
+                destination=LogsPolicy.Destination.CLOUD_LOGGING
+            )
+
+            job = Job(
+                task_groups=[task_group],
+                allocation_policy=allocation_policy,
+                logs_policy=logs_policy,
+                labels={"job": "gcs-unzip-vcf-gz-file"},
+            )
+
+            response = batch_client.create_job(parent=parent, job=job, job_id=job_id)
+            logging.info("Decompressing %s in batch job %s", blob.name, job_id)
+
+            # Wait for the job to complete
+            job_response = batch_client.get_job(name=response.name)
+            while True:
+                if job_response.status.state == batch_v1.JobStatus.State.SUCCEEDED:
+                    break
+                if job_response.status.state == batch_v1.JobStatus.State.FAILED:
+                    raise RuntimeError(f"Batch job {job_id} failed")
+
+                logging.info("Waiting for batch job %s to complete...", job_id)
+                time.sleep(10)
+                job_response = batch_client.get_job(name=response.name)
+
+            logging.info("Decompressed %s to %s", blob.name, destination_blob_name)
+            blob = bucket.blob(destination_blob_name)
+
+        if blob.name.endswith(".tbi"):
+            logging.info("Skipping index file: %s", blob.name)
+        else:
+            list_decompressed_patterns.append(get_gsuri(blob))
+
+    return list_decompressed_patterns
+
+
 def run(argv=None):
   # type: (List[str]) -> None
   """Runs VCF to BigQuery pipeline."""
   logging.info('Command: %s', ' '.join(argv or sys.argv))
   known_args, pipeline_args = pipeline_common.parse_args(argv,
                                                          _COMMAND_LINE_OPTIONS)
+
+  if any('.gz' in pattern for pattern in known_args.all_patterns):
+      all_patterns_handler = sum([decompress_gz_files(pattern, known_args.location) for pattern in known_args.all_patterns], [])
+      known_args.all_patterns = all_patterns_handler
 
   if known_args.auto_flags_experiment:
     _get_input_dimensions(known_args, pipeline_args)
@@ -714,7 +817,7 @@ def run(argv=None):
                  avro_root_path)
     raise e
   else:
-    logging.warning('All AVRO files were successfully loaded to BigQuery.')
+    logging.info('All AVRO files were successfully loaded to BigQuery.')
     if known_args.keep_intermediate_avro_files:
       logging.info('Since "--keep_intermediate_avro_files" flag is set, the '
                    'AVRO files are kept and stored at: %s', avro_root_path)
