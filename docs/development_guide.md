@@ -41,10 +41,10 @@ git remote add upstream git@github.com:googlegenomics/gcp-variant-transforms.git
 
 #### Setup virtualenv
 
-Ensure you are using Python 3.7 version, since Apache Beam does not support 3.8.
+We encourage you to use Python 3.12, as we have upgraded and fully adapted the project to work well with this version.
 
 ```bash
-sudo apt-get install python3-pip python3-venv python3.7-venv python-dev build-essential
+sudo apt-get install python3-pip python3-venv python3.12-venv python-dev build-essential
 python3 -m venv venv3
 . venv3/bin/activate
 ```
@@ -102,7 +102,7 @@ checked into the git repository and can be imported into
 File | Settings | Editor | Inspections.
 
 Code inspections can be run from the Analyze menu. To speed up the inspection
-process, you can go to File | Project Structure | Modules and only set the 
+process, you can go to File | Project Structure | Modules and only set the
 gcp_variant_transforms as the Sources. You may exclude other folders, or specify
 the inspection scope to be only Module 'gcp-variant-transforms' when running
 the inspection. The result window can be accessed from View > Tool Windows.

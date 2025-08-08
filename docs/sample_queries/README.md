@@ -10,6 +10,7 @@ users to send us their queries so we can share them here with all other
 researchers. Please feel free to [submit an issue](https://github.com/googlegenomics/gcp-variant-transforms/issues)
 or contact us via our public mailing list
 [gcp-life-sciences-discuss@googlegroups.com](mailto:gcp-life-sciences-discuss@googlegroups.com).
+<!-- TODO: Change this email -->
 
 ## Genome Aggregation Database (gnomAD)
 

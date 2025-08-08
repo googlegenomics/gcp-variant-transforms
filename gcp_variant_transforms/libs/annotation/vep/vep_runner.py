@@ -19,6 +19,7 @@ import logging
 import time
 import json
 from typing import Any, Dict, List, Optional  # pylint: disable=unused-import
+import math
 
 from apache_beam.io import filesystem  # pylint: disable=unused-import
 from apache_beam.io import filesystems
@@ -61,7 +62,7 @@ _VEP_RUN_SCRIPT = "/opt/variant_effect_predictor/run_vep.sh"
 _WATCHDOG_RUNNER_SCRIPT = "/opt/variant_effect_predictor/run_script_with_watchdog.sh"
 # The local name of the output file and directory for VEP runs.
 _LOCAL_OUTPUT_DIR = "/mnt/disks/vep/output_files"
-_LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + "/output.vcf"
+_LOCAL_OUTPUT_FILE = _LOCAL_OUTPUT_DIR + "/{}_vep_output.vcf"
 
 # The time between operation polling rounds.
 _POLLING_INTERVAL_SECONDS = 30
@@ -107,6 +108,7 @@ def create_runner(
         pipeline_args,
         watchdog_file,
         watchdog_file_update_interval_seconds,
+        known_args.number_of_runnables_per_job
     )
     return runner
 
@@ -133,6 +135,7 @@ class VepRunner:
         pipeline_args,  # type: List[str]
         watchdog_file,  # type: Optional[str]
         watchdog_file_update_interval_seconds,  # type: int
+        number_of_runnables_per_job # type: int
     ):
         # type: (...) -> None
         """Constructs an instance for running VEP.
@@ -176,6 +179,7 @@ class VepRunner:
         self._operation_name_to_io_infos = {}
         self._operation_name_to_logs = {}
         self._max_num_workers = 10
+        self._number_of_runnables_per_job = number_of_runnables_per_job
 
     def _make_vep_cache_path(self, vep_cache_path):
         # type: (str) -> str
@@ -428,6 +432,23 @@ class VepRunner:
             return "Job failed without detailed error."
         return ""
 
+    def _calculate_chunk_size(self, list_file: List) -> List:
+        """ Calculates the chunk size for the input files.
+        The input files are split into chunks of size
+        Args:
+            list_file (list): List of input files to be processed.
+
+        Returns:
+            List: List of chunks, each containing a subset of the input files.
+        """
+        ceil = int(math.ceil(len(list_file) / self._number_of_runnables_per_job))
+        chunks = [
+            list_file[i * self._number_of_runnables_per_job : (i + 1) * self._number_of_runnables_per_job]
+            for i in range(0, ceil)
+        ]
+
+        return chunks
+
     def run_on_all_files(self):
         # type: () -> None
         """Runs VEP on all input files.
@@ -450,22 +471,47 @@ class VepRunner:
                 "No files matched input_pattern: {}".format(self._input_pattern)
             )
         logging.info("Number of files: %d", len(match_results[0].metadata_list))
-        vm_io_info = vep_runner_util.get_all_vm_io_info(
-            match_results[0].metadata_list, self._output_dir, self._max_num_workers
-        )
-        for vm_index, io_info in enumerate(vm_io_info):
-            output_log_path = self._get_output_log_path(self._output_dir, vm_index)
-            operation_name = self._call_pipelines_api(io_info)
-            self._operation_name_to_io_infos.update({operation_name: io_info})
-            self._operation_name_to_logs.update({operation_name: output_log_path})
 
-            logging.info(
-                "Started operation %s on VM %d processing %d input files",
-                operation_name,
-                vm_index,
-                len(io_info.io_map),
+        chunks = self._calculate_chunk_size(match_results[0].metadata_list)
+        logging.info("Found %d chunks of files to process, each with at most %d files.", len(chunks), self._number_of_runnables_per_job)
+
+        for i, chunk in enumerate(chunks):
+            logging.info("Chunk %d/%d: %d files", i + 1, len(chunks), len(chunk))
+            vm_io_info = vep_runner_util.get_all_vm_io_info(
+                chunk, self._output_dir, self._max_num_workers
             )
-            self._running_operation_ids.append(operation_name)
+
+            for vm_index, io_info in enumerate(vm_io_info):
+                output_log_path = self._get_output_log_path(self._output_dir, vm_index)
+                operation_name = self._call_pipelines_api(io_info)
+                self._operation_name_to_io_infos.update({operation_name: io_info})
+                self._operation_name_to_logs.update({operation_name: output_log_path})
+
+                logging.info(
+                    "Started operation %s on VM %d processing %d input files",
+                    operation_name,
+                    vm_index,
+                    len(io_info.io_map),
+                )
+                self._running_operation_ids.append(operation_name)
+
+
+        # vm_io_info = vep_runner_util.get_all_vm_io_info(
+        #     match_results[0].metadata_list, self._output_dir, self._max_num_workers
+        # )
+        # for vm_index, io_info in enumerate(vm_io_info):
+        #     output_log_path = self._get_output_log_path(self._output_dir, vm_index)
+        #     operation_name = self._call_pipelines_api(io_info)
+        #     self._operation_name_to_io_infos.update({operation_name: io_info})
+        #     self._operation_name_to_logs.update({operation_name: output_log_path})
+
+        #     logging.info(
+        #         "Started operation %s on VM %d processing %d input files",
+        #         operation_name,
+        #         vm_index,
+        #         len(io_info.io_map),
+        #     )
+        #     self._running_operation_ids.append(operation_name)
 
     def _call_pipelines_api(self, io_infos):
         # type: (vep_runner_util.SingleWorkerActions, str) -> str
@@ -474,10 +520,10 @@ class VepRunner:
         api_request["allocationPolicy"]["instances"][0]["policy"]["disks"][0][
             "newDisk"
         ]["sizeGb"] = (size_gb + _MINIMUM_DISK_SIZE_GB)
-        for input_file, output_file in io_infos.io_map.items():
-            api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].extend(
-                self._create_runnables(input_file, output_file)
-            )
+
+        api_request[_API_TASKGROUPS][0][_API_TASKSPEC][_API_RUNNABLES].extend(
+            self._create_runnables(io_infos)
+        )
 
         # pylint: disable=no-member
         parent = "projects/{}/locations/{}".format(self._project, self._location)
@@ -512,37 +558,46 @@ class VepRunner:
         log_filename = "output_VM_{}.log".format(vm_index)
         return filesystems.FileSystems.join(output_dir, "logs", log_filename)
 
-    def _create_runnables(self, input_file: str, output_file: str) -> list:
+    def _create_runnables(self, io_infos) -> list:
         """Creates a list of Batch v1 `runnables` for processing one input/output pair."""
-        base_input = _get_base_name(input_file)
-        local_input_file = "/mnt/disks/vep/{}".format(_get_base_name(input_file))
-        print(local_input_file)
+        local_input_dir = "/mnt/disks/vep/"
+        input_path = self._input_pattern.rstrip("**")
+        vep_output_dir = f"{self._output_dir}/{input_path.replace('gs://', '', 1)}"
         runnables = []
 
+        # Copy the input file to the local disk of the VM.
         runnables.append(
             self._make_runnable(
                 _GSUTIL_IMAGE,
                 "sh",
                 "-c",
-                f"gsutil cp {input_file} {local_input_file} 2>&1",
+                f"gsutil -m rsync -r {input_path} {local_input_dir} 2>&1",
             )
         )
 
+        # Remove the output directory if it exists.
+        # This is needed to ensure that the output directory is empty before
+        # running VEP.
         runnables.append(
             self._make_runnable(
                 self._vep_image_uri, "rm", "-r", "-f", _LOCAL_OUTPUT_DIR
             )
         )
-        # TODO(nhon): Add watchdog
-        runnables.append(
-            self._make_runnable(
-                self._vep_image_uri,
-                _VEP_RUN_SCRIPT,
-                local_input_file,
-                _LOCAL_OUTPUT_FILE,
-            )
-        )
 
+        # Run VEP
+        for input_file, output_file in io_infos.io_map.items():
+            base_input = "/".join(input_file.split("/")[-2:])
+            local_output_file = _LOCAL_OUTPUT_FILE.format(base_input)
+            runnables.append(
+                self._make_runnable(
+                    self._vep_image_uri,
+                    _VEP_RUN_SCRIPT,
+                    local_input_dir + base_input,
+                    local_output_file,
+                )
+            )
+
+        # TODO(nhon): Add watchdog
         # if self._watchdog_file:
         #     runnables.append(self._make_runnable(
         #         self._vep_image_uri,
@@ -561,12 +616,13 @@ class VepRunner:
         #         _LOCAL_OUTPUT_FILE
         #     ))
 
+        # Copy the output file to the output directory.
         runnables.append(
             self._make_runnable(
                 _GSUTIL_IMAGE,
                 "sh",
                 "-c",
-                f"gsutil cp {_LOCAL_OUTPUT_FILE} {output_file} 2>&1",
+                f"gsutil -m rsync -r -x \".*_vep_output\.vcf_summary.html$\" {_LOCAL_OUTPUT_DIR} {vep_output_dir} 2>&1",
             )
         )
 

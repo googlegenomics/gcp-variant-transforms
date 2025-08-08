@@ -79,10 +79,10 @@ function main {
   # If missing, we will try to find the default values.
   google_cloud_project="${google_cloud_project:-$(gcloud config get-value project)}"
   region="${region:-$(gcloud config get-value compute/region)}"
+  location="${location:-$(gcloud config get-value batch/location)}"
   vt_docker_image="${vt_docker_image:-us-east1-docker.pkg.dev/variant-transform-dxt/dxt-public-variant-transform/batch-runner:latest}"
 
   sdk_container_image="${sdk_container_image:-}"
-  location="${location:-}"
   temp_location="${temp_location:-}"
   subnetwork="${subnetwork:-}"
   use_public_ips="${use_public_ips:-}"
@@ -113,7 +113,7 @@ function main {
   # Build Dataflow required args based on `docker run ...` inputs.
   df_required_args="--project ${google_cloud_project} --region ${region} --temp_location ${temp_location}"
 
-  # Build up optional args for pipelines-tools and Dataflow, if they are provided.
+  # Build up optional args for Batch Job and Dataflow, if they are provided.
   pt_optional_args=""
   df_optional_args=""
 

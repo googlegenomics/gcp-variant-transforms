@@ -315,6 +315,7 @@ class AnnotationOptions(VariantTransformsOptions):
   _OUTPUT_DIR_FLAG = 'annotation_output_dir'
   _VEP_IMAGE_FLAG = 'vep_image_uri'
   _VEP_CACHE_FLAG = 'vep_cache_path'
+  _NUM_RUNNABLES_PER_JOB = 'number_of_runnables_per_job'
 
   def add_arguments(self, parser):
     # type: (argparse.ArgumentParser) -> None
@@ -369,7 +370,7 @@ class AnnotationOptions(VariantTransformsOptions):
               'process of running VEP pipelines.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_IMAGE_FLAG,
-        default='gcr.io/cloud-lifesciences/vep:104',
+        default='gcr.io/cloud-lifesciences/vep:104', # TODO: The Docker image must be rebuilt and hosted elsewhere
         help=('The URI of the latest docker image for VEP.'))
     parser.add_argument(
         '--' + AnnotationOptions._VEP_CACHE_FLAG,
@@ -434,8 +435,17 @@ class AnnotationOptions(VariantTransformsOptions):
     parser.add_argument(
         '--location',
         default='us-central1',
-        help=('The location in which to call Life Sciences API which will '
+        help=('The location in which to call Cloud Batch which will '
               'start the vep_runner.'))
+    parser.add_argument(
+      '--' + AnnotationOptions._NUM_RUNNABLES_PER_JOB,
+      type=int, default=95,
+      help=('The maximum number of runnables (e.g. VEP jobs) to create per job. '
+          'The batch system only supports a maximum of 100 runnables per job, '
+          'so this flag cannot be set higher than 95. This ensures that there '
+          'are always 5 runnables reserved for system cycles. You may change this '
+          'flag to a smaller value if you have a dataset with a lot of samples.'))
+
 
   def validate(self, parsed_args):
     # type: (argparse.Namespace) -> None
@@ -453,6 +463,11 @@ class AnnotationOptions(VariantTransformsOptions):
       if vep_cache and not vep_cache.startswith('gs://'):
         raise ValueError('Flag {} should start with gs://, got {}'.format(
             AnnotationOptions._VEP_CACHE_FLAG, vep_cache))
+      if not 1 <= args_dict[AnnotationOptions._NUM_RUNNABLES_PER_JOB] <= 95:
+        # 100 is the maximum number of runnables per job in Dataflow.
+        # we limit it to 95 becasuse we reserve 5 for fixed steps to use.
+        raise ValueError('Flag --{} must be between 1 and 95'.format(
+            AnnotationOptions._NUM_RUNNABLES_PER_JOB))
 
 
 class FilterOptions(VariantTransformsOptions):

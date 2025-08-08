@@ -24,6 +24,7 @@ This class has 2 main operating modes:
      available at gcp_variant_transforms/testing/data/misc/*.yaml
 """
 
+import logging
 
 from collections import defaultdict
 import re
@@ -84,7 +85,7 @@ class _ChromosomeSharder():
 
     If no interval is found returns _UNDEFINED_SHARD_INDEX.
     """
-    matched_regions = self._interval_tree.search(pos)
+    matched_regions = self._interval_tree.at(pos)
     # Ensure at most one region is matching to the give position.
     assert len(matched_regions) <= 1
     if len(matched_regions) == 1:
@@ -277,6 +278,7 @@ class VariantSharding():
       shard_index = self._region_to_shard.get(chrom, _UNDEFINED_SHARD_INDEX)
 
     if shard_index == _UNDEFINED_SHARD_INDEX:
+      logging.warning(f"Position {pos} on chromosome {chrom} left as residual because it is not defined in any region in the sharding config")
       return self._residual_index
     else:
       return shard_index
