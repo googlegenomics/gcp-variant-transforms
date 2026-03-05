@@ -33,4 +33,3 @@ consistent across all VCF files, or else pipeline fails by default.
 However, Variant Transforms pipeline is able to handle such malformed files if
 instructed to do so. See [Dealing with malformed files](./malformed_files.md)
 for more details.
-

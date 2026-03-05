@@ -45,8 +45,8 @@ _GLOBAL_LOG_FILE = 'VEP_run_info.log'
 _API_PIPELINE = 'pipeline'
 _API_ACTIONS = 'actions'
 
-# The following image wraps gsutil with additional retry logic.
-_GSUTIL_IMAGE = 'gcr.io/cloud-genomics-pipelines/io'
+# The gcloud image.
+_GCLOUD_IMAGE = 'gcr.io/cloud-builders/gcloud'
 # The expected path of the run_vep.sh script in the docker container.
 _VEP_RUN_SCRIPT = '/opt/variant_effect_predictor/run_vep.sh'
 
@@ -181,7 +181,7 @@ class VepRunner():
             _API_ACTIONS: [
                 self._make_action(self._vep_image_uri, 'mkdir', '-p',
                                   '/mnt/vep/vep_cache'),
-                self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
+                self._make_action(_GCLOUD_IMAGE, 'storage', 'cp',
                                   self._vep_cache_path, '/mnt/vep/vep_cache/')
             ],
             'environment': {
@@ -404,7 +404,7 @@ class VepRunner():
       api_request[_API_PIPELINE][_API_ACTIONS].extend(
           self._create_actions(input_file, output_file))
     api_request[_API_PIPELINE][_API_ACTIONS].append(
-        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
+        self._make_action(_GCLOUD_IMAGE, 'storage', 'cp',
                           '/google/logs/output',
                           output_log_path))
     # pylint: disable=no-member
@@ -452,14 +452,14 @@ class VepRunner():
                                  local_input_file,
                                  _LOCAL_OUTPUT_FILE)
     return [
-        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp', input_file,
+        self._make_action(_GCLOUD_IMAGE, 'storage', 'cp', input_file,
                           local_input_file),
         self._make_action(self._vep_image_uri, 'rm', '-r', '-f',
                           _LOCAL_OUTPUT_DIR),
         action,
         # TODO(bashir2): When the output files are local, the output directory
-        # structure should be created as well otherwise gsutil fails.
-        self._make_action(_GSUTIL_IMAGE, 'gsutil', '-q', 'cp',
+        # structure should be created as well otherwise gcloud storage fails.
+        self._make_action(_GCLOUD_IMAGE, 'storage', 'cp',
                           _LOCAL_OUTPUT_FILE, output_file)]
 
 

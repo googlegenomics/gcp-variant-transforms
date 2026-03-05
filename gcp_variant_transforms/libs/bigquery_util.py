@@ -34,7 +34,7 @@ _VcfHeaderTypeConstants = vcf_header_io.VcfHeaderFieldTypeConstants
 TABLE_SUFFIX_SEPARATOR = '__'
 
 _BQ_DELETE_TABLE_COMMAND = 'bq rm -f -t {FULL_TABLE_ID}'
-_GCS_DELETE_FILES_COMMAND = 'gsutil -m rm -f -R {ROOT_PATH}'
+_GCS_DELETE_FILES_COMMAND = 'gcloud storage rm --continue-on-error --recursive {ROOT_PATH}'
 BQ_NUM_RETRIES = 5
 
 
